@@ -26,27 +26,6 @@ struct DeviceSupportContext final
     double fixed_step_seconds {0.0};
 };
 
-template <typename Fn>
-Gs1Status with_device_support_context(
-    gs1::RuntimeInvocation& invocation,
-    Fn&& fn,
-    bool missing_context_is_ok = false)
-{
-    auto access = gs1::make_game_state_access<gs1::DeviceSupportSystem>(invocation);
-    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<gs1::RuntimeFixedStepSecondsTag>();
-    if (!site_run.has_value())
-    {
-        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
-    }
-
-    DeviceSupportContext context {
-        *site_run,
-        gs1::SiteWorldAccess<gs1::DeviceSupportSystem> {*site_run},
-        fixed_step_seconds};
-    return fn(context);
-}
-
 Gs1Status process_message(
     DeviceSupportContext& context,
     const gs1::GameMessage& message)
@@ -165,36 +144,44 @@ Gs1Status DeviceSupportSystem::process_game_message(
     const GameMessage& message)
 {
     auto access = make_game_state_access<DeviceSupportSystem>(invocation);
-    (void)access;
-    return with_device_support_context(
-        invocation,
-        [&](DeviceSupportContext& context) -> Gs1Status
-        {
-            return process_message(context, message);
-        });
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    DeviceSupportContext context {
+        *site_run,
+        SiteWorldAccess<DeviceSupportSystem> {*site_run},
+        fixed_step_seconds};
+    return process_message(context, message);
 }
 
 Gs1Status DeviceSupportSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto access = make_game_state_access<DeviceSupportSystem>(invocation);
-    (void)access;
     (void)message;
+    (void)invocation;
     return GS1_STATUS_OK;
 }
 
 void DeviceSupportSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<DeviceSupportSystem>(invocation);
-    (void)access;
-    (void)with_device_support_context(
-        invocation,
-        [&](DeviceSupportContext& context) -> Gs1Status
-        {
-            run_context(context);
-            return GS1_STATUS_OK;
-        });
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!site_run.has_value())
+    {
+        return;
+    }
+
+    DeviceSupportContext context {
+        *site_run,
+        SiteWorldAccess<DeviceSupportSystem> {*site_run},
+        fixed_step_seconds};
+    run_context(context);
 }
 }  // namespace gs1
 

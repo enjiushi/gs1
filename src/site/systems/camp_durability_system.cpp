@@ -20,28 +20,6 @@ struct CampDurabilityContext final
     double fixed_step_seconds {0.0};
 };
 
-template <typename Fn>
-Gs1Status with_camp_durability_context(
-    RuntimeInvocation& invocation,
-    Fn&& fn,
-    bool missing_context_is_ok = false)
-{
-    auto access = make_game_state_access<CampDurabilitySystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    if (!site_run.has_value())
-    {
-        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
-    }
-
-    CampDurabilityContext context {
-        *site_run,
-        SiteWorldAccess<CampDurabilitySystem> {*site_run},
-        invocation.game_message_queue(),
-        fixed_step_seconds};
-    return fn(context);
-}
-
 struct CampDurabilityMemory final
 {
     std::optional<SiteRunId> site_run_id {};
@@ -154,81 +132,91 @@ Gs1Status CampDurabilitySystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<CampDurabilitySystem>(invocation);
-    (void)access;
     if (message.type != GameMessageType::SiteRunStarted)
     {
         return GS1_STATUS_OK;
     }
 
-    return with_camp_durability_context(
-        invocation,
-        [&](CampDurabilityContext& context) -> Gs1Status
-        {
-            auto& camp = context.world.own_camp();
-            camp.camp_durability = camp_durability_tuning().durability_max;
-            camp.camp_protection_resolved = true;
-            camp.delivery_point_operational = true;
-            camp.shared_storage_access_enabled = true;
-            refresh_memory_with_current_state(context);
-            return GS1_STATUS_OK;
-        });
+    auto access = make_game_state_access<CampDurabilitySystem>(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    CampDurabilityContext context {
+        *site_run,
+        SiteWorldAccess<CampDurabilitySystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds};
+    auto& camp = context.world.own_camp();
+    camp.camp_durability = camp_durability_tuning().durability_max;
+    camp.camp_protection_resolved = true;
+    camp.delivery_point_operational = true;
+    camp.shared_storage_access_enabled = true;
+    refresh_memory_with_current_state(context);
+    return GS1_STATUS_OK;
 }
 
 Gs1Status CampDurabilitySystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto access = make_game_state_access<CampDurabilitySystem>(invocation);
-    (void)access;
     (void)message;
+    (void)invocation;
     return GS1_STATUS_OK;
 }
 
 void CampDurabilitySystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<CampDurabilitySystem>(invocation);
-    (void)access;
-    (void)with_camp_durability_context(
-        invocation,
-        [&](CampDurabilityContext& context) -> Gs1Status
-        {
-            ensure_memory_for_run(context);
-            if (context.fixed_step_seconds <= 0.0)
-            {
-                return GS1_STATUS_OK;
-            }
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!site_run.has_value())
+    {
+        return;
+    }
 
-            auto& camp = context.world.own_camp();
-            const auto& tuning = camp_durability_tuning();
-            const auto step_seconds = static_cast<float>(context.fixed_step_seconds);
-            const float wear_rate_per_second =
-                tuning.base_wear_per_second +
-                compute_weather_intensity(context.world.read_weather()) * tuning.weather_wear_scale +
-                (tuning.event_timeline_wear_per_second *
-                    compute_event_pressure_ratio(context.world.read_event()));
-            const float wear_amount = wear_rate_per_second * step_seconds;
-            const float previous = camp.camp_durability;
-            camp.camp_durability =
-                std::clamp(previous - wear_amount, 0.0f, tuning.durability_max);
+    CampDurabilityContext context {
+        *site_run,
+        SiteWorldAccess<CampDurabilitySystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds};
+    ensure_memory_for_run(context);
+    if (context.fixed_step_seconds <= 0.0)
+    {
+        return;
+    }
 
-            const float durability = camp.camp_durability;
-            const bool protection_resolved = durability >= tuning.protection_threshold;
-            const bool delivery_operational = durability >= tuning.delivery_threshold;
-            const bool shared_storage_access_enabled = durability >= tuning.shared_storage_threshold;
+    auto& camp = context.world.own_camp();
+    const auto& tuning = camp_durability_tuning();
+    const auto step_seconds = static_cast<float>(context.fixed_step_seconds);
+    const float wear_rate_per_second =
+        tuning.base_wear_per_second +
+        compute_weather_intensity(context.world.read_weather()) * tuning.weather_wear_scale +
+        (tuning.event_timeline_wear_per_second *
+            compute_event_pressure_ratio(context.world.read_event()));
+    const float wear_amount = wear_rate_per_second * step_seconds;
+    const float previous = camp.camp_durability;
+    camp.camp_durability =
+        std::clamp(previous - wear_amount, 0.0f, tuning.durability_max);
 
-            camp.camp_protection_resolved = protection_resolved;
-            camp.delivery_point_operational = delivery_operational;
-            camp.shared_storage_access_enabled = shared_storage_access_enabled;
+    const float durability = camp.camp_durability;
+    const bool protection_resolved = durability >= tuning.protection_threshold;
+    const bool delivery_operational = durability >= tuning.delivery_threshold;
+    const bool shared_storage_access_enabled = durability >= tuning.shared_storage_threshold;
 
-            apply_projection_if_needed(
-                context,
-                durability,
-                protection_resolved,
-                delivery_operational,
-                shared_storage_access_enabled);
-            return GS1_STATUS_OK;
-        });
+    camp.camp_protection_resolved = protection_resolved;
+    camp.delivery_point_operational = delivery_operational;
+    camp.shared_storage_access_enabled = shared_storage_access_enabled;
+
+    apply_projection_if_needed(
+        context,
+        durability,
+        protection_resolved,
+        delivery_operational,
+        shared_storage_access_enabled);
 }
 }  // namespace gs1
 

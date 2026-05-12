@@ -30,28 +30,6 @@ struct DeviceMaintenanceContext final
     double fixed_step_seconds {0.0};
 };
 
-template <typename Fn>
-Gs1Status with_device_maintenance_context(
-    gs1::RuntimeInvocation& invocation,
-    Fn&& fn,
-    bool missing_context_is_ok = false)
-{
-    auto access = gs1::make_game_state_access<gs1::DeviceMaintenanceSystem>(invocation);
-    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<gs1::RuntimeFixedStepSecondsTag>();
-    if (!site_run.has_value())
-    {
-        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
-    }
-
-    DeviceMaintenanceContext context {
-        *site_run,
-        gs1::SiteWorldAccess<gs1::DeviceMaintenanceSystem> {*site_run},
-        invocation.game_message_queue(),
-        fixed_step_seconds};
-    return fn(context);
-}
-
 struct BrokenDeviceEntry final
 {
     gs1::TileCoord coord {};
@@ -365,36 +343,46 @@ Gs1Status DeviceMaintenanceSystem::process_game_message(
     const GameMessage& message)
 {
     auto access = make_game_state_access<DeviceMaintenanceSystem>(invocation);
-    (void)access;
-    return with_device_maintenance_context(
-        invocation,
-        [&](DeviceMaintenanceContext& context) -> Gs1Status
-        {
-            return process_message(context, message);
-        });
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    DeviceMaintenanceContext context {
+        *site_run,
+        SiteWorldAccess<DeviceMaintenanceSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds};
+    return process_message(context, message);
 }
 
 Gs1Status DeviceMaintenanceSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto access = make_game_state_access<DeviceMaintenanceSystem>(invocation);
-    (void)access;
     (void)message;
+    (void)invocation;
     return GS1_STATUS_OK;
 }
 
 void DeviceMaintenanceSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<DeviceMaintenanceSystem>(invocation);
-    (void)access;
-    (void)with_device_maintenance_context(
-        invocation,
-        [&](DeviceMaintenanceContext& context) -> Gs1Status
-        {
-            run_context(context);
-            return GS1_STATUS_OK;
-        });
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!site_run.has_value())
+    {
+        return;
+    }
+
+    DeviceMaintenanceContext context {
+        *site_run,
+        SiteWorldAccess<DeviceMaintenanceSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds};
+    run_context(context);
 }
 }  // namespace gs1
 

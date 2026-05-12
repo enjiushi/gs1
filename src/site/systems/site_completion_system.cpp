@@ -19,25 +19,6 @@ struct SiteCompletionContext final
     GameMessageQueue& message_queue;
 };
 
-template <typename Fn>
-Gs1Status with_site_completion_context(
-    RuntimeInvocation& invocation,
-    Fn&& fn,
-    bool missing_context_is_ok = false)
-{
-    auto access = make_game_state_access<SiteCompletionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
-    }
-
-    SiteCompletionContext context {
-        SiteWorldAccess<SiteCompletionSystem> {*site_run},
-        invocation.game_message_queue()};
-    return fn(context);
-}
-
 constexpr float k_objective_progress_epsilon = 0.0001f;
 
 bool has_pending_site_transition_message(
@@ -309,8 +290,7 @@ Gs1Status SiteCompletionSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<SiteCompletionSystem>(invocation);
-    (void)access;
+    (void)invocation;
     (void)message;
     return GS1_STATUS_OK;
 }
@@ -319,8 +299,7 @@ Gs1Status SiteCompletionSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto access = make_game_state_access<SiteCompletionSystem>(invocation);
-    (void)access;
+    (void)invocation;
     (void)message;
     return GS1_STATUS_OK;
 }
@@ -328,122 +307,125 @@ Gs1Status SiteCompletionSystem::process_host_message(
 void SiteCompletionSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<SiteCompletionSystem>(invocation);
-    (void)access;
-    (void)with_site_completion_context(
-        invocation,
-        [&](SiteCompletionContext& context) -> Gs1Status
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return;
+    }
+
+    SiteCompletionContext context {
+        SiteWorldAccess<SiteCompletionSystem> {*site_run},
+        invocation.game_message_queue()};
+    const auto& counters = context.world.read_counters();
+    const auto& objective = context.world.read_objective();
+    const auto& clock = context.world.read_time();
+    if (context.world.run_status() != SiteRunStatus::Active ||
+        has_pending_site_transition_message(
+            context.message_queue,
+            context.world.site_id_value()))
+    {
+        return;
+    }
+
+    switch (objective.type)
+    {
+    case SiteObjectiveType::DenseRestoration:
+        if (counters.site_completion_tile_threshold == 0U ||
+            counters.fully_grown_tile_count < counters.site_completion_tile_threshold)
         {
-            const auto& counters = context.world.read_counters();
-            const auto& objective = context.world.read_objective();
-            const auto& clock = context.world.read_time();
-            if (context.world.run_status() != SiteRunStatus::Active ||
-                has_pending_site_transition_message(
-                    context.message_queue,
-                    context.world.site_id_value()))
-            {
-                return GS1_STATUS_OK;
-            }
+            return;
+        }
 
-            switch (objective.type)
-            {
-            case SiteObjectiveType::DenseRestoration:
-                if (counters.site_completion_tile_threshold == 0U ||
-                    counters.fully_grown_tile_count < counters.site_completion_tile_threshold)
-                {
-                    return GS1_STATUS_OK;
-                }
+        enqueue_site_attempt_result(
+            context.message_queue,
+            context.world.site_id_value(),
+            GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+        return;
 
-                enqueue_site_attempt_result(
-                    context.message_queue,
-                    context.world.site_id_value(),
-                    GS1_SITE_ATTEMPT_RESULT_COMPLETED);
-                return GS1_STATUS_OK;
+    case SiteObjectiveType::HighwayProtection:
+    {
+        const float cover_threshold =
+            objective.highway_max_average_sand_cover > 0.0f &&
+                objective.highway_max_average_sand_cover <= 1.0f
+            ? objective.highway_max_average_sand_cover * 100.0f
+            : objective.highway_max_average_sand_cover;
+        if (cover_threshold <= 0.0f ||
+            objective.time_limit_minutes <= 0.0 ||
+            objective.target_tile_indices.empty())
+        {
+            return;
+        }
 
-            case SiteObjectiveType::HighwayProtection:
-            {
-                const float cover_threshold =
-                    objective.highway_max_average_sand_cover > 0.0f &&
-                        objective.highway_max_average_sand_cover <= 1.0f
-                    ? objective.highway_max_average_sand_cover * 100.0f
-                    : objective.highway_max_average_sand_cover;
-                if (cover_threshold <= 0.0f ||
-                    objective.time_limit_minutes <= 0.0 ||
-                    objective.target_tile_indices.empty())
-                {
-                    return GS1_STATUS_OK;
-                }
+        if (counters.highway_average_sand_cover >= cover_threshold)
+        {
+            enqueue_site_attempt_result(
+                context.message_queue,
+                context.world.site_id_value(),
+                GS1_SITE_ATTEMPT_RESULT_FAILED);
+            return;
+        }
 
-                if (counters.highway_average_sand_cover >= cover_threshold)
-                {
-                    enqueue_site_attempt_result(
-                        context.message_queue,
-                        context.world.site_id_value(),
-                        GS1_SITE_ATTEMPT_RESULT_FAILED);
-                    return GS1_STATUS_OK;
-                }
+        if (clock.world_time_minutes < objective.time_limit_minutes)
+        {
+            return;
+        }
 
-                if (clock.world_time_minutes < objective.time_limit_minutes)
-                {
-                    return GS1_STATUS_OK;
-                }
+        enqueue_site_attempt_result(
+            context.message_queue,
+            context.world.site_id_value(),
+            GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+        return;
+    }
 
-                enqueue_site_attempt_result(
-                    context.message_queue,
-                    context.world.site_id_value(),
-                    GS1_SITE_ATTEMPT_RESULT_COMPLETED);
-                return GS1_STATUS_OK;
-            }
+    case SiteObjectiveType::GreenWallConnection:
+        run_green_wall_connection(context, clock);
+        return;
 
-            case SiteObjectiveType::GreenWallConnection:
-                run_green_wall_connection(context, clock);
-                return GS1_STATUS_OK;
+    case SiteObjectiveType::PureSurvival:
+        if (objective.time_limit_minutes <= 0.0)
+        {
+            return;
+        }
 
-            case SiteObjectiveType::PureSurvival:
-                if (objective.time_limit_minutes <= 0.0)
-                {
-                    return GS1_STATUS_OK;
-                }
+        update_objective_progress(
+            context,
+            static_cast<float>(std::clamp(
+                clock.world_time_minutes / objective.time_limit_minutes,
+                0.0,
+                1.0)));
+        if (clock.world_time_minutes < objective.time_limit_minutes)
+        {
+            return;
+        }
 
-                update_objective_progress(
-                    context,
-                    static_cast<float>(std::clamp(
-                        clock.world_time_minutes / objective.time_limit_minutes,
-                        0.0,
-                        1.0)));
-                if (clock.world_time_minutes < objective.time_limit_minutes)
-                {
-                    return GS1_STATUS_OK;
-                }
+        enqueue_site_attempt_result(
+            context.message_queue,
+            context.world.site_id_value(),
+            GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+        return;
 
-                enqueue_site_attempt_result(
-                    context.message_queue,
-                    context.world.site_id_value(),
-                    GS1_SITE_ATTEMPT_RESULT_COMPLETED);
-                return GS1_STATUS_OK;
+    case SiteObjectiveType::CashTargetSurvival:
+    {
+        const auto& economy = context.world.read_economy();
+        update_objective_progress(
+            context,
+            normalized_cash_target_progress(objective, economy));
+        if (objective.target_cash_points <= 0 ||
+            economy.current_cash < objective.target_cash_points)
+        {
+            return;
+        }
 
-            case SiteObjectiveType::CashTargetSurvival:
-            {
-                const auto& economy = context.world.read_economy();
-                update_objective_progress(
-                    context,
-                    normalized_cash_target_progress(objective, economy));
-                if (objective.target_cash_points <= 0 ||
-                    economy.current_cash < objective.target_cash_points)
-                {
-                    return GS1_STATUS_OK;
-                }
+        enqueue_site_attempt_result(
+            context.message_queue,
+            context.world.site_id_value(),
+            GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+        return;
+    }
 
-                enqueue_site_attempt_result(
-                    context.message_queue,
-                    context.world.site_id_value(),
-                    GS1_SITE_ATTEMPT_RESULT_COMPLETED);
-                return GS1_STATUS_OK;
-            }
-
-            default:
-                return GS1_STATUS_OK;
-            }
-        });
+    default:
+        return;
+    }
 }
 }  // namespace gs1
 

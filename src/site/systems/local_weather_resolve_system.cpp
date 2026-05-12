@@ -29,26 +29,6 @@ struct LocalWeatherResolveContext final
     gs1::GameMessageQueue& message_queue;
 };
 
-template <typename Fn>
-Gs1Status with_local_weather_resolve_context(
-    gs1::RuntimeInvocation& invocation,
-    Fn&& fn,
-    bool missing_context_is_ok = false)
-{
-    auto access = gs1::make_game_state_access<gs1::LocalWeatherResolveSystem>(invocation);
-    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
-    }
-
-    LocalWeatherResolveContext context {
-        *site_run,
-        gs1::SiteWorldAccess<gs1::LocalWeatherResolveSystem> {*site_run},
-        invocation.game_message_queue()};
-    return fn(context);
-}
-
 struct BaseLocalWeather final
 {
     float heat {0.0f};
@@ -386,36 +366,42 @@ Gs1Status LocalWeatherResolveSystem::process_game_message(
     const GameMessage& message)
 {
     auto access = make_game_state_access<LocalWeatherResolveSystem>(invocation);
-    (void)access;
-    return with_local_weather_resolve_context(
-        invocation,
-        [&](LocalWeatherResolveContext& context) -> Gs1Status
-        {
-            return process_message(context, message);
-        });
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    LocalWeatherResolveContext context {
+        *site_run,
+        SiteWorldAccess<LocalWeatherResolveSystem> {*site_run},
+        invocation.game_message_queue()};
+    return process_message(context, message);
 }
 
 Gs1Status LocalWeatherResolveSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto access = make_game_state_access<LocalWeatherResolveSystem>(invocation);
-    (void)access;
     (void)message;
+    (void)invocation;
     return GS1_STATUS_OK;
 }
 
 void LocalWeatherResolveSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<LocalWeatherResolveSystem>(invocation);
-    (void)access;
-    (void)with_local_weather_resolve_context(
-        invocation,
-        [&](LocalWeatherResolveContext& context) -> Gs1Status
-        {
-            run_context(context);
-            return GS1_STATUS_OK;
-        });
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return;
+    }
+
+    LocalWeatherResolveContext context {
+        *site_run,
+        SiteWorldAccess<LocalWeatherResolveSystem> {*site_run},
+        invocation.game_message_queue()};
+    run_context(context);
 }
 }  // namespace gs1
 

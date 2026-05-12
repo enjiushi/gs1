@@ -51,28 +51,6 @@ struct InventoryContext final
     GameMessageQueue& message_queue;
 };
 
-template <typename Fn>
-Gs1Status with_inventory_context(
-    RuntimeInvocation& invocation,
-    Fn&& fn,
-    bool missing_context_is_ok = false)
-{
-    auto access = make_game_state_access<InventorySystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
-    }
-
-    InventoryContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<InventorySystem> {*site_run},
-        invocation.game_message_queue()};
-    return fn(context);
-}
-
 constexpr std::uint32_t k_delivery_box_storage_flags =
     inventory_storage::k_inventory_storage_flag_delivery_box |
     inventory_storage::k_inventory_storage_flag_retrieval_only;
@@ -1795,13 +1773,19 @@ Gs1Status InventorySystem::process_game_message(
     const GameMessage& message)
 {
     auto access = make_game_state_access<InventorySystem>(invocation);
-    (void)access;
-    return with_inventory_context(
-        invocation,
-        [&](InventoryContext& context)
-        {
-            return process_game_message_impl(context, message);
-        });
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    InventoryContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<InventorySystem> {*site_run},
+        invocation.game_message_queue()};
+    return process_game_message_impl(context, message);
 }
 
 Gs1Status InventorySystem::process_host_message(
@@ -1809,27 +1793,37 @@ Gs1Status InventorySystem::process_host_message(
     const Gs1HostMessage& message)
 {
     auto access = make_game_state_access<InventorySystem>(invocation);
-    (void)access;
-    return with_inventory_context(
-        invocation,
-        [&](InventoryContext& context)
-        {
-            return process_host_message_impl(context, message);
-        });
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    InventoryContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<InventorySystem> {*site_run},
+        invocation.game_message_queue()};
+    return process_host_message_impl(context, message);
 }
 
 void InventorySystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<InventorySystem>(invocation);
-    (void)access;
-    (void)with_inventory_context(
-        invocation,
-        [&](InventoryContext& context)
-        {
-            run_impl(context);
-            return GS1_STATUS_OK;
-        },
-        true);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return;
+    }
+
+    InventoryContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<InventorySystem> {*site_run},
+        invocation.game_message_queue()};
+    run_impl(context);
 }
 }  // namespace gs1
 

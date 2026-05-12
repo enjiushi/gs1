@@ -37,27 +37,6 @@ struct CraftContext final
     SiteWorldAccess<CraftSystem> world;
 };
 
-template <typename Fn>
-Gs1Status with_craft_context(
-    RuntimeInvocation& invocation,
-    Fn&& fn,
-    bool missing_context_is_ok = false)
-{
-    auto access = make_game_state_access<CraftSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
-    }
-
-    CraftContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<CraftSystem> {*site_run}};
-    return fn(context);
-}
-
 bool same_tile_coord(TileCoord lhs, TileCoord rhs) noexcept
 {
     return lhs.x == rhs.x && lhs.y == rhs.y;
@@ -310,13 +289,18 @@ Gs1Status CraftSystem::process_game_message(
     const GameMessage& message)
 {
     auto access = make_game_state_access<CraftSystem>(invocation);
-    (void)access;
-    return with_craft_context(
-        invocation,
-        [&](CraftContext& context)
-        {
-            return process_game_message_impl(context, message);
-        });
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    CraftContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<CraftSystem> {*site_run}};
+    return process_game_message_impl(context, message);
 }
 
 Gs1Status CraftSystem::process_host_message(
@@ -324,27 +308,35 @@ Gs1Status CraftSystem::process_host_message(
     const Gs1HostMessage& message)
 {
     auto access = make_game_state_access<CraftSystem>(invocation);
-    (void)access;
-    return with_craft_context(
-        invocation,
-        [&](CraftContext& context)
-        {
-            return process_host_message_impl(context, message);
-        });
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    CraftContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<CraftSystem> {*site_run}};
+    return process_host_message_impl(context, message);
 }
 
 void CraftSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<CraftSystem>(invocation);
-    (void)access;
-    (void)with_craft_context(
-        invocation,
-        [&](CraftContext& context)
-        {
-            run_impl(context);
-            return GS1_STATUS_OK;
-        },
-        true);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return;
+    }
+
+    CraftContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<CraftSystem> {*site_run}};
+    run_impl(context);
 }
 }  // namespace gs1
 

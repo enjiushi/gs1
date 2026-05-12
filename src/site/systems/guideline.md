@@ -1,7 +1,7 @@
 # src/site/systems/
 
 Site-owned systems that declare direct message/host subscription lists and mutate only the state they own.
-The current conversion slices now wire camp durability, site flow/time, failure/completion, weather events, worker condition, action execution, craft, inventory, economy phone, phone panel, task board, device support, device maintenance, device weather contribution, local weather resolve, plant weather contribution, ecology, placement validation, site completion, and modifier handling through direct `RuntimeInvocation` entry points plus file-local context builders instead of any shared production site-system context bundle.
+The current conversion slices now wire camp durability, site flow/time, failure/completion, weather events, worker condition, action execution, craft, inventory, economy phone, phone panel, task board, device support, device maintenance, device weather contribution, local weather resolve, plant weather contribution, ecology, placement validation, site completion, and modifier handling through direct `RuntimeInvocation` entry points that build their local runtime contexts inline instead of routing through any shared production site-system context bundle or per-file context-wrapper trampolines.
 
 ## Usage
 - Read this file before scanning the folder in detail.

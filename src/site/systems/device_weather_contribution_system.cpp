@@ -23,25 +23,6 @@ struct DeviceWeatherContributionContext final
     gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem> world;
 };
 
-template <typename Fn>
-Gs1Status with_device_weather_contribution_context(
-    gs1::RuntimeInvocation& invocation,
-    Fn&& fn,
-    bool missing_context_is_ok = false)
-{
-    auto access = gs1::make_game_state_access<gs1::DeviceWeatherContributionSystem>(invocation);
-    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
-    }
-
-    DeviceWeatherContributionContext context {
-        *site_run,
-        gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem> {*site_run}};
-    return fn(context);
-}
-
 [[nodiscard]] bool device_tile_is_support_anchor(
     gs1::TileCoord coord,
     gs1::StructureId structure_id) noexcept
@@ -397,36 +378,40 @@ Gs1Status DeviceWeatherContributionSystem::process_game_message(
     const GameMessage& message)
 {
     auto access = make_game_state_access<DeviceWeatherContributionSystem>(invocation);
-    (void)access;
-    return with_device_weather_contribution_context(
-        invocation,
-        [&](DeviceWeatherContributionContext& context) -> Gs1Status
-        {
-            return process_message(context, message);
-        });
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    DeviceWeatherContributionContext context {
+        *site_run,
+        SiteWorldAccess<DeviceWeatherContributionSystem> {*site_run}};
+    return process_message(context, message);
 }
 
 Gs1Status DeviceWeatherContributionSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto access = make_game_state_access<DeviceWeatherContributionSystem>(invocation);
-    (void)access;
     (void)message;
+    (void)invocation;
     return GS1_STATUS_OK;
 }
 
 void DeviceWeatherContributionSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<DeviceWeatherContributionSystem>(invocation);
-    (void)access;
-    (void)with_device_weather_contribution_context(
-        invocation,
-        [&](DeviceWeatherContributionContext& context) -> Gs1Status
-        {
-            run_context(context);
-            return GS1_STATUS_OK;
-        });
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return;
+    }
+
+    DeviceWeatherContributionContext context {
+        *site_run,
+        SiteWorldAccess<DeviceWeatherContributionSystem> {*site_run}};
+    run_context(context);
 }
 }  // namespace gs1
 

@@ -47,36 +47,6 @@ struct ActionExecutionContext final
     SiteMoveDirectionInput move_direction {};
 };
 
-template <typename Fn>
-Gs1Status with_action_execution_context(
-    RuntimeInvocation& invocation,
-    Fn&& fn,
-    bool missing_context_is_ok = false)
-{
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
-    }
-
-    ActionExecutionContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<ActionExecutionSystem> {*site_run},
-        invocation.game_message_queue(),
-        fixed_step_seconds,
-        SiteMoveDirectionInput {
-            move_direction.world_move_x,
-            move_direction.world_move_y,
-            move_direction.world_move_z,
-            move_direction.present}};
-    return fn(context);
-}
-
 constexpr double k_minimum_action_duration_minutes = 0.25;
 constexpr float k_repair_integrity_full = 1.0f;
 constexpr float k_repair_integrity_epsilon = 0.0001f;
@@ -3463,13 +3433,27 @@ Gs1Status ActionExecutionSystem::process_game_message(
     const GameMessage& message)
 {
     auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    (void)access;
-    return with_action_execution_context(
-        invocation,
-        [&](ActionExecutionContext& context)
-        {
-            return process_game_message_impl(context, message);
-        });
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    ActionExecutionContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<ActionExecutionSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds,
+        SiteMoveDirectionInput {
+            move_direction.world_move_x,
+            move_direction.world_move_y,
+            move_direction.world_move_z,
+            move_direction.present}};
+    return process_game_message_impl(context, message);
 }
 
 Gs1Status ActionExecutionSystem::process_host_message(
@@ -3477,27 +3461,53 @@ Gs1Status ActionExecutionSystem::process_host_message(
     const Gs1HostMessage& message)
 {
     auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    (void)access;
-    return with_action_execution_context(
-        invocation,
-        [&](ActionExecutionContext& context)
-        {
-            return process_host_message_impl(context, message);
-        });
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    ActionExecutionContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<ActionExecutionSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds,
+        SiteMoveDirectionInput {
+            move_direction.world_move_x,
+            move_direction.world_move_y,
+            move_direction.world_move_z,
+            move_direction.present}};
+    return process_host_message_impl(context, message);
 }
 
 void ActionExecutionSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    (void)access;
-    (void)with_action_execution_context(
-        invocation,
-        [&](ActionExecutionContext& context)
-        {
-            run_impl(context);
-            return GS1_STATUS_OK;
-        },
-        true);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return;
+    }
+
+    ActionExecutionContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<ActionExecutionSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds,
+        SiteMoveDirectionInput {
+            move_direction.world_move_x,
+            move_direction.world_move_y,
+            move_direction.world_move_z,
+            move_direction.present}};
+    run_impl(context);
 }
 }  // namespace gs1
 

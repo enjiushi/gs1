@@ -18,25 +18,6 @@ struct PlacementValidationContext final
     GameMessageQueue& message_queue;
 };
 
-template <typename Fn>
-Gs1Status with_placement_validation_context(
-    RuntimeInvocation& invocation,
-    Fn&& fn,
-    bool missing_context_is_ok = false)
-{
-    auto access = make_game_state_access<PlacementValidationSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
-    }
-
-    PlacementValidationContext context {
-        SiteWorldAccess<PlacementValidationSystem> {*site_run},
-        invocation.game_message_queue()};
-    return fn(context);
-}
-
 struct PlacementReservationRecord final
 {
     SiteRunId site_run_id {};
@@ -291,56 +272,60 @@ Gs1Status PlacementValidationSystem::process_game_message(
     const GameMessage& message)
 {
     auto access = make_game_state_access<PlacementValidationSystem>(invocation);
-    (void)access;
-    return with_placement_validation_context(
-        invocation,
-        [&](PlacementValidationContext& context) -> Gs1Status
-        {
-            switch (message.type)
-            {
-            case GameMessageType::SiteRunStarted:
-                handle_site_run_started(context);
-                break;
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
 
-            case GameMessageType::PlacementReservationRequested:
-                handle_reservation_requested(
-                    context,
-                    message.payload_as<PlacementReservationRequestedMessage>());
-                break;
+    PlacementValidationContext context {
+        SiteWorldAccess<PlacementValidationSystem> {*site_run},
+        invocation.game_message_queue()};
+    switch (message.type)
+    {
+    case GameMessageType::SiteRunStarted:
+        handle_site_run_started(context);
+        break;
 
-            case GameMessageType::PlacementReservationReleased:
-                handle_reservation_released(message.payload_as<PlacementReservationReleasedMessage>());
-                break;
+    case GameMessageType::PlacementReservationRequested:
+        handle_reservation_requested(
+            context,
+            message.payload_as<PlacementReservationRequestedMessage>());
+        break;
 
-            default:
-                break;
-            }
+    case GameMessageType::PlacementReservationReleased:
+        handle_reservation_released(message.payload_as<PlacementReservationReleasedMessage>());
+        break;
 
-            return GS1_STATUS_OK;
-        });
+    default:
+        break;
+    }
+
+    return GS1_STATUS_OK;
 }
 
 Gs1Status PlacementValidationSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto access = make_game_state_access<PlacementValidationSystem>(invocation);
-    (void)access;
     (void)message;
+    (void)invocation;
     return GS1_STATUS_OK;
 }
 
 void PlacementValidationSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<PlacementValidationSystem>(invocation);
-    (void)access;
-    (void)with_placement_validation_context(
-        invocation,
-        [&](PlacementValidationContext& context) -> Gs1Status
-        {
-            (void)context;
-            return GS1_STATUS_OK;
-        });
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return;
+    }
+
+    PlacementValidationContext context {
+        SiteWorldAccess<PlacementValidationSystem> {*site_run},
+        invocation.game_message_queue()};
+    (void)context;
 }
 }  // namespace gs1
 

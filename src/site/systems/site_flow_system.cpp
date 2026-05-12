@@ -20,34 +20,6 @@ struct SiteFlowContext final
     double fixed_step_seconds {0.0};
 };
 
-template <typename Fn>
-Gs1Status with_site_flow_context(
-    RuntimeInvocation& invocation,
-    Fn&& fn,
-    bool missing_context_is_ok = false)
-{
-    auto access = make_game_state_access<SiteFlowSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    if (!site_run.has_value())
-    {
-        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
-    }
-
-    SiteFlowContext context {
-        *site_run,
-        SiteWorldAccess<SiteFlowSystem> {*site_run},
-        invocation.game_message_queue(),
-        SiteMoveDirectionInput {
-            move_direction.world_move_x,
-            move_direction.world_move_y,
-            move_direction.world_move_z,
-            move_direction.present},
-        fixed_step_seconds};
-    return fn(context);
-}
-
 constexpr float k_worker_move_speed_tiles_per_second = 3.5f;
 constexpr float k_radians_to_degrees = 57.2957795f;
 constexpr float k_worker_position_epsilon = 0.0001f;
@@ -120,8 +92,7 @@ Gs1Status SiteFlowSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<SiteFlowSystem>(invocation);
-    (void)access;
+    (void)invocation;
     (void)message;
     return GS1_STATUS_OK;
 }
@@ -131,168 +102,176 @@ Gs1Status SiteFlowSystem::process_host_message(
     const Gs1HostMessage& message)
 {
     auto access = make_game_state_access<SiteFlowSystem>(invocation);
-    (void)access;
     if (message.type != GS1_HOST_EVENT_SITE_MOVE_DIRECTION)
     {
         return GS1_STATUS_OK;
     }
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return GS1_STATUS_OK;
+    }
 
-    return with_site_flow_context(
-        invocation,
-        [&](SiteFlowContext& context) -> Gs1Status
-        {
-            const auto& payload = message.payload.site_move_direction;
-            context.site_run.host_move_direction.world_move_x = payload.world_move_x;
-            context.site_run.host_move_direction.world_move_y = payload.world_move_y;
-            context.site_run.host_move_direction.world_move_z = payload.world_move_z;
-            context.site_run.host_move_direction.present = true;
-            return GS1_STATUS_OK;
-        },
-        true);
+    const auto& payload = message.payload.site_move_direction;
+    site_run->host_move_direction.world_move_x = payload.world_move_x;
+    site_run->host_move_direction.world_move_y = payload.world_move_y;
+    site_run->host_move_direction.world_move_z = payload.world_move_z;
+    site_run->host_move_direction.present = true;
+    return GS1_STATUS_OK;
 }
 
 void SiteFlowSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<SiteFlowSystem>(invocation);
-    (void)access;
-    (void)with_site_flow_context(
-        invocation,
-        [&](SiteFlowContext& context) -> Gs1Status
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return;
+    }
+
+    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
+    SiteFlowContext context {
+        *site_run,
+        SiteWorldAccess<SiteFlowSystem> {*site_run},
+        invocation.game_message_queue(),
+        SiteMoveDirectionInput {
+            move_direction.world_move_x,
+            move_direction.world_move_y,
+            move_direction.world_move_z,
+            move_direction.present},
+        access.template read<RuntimeFixedStepSecondsTag>()};
+    const std::uint32_t width = context.world.tile_width();
+    const std::uint32_t height = context.world.tile_height();
+    if (width == 0U || height == 0U)
+    {
+        return;
+    }
+
+    auto worker = context.world.read_worker();
+    const auto& action_state = context.world.read_action();
+    const auto& inventory = context.world.read_inventory();
+    const float movement_step =
+        k_worker_move_speed_tiles_per_second * static_cast<float>(context.fixed_step_seconds);
+
+    std::optional<TileCoord> move_goal_tile {};
+    if (action_waits_for_worker_approach(action_state))
+    {
+        move_goal_tile = action_state.approach_tile;
+    }
+    else if (action_blocks_worker_movement(action_state))
+    {
+        if (action_state.target_tile.has_value())
         {
-            const std::uint32_t width = context.world.tile_width();
-            const std::uint32_t height = context.world.tile_height();
-            if (width == 0U || height == 0U)
-            {
-                return GS1_STATUS_OK;
-            }
-
-            auto worker = context.world.read_worker();
-            const auto& action_state = context.world.read_action();
-            const auto& inventory = context.world.read_inventory();
-            const float movement_step =
-                k_worker_move_speed_tiles_per_second * static_cast<float>(context.fixed_step_seconds);
-
-            std::optional<TileCoord> move_goal_tile {};
-            if (action_waits_for_worker_approach(action_state))
-            {
-                move_goal_tile = action_state.approach_tile;
-            }
-            else if (action_blocks_worker_movement(action_state))
-            {
-                if (action_state.target_tile.has_value())
-                {
-                    const float face_dx =
-                        static_cast<float>(action_state.target_tile->x) - worker.position.tile_x;
-                    const float face_dy =
-                        static_cast<float>(action_state.target_tile->y) - worker.position.tile_y;
-                    const float next_facing = facing_degrees_for_direction(face_dx, face_dy);
-                    if (std::fabs(next_facing - worker.position.facing_degrees) > k_worker_position_epsilon)
-                    {
-                        worker.position.facing_degrees = next_facing;
-                        context.world.write_worker(worker);
-                        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
-                    }
-                }
-                return GS1_STATUS_OK;
-            }
-            else if (has_pending_device_storage_open(inventory))
-            {
-                move_goal_tile = inventory.pending_device_storage_open.approach_tile;
-            }
-
-            float direction_x = 0.0f;
-            float direction_y = 0.0f;
-            float target_x = worker.position.tile_x;
-            float target_y = worker.position.tile_y;
-
-            if (move_goal_tile.has_value())
-            {
-                if (!context.world.tile_coord_in_bounds(*move_goal_tile) ||
-                    !context.world.read_tile(*move_goal_tile).static_data.traversable)
-                {
-                    return GS1_STATUS_OK;
-                }
-
-                const float delta_x =
-                    static_cast<float>(move_goal_tile->x) - worker.position.tile_x;
-                const float delta_y =
-                    static_cast<float>(move_goal_tile->y) - worker.position.tile_y;
-                const float distance_squared = delta_x * delta_x + delta_y * delta_y;
-                if (distance_squared <= k_worker_position_epsilon)
-                {
-                    target_x = static_cast<float>(move_goal_tile->x);
-                    target_y = static_cast<float>(move_goal_tile->y);
-                }
-                else
-                {
-                    const float distance = std::sqrt(distance_squared);
-                    const float step = std::min(movement_step, distance);
-                    direction_x = delta_x / distance;
-                    direction_y = delta_y / distance;
-                    target_x = worker.position.tile_x + direction_x * step;
-                    target_y = worker.position.tile_y + direction_y * step;
-                }
-            }
-            else
-            {
-                if (!context.move_direction.present)
-                {
-                    return GS1_STATUS_OK;
-                }
-
-                const float move_x = context.move_direction.world_move_x;
-                const float move_y = context.move_direction.world_move_y;
-                const float move_length_squared = move_x * move_x + move_y * move_y;
-                if (move_length_squared <= 0.0001f)
-                {
-                    return GS1_STATUS_OK;
-                }
-
-                const float move_length = std::sqrt(move_length_squared);
-                direction_x = move_x / move_length;
-                direction_y = move_y / move_length;
-                const float max_x = static_cast<float>(width - 1U);
-                const float max_y = static_cast<float>(height - 1U);
-                target_x =
-                    std::clamp(worker.position.tile_x + direction_x * movement_step, 0.0f, max_x);
-                target_y =
-                    std::clamp(worker.position.tile_y + direction_y * movement_step, 0.0f, max_y);
-            }
-
-            const TileCoord target_tile {
-                static_cast<std::int32_t>(std::lround(target_x)),
-                static_cast<std::int32_t>(std::lround(target_y))};
-            if (!context.world.tile_coord_in_bounds(target_tile) ||
-                !context.world.read_tile(target_tile).static_data.traversable)
-            {
-                return GS1_STATUS_OK;
-            }
-
-            const bool position_changed =
-                std::fabs(target_x - worker.position.tile_x) > k_worker_position_epsilon ||
-                std::fabs(target_y - worker.position.tile_y) > k_worker_position_epsilon;
-            const float next_facing =
-                facing_degrees_for_direction(direction_x, direction_y);
-            const bool facing_changed =
-                std::fabs(next_facing - worker.position.facing_degrees) > k_worker_position_epsilon &&
-                (std::fabs(direction_x) > k_worker_position_epsilon ||
-                    std::fabs(direction_y) > k_worker_position_epsilon);
-            if (!position_changed && !facing_changed)
-            {
-                return GS1_STATUS_OK;
-            }
-
-            worker.position.tile_x = target_x;
-            worker.position.tile_y = target_y;
-            worker.position.tile_coord = target_tile;
-            if (facing_changed)
+            const float face_dx =
+                static_cast<float>(action_state.target_tile->x) - worker.position.tile_x;
+            const float face_dy =
+                static_cast<float>(action_state.target_tile->y) - worker.position.tile_y;
+            const float next_facing = facing_degrees_for_direction(face_dx, face_dy);
+            if (std::fabs(next_facing - worker.position.facing_degrees) > k_worker_position_epsilon)
             {
                 worker.position.facing_degrees = next_facing;
+                context.world.write_worker(worker);
+                context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
             }
-            context.world.write_worker(worker);
-            context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
-            return GS1_STATUS_OK;
-        });
+        }
+        return;
+    }
+    else if (has_pending_device_storage_open(inventory))
+    {
+        move_goal_tile = inventory.pending_device_storage_open.approach_tile;
+    }
+
+    float direction_x = 0.0f;
+    float direction_y = 0.0f;
+    float target_x = worker.position.tile_x;
+    float target_y = worker.position.tile_y;
+
+    if (move_goal_tile.has_value())
+    {
+        if (!context.world.tile_coord_in_bounds(*move_goal_tile) ||
+            !context.world.read_tile(*move_goal_tile).static_data.traversable)
+        {
+            return;
+        }
+
+        const float delta_x =
+            static_cast<float>(move_goal_tile->x) - worker.position.tile_x;
+        const float delta_y =
+            static_cast<float>(move_goal_tile->y) - worker.position.tile_y;
+        const float distance_squared = delta_x * delta_x + delta_y * delta_y;
+        if (distance_squared <= k_worker_position_epsilon)
+        {
+            target_x = static_cast<float>(move_goal_tile->x);
+            target_y = static_cast<float>(move_goal_tile->y);
+        }
+        else
+        {
+            const float distance = std::sqrt(distance_squared);
+            const float step = std::min(movement_step, distance);
+            direction_x = delta_x / distance;
+            direction_y = delta_y / distance;
+            target_x = worker.position.tile_x + direction_x * step;
+            target_y = worker.position.tile_y + direction_y * step;
+        }
+    }
+    else
+    {
+        if (!context.move_direction.present)
+        {
+            return;
+        }
+
+        const float move_x = context.move_direction.world_move_x;
+        const float move_y = context.move_direction.world_move_y;
+        const float move_length_squared = move_x * move_x + move_y * move_y;
+        if (move_length_squared <= 0.0001f)
+        {
+            return;
+        }
+
+        const float move_length = std::sqrt(move_length_squared);
+        direction_x = move_x / move_length;
+        direction_y = move_y / move_length;
+        const float max_x = static_cast<float>(width - 1U);
+        const float max_y = static_cast<float>(height - 1U);
+        target_x =
+            std::clamp(worker.position.tile_x + direction_x * movement_step, 0.0f, max_x);
+        target_y =
+            std::clamp(worker.position.tile_y + direction_y * movement_step, 0.0f, max_y);
+    }
+
+    const TileCoord target_tile {
+        static_cast<std::int32_t>(std::lround(target_x)),
+        static_cast<std::int32_t>(std::lround(target_y))};
+    if (!context.world.tile_coord_in_bounds(target_tile) ||
+        !context.world.read_tile(target_tile).static_data.traversable)
+    {
+        return;
+    }
+
+    const bool position_changed =
+        std::fabs(target_x - worker.position.tile_x) > k_worker_position_epsilon ||
+        std::fabs(target_y - worker.position.tile_y) > k_worker_position_epsilon;
+    const float next_facing =
+        facing_degrees_for_direction(direction_x, direction_y);
+    const bool facing_changed =
+        std::fabs(next_facing - worker.position.facing_degrees) > k_worker_position_epsilon &&
+        (std::fabs(direction_x) > k_worker_position_epsilon ||
+            std::fabs(direction_y) > k_worker_position_epsilon);
+    if (!position_changed && !facing_changed)
+    {
+        return;
+    }
+
+    worker.position.tile_x = target_x;
+    worker.position.tile_y = target_y;
+    worker.position.tile_coord = target_tile;
+    if (facing_changed)
+    {
+        worker.position.facing_degrees = next_facing;
+    }
+    context.world.write_worker(worker);
+    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
 }
 }  // namespace gs1
 

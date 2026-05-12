@@ -69,28 +69,6 @@ struct ModifierContext final
     double fixed_step_seconds {0.0};
 };
 
-template <typename Fn>
-Gs1Status with_modifier_context(
-    RuntimeInvocation& invocation,
-    Fn&& fn,
-    bool missing_context_is_ok = false)
-{
-    auto access = make_game_state_access<ModifierSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
-    }
-
-    ModifierContext context {
-        *campaign,
-        SiteWorldAccess<ModifierSystem> {*site_run},
-        fixed_step_seconds};
-    return fn(context);
-}
-
 const ModifierSystemTuning& modifier_system_tuning() noexcept
 {
     return gameplay_tuning_def().modifier_system;
@@ -1212,13 +1190,19 @@ Gs1Status ModifierSystem::process_game_message(
     const GameMessage& message)
 {
     auto access = make_game_state_access<ModifierSystem>(invocation);
-    (void)access;
-    return with_modifier_context(
-        invocation,
-        [&](ModifierContext& context) -> Gs1Status
-        {
-            return process_game_message_impl(context, message);
-        });
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    ModifierContext context {
+        *campaign,
+        SiteWorldAccess<ModifierSystem> {*site_run},
+        fixed_step_seconds};
+    return process_game_message_impl(context, message);
 }
 
 Gs1Status ModifierSystem::process_host_message(
@@ -1226,14 +1210,19 @@ Gs1Status ModifierSystem::process_host_message(
     const Gs1HostMessage& message)
 {
     auto access = make_game_state_access<ModifierSystem>(invocation);
-    (void)access;
-    return with_modifier_context(
-        invocation,
-        [&](ModifierContext& context) -> Gs1Status
-        {
-            return process_host_message_impl(context, message);
-        },
-        true);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return GS1_STATUS_OK;
+    }
+
+    ModifierContext context {
+        *campaign,
+        SiteWorldAccess<ModifierSystem> {*site_run},
+        fixed_step_seconds};
+    return process_host_message_impl(context, message);
 }
 
 bool ModifierSystem::subscribes_to(GameMessageType type) noexcept
@@ -1247,14 +1236,19 @@ bool ModifierSystem::subscribes_to(GameMessageType type) noexcept
 void ModifierSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<ModifierSystem>(invocation);
-    (void)access;
-    (void)with_modifier_context(
-        invocation,
-        [&](ModifierContext& context) -> Gs1Status
-        {
-            run_impl(context);
-            return GS1_STATUS_OK;
-        });
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return;
+    }
+
+    ModifierContext context {
+        *campaign,
+        SiteWorldAccess<ModifierSystem> {*site_run},
+        fixed_step_seconds};
+    run_impl(context);
 }
 }  // namespace gs1
 

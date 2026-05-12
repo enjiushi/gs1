@@ -30,25 +30,6 @@ struct PhonePanelContext final
     SiteWorldAccess<PhonePanelSystem> world;
 };
 
-template <typename Fn>
-Gs1Status with_phone_panel_context(
-    RuntimeInvocation& invocation,
-    Fn&& fn,
-    bool missing_context_is_ok = false)
-{
-    auto access = make_game_state_access<PhonePanelSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
-    }
-
-    PhonePanelContext context {
-        *site_run,
-        SiteWorldAccess<PhonePanelSystem> {*site_run}};
-    return fn(context);
-}
-
 constexpr std::uint32_t k_sell_listing_id_base = 1000U;
 constexpr std::uint64_t k_phone_signature_offset = 14695981039346656037ULL;
 constexpr std::uint64_t k_phone_signature_prime = 1099511628211ULL;
@@ -607,13 +588,16 @@ Gs1Status PhonePanelSystem::process_game_message(
     const GameMessage& message)
 {
     auto access = make_game_state_access<PhonePanelSystem>(invocation);
-    (void)access;
-    return with_phone_panel_context(
-        invocation,
-        [&](PhonePanelContext& context)
-        {
-            return process_game_message_impl(context, message);
-        });
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    PhonePanelContext context {
+        *site_run,
+        SiteWorldAccess<PhonePanelSystem> {*site_run}};
+    return process_game_message_impl(context, message);
 }
 
 Gs1Status PhonePanelSystem::process_host_message(
@@ -626,95 +610,99 @@ Gs1Status PhonePanelSystem::process_host_message(
     }
 
     auto access = make_game_state_access<PhonePanelSystem>(invocation);
-    (void)access;
-    return with_phone_panel_context(
-        invocation,
-        [&](PhonePanelContext& context)
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    PhonePanelContext context {
+        *site_run,
+        SiteWorldAccess<PhonePanelSystem> {*site_run}};
+    const auto& action = message.payload.ui_action.action;
+    switch (action.type)
+    {
+    case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
+    {
+        if (action.arg0 > static_cast<std::uint64_t>(GS1_PHONE_PANEL_SECTION_CART))
         {
-            const auto& action = message.payload.ui_action.action;
-            switch (action.type)
-            {
-            case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
-            {
-                if (action.arg0 > static_cast<std::uint64_t>(GS1_PHONE_PANEL_SECTION_CART))
-                {
-                    return GS1_STATUS_INVALID_ARGUMENT;
-                }
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
 
-                PhonePanelSection section = PhonePanelSection::Home;
-                if (!try_map_phone_panel_section(static_cast<Gs1PhonePanelSection>(action.arg0), section))
-                {
-                    return GS1_STATUS_INVALID_ARGUMENT;
-                }
+        PhonePanelSection section = PhonePanelSection::Home;
+        if (!try_map_phone_panel_section(static_cast<Gs1PhonePanelSection>(action.arg0), section))
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
 
-                auto& phone_panel = context.world.own_phone_panel();
-                bool dirty = false;
-                const auto updated_badge_flags =
-                    (phone_panel.badge_flags & ~GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) &
-                    ~badge_flag_for_section(section);
-                if (phone_panel.badge_flags != updated_badge_flags)
-                {
-                    phone_panel.badge_flags = updated_badge_flags;
-                    dirty = true;
-                }
-                if (!phone_panel.open)
-                {
-                    phone_panel.open = true;
-                    dirty = true;
-                }
-                if (phone_panel.active_section != section)
-                {
-                    phone_panel.active_section = section;
-                    dirty = true;
-                }
-                if (dirty)
-                {
-                    mark_phone_dirty(context);
-                }
-                return GS1_STATUS_OK;
-            }
+        auto& phone_panel = context.world.own_phone_panel();
+        bool dirty = false;
+        const auto updated_badge_flags =
+            (phone_panel.badge_flags & ~GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) &
+            ~badge_flag_for_section(section);
+        if (phone_panel.badge_flags != updated_badge_flags)
+        {
+            phone_panel.badge_flags = updated_badge_flags;
+            dirty = true;
+        }
+        if (!phone_panel.open)
+        {
+            phone_panel.open = true;
+            dirty = true;
+        }
+        if (phone_panel.active_section != section)
+        {
+            phone_panel.active_section = section;
+            dirty = true;
+        }
+        if (dirty)
+        {
+            mark_phone_dirty(context);
+        }
+        return GS1_STATUS_OK;
+    }
 
-            case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
-            {
-                auto& phone_panel = context.world.own_phone_panel();
-                bool dirty = false;
-                const auto updated_badge_flags =
-                    phone_panel.badge_flags & ~GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE;
-                if (phone_panel.badge_flags != updated_badge_flags)
-                {
-                    phone_panel.badge_flags = updated_badge_flags;
-                    dirty = true;
-                }
-                if (phone_panel.open)
-                {
-                    phone_panel.open = false;
-                    dirty = true;
-                }
-                if (dirty)
-                {
-                    mark_phone_dirty(context);
-                }
-                return GS1_STATUS_OK;
-            }
+    case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
+    {
+        auto& phone_panel = context.world.own_phone_panel();
+        bool dirty = false;
+        const auto updated_badge_flags =
+            phone_panel.badge_flags & ~GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE;
+        if (phone_panel.badge_flags != updated_badge_flags)
+        {
+            phone_panel.badge_flags = updated_badge_flags;
+            dirty = true;
+        }
+        if (phone_panel.open)
+        {
+            phone_panel.open = false;
+            dirty = true;
+        }
+        if (dirty)
+        {
+            mark_phone_dirty(context);
+        }
+        return GS1_STATUS_OK;
+    }
 
-            default:
-                return GS1_STATUS_OK;
-            }
-        });
+    default:
+        return GS1_STATUS_OK;
+    }
 }
 
 void PhonePanelSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<PhonePanelSystem>(invocation);
-    (void)access;
-    (void)with_phone_panel_context(
-        invocation,
-        [&](PhonePanelContext& context)
-        {
-            run_impl(context);
-            return GS1_STATUS_OK;
-        },
-        true);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return;
+    }
+
+    PhonePanelContext context {
+        *site_run,
+        SiteWorldAccess<PhonePanelSystem> {*site_run}};
+    run_impl(context);
 }
 }  // namespace gs1
 

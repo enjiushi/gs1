@@ -25,30 +25,6 @@ struct WorkerConditionContext final
     double fixed_step_seconds {0.0};
 };
 
-template <typename Fn>
-Gs1Status with_worker_condition_context(
-    RuntimeInvocation& invocation,
-    Fn&& fn,
-    bool missing_context_is_ok = false)
-{
-    auto access = make_game_state_access<WorkerConditionSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
-    }
-
-    WorkerConditionContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<WorkerConditionSystem> {*site_run},
-        invocation.game_message_queue(),
-        fixed_step_seconds};
-    return fn(context);
-}
-
 struct WorkerMeterSnapshot final
 {
     float health {0.0f};
@@ -696,57 +672,63 @@ Gs1Status WorkerConditionSystem::process_game_message(
     const GameMessage& message)
 {
     auto access = make_game_state_access<WorkerConditionSystem>(invocation);
-    (void)access;
-    return with_worker_condition_context(
-        invocation,
-        [&](WorkerConditionContext& context) -> Gs1Status
-        {
-            if (message.type == GameMessageType::SiteRunStarted)
-            {
-                emit_worker_meters_changed_if_needed(context);
-                return GS1_STATUS_OK;
-            }
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
 
-            if (message.type != GameMessageType::WorkerMeterDeltaRequested &&
-                message.type != GameMessageType::InventoryItemUseCompleted)
-            {
-                return GS1_STATUS_OK;
-            }
+    WorkerConditionContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<WorkerConditionSystem> {*site_run},
+        invocation.game_message_queue(),
+        access.template read<RuntimeFixedStepSecondsTag>()};
+    if (message.type == GameMessageType::SiteRunStarted)
+    {
+        emit_worker_meters_changed_if_needed(context);
+        return GS1_STATUS_OK;
+    }
 
-            if (!context.world.has_world())
-            {
-                return GS1_STATUS_OK;
-            }
+    if (message.type != GameMessageType::WorkerMeterDeltaRequested &&
+        message.type != GameMessageType::InventoryItemUseCompleted)
+    {
+        return GS1_STATUS_OK;
+    }
 
-            auto worker = context.world.read_worker();
-            const auto previous = worker.conditions;
-            const auto deltas =
-                message.type == GameMessageType::WorkerMeterDeltaRequested
-                ? deltas_from_message(message.payload_as<WorkerMeterDeltaRequestedMessage>())
-                : deltas_from_item_use_completed(
-                      message.payload_as<InventoryItemUseCompletedMessage>());
-            worker.conditions = resolve_worker_conditions(
-                previous,
-                deltas,
-                context.world.read_modifier().resolved_channel_totals,
-                0.0f,
-                0.0f);
-            const bool modified = worker_conditions_changed(previous, worker.conditions);
-            if (modified)
-            {
-                context.world.write_worker(worker);
-                emit_worker_meters_changed_if_needed(context);
-            }
-            return GS1_STATUS_OK;
-        });
+    if (!context.world.has_world())
+    {
+        return GS1_STATUS_OK;
+    }
+
+    auto worker = context.world.read_worker();
+    const auto previous = worker.conditions;
+    const auto deltas =
+        message.type == GameMessageType::WorkerMeterDeltaRequested
+        ? deltas_from_message(message.payload_as<WorkerMeterDeltaRequestedMessage>())
+        : deltas_from_item_use_completed(
+              message.payload_as<InventoryItemUseCompletedMessage>());
+    worker.conditions = resolve_worker_conditions(
+        previous,
+        deltas,
+        context.world.read_modifier().resolved_channel_totals,
+        0.0f,
+        0.0f);
+    const bool modified = worker_conditions_changed(previous, worker.conditions);
+    if (modified)
+    {
+        context.world.write_worker(worker);
+        emit_worker_meters_changed_if_needed(context);
+    }
+    return GS1_STATUS_OK;
 }
 
 Gs1Status WorkerConditionSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto access = make_game_state_access<WorkerConditionSystem>(invocation);
-    (void)access;
+    (void)invocation;
     (void)message;
     return GS1_STATUS_OK;
 }
@@ -754,46 +736,52 @@ Gs1Status WorkerConditionSystem::process_host_message(
 void WorkerConditionSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<WorkerConditionSystem>(invocation);
-    (void)access;
-    (void)with_worker_condition_context(
-        invocation,
-        [&](WorkerConditionContext& context) -> Gs1Status
-        {
-            if (!context.world.has_world())
-            {
-                return GS1_STATUS_OK;
-            }
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return;
+    }
 
-            auto worker = context.world.read_worker();
-            const auto previous = worker.conditions;
-            WorkerMeterDeltas deltas {};
-            const float step_real_seconds =
-                static_cast<float>(std::max(0.0, context.fixed_step_seconds));
-            accumulate_passive_deltas(
-                deltas,
-                previous,
-                context.world.read_tile_local_weather(worker.position.tile_coord),
-                context.world.read_modifier(),
-                static_cast<float>(runtime_minutes_from_real_seconds(context.fixed_step_seconds)),
-                step_real_seconds);
-            const float passive_energy_step_real_seconds =
-                action_is_executing(context.world.read_action()) ? 0.0f : step_real_seconds;
-            const float passive_energy_bonus =
-                special_energy_recovery_bonus(context.world.read_modifier());
-            worker.conditions = resolve_worker_conditions(
-                previous,
-                deltas,
-                context.world.read_modifier().resolved_channel_totals,
-                passive_energy_step_real_seconds,
-                passive_energy_bonus);
-            const bool modified = worker_conditions_changed(previous, worker.conditions);
-            if (modified)
-            {
-                context.world.write_worker(worker);
-                emit_worker_meters_changed_if_needed(context);
-            }
-            return GS1_STATUS_OK;
-        });
+    WorkerConditionContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<WorkerConditionSystem> {*site_run},
+        invocation.game_message_queue(),
+        access.template read<RuntimeFixedStepSecondsTag>()};
+    if (!context.world.has_world())
+    {
+        return;
+    }
+
+    auto worker = context.world.read_worker();
+    const auto previous = worker.conditions;
+    WorkerMeterDeltas deltas {};
+    const float step_real_seconds =
+        static_cast<float>(std::max(0.0, context.fixed_step_seconds));
+    accumulate_passive_deltas(
+        deltas,
+        previous,
+        context.world.read_tile_local_weather(worker.position.tile_coord),
+        context.world.read_modifier(),
+        static_cast<float>(runtime_minutes_from_real_seconds(context.fixed_step_seconds)),
+        step_real_seconds);
+    const float passive_energy_step_real_seconds =
+        action_is_executing(context.world.read_action()) ? 0.0f : step_real_seconds;
+    const float passive_energy_bonus =
+        special_energy_recovery_bonus(context.world.read_modifier());
+    worker.conditions = resolve_worker_conditions(
+        previous,
+        deltas,
+        context.world.read_modifier().resolved_channel_totals,
+        passive_energy_step_real_seconds,
+        passive_energy_bonus);
+    const bool modified = worker_conditions_changed(previous, worker.conditions);
+    if (modified)
+    {
+        context.world.write_worker(worker);
+        emit_worker_meters_changed_if_needed(context);
+    }
 }
 }  // namespace gs1
 

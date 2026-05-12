@@ -26,25 +26,6 @@ struct PlantWeatherContributionContext final
     gs1::SiteWorldAccess<gs1::PlantWeatherContributionSystem> world;
 };
 
-template <typename Fn>
-Gs1Status with_plant_weather_contribution_context(
-    gs1::RuntimeInvocation& invocation,
-    Fn&& fn,
-    bool missing_context_is_ok = false)
-{
-    auto access = gs1::make_game_state_access<gs1::PlantWeatherContributionSystem>(invocation);
-    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
-    }
-
-    PlantWeatherContributionContext context {
-        *site_run,
-        gs1::SiteWorldAccess<gs1::PlantWeatherContributionSystem> {*site_run}};
-    return fn(context);
-}
-
 template <typename Func>
 void for_each_contribution_sample(std::uint8_t max_distance, Func&& func)
 {
@@ -695,21 +676,23 @@ Gs1Status PlantWeatherContributionSystem::process_game_message(
     const GameMessage& message)
 {
     auto access = make_game_state_access<PlantWeatherContributionSystem>(invocation);
-    (void)access;
-    return with_plant_weather_contribution_context(
-        invocation,
-        [&](PlantWeatherContributionContext& context) -> Gs1Status
-        {
-            return process_message(context, message);
-        });
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    PlantWeatherContributionContext context {
+        *site_run,
+        SiteWorldAccess<PlantWeatherContributionSystem> {*site_run}};
+    return process_message(context, message);
 }
 
 Gs1Status PlantWeatherContributionSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto access = make_game_state_access<PlantWeatherContributionSystem>(invocation);
-    (void)access;
+    (void)invocation;
     (void)message;
     return GS1_STATUS_OK;
 }
@@ -717,14 +700,16 @@ Gs1Status PlantWeatherContributionSystem::process_host_message(
 void PlantWeatherContributionSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<PlantWeatherContributionSystem>(invocation);
-    (void)access;
-    (void)with_plant_weather_contribution_context(
-        invocation,
-        [&](PlantWeatherContributionContext& context) -> Gs1Status
-        {
-            run_context(context);
-            return GS1_STATUS_OK;
-        });
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return;
+    }
+
+    PlantWeatherContributionContext context {
+        *site_run,
+        SiteWorldAccess<PlantWeatherContributionSystem> {*site_run}};
+    run_context(context);
 }
 }  // namespace gs1
 

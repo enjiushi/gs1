@@ -40,36 +40,6 @@ struct EconomyPhoneContext final
     SiteMoveDirectionInput move_direction {};
 };
 
-template <typename Fn>
-Gs1Status with_economy_phone_context(
-    RuntimeInvocation& invocation,
-    Fn&& fn,
-    bool missing_context_is_ok = false)
-{
-    auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
-    }
-
-    EconomyPhoneContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<EconomyPhoneSystem> {*site_run},
-        invocation.game_message_queue(),
-        fixed_step_seconds,
-        SiteMoveDirectionInput {
-            move_direction.world_move_x,
-            move_direction.world_move_y,
-            move_direction.world_move_z,
-            move_direction.present}};
-    return fn(context);
-}
-
 constexpr std::uint32_t k_sell_listing_id_base = 1000U;
 
 std::uint32_t normalize_quantity(std::uint16_t value) noexcept
@@ -1371,13 +1341,27 @@ Gs1Status EconomyPhoneSystem::process_game_message(
     const GameMessage& message)
 {
     auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
-    (void)access;
-    return with_economy_phone_context(
-        invocation,
-        [&](EconomyPhoneContext& context)
-        {
-            return process_game_message_impl(context, message);
-        });
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    EconomyPhoneContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<EconomyPhoneSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds,
+        SiteMoveDirectionInput {
+            move_direction.world_move_x,
+            move_direction.world_move_y,
+            move_direction.world_move_z,
+            move_direction.present}};
+    return process_game_message_impl(context, message);
 }
 
 Gs1Status EconomyPhoneSystem::process_host_message(
@@ -1385,27 +1369,53 @@ Gs1Status EconomyPhoneSystem::process_host_message(
     const Gs1HostMessage& message)
 {
     auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
-    (void)access;
-    return with_economy_phone_context(
-        invocation,
-        [&](EconomyPhoneContext& context)
-        {
-            return process_host_message_impl(context, message);
-        });
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    EconomyPhoneContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<EconomyPhoneSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds,
+        SiteMoveDirectionInput {
+            move_direction.world_move_x,
+            move_direction.world_move_y,
+            move_direction.world_move_z,
+            move_direction.present}};
+    return process_host_message_impl(context, message);
 }
 
 void EconomyPhoneSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
-    (void)access;
-    (void)with_economy_phone_context(
-        invocation,
-        [&](EconomyPhoneContext& context)
-        {
-            run_impl(context);
-            return GS1_STATUS_OK;
-        },
-        true);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return;
+    }
+
+    EconomyPhoneContext context {
+        *campaign,
+        *site_run,
+        SiteWorldAccess<EconomyPhoneSystem> {*site_run},
+        invocation.game_message_queue(),
+        fixed_step_seconds,
+        SiteMoveDirectionInput {
+            move_direction.world_move_x,
+            move_direction.world_move_y,
+            move_direction.world_move_z,
+            move_direction.present}};
+    run_impl(context);
 }
 }  // namespace gs1
 
