@@ -1911,6 +1911,30 @@ int main()
         assert(payload.mode == GS1_SITE_PROTECTION_OVERLAY_HEAT);
     }
 
+    assert(panel_state_runtime.submit_host_messages(&open_site_tech_tree_event, 1U) == GS1_STATUS_OK);
+    Gs1Phase1Result open_tech_tree_from_overlay_result {};
+    run_phase1(panel_state_runtime, 0.0, open_tech_tree_from_overlay_result);
+    assert(open_tech_tree_from_overlay_result.processed_host_message_count == 1U);
+    assert(!gs1::GameRuntimeProjectionTestAccess::site_protection_selector_open(panel_state_runtime));
+    assert(
+        gs1::GameRuntimeProjectionTestAccess::site_protection_overlay_mode(panel_state_runtime) ==
+        GS1_SITE_PROTECTION_OVERLAY_NONE);
+    const auto open_tech_tree_from_overlay_messages = drain_runtime_messages(panel_state_runtime);
+    assert(find_ui_surface_visibility_message(
+               open_tech_tree_from_overlay_messages,
+               GS1_UI_SURFACE_SITE_OVERLAY_PANEL,
+               false) != nullptr);
+    const auto cleared_by_tech_tree_messages =
+        collect_messages_of_type(
+            open_tech_tree_from_overlay_messages,
+            GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE);
+    assert(cleared_by_tech_tree_messages.size() == 1U);
+    {
+        const auto& payload =
+            cleared_by_tech_tree_messages.front()->payload_as<Gs1EngineMessageSiteProtectionOverlayData>();
+        assert(payload.mode == GS1_SITE_PROTECTION_OVERLAY_NONE);
+    }
+
     assert(panel_state_runtime.submit_host_messages(&open_phone_event, 1U) == GS1_STATUS_OK);
     Gs1Phase1Result reopen_phone_result {};
     run_phase1(panel_state_runtime, 0.0, reopen_phone_result);

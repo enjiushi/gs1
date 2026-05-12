@@ -1051,8 +1051,7 @@ Gs1PhonePanelSection to_phone_panel_section(PhonePanelSection section) noexcept
 bool GamePresentationCoordinator::subscribes_to_host_message(Gs1HostMessageType type) noexcept
 {
     return type == GS1_HOST_EVENT_SITE_SCENE_READY ||
-        type == GS1_HOST_EVENT_UI_ACTION ||
-        type == GS1_HOST_EVENT_SITE_STORAGE_VIEW;
+        type == GS1_HOST_EVENT_UI_ACTION;
 }
 
 Gs1Status GamePresentationCoordinator::process_host_message(
@@ -1063,25 +1062,6 @@ Gs1Status GamePresentationCoordinator::process_host_message(
     if (message.type == GS1_HOST_EVENT_SITE_SCENE_READY)
     {
         activate_loaded_site_scene(context);
-        return GS1_STATUS_OK;
-    }
-
-    if (message.type == GS1_HOST_EVENT_SITE_STORAGE_VIEW)
-    {
-        if (message.payload.site_storage_view.event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT)
-        {
-            queue_site_protection_overlay_state_message();
-            queue_close_site_phone_panel_if_open();
-            if (campaign().has_value() &&
-                app_state_supports_technology_tree(app_state()) &&
-                campaign()->regional_map_state.tech_tree_open)
-            {
-                GameMessage close_tech_tree {};
-                close_tech_tree.type = GameMessageType::CloseRegionalMapTechTree;
-                close_tech_tree.set_payload(CloseRegionalMapTechTreeMessage {});
-                message_queue().push_back(close_tech_tree);
-            }
-        }
         return GS1_STATUS_OK;
     }
 
@@ -1115,16 +1095,8 @@ Gs1Status GamePresentationCoordinator::process_host_message(
             return GS1_STATUS_OK;
 
         case GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
-            if (site_protection_selector_open())
-            {
-                queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-            }
-            if (site_protection_overlay_mode() != GS1_SITE_PROTECTION_OVERLAY_NONE)
-            {
-                queue_site_protection_overlay_state_message();
-            }
-            queue_close_site_inventory_panels_if_open();
-            queue_close_site_phone_panel_if_open();
+            queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
+            queue_site_protection_overlay_state_message();
             queue_regional_map_menu_ui_messages();
             queue_regional_map_tech_tree_ui_messages();
             return GS1_STATUS_OK;
@@ -1141,7 +1113,6 @@ Gs1Status GamePresentationCoordinator::process_host_message(
             return GS1_STATUS_OK;
 
         case GS1_UI_ACTION_START_SITE_ATTEMPT:
-            close_site_protection_ui();
             queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
             queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
             queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP);
@@ -1151,7 +1122,6 @@ Gs1Status GamePresentationCoordinator::process_host_message(
             return GS1_STATUS_OK;
 
         case GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP:
-            close_site_protection_ui();
             queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
             queue_app_state_message(app_state());
             queue_campaign_resources_message();
@@ -1162,60 +1132,15 @@ Gs1Status GamePresentationCoordinator::process_host_message(
             return GS1_STATUS_OK;
 
         case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
-            if (active_ui_setups_.contains(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR))
-            {
-                queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-            }
             queue_site_protection_overlay_state_message();
-            queue_close_site_inventory_panels_if_open();
-            if (campaign().has_value() &&
-                app_state_supports_technology_tree(app_state()) &&
-                campaign()->regional_map_state.tech_tree_open)
-            {
-                GameMessage close_tech_tree {};
-                close_tech_tree.type = GameMessageType::CloseRegionalMapTechTree;
-                close_tech_tree.set_payload(CloseRegionalMapTechTreeMessage {});
-                message_queue().push_back(close_tech_tree);
-            }
             return GS1_STATUS_OK;
 
         case GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR:
-            if (!active_site_run().has_value() ||
-                app_state() != GS1_APP_STATE_SITE_ACTIVE)
-            {
-                return GS1_STATUS_OK;
-            }
-            queue_close_site_inventory_panels_if_open();
-            queue_close_site_phone_panel_if_open();
-            if (campaign().has_value() &&
-                app_state_supports_technology_tree(app_state()) &&
-                campaign()->regional_map_state.tech_tree_open)
-            {
-                GameMessage close_tech_tree {};
-                close_tech_tree.type = GameMessageType::CloseRegionalMapTechTree;
-                close_tech_tree.set_payload(CloseRegionalMapTechTreeMessage {});
-                message_queue().push_back(close_tech_tree);
-            }
             queue_site_protection_selector_ui_messages();
             return GS1_STATUS_OK;
 
         case GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI:
-            if (active_ui_setups_.contains(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR))
-            {
-                queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-            }
-            else if (site_protection_overlay_mode() != GS1_SITE_PROTECTION_OVERLAY_NONE)
-            {
-                queue_site_protection_overlay_state_message();
-            }
-            return GS1_STATUS_OK;
-
         case GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
-            if (!active_site_run().has_value() ||
-                app_state() != GS1_APP_STATE_SITE_ACTIVE)
-            {
-                return GS1_STATUS_OK;
-            }
             queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
             queue_site_protection_overlay_state_message();
             return GS1_STATUS_OK;
@@ -1277,16 +1202,8 @@ void GamePresentationCoordinator::on_message_processed(GamePresentationRuntimeCo
         break;
 
     case GameMessageType::OpenRegionalMapTechTree:
-        if (site_protection_selector_open())
-        {
-            queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-        }
-        if (site_protection_overlay_mode() != GS1_SITE_PROTECTION_OVERLAY_NONE)
-        {
-            queue_site_protection_overlay_state_message();
-        }
-        queue_close_site_inventory_panels_if_open();
-        queue_close_site_phone_panel_if_open();
+        queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
+        queue_site_protection_overlay_state_message();
         queue_regional_map_menu_ui_messages();
         queue_regional_map_tech_tree_ui_messages();
         break;
@@ -1325,21 +1242,7 @@ void GamePresentationCoordinator::on_message_processed(GamePresentationRuntimeCo
         break;
 
     case GameMessageType::PhonePanelSectionRequested:
-        if (active_ui_setups_.contains(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR))
-        {
-            queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-        }
         queue_site_protection_overlay_state_message();
-        queue_close_site_inventory_panels_if_open();
-        if (campaign().has_value() &&
-            app_state_supports_technology_tree(app_state()) &&
-            campaign()->regional_map_state.tech_tree_open)
-        {
-            GameMessage close_tech_tree {};
-            close_tech_tree.type = GameMessageType::CloseRegionalMapTechTree;
-            close_tech_tree.set_payload(CloseRegionalMapTechTreeMessage {});
-            message_queue().push_back(close_tech_tree);
-        }
         break;
 
     case GameMessageType::ClosePhonePanel:
@@ -1350,27 +1253,12 @@ void GamePresentationCoordinator::on_message_processed(GamePresentationRuntimeCo
         const auto& payload = message.payload_as<InventoryStorageViewRequestMessage>();
         if (payload.event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT)
         {
-            if (active_ui_setups_.contains(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR))
-            {
-                queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-            }
             queue_site_protection_overlay_state_message();
-            queue_close_site_phone_panel_if_open();
-            if (campaign().has_value() &&
-                app_state_supports_technology_tree(app_state()) &&
-                campaign()->regional_map_state.tech_tree_open)
-            {
-                GameMessage close_tech_tree {};
-                close_tech_tree.type = GameMessageType::CloseRegionalMapTechTree;
-                close_tech_tree.set_payload(CloseRegionalMapTechTreeMessage {});
-                message_queue().push_back(close_tech_tree);
-            }
         }
         break;
     }
 
     case GameMessageType::StartSiteAttempt:
-        close_site_protection_ui();
         queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
         queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
         queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP);
@@ -1383,7 +1271,6 @@ void GamePresentationCoordinator::on_message_processed(GamePresentationRuntimeCo
         break;
 
     case GameMessageType::ReturnToRegionalMap:
-        close_site_protection_ui();
         queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
         queue_app_state_message(app_state());
         queue_campaign_resources_message();
@@ -1398,7 +1285,6 @@ void GamePresentationCoordinator::on_message_processed(GamePresentationRuntimeCo
         const auto& payload = message.payload_as<SiteAttemptEndedMessage>();
         const auto newly_revealed_site_count =
             active_site_run().has_value() ? active_site_run()->result_newly_revealed_site_count : 0U;
-        close_site_protection_ui();
         queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
         queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
         queue_close_progression_view_if_open(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
@@ -1456,42 +1342,11 @@ void GamePresentationCoordinator::on_message_processed(GamePresentationRuntimeCo
         break;
 
     case GameMessageType::OpenSiteProtectionSelector:
-        if (!active_site_run().has_value() ||
-            app_state() != GS1_APP_STATE_SITE_ACTIVE)
-        {
-            break;
-        }
-        queue_close_site_inventory_panels_if_open();
-        queue_close_site_phone_panel_if_open();
-        if (campaign().has_value() &&
-            app_state_supports_technology_tree(app_state()) &&
-            campaign()->regional_map_state.tech_tree_open)
-        {
-            GameMessage close_tech_tree {};
-            close_tech_tree.type = GameMessageType::CloseRegionalMapTechTree;
-            close_tech_tree.set_payload(CloseRegionalMapTechTreeMessage {});
-            message_queue().push_back(close_tech_tree);
-        }
         queue_site_protection_selector_ui_messages();
         break;
 
     case GameMessageType::CloseSiteProtectionUi:
-        if (active_ui_setups_.contains(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR))
-        {
-            queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-        }
-        else if (site_protection_overlay_mode() != GS1_SITE_PROTECTION_OVERLAY_NONE)
-        {
-            queue_site_protection_overlay_state_message();
-        }
-        break;
-
     case GameMessageType::SetSiteProtectionOverlayMode:
-        if (!active_site_run().has_value() ||
-            app_state() != GS1_APP_STATE_SITE_ACTIVE)
-        {
-            break;
-        }
         queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
         queue_site_protection_overlay_state_message();
         break;
@@ -1723,59 +1578,6 @@ void GamePresentationCoordinator::queue_close_active_normal_ui_if_open()
     }
 
     queue_close_ui_setup_if_open(active_normal_ui_setup_.value());
-}
-
-void GamePresentationCoordinator::queue_close_site_inventory_panels_if_open()
-{
-    if (!active_site_run().has_value())
-    {
-        return;
-    }
-
-    const auto queue_close_storage = [this](std::uint32_t storage_id)
-    {
-        if (storage_id == 0U)
-        {
-            return;
-        }
-
-        GameMessage message {};
-        message.type = GameMessageType::InventoryStorageViewRequest;
-        message.set_payload(InventoryStorageViewRequestMessage {
-            storage_id,
-            GS1_INVENTORY_VIEW_EVENT_CLOSE,
-            {0U, 0U, 0U}});
-        message_queue().push_back(message);
-    };
-
-    const auto& inventory = active_site_run()->inventory;
-    if (inventory.worker_pack_panel_open)
-    {
-        queue_close_storage(inventory.worker_pack_storage_id);
-    }
-    if (inventory.opened_device_storage_id != 0U)
-    {
-        queue_close_storage(inventory.opened_device_storage_id);
-    }
-    if (inventory.pending_device_storage_open.active &&
-        inventory.pending_device_storage_open.storage_id != 0U &&
-        inventory.pending_device_storage_open.storage_id != inventory.opened_device_storage_id)
-    {
-        queue_close_storage(inventory.pending_device_storage_open.storage_id);
-    }
-}
-
-void GamePresentationCoordinator::queue_close_site_phone_panel_if_open()
-{
-    if (!active_site_run().has_value() || !active_site_run()->phone_panel.open)
-    {
-        return;
-    }
-
-    GameMessage message {};
-    message.type = GameMessageType::ClosePhonePanel;
-    message.set_payload(ClosePhonePanelMessage {});
-    message_queue().push_back(message);
 }
 
 void GamePresentationCoordinator::queue_ui_element_message(
@@ -4134,13 +3936,6 @@ void GamePresentationCoordinator::sync_campaign_unlock_presentations()
     last_campaign_unlock_snapshot_.unlocked_technology_node_ids =
         std::move(unlocked_technology_node_ids);
 }
-
-void GamePresentationCoordinator::close_site_protection_ui() noexcept
-{
-    protection_presentation_state().selector_open = false;
-    protection_presentation_state().overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
-}
-
 
 void GamePresentationCoordinator::activate_loaded_site_scene(GamePresentationRuntimeContext& context)
 {

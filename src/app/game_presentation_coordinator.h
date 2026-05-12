@@ -109,8 +109,6 @@ private:
     void queue_close_ui_panel_if_open(Gs1UiPanelId panel_id);
     void queue_close_progression_view_if_open(Gs1ProgressionViewId view_id);
     void queue_close_active_normal_ui_if_open();
-    void queue_close_site_inventory_panels_if_open();
-    void queue_close_site_phone_panel_if_open();
     void queue_ui_element_message(
         std::uint32_t element_id,
         Gs1UiElementType element_type,
@@ -285,7 +283,6 @@ private:
         std::uint32_t detail_id,
         std::uint32_t detail_kind);
     void sync_campaign_unlock_presentations();
-    void close_site_protection_ui() noexcept;
     void clear_pending_site_tile_projection_updates() noexcept;
     void clear_pending_site_inventory_projection_updates() noexcept;
 
