@@ -1,10 +1,10 @@
 #include "app/campaign_factory.h"
 #include "campaign/campaign_state.h"
-#include "campaign/systems/campaign_system_context.h"
 #include "campaign/systems/campaign_flow_system.h"
 #include "campaign/systems/campaign_time_system.h"
 #include "campaign/systems/loadout_planner_system.h"
 #include "messages/game_message.h"
+#include "runtime/system_interface.h"
 #include "site/site_run_state.h"
 #include "site/site_world.h"
 #include "site/site_world_access.h"
@@ -12,16 +12,14 @@
 #include "site/systems/site_completion_system.h"
 #include "site/systems/site_flow_system.h"
 #include "site/systems/site_time_system.h"
-#include "site/systems/site_system_context.h"
 
 #include <cassert>
+#include <deque>
+#include <optional>
 
 namespace
 {
 using gs1::CampaignState;
-using gs1::CampaignFixedStepContext;
-using gs1::CampaignFlowMessageContext;
-using gs1::CampaignSystemContext;
 using gs1::CampaignFactory;
 using gs1::CampaignFlowSystem;
 using gs1::CampaignTimeSystem;
@@ -31,6 +29,7 @@ using gs1::FailureRecoverySystem;
 using gs1::GameMessageQueue;
 using gs1::GameMessageType;
 using gs1::LoadoutPlannerSystem;
+using gs1::RuntimeInvocation;
 using gs1::SiteCompletionSystem;
 using gs1::SiteAttemptEndedMessage;
 using gs1::SiteRunStartedMessage;
@@ -38,25 +37,61 @@ using gs1::SiteFlowSystem;
 using gs1::SiteId;
 using gs1::SiteRunState;
 using gs1::SiteRunStatus;
-using gs1::SiteSystemContext;
 using gs1::SiteMoveDirectionInput;
 using gs1::StartSiteAttemptMessage;
 using gs1::SiteTimeSystem;
 using gs1::SiteWorld;
 using gs1::TileCoord;
 
-template <typename SiteSystemTag>
-SiteSystemContext<SiteSystemTag> make_site_context(
-    CampaignState& campaign,
-    SiteRunState& site_run,
-    GameMessageQueue& message_queue)
+template <typename System>
+Gs1Status invoke_system_message(
+    const gs1::GameMessage& message,
+    Gs1AppState& app_state,
+    std::optional<CampaignState>& campaign,
+    std::optional<SiteRunState>& active_site_run,
+    GameMessageQueue& message_queue,
+    std::deque<Gs1RuntimeMessage>& runtime_messages,
+    double fixed_step_seconds = 0.25,
+    SiteMoveDirectionInput move_direction = {})
 {
-    return gs1::make_site_system_context<SiteSystemTag>(
+    RuntimeInvocation invocation {
+        app_state,
         campaign,
-        site_run,
+        active_site_run,
+        runtime_messages,
         message_queue,
-        0.25,
-        SiteMoveDirectionInput {});
+        fixed_step_seconds,
+        move_direction.world_move_x,
+        move_direction.world_move_y,
+        move_direction.world_move_z,
+        move_direction.present};
+    System system {};
+    return system.process_game_message(invocation, message);
+}
+
+template <typename System>
+void run_system(
+    Gs1AppState& app_state,
+    std::optional<CampaignState>& campaign,
+    std::optional<SiteRunState>& active_site_run,
+    GameMessageQueue& message_queue,
+    std::deque<Gs1RuntimeMessage>& runtime_messages,
+    double fixed_step_seconds = 0.25,
+    SiteMoveDirectionInput move_direction = {})
+{
+    RuntimeInvocation invocation {
+        app_state,
+        campaign,
+        active_site_run,
+        runtime_messages,
+        message_queue,
+        fixed_step_seconds,
+        move_direction.world_move_x,
+        move_direction.world_move_y,
+        move_direction.world_move_z,
+        move_direction.present};
+    System system {};
+    system.run(invocation);
 }
 
 void initialize_site_world(
@@ -91,40 +126,63 @@ void initialize_site_world(
 int main()
 {
     CampaignState campaign = CampaignFactory::create_prototype_campaign(42ULL, 30U);
+    std::optional<CampaignState> campaign_state {campaign};
+    std::optional<SiteRunState> no_site_run {};
+    Gs1AppState app_state = GS1_APP_STATE_REGIONAL_MAP;
+    GameMessageQueue runtime_queue {};
+    std::deque<Gs1RuntimeMessage> runtime_messages {};
 
-    CampaignSystemContext campaign_context {campaign};
     gs1::GameMessage selection_changed {};
     selection_changed.type = GameMessageType::DeploymentSiteSelectionChanged;
     selection_changed.set_payload(DeploymentSiteSelectionChangedMessage {3U});
     assert(LoadoutPlannerSystem::subscribes_to(selection_changed.type));
-    assert(LoadoutPlannerSystem::process_message(campaign_context, selection_changed) == GS1_STATUS_OK);
-    assert(campaign.loadout_planner_state.selected_target_site_id.has_value());
-    assert(campaign.loadout_planner_state.selected_target_site_id->value == 3U);
+    assert(
+        invoke_system_message<LoadoutPlannerSystem>(
+            selection_changed,
+            app_state,
+            campaign_state,
+            no_site_run,
+            runtime_queue,
+            runtime_messages) == GS1_STATUS_OK);
+    assert(campaign_state->loadout_planner_state.selected_target_site_id.has_value());
+    assert(campaign_state->loadout_planner_state.selected_target_site_id->value == 3U);
 
     selection_changed.set_payload(DeploymentSiteSelectionChangedMessage {0U});
-    assert(LoadoutPlannerSystem::process_message(campaign_context, selection_changed) == GS1_STATUS_OK);
-    assert(!campaign.loadout_planner_state.selected_target_site_id.has_value());
+    assert(
+        invoke_system_message<LoadoutPlannerSystem>(
+            selection_changed,
+            app_state,
+            campaign_state,
+            no_site_run,
+            runtime_queue,
+            runtime_messages) == GS1_STATUS_OK);
+    assert(!campaign_state->loadout_planner_state.selected_target_site_id.has_value());
 
-    CampaignFixedStepContext campaign_step_context {campaign};
-    CampaignTimeSystem::run(campaign_step_context);
-    assert(campaign.campaign_clock_minutes_elapsed > 0.0);
-    assert(campaign.campaign_days_remaining == 30U);
-    campaign.campaign_clock_minutes_elapsed = 0.0;
+    run_system<CampaignTimeSystem>(
+        app_state,
+        campaign_state,
+        no_site_run,
+        runtime_queue,
+        runtime_messages);
+    assert(campaign_state->campaign_clock_minutes_elapsed > 0.0);
+    assert(campaign_state->campaign_days_remaining == 30U);
+    campaign_state->campaign_clock_minutes_elapsed = 0.0;
 
     std::optional<CampaignState> active_campaign {
         CampaignFactory::create_prototype_campaign(42ULL, 30U)};
     std::optional<SiteRunState> active_site_run {};
-    Gs1AppState app_state = GS1_APP_STATE_REGIONAL_MAP;
     GameMessageQueue site_start_queue {};
-    CampaignFlowMessageContext flow_context {
-        active_campaign,
-        active_site_run,
-        app_state,
-        site_start_queue};
     gs1::GameMessage start_site_attempt {};
     start_site_attempt.type = GameMessageType::StartSiteAttempt;
     start_site_attempt.set_payload(StartSiteAttemptMessage {1U});
-    assert(CampaignFlowSystem::process_message(flow_context, start_site_attempt) == GS1_STATUS_OK);
+    assert(
+        invoke_system_message<CampaignFlowSystem>(
+            start_site_attempt,
+            app_state,
+            active_campaign,
+            active_site_run,
+            site_start_queue,
+            runtime_messages) == GS1_STATUS_OK);
     assert(active_site_run.has_value());
     assert(app_state == GS1_APP_STATE_SITE_LOADING);
     assert(site_start_queue.size() == 1U);
@@ -142,39 +200,59 @@ int main()
     site_run.counters.fully_grown_tile_count = 0U;
 
     GameMessageQueue message_queue {};
-    auto site_time_context = make_site_context<SiteTimeSystem>(campaign, site_run, message_queue);
-    auto site_flow_context = make_site_context<SiteFlowSystem>(campaign, site_run, message_queue);
-    site_flow_context.move_direction = SiteMoveDirectionInput {1.0f, 0.0f, 0.0f, true};
+    std::optional<CampaignState> site_campaign {campaign};
+    std::optional<SiteRunState> runtime_site_run {std::move(site_run)};
+    auto& site_run_ref = runtime_site_run.value();
 
-    SiteTimeSystem::run(site_time_context);
-    SiteFlowSystem::run(site_flow_context);
-    const auto worker_position = gs1::site_world_access::worker_position(site_run);
+    run_system<SiteTimeSystem>(
+        app_state,
+        site_campaign,
+        runtime_site_run,
+        message_queue,
+        runtime_messages);
+    run_system<SiteFlowSystem>(
+        app_state,
+        site_campaign,
+        runtime_site_run,
+        message_queue,
+        runtime_messages,
+        0.25,
+        SiteMoveDirectionInput {1.0f, 0.0f, 0.0f, true});
+    const auto worker_position = gs1::site_world_access::worker_position(site_run_ref);
     assert(worker_position.tile_x > 2.0f);
     assert(worker_position.tile_y == 2.0f);
     assert(worker_position.facing_degrees == 90.0f);
-    assert(site_run.run_status == SiteRunStatus::Active);
+    assert(site_run_ref.run_status == SiteRunStatus::Active);
     assert(message_queue.empty());
-    assert(site_run.clock.day_phase == DayPhase::Dawn);
-    assert(campaign.campaign_clock_minutes_elapsed == 0.0);
-    assert(campaign.campaign_days_remaining == 30U);
+    assert(site_run_ref.clock.day_phase == DayPhase::Dawn);
+    assert(site_campaign->campaign_clock_minutes_elapsed == 0.0);
+    assert(site_campaign->campaign_days_remaining == 30U);
 
-    site_run.counters.fully_grown_tile_count = 3U;
-    auto completion_context = make_site_context<SiteCompletionSystem>(campaign, site_run, message_queue);
-    SiteCompletionSystem::run(completion_context);
-    assert(site_run.run_status == SiteRunStatus::Active);
+    site_run_ref.counters.fully_grown_tile_count = 3U;
+    run_system<SiteCompletionSystem>(
+        app_state,
+        site_campaign,
+        runtime_site_run,
+        message_queue,
+        runtime_messages);
+    assert(site_run_ref.run_status == SiteRunStatus::Active);
     assert(message_queue.size() == 1U);
     assert(message_queue.front().type == GameMessageType::SiteAttemptEnded);
     assert(message_queue.front().payload_as<SiteAttemptEndedMessage>().site_id == 7U);
     assert(message_queue.front().payload_as<SiteAttemptEndedMessage>().result == GS1_SITE_ATTEMPT_RESULT_COMPLETED);
 
     message_queue.clear();
-    site_run.counters.fully_grown_tile_count = 0U;
-    auto failure_context = make_site_context<FailureRecoverySystem>(campaign, site_run, message_queue);
-    auto worker_conditions = gs1::site_world_access::worker_conditions(site_run);
+    site_run_ref.counters.fully_grown_tile_count = 0U;
+    auto worker_conditions = gs1::site_world_access::worker_conditions(site_run_ref);
     worker_conditions.health = 0.0f;
-    gs1::site_world_access::set_worker_conditions(site_run, worker_conditions);
-    FailureRecoverySystem::run(failure_context);
-    assert(site_run.run_status == SiteRunStatus::Active);
+    gs1::site_world_access::set_worker_conditions(site_run_ref, worker_conditions);
+    run_system<FailureRecoverySystem>(
+        app_state,
+        site_campaign,
+        runtime_site_run,
+        message_queue,
+        runtime_messages);
+    assert(site_run_ref.run_status == SiteRunStatus::Active);
     assert(message_queue.size() == 1U);
     assert(message_queue.front().type == GameMessageType::SiteAttemptEnded);
     assert(message_queue.front().payload_as<SiteAttemptEndedMessage>().site_id == 7U);

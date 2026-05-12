@@ -3,7 +3,6 @@
 #include "app/game_presentation_coordinator.h"
 #include "campaign/campaign_state.h"
 #include "campaign/systems/campaign_flow_system.h"
-#include "campaign/systems/campaign_system_context.h"
 #include "campaign/systems/campaign_time_system.h"
 #include "messages/game_message.h"
 #include "runtime/runtime_clock.h"
@@ -44,11 +43,14 @@ public:
     [[nodiscard]] bool profiled_system_enabled(Gs1RuntimeProfileSystemId system_id) const noexcept;
 
     [[nodiscard]] GameMessageQueue& message_queue() noexcept { return message_queue_; }
+    [[nodiscard]] const GameMessageQueue& message_queue() const noexcept { return message_queue_; }
+    [[nodiscard]] std::deque<Gs1RuntimeMessage>& runtime_messages() noexcept { return runtime_messages_; }
+    [[nodiscard]] const std::deque<Gs1RuntimeMessage>& runtime_messages() const noexcept { return runtime_messages_; }
     [[nodiscard]] Gs1Status handle_message(const GameMessage& message);
 
     friend struct GameRuntimeProjectionTestAccess;
     friend class MessageDispatcher;
-    friend class GameRuntimeTempBridge;
+    friend class RuntimeInvocation;
 
 private:
     struct TimingAccumulator final
@@ -99,73 +101,33 @@ private:
     bool boot_initialized_ {false};
 };
 
-template <typename Fn>
-Gs1Status GameRuntimeTempBridge::with_campaign_flow_message_context(Fn&& fn)
-{
-    CampaignFlowMessageContext context {
-        runtime_.campaign_,
-        runtime_.active_site_run_,
-        runtime_.app_state_,
-        runtime_.message_queue_};
-    return fn(context);
-}
-
-template <typename Fn>
-Gs1Status GameRuntimeTempBridge::with_campaign_context(Fn&& fn)
-{
-    if (!runtime_.campaign_.has_value())
-    {
-        return GS1_STATUS_OK;
-    }
-
-    CampaignSystemContext context {*runtime_.campaign_};
-    return fn(context);
-}
-
-template <typename Fn>
-void GameRuntimeTempBridge::with_campaign_fixed_step_context(Fn&& fn)
-{
-    if (!runtime_.campaign_.has_value())
-    {
-        return;
-    }
-
-    CampaignFixedStepContext context {*runtime_.campaign_, runtime_.fixed_step_seconds_};
-    fn(context);
-}
-
 template <typename SystemTag, typename Fn>
-Gs1Status GameRuntimeTempBridge::with_site_context(
+Gs1Status with_site_system_context(
+    RuntimeInvocation& invocation,
     Fn&& fn,
-    SiteMoveDirectionInput move_direction,
-    bool missing_context_is_ok)
+    bool missing_context_is_ok = false)
 {
-    if (!runtime_.campaign_.has_value() || !runtime_.active_site_run_.has_value())
+    auto access = make_game_state_access<SystemTag>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const auto fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
+    if (!campaign.has_value() || !site_run.has_value())
     {
         return missing_context_is_ok ? GS1_STATUS_OK : GS1_STATUS_INVALID_STATE;
     }
 
     auto context = make_site_system_context<SystemTag>(
-        *runtime_.campaign_,
-        *runtime_.active_site_run_,
-        runtime_.message_queue_,
-        runtime_.fixed_step_seconds_,
-        move_direction);
+        *campaign,
+        *site_run,
+        invocation.game_message_queue(),
+        fixed_step_seconds,
+        SiteMoveDirectionInput {
+            move_direction.world_move_x,
+            move_direction.world_move_y,
+            move_direction.world_move_z,
+            move_direction.present});
     return fn(context);
 }
-
-template <typename Fn>
-Gs1Status GameRuntimeTempBridge::with_presentation_context(Fn&& fn)
-{
-    GamePresentationRuntimeContext context {
-        runtime_.app_state_,
-        runtime_.campaign_,
-        runtime_.active_site_run_,
-        runtime_.message_queue_,
-        runtime_.runtime_messages_,
-        runtime_.fixed_step_seconds_};
-    return fn(context);
-}
-
 }  // namespace gs1
 

@@ -12,6 +12,16 @@
 
 namespace gs1
 {
+template <>
+struct system_state_tags<PhonePanelSystem>
+{
+    using type = type_list<
+        RuntimeCampaignTag,
+        RuntimeActiveSiteRunTag,
+        RuntimeFixedStepSecondsTag,
+        RuntimeMoveDirectionTag>;
+};
+
 namespace
 {
 constexpr std::uint32_t k_sell_listing_id_base = 1000U;
@@ -436,12 +446,16 @@ void sync_phone_panel_projection(
 }
 }  // namespace
 
+Gs1Status process_game_message_impl(
+    SiteSystemContext<PhonePanelSystem>& context,
+    const GameMessage& message);
+
 bool PhonePanelSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
 {
     return type == GS1_HOST_EVENT_UI_ACTION;
 }
 
-Gs1Status PhonePanelSystem::process_host_message(
+Gs1Status process_host_message_impl(
     SiteSystemContext<PhonePanelSystem>& context,
     const Gs1HostMessage& message)
 {
@@ -466,7 +480,7 @@ Gs1Status PhonePanelSystem::process_host_message(
         auto message_copy = GameMessage {};
         message_copy.type = GameMessageType::PhonePanelSectionRequested;
         message_copy.set_payload(payload);
-        return process_message(context, message_copy);
+        return process_game_message_impl(context, message_copy);
     }
 
     case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
@@ -474,7 +488,7 @@ Gs1Status PhonePanelSystem::process_host_message(
         auto message_copy = GameMessage {};
         message_copy.type = GameMessageType::ClosePhonePanel;
         message_copy.set_payload(ClosePhonePanelMessage {});
-        return process_message(context, message_copy);
+        return process_game_message_impl(context, message_copy);
     }
 
     default:
@@ -495,7 +509,7 @@ bool PhonePanelSystem::subscribes_to(GameMessageType type) noexcept
     }
 }
 
-Gs1Status PhonePanelSystem::process_message(
+Gs1Status process_game_message_impl(
     SiteSystemContext<PhonePanelSystem>& context,
     const GameMessage& message)
 {
@@ -571,12 +585,78 @@ Gs1Status PhonePanelSystem::process_message(
     }
 }
 
-void PhonePanelSystem::run(SiteSystemContext<PhonePanelSystem>& context)
+void run_impl(SiteSystemContext<PhonePanelSystem>& context)
 {
     sync_phone_panel_projection(context);
 }
-GS1_IMPLEMENT_RUNTIME_SITE_HOST_AND_MESSAGE_SYSTEM(
-    PhonePanelSystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_PHONE_PANEL,
-    18U)
+
+const char* PhonePanelSystem::name() const noexcept
+{
+    return "PhonePanelSystem";
+}
+
+GameMessageSubscriptionSpan PhonePanelSystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<GameMessageType, k_game_message_type_count, &PhonePanelSystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan PhonePanelSystem::subscribed_host_messages() const noexcept
+{
+    return runtime_subscription_list<
+        Gs1HostMessageType,
+        k_runtime_host_message_type_count,
+        &PhonePanelSystem::subscribes_to_host_message>();
+}
+
+std::optional<Gs1RuntimeProfileSystemId> PhonePanelSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_PHONE_PANEL;
+}
+
+std::optional<std::uint32_t> PhonePanelSystem::fixed_step_order() const noexcept
+{
+    return 18U;
+}
+
+Gs1Status PhonePanelSystem::process_game_message(
+    RuntimeInvocation& invocation,
+    const GameMessage& message)
+{
+    auto access = make_game_state_access<PhonePanelSystem>(invocation);
+    (void)access;
+    return with_site_system_context<PhonePanelSystem>(
+        invocation,
+        [&](SiteSystemContext<PhonePanelSystem>& context)
+        {
+            return process_game_message_impl(context, message);
+        });
+}
+
+Gs1Status PhonePanelSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    auto access = make_game_state_access<PhonePanelSystem>(invocation);
+    (void)access;
+    return with_site_system_context<PhonePanelSystem>(
+        invocation,
+        [&](SiteSystemContext<PhonePanelSystem>& context)
+        {
+            return process_host_message_impl(context, message);
+        });
+}
+
+void PhonePanelSystem::run(RuntimeInvocation& invocation)
+{
+    auto access = make_game_state_access<PhonePanelSystem>(invocation);
+    (void)access;
+    (void)with_site_system_context<PhonePanelSystem>(
+        invocation,
+        [&](SiteSystemContext<PhonePanelSystem>& context)
+        {
+            run_impl(context);
+            return GS1_STATUS_OK;
+        },
+        true);
+}
 }  // namespace gs1

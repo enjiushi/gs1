@@ -94,9 +94,9 @@ void run_local_weather_pipeline(
     auto local_weather_context =
         make_site_context<LocalWeatherResolveSystem>(campaign, site_run, queue);
 
-    PlantWeatherContributionSystem::run(plant_context);
-    DeviceWeatherContributionSystem::run(device_context);
-    LocalWeatherResolveSystem::run(local_weather_context);
+    invoke_system_run<PlantWeatherContributionSystem>(plant_context);
+    invoke_system_run<DeviceWeatherContributionSystem>(device_context);
+    invoke_system_run<LocalWeatherResolveSystem>(local_weather_context);
 }
 
 void prototype_site_run_seeds_site_one_desert_ephedra_patches_near_camp(
@@ -224,7 +224,7 @@ void weather_event_site_run_started_applies_site_one_background_conditions(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WeatherEventSystem::process_message(site_one_context, started_one) == GS1_STATUS_OK);
+        invoke_system_message<WeatherEventSystem>(site_one_context, started_one) == GS1_STATUS_OK);
     const auto& site_one_content = require_site_content(context, 1U);
     GS1_SYSTEM_TEST_CHECK(context, site_one_run.weather.forecast_profile_state.forecast_profile_id == 1U);
     GS1_SYSTEM_TEST_CHECK(context, !site_one_run.event.active_event_template_id.has_value());
@@ -245,7 +245,7 @@ void weather_event_site_run_started_applies_site_one_background_conditions(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WeatherEventSystem::process_message(site_two_context, started_two) == GS1_STATUS_OK);
+        invoke_system_message<WeatherEventSystem>(site_two_context, started_two) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !site_two_run.event.active_event_template_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_two_run.weather.weather_heat, 0.0f));
 }
@@ -260,7 +260,7 @@ void site_one_starting_weather_keeps_starter_plant_density_stable(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WeatherEventSystem::process_message(
+        invoke_system_message<WeatherEventSystem>(
             weather_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -270,7 +270,7 @@ void site_one_starting_weather_keeps_starter_plant_density_stable(
     run_local_weather_pipeline(campaign, site_run, queue);
 
     auto ecology_context = make_site_context<EcologySystem>(campaign, site_run, queue, 60.0);
-    EcologySystem::run(ecology_context);
+    invoke_system_run<EcologySystem>(ecology_context);
 
     for (const TileCoord coord : {
              TileCoord {12, 14},
@@ -308,14 +308,14 @@ void site_one_small_fixed_steps_keep_density_stable_without_density_reports(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WeatherEventSystem::process_message(weather_context, started) == GS1_STATUS_OK);
+        invoke_system_message<WeatherEventSystem>(weather_context, started) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        LocalWeatherResolveSystem::process_message(local_weather_message_context, started) ==
+        invoke_system_message<LocalWeatherResolveSystem>(local_weather_message_context, started) ==
             GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        EcologySystem::process_message(ecology_message_context, started) == GS1_STATUS_OK);
+        invoke_system_message<EcologySystem>(ecology_message_context, started) == GS1_STATUS_OK);
 
     queue.clear();
 
@@ -323,7 +323,7 @@ void site_one_small_fixed_steps_keep_density_stable_without_density_reports(
     {
         run_local_weather_pipeline(campaign, site_run, queue);
         auto ecology_context = make_site_context<EcologySystem>(campaign, site_run, queue, 1.0 / 60.0);
-        EcologySystem::run(ecology_context);
+        invoke_system_run<EcologySystem>(ecology_context);
     }
 
     const auto tile = site_run.site_world->tile_at(TileCoord {12, 14});
@@ -341,7 +341,7 @@ void weather_event_run_advances_active_event_through_full_lifecycle(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WeatherEventSystem::process_message(
+        invoke_system_message<WeatherEventSystem>(
             weather_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -355,8 +355,8 @@ void weather_event_run_advances_active_event_through_full_lifecycle(
 
     for (int index = 0; index < 10; ++index)
     {
-        SiteTimeSystem::run(site_time_context);
-        WeatherEventSystem::run(weather_context);
+        invoke_system_run<SiteTimeSystem>(site_time_context);
+        invoke_system_run<WeatherEventSystem>(weather_context);
     }
     const auto& site_one_content = require_site_content(context, 1U);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.weather_heat, site_one_content.default_weather_heat));
@@ -365,8 +365,8 @@ void weather_event_run_advances_active_event_through_full_lifecycle(
 
     for (int index = 0; index < 25; ++index)
     {
-        SiteTimeSystem::run(site_time_context);
-        WeatherEventSystem::run(weather_context);
+        invoke_system_run<SiteTimeSystem>(site_time_context);
+        invoke_system_run<WeatherEventSystem>(weather_context);
     }
     GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_heat > site_one_content.default_weather_heat);
     GS1_SYSTEM_TEST_CHECK(context, site_run.weather.weather_heat < site_one_content.default_weather_heat + 15.0f);
@@ -377,8 +377,8 @@ void weather_event_run_advances_active_event_through_full_lifecycle(
 
     for (int index = 0; index < 120; ++index)
     {
-        SiteTimeSystem::run(site_time_context);
-        WeatherEventSystem::run(weather_context);
+        invoke_system_run<SiteTimeSystem>(site_time_context);
+        invoke_system_run<WeatherEventSystem>(weather_context);
     }
     GS1_SYSTEM_TEST_CHECK(context, !site_run.event.active_event_template_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.weather.weather_heat, site_one_content.default_weather_heat, 0.01f));
@@ -405,7 +405,7 @@ void weather_event_does_not_reseed_when_event_is_already_active(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WeatherEventSystem::process_message(
+        invoke_system_message<WeatherEventSystem>(
             site_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -433,7 +433,7 @@ void weather_event_timeline_progress_tracks_site_clock_progress(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WeatherEventSystem::process_message(
+        invoke_system_message<WeatherEventSystem>(
             weather_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -449,8 +449,8 @@ void weather_event_timeline_progress_tracks_site_clock_progress(
 
     for (int index = 0; index < 10; ++index)
     {
-        SiteTimeSystem::run(site_time_context);
-        WeatherEventSystem::run(weather_context);
+        invoke_system_run<SiteTimeSystem>(site_time_context);
+        invoke_system_run<WeatherEventSystem>(weather_context);
     }
 
     const double world_minutes_elapsed =
@@ -471,7 +471,7 @@ void weather_event_timeline_ramp_down_smooths_weather_toward_lower_target(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WeatherEventSystem::process_message(
+        invoke_system_message<WeatherEventSystem>(
             weather_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -492,7 +492,7 @@ void weather_event_timeline_ramp_down_smooths_weather_toward_lower_target(
     site_run.weather.weather_wind_direction_degrees = 74.0f;
     site_run.clock.world_time_minutes = 6.0;
 
-    WeatherEventSystem::run(weather_context);
+    invoke_system_run<WeatherEventSystem>(weather_context);
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.event.event_heat_pressure < 15.0f);
     GS1_SYSTEM_TEST_CHECK(context, site_run.event.event_wind_pressure < 10.0f);
@@ -524,7 +524,7 @@ void onboarding_chain_locks_weather_to_authored_baseline_until_chain_finishes(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WeatherEventSystem::process_message(weather_context, started) == GS1_STATUS_OK);
+        invoke_system_message<WeatherEventSystem>(weather_context, started) == GS1_STATUS_OK);
 
     const auto& site_one_content = require_site_content(context, 1U);
     gs1::TaskInstanceState onboarding_task {};
@@ -561,7 +561,7 @@ void onboarding_chain_locks_weather_to_authored_baseline_until_chain_finishes(
 
     for (int index = 0; index < 30; ++index)
     {
-        WeatherEventSystem::run(weather_context);
+        invoke_system_run<WeatherEventSystem>(weather_context);
     }
 
     GS1_SYSTEM_TEST_CHECK(context, !site_run.event.active_event_template_id.has_value());
@@ -594,7 +594,7 @@ void onboarding_chain_locks_weather_to_authored_baseline_until_chain_finishes(
 
     for (int index = 0; index < 40; ++index)
     {
-        WeatherEventSystem::run(weather_context);
+        invoke_system_run<WeatherEventSystem>(weather_context);
     }
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.weather.forecast_profile_state.forecast_profile_id == 1U);
@@ -618,7 +618,7 @@ void weather_event_highway_objective_schedules_repeating_waves_with_one_sided_wi
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WeatherEventSystem::process_message(
+        invoke_system_message<WeatherEventSystem>(
             weather_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -630,7 +630,7 @@ void weather_event_highway_objective_schedules_repeating_waves_with_one_sided_wi
 
     for (int index = 0; index < 40; ++index)
     {
-        WeatherEventSystem::run(weather_context);
+        invoke_system_run<WeatherEventSystem>(weather_context);
     }
 
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.event.active_event_template_id.has_value());
@@ -656,7 +656,7 @@ void weather_event_cash_target_objective_schedules_repeating_waves_from_target_e
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WeatherEventSystem::process_message(
+        invoke_system_message<WeatherEventSystem>(
             weather_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -668,7 +668,7 @@ void weather_event_cash_target_objective_schedules_repeating_waves_from_target_e
 
     for (int index = 0; index < 40; ++index)
     {
-        WeatherEventSystem::run(weather_context);
+        invoke_system_run<WeatherEventSystem>(weather_context);
     }
 
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.event.active_event_template_id.has_value());
@@ -695,7 +695,7 @@ void local_weather_resolve_recomputes_full_grid_each_run(
     GS1_SYSTEM_TEST_CHECK(context, !LocalWeatherResolveSystem::subscribes_to(GameMessageType::TileEcologyBatchChanged));
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        LocalWeatherResolveSystem::process_message(
+        invoke_system_message<LocalWeatherResolveSystem>(
             site_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -923,7 +923,7 @@ void local_weather_resolve_straw_checkerboard_planting_completion_projects_wind_
     auto ecology_context = make_site_context<EcologySystem>(campaign, site_run, queue);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        EcologySystem::process_message(
+        invoke_system_message<EcologySystem>(
             ecology_context,
             make_message(
                 GameMessageType::SiteTilePlantingCompleted,
@@ -946,7 +946,7 @@ void local_weather_resolve_straw_checkerboard_planting_completion_projects_wind_
 
         GS1_SYSTEM_TEST_REQUIRE(
             context,
-            PlantWeatherContributionSystem::process_message(plant_context, message) == GS1_STATUS_OK);
+            invoke_system_message<PlantWeatherContributionSystem>(plant_context, message) == GS1_STATUS_OK);
     }
 
     site_run.weather.weather_wind = 50.0f;
@@ -1156,7 +1156,7 @@ void local_weather_resolve_applies_device_wind_protection_value_and_range(
     GS1_SYSTEM_TEST_CHECK(context, !LocalWeatherResolveSystem::subscribes_to(GameMessageType::SiteDeviceRepaired));
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        DeviceWeatherContributionSystem::process_message(
+        invoke_system_message<DeviceWeatherContributionSystem>(
             device_context,
             make_message(
                 GameMessageType::SiteDevicePlaced,
@@ -1212,8 +1212,8 @@ void ecology_non_growable_checkerboard_ignores_weather_pressure_and_uses_constan
     harsh_tile.local_weather.dust = 100.0f;
     harsh_run.site_world->set_tile(TileCoord {2, 2}, harsh_tile);
 
-    EcologySystem::run(calm_context);
-    EcologySystem::run(harsh_context);
+    invoke_system_run<EcologySystem>(calm_context);
+    invoke_system_run<EcologySystem>(harsh_context);
 
     const auto calm = calm_run.site_world->tile_at(TileCoord {2, 2});
     const auto harsh = harsh_run.site_world->tile_at(TileCoord {2, 2});
@@ -1244,14 +1244,14 @@ void ecology_non_growable_checkerboard_withers_out_in_five_real_minutes(
 
     for (int minute = 0; minute < 4; ++minute)
     {
-        EcologySystem::run(site_context);
+        invoke_system_run<EcologySystem>(site_context);
     }
 
     tile = site_run.site_world->tile_at(TileCoord {2, 2});
     GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id == gs1::PlantId {gs1::k_plant_straw_checkerboard});
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.plant_density, 20.0f, 0.02f));
 
-    EcologySystem::run(site_context);
+    invoke_system_run<EcologySystem>(site_context);
 
     tile = site_run.site_world->tile_at(TileCoord {2, 2});
     GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_id == gs1::PlantId {});
@@ -1309,9 +1309,9 @@ void ecology_density_change_speed_follows_linear_growth_pressure_curve(
     wither_tile.local_weather.dust = 100.0f;
     wither_run.site_world->set_tile(TileCoord {2, 2}, wither_tile);
 
-    EcologySystem::run(grow_context);
-    EcologySystem::run(hold_context);
-    EcologySystem::run(wither_context);
+    invoke_system_run<EcologySystem>(grow_context);
+    invoke_system_run<EcologySystem>(hold_context);
+    invoke_system_run<EcologySystem>(wither_context);
 
     grow_tile = grow_run.site_world->tile_at(TileCoord {2, 2});
     hold_tile = hold_run.site_world->tile_at(TileCoord {2, 2});
@@ -1344,7 +1344,7 @@ void worker_condition_requested_delta_recomputes_cap_and_clamps_energy(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        WorkerConditionSystem::process_message(
+        invoke_system_message<WorkerConditionSystem>(
             site_context,
             make_message(
                 GameMessageType::WorkerMeterDeltaRequested,
@@ -1400,7 +1400,7 @@ void worker_condition_run_applies_passive_decay_and_derived_value_floors(
     tile.local_weather.dust = 100.0f;
     site_run.site_world->set_tile(TileCoord {2, 2}, tile);
 
-    WorkerConditionSystem::run(site_context);
+    invoke_system_run<WorkerConditionSystem>(site_context);
 
     const auto updated = gs1::site_world_access::worker_conditions(site_run);
     GS1_SYSTEM_TEST_CHECK(context, updated.health < 10.0f);
@@ -1431,7 +1431,7 @@ void worker_condition_run_recovers_morale_in_calm_weather(
     tile.local_weather.dust = 0.0f;
     site_run.site_world->set_tile(TileCoord {2, 2}, tile);
 
-    WorkerConditionSystem::run(site_context);
+    invoke_system_run<WorkerConditionSystem>(site_context);
 
     const auto updated = gs1::site_world_access::worker_conditions(site_run);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(updated.morale, 45.55556f, 0.01f));
@@ -1458,7 +1458,7 @@ void worker_condition_run_applies_morale_support_to_background_resolution(
 
     site_run.modifier.resolved_channel_totals.morale = 1.0f;
 
-    WorkerConditionSystem::run(site_context);
+    invoke_system_run<WorkerConditionSystem>(site_context);
 
     const auto updated = gs1::site_world_access::worker_conditions(site_run);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(updated.morale, 53.88889f, 0.01f));
@@ -1489,7 +1489,7 @@ void worker_condition_run_scales_background_energy_recovery_from_hydration_and_n
         tile.local_weather.dust = 0.0f;
         site_run.site_world->set_tile(TileCoord {2, 2}, tile);
 
-        WorkerConditionSystem::run(site_context);
+        invoke_system_run<WorkerConditionSystem>(site_context);
 
         GS1_SYSTEM_TEST_CHECK(context, queue.size() == 1U);
         return gs1::site_world_access::worker_conditions(site_run);
@@ -1530,7 +1530,7 @@ void worker_condition_run_pauses_background_energy_recovery_while_action_execute
     site_run.site_action.current_action_id = gs1::RuntimeActionId {77U};
     site_run.site_action.started_at_world_minute = 12.0;
 
-    WorkerConditionSystem::run(site_context);
+    invoke_system_run<WorkerConditionSystem>(site_context);
 
     const auto updated = gs1::site_world_access::worker_conditions(site_run);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(updated.energy, 20.0f, 0.01f));
@@ -1582,8 +1582,8 @@ void worker_condition_run_softens_environmental_decay_when_sheltered(
     sheltered_worker.is_sheltered = true;
     gs1::site_world_access::set_worker_conditions(sheltered_run, sheltered_worker);
 
-    WorkerConditionSystem::run(exposed_context);
-    WorkerConditionSystem::run(sheltered_context);
+    invoke_system_run<WorkerConditionSystem>(exposed_context);
+    invoke_system_run<WorkerConditionSystem>(sheltered_context);
 
     const auto exposed = gs1::site_world_access::worker_conditions(exposed_run);
     const auto sheltered = gs1::site_world_access::worker_conditions(sheltered_run);
@@ -1615,7 +1615,7 @@ void worker_condition_run_matches_requested_weather_decay_timings(
     heat_health_tile.local_weather.heat = 100.0f;
     heat_health_run.site_world->set_tile(TileCoord {2, 2}, heat_health_tile);
 
-    WorkerConditionSystem::run(heat_health_context);
+    invoke_system_run<WorkerConditionSystem>(heat_health_context);
 
     const auto heat_health = gs1::site_world_access::worker_conditions(heat_health_run);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(heat_health.health, 0.0f, 0.01f));
@@ -1631,7 +1631,7 @@ void worker_condition_run_matches_requested_weather_decay_timings(
     heat_hydration_tile.local_weather.heat = 100.0f;
     heat_hydration_run.site_world->set_tile(TileCoord {2, 2}, heat_hydration_tile);
 
-    WorkerConditionSystem::run(heat_hydration_context);
+    invoke_system_run<WorkerConditionSystem>(heat_hydration_context);
 
     const auto heat_hydration = gs1::site_world_access::worker_conditions(heat_hydration_run);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(heat_hydration.hydration, 0.0f, 0.01f));
@@ -1644,7 +1644,7 @@ void worker_condition_run_matches_requested_weather_decay_timings(
     wind_health_tile.local_weather.wind = 100.0f;
     wind_health_run.site_world->set_tile(TileCoord {2, 2}, wind_health_tile);
 
-    WorkerConditionSystem::run(wind_health_context);
+    invoke_system_run<WorkerConditionSystem>(wind_health_context);
 
     const auto wind_health = gs1::site_world_access::worker_conditions(wind_health_run);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(wind_health.health, 0.0f, 0.01f));
@@ -1665,7 +1665,7 @@ void worker_condition_run_uses_requested_weather_decay_ratios(
         tile.local_weather.wind = wind;
         tile.local_weather.dust = dust;
         site_run.site_world->set_tile(TileCoord {2, 2}, tile);
-        WorkerConditionSystem::run(site_context);
+        invoke_system_run<WorkerConditionSystem>(site_context);
         return gs1::site_world_access::worker_conditions(site_run);
     };
 
@@ -1732,8 +1732,8 @@ void worker_condition_run_uses_resolved_village_effect_state_for_weather_mitigat
     mitigated_run.modifier.resolved_village_technology_effects
         .weather_health_morale_loss_reduction = 0.30f;
 
-    WorkerConditionSystem::run(baseline_context);
-    WorkerConditionSystem::run(mitigated_context);
+    invoke_system_run<WorkerConditionSystem>(baseline_context);
+    invoke_system_run<WorkerConditionSystem>(mitigated_context);
 
     const auto baseline = gs1::site_world_access::worker_conditions(baseline_run);
     const auto mitigated = gs1::site_world_access::worker_conditions(mitigated_run);
@@ -1759,7 +1759,7 @@ void device_support_updates_efficiency_and_water_from_heat(
     tile.device.device_stored_water = 1.0f;
     site_run.site_world->set_tile(TileCoord {2, 2}, tile);
 
-    DeviceSupportSystem::run(site_context);
+    invoke_system_run<DeviceSupportSystem>(site_context);
 
     const auto device = site_run.site_world->tile_device(TileCoord {2, 2});
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(device.device_efficiency, 0.4f));
@@ -1785,7 +1785,7 @@ void device_maintenance_uses_max_weather_meter_and_authored_base_speed(
     tile.device.device_integrity = 1.0f;
     site_run.site_world->set_tile(TileCoord {3, 3}, tile);
 
-    DeviceMaintenanceSystem::run(site_context);
+    invoke_system_run<DeviceMaintenanceSystem>(site_context);
 
     const auto device = site_run.site_world->tile_device(TileCoord {3, 3});
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(device.device_integrity, 0.99666667f));
@@ -1813,7 +1813,7 @@ void device_maintenance_preserves_fixed_integrity_delivery_crate(
     GS1_SYSTEM_TEST_REQUIRE(context, workbench_before.structure_id.value == gs1::k_structure_workbench);
     GS1_SYSTEM_TEST_REQUIRE(context, !workbench_before.fixed_integrity);
 
-    DeviceMaintenanceSystem::run(site_context);
+    invoke_system_run<DeviceMaintenanceSystem>(site_context);
 
     const auto delivery_box_after = site_run.site_world->tile_device(delivery_box_tile);
     const auto workbench_after = site_run.site_world->tile_device(workbench_tile);
@@ -1839,7 +1839,7 @@ void camp_durability_resets_and_crosses_service_thresholds(gs1::testing::SystemT
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        CampDurabilitySystem::process_message(
+        invoke_system_message<CampDurabilitySystem>(
             site_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -1855,7 +1855,7 @@ void camp_durability_resets_and_crosses_service_thresholds(gs1::testing::SystemT
     site_run.event.event_heat_pressure = 15.0f;
     site_run.event.event_wind_pressure = 10.0f;
     site_run.event.event_dust_pressure = 5.0f;
-    CampDurabilitySystem::run(site_context);
+    invoke_system_run<CampDurabilitySystem>(site_context);
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.camp.camp_durability < 30.0f);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.camp.camp_protection_resolved);
@@ -1879,7 +1879,7 @@ void modifier_imports_campaign_aura_and_reacts_to_camp_changes(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        ModifierSystem::process_message(
+        invoke_system_message<ModifierSystem>(
             site_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -1889,7 +1889,7 @@ void modifier_imports_campaign_aura_and_reacts_to_camp_changes(
 
     site_run.pending_projection_update_flags = 0U;
     site_run.camp.camp_durability = 0.0f;
-    ModifierSystem::run(site_context);
+    invoke_system_run<ModifierSystem>(site_context);
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.modifier.resolved_channel_totals.morale < initial_morale);
 }
@@ -1927,7 +1927,7 @@ void modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_wit
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        ModifierSystem::process_message(
+        invoke_system_message<ModifierSystem>(
             site_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -1945,7 +1945,7 @@ void modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_wit
     const auto initial_work_efficiency = site_run.modifier.resolved_channel_totals.work_efficiency;
 
     campaign.faction_progress[2].faction_reputation = reputation_for_progress_tier(1U) + 40;
-    ModifierSystem::run(site_context);
+    invoke_system_run<ModifierSystem>(site_context);
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.modifier.resolved_channel_totals.hydration > initial_hydration);
     GS1_SYSTEM_TEST_CHECK(
@@ -2145,3 +2145,4 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "modifier",
     "imports_campaign_assistant_and_scales_technology_run_modifiers_with_reputation",
     modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_with_reputation);
+

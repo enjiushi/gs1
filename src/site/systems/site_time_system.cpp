@@ -32,37 +32,86 @@ DayPhase resolve_day_phase(double world_time_minutes)
 }
 }  // namespace
 
-void SiteTimeSystem::run(SiteSystemContext<SiteTimeSystem>& context)
+const char* SiteTimeSystem::name() const noexcept
 {
-    auto& clock = context.world.own_time();
-    const double step_minutes =
-        runtime_minutes_from_real_seconds(context.fixed_step_seconds);
-    clock.world_time_minutes += step_minutes;
-    clock.day_index =
-        static_cast<std::uint32_t>(clock.world_time_minutes / k_runtime_minutes_per_day);
-    clock.day_phase = resolve_day_phase(clock.world_time_minutes);
-
-    const double refresh_interval_minutes =
-        static_cast<double>(gameplay_tuning_def().task_board.refresh_interval_minutes);
-    if (refresh_interval_minutes <= 0.0)
-    {
-        return;
-    }
-
-    clock.task_refresh_accumulator += step_minutes;
-    while (clock.task_refresh_accumulator + 0.0001 >= refresh_interval_minutes)
-    {
-        clock.task_refresh_accumulator =
-            std::max(0.0, clock.task_refresh_accumulator - refresh_interval_minutes);
-        GameMessage refresh_message {};
-        refresh_message.type = GameMessageType::SiteRefreshTick;
-        refresh_message.set_payload(SiteRefreshTickMessage {
-            SITE_REFRESH_TICK_TASK_BOARD | SITE_REFRESH_TICK_PHONE_BUY_STOCK});
-        context.message_queue.push_back(refresh_message);
-    }
+    return access().system_name.data();
 }
-GS1_IMPLEMENT_RUNTIME_SITE_RUN_ONLY_SYSTEM(
-    SiteTimeSystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_SITE_TIME,
-    1U)
+
+GameMessageSubscriptionSpan SiteTimeSystem::subscribed_game_messages() const noexcept
+{
+    return {};
+}
+
+HostMessageSubscriptionSpan SiteTimeSystem::subscribed_host_messages() const noexcept
+{
+    return {};
+}
+
+std::optional<Gs1RuntimeProfileSystemId> SiteTimeSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_SITE_TIME;
+}
+
+std::optional<std::uint32_t> SiteTimeSystem::fixed_step_order() const noexcept
+{
+    return 1U;
+}
+
+Gs1Status SiteTimeSystem::process_game_message(
+    RuntimeInvocation& invocation,
+    const GameMessage& message)
+{
+    auto access = make_game_state_access<SiteTimeSystem>(invocation);
+    (void)access;
+    (void)message;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status SiteTimeSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    auto access = make_game_state_access<SiteTimeSystem>(invocation);
+    (void)access;
+    (void)message;
+    return GS1_STATUS_OK;
+}
+
+void SiteTimeSystem::run(RuntimeInvocation& invocation)
+{
+    auto access = make_game_state_access<SiteTimeSystem>(invocation);
+    (void)access;
+    (void)with_site_system_context<SiteTimeSystem>(
+        invocation,
+        [&](SiteSystemContext<SiteTimeSystem>& context) -> Gs1Status
+        {
+            auto& clock = context.world.own_time();
+            const double step_minutes =
+                runtime_minutes_from_real_seconds(context.fixed_step_seconds);
+            clock.world_time_minutes += step_minutes;
+            clock.day_index =
+                static_cast<std::uint32_t>(clock.world_time_minutes / k_runtime_minutes_per_day);
+            clock.day_phase = resolve_day_phase(clock.world_time_minutes);
+
+            const double refresh_interval_minutes =
+                static_cast<double>(gameplay_tuning_def().task_board.refresh_interval_minutes);
+            if (refresh_interval_minutes <= 0.0)
+            {
+                return GS1_STATUS_OK;
+            }
+
+            clock.task_refresh_accumulator += step_minutes;
+            while (clock.task_refresh_accumulator + 0.0001 >= refresh_interval_minutes)
+            {
+                clock.task_refresh_accumulator =
+                    std::max(0.0, clock.task_refresh_accumulator - refresh_interval_minutes);
+                GameMessage refresh_message {};
+                refresh_message.type = GameMessageType::SiteRefreshTick;
+                refresh_message.set_payload(SiteRefreshTickMessage {
+                    SITE_REFRESH_TICK_TASK_BOARD | SITE_REFRESH_TICK_PHONE_BUY_STOCK});
+                context.message_queue.push_back(refresh_message);
+            }
+            return GS1_STATUS_OK;
+        });
+}
 }  // namespace gs1

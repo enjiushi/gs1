@@ -255,119 +255,169 @@ void run_green_wall_connection(
 }
 }  // namespace
 
-void SiteCompletionSystem::run(SiteSystemContext<SiteCompletionSystem>& context)
+const char* SiteCompletionSystem::name() const noexcept
 {
-    const auto& counters = context.world.read_counters();
-    const auto& objective = context.world.read_objective();
-    const auto& clock = context.world.read_time();
-    if (context.world.run_status() != SiteRunStatus::Active ||
-        has_pending_site_transition_message(context.message_queue, context.world.site_id_value()))
-    {
-        return;
-    }
-
-    switch (objective.type)
-    {
-    case SiteObjectiveType::DenseRestoration:
-        if (counters.site_completion_tile_threshold == 0U ||
-            counters.fully_grown_tile_count < counters.site_completion_tile_threshold)
-        {
-            return;
-        }
-
-        enqueue_site_attempt_result(
-            context.message_queue,
-            context.world.site_id_value(),
-            GS1_SITE_ATTEMPT_RESULT_COMPLETED);
-        return;
-
-    case SiteObjectiveType::HighwayProtection:
-        {
-        const float cover_threshold =
-            objective.highway_max_average_sand_cover > 0.0f &&
-                objective.highway_max_average_sand_cover <= 1.0f
-            ? objective.highway_max_average_sand_cover * 100.0f
-            : objective.highway_max_average_sand_cover;
-        if (cover_threshold <= 0.0f ||
-            objective.time_limit_minutes <= 0.0 ||
-            objective.target_tile_indices.empty())
-        {
-            return;
-        }
-
-        if (counters.highway_average_sand_cover >= cover_threshold)
-        {
-            enqueue_site_attempt_result(
-                context.message_queue,
-                context.world.site_id_value(),
-                GS1_SITE_ATTEMPT_RESULT_FAILED);
-            return;
-        }
-
-        if (clock.world_time_minutes < objective.time_limit_minutes)
-        {
-            return;
-        }
-
-        enqueue_site_attempt_result(
-            context.message_queue,
-            context.world.site_id_value(),
-            GS1_SITE_ATTEMPT_RESULT_COMPLETED);
-        return;
-        }
-
-    case SiteObjectiveType::GreenWallConnection:
-        run_green_wall_connection(context, clock);
-        return;
-
-    case SiteObjectiveType::PureSurvival:
-        if (objective.time_limit_minutes <= 0.0)
-        {
-            return;
-        }
-
-        update_objective_progress(
-            context,
-            static_cast<float>(std::clamp(
-                clock.world_time_minutes / objective.time_limit_minutes,
-                0.0,
-                1.0)));
-        if (clock.world_time_minutes < objective.time_limit_minutes)
-        {
-            return;
-        }
-
-        enqueue_site_attempt_result(
-            context.message_queue,
-            context.world.site_id_value(),
-            GS1_SITE_ATTEMPT_RESULT_COMPLETED);
-        return;
-
-    case SiteObjectiveType::CashTargetSurvival:
-    {
-        const auto& economy = context.world.read_economy();
-        update_objective_progress(
-            context,
-            normalized_cash_target_progress(objective, economy));
-        if (objective.target_cash_points <= 0 ||
-            economy.current_cash < objective.target_cash_points)
-        {
-            return;
-        }
-
-        enqueue_site_attempt_result(
-            context.message_queue,
-            context.world.site_id_value(),
-            GS1_SITE_ATTEMPT_RESULT_COMPLETED);
-        return;
-    }
-
-    default:
-        return;
-    }
+    return access().system_name.data();
 }
-GS1_IMPLEMENT_RUNTIME_SITE_RUN_ONLY_SYSTEM(
-    SiteCompletionSystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_SITE_COMPLETION,
-    20U)
+
+GameMessageSubscriptionSpan SiteCompletionSystem::subscribed_game_messages() const noexcept
+{
+    return {};
+}
+
+HostMessageSubscriptionSpan SiteCompletionSystem::subscribed_host_messages() const noexcept
+{
+    return {};
+}
+
+std::optional<Gs1RuntimeProfileSystemId> SiteCompletionSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_SITE_COMPLETION;
+}
+
+std::optional<std::uint32_t> SiteCompletionSystem::fixed_step_order() const noexcept
+{
+    return 20U;
+}
+
+Gs1Status SiteCompletionSystem::process_game_message(
+    RuntimeInvocation& invocation,
+    const GameMessage& message)
+{
+    auto access = make_game_state_access<SiteCompletionSystem>(invocation);
+    (void)access;
+    (void)message;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status SiteCompletionSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    auto access = make_game_state_access<SiteCompletionSystem>(invocation);
+    (void)access;
+    (void)message;
+    return GS1_STATUS_OK;
+}
+
+void SiteCompletionSystem::run(RuntimeInvocation& invocation)
+{
+    auto access = make_game_state_access<SiteCompletionSystem>(invocation);
+    (void)access;
+    (void)with_site_system_context<SiteCompletionSystem>(
+        invocation,
+        [&](SiteSystemContext<SiteCompletionSystem>& context) -> Gs1Status
+        {
+            const auto& counters = context.world.read_counters();
+            const auto& objective = context.world.read_objective();
+            const auto& clock = context.world.read_time();
+            if (context.world.run_status() != SiteRunStatus::Active ||
+                has_pending_site_transition_message(
+                    context.message_queue,
+                    context.world.site_id_value()))
+            {
+                return GS1_STATUS_OK;
+            }
+
+            switch (objective.type)
+            {
+            case SiteObjectiveType::DenseRestoration:
+                if (counters.site_completion_tile_threshold == 0U ||
+                    counters.fully_grown_tile_count < counters.site_completion_tile_threshold)
+                {
+                    return GS1_STATUS_OK;
+                }
+
+                enqueue_site_attempt_result(
+                    context.message_queue,
+                    context.world.site_id_value(),
+                    GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+                return GS1_STATUS_OK;
+
+            case SiteObjectiveType::HighwayProtection:
+            {
+                const float cover_threshold =
+                    objective.highway_max_average_sand_cover > 0.0f &&
+                        objective.highway_max_average_sand_cover <= 1.0f
+                    ? objective.highway_max_average_sand_cover * 100.0f
+                    : objective.highway_max_average_sand_cover;
+                if (cover_threshold <= 0.0f ||
+                    objective.time_limit_minutes <= 0.0 ||
+                    objective.target_tile_indices.empty())
+                {
+                    return GS1_STATUS_OK;
+                }
+
+                if (counters.highway_average_sand_cover >= cover_threshold)
+                {
+                    enqueue_site_attempt_result(
+                        context.message_queue,
+                        context.world.site_id_value(),
+                        GS1_SITE_ATTEMPT_RESULT_FAILED);
+                    return GS1_STATUS_OK;
+                }
+
+                if (clock.world_time_minutes < objective.time_limit_minutes)
+                {
+                    return GS1_STATUS_OK;
+                }
+
+                enqueue_site_attempt_result(
+                    context.message_queue,
+                    context.world.site_id_value(),
+                    GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+                return GS1_STATUS_OK;
+            }
+
+            case SiteObjectiveType::GreenWallConnection:
+                run_green_wall_connection(context, clock);
+                return GS1_STATUS_OK;
+
+            case SiteObjectiveType::PureSurvival:
+                if (objective.time_limit_minutes <= 0.0)
+                {
+                    return GS1_STATUS_OK;
+                }
+
+                update_objective_progress(
+                    context,
+                    static_cast<float>(std::clamp(
+                        clock.world_time_minutes / objective.time_limit_minutes,
+                        0.0,
+                        1.0)));
+                if (clock.world_time_minutes < objective.time_limit_minutes)
+                {
+                    return GS1_STATUS_OK;
+                }
+
+                enqueue_site_attempt_result(
+                    context.message_queue,
+                    context.world.site_id_value(),
+                    GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+                return GS1_STATUS_OK;
+
+            case SiteObjectiveType::CashTargetSurvival:
+            {
+                const auto& economy = context.world.read_economy();
+                update_objective_progress(
+                    context,
+                    normalized_cash_target_progress(objective, economy));
+                if (objective.target_cash_points <= 0 ||
+                    economy.current_cash < objective.target_cash_points)
+                {
+                    return GS1_STATUS_OK;
+                }
+
+                enqueue_site_attempt_result(
+                    context.message_queue,
+                    context.world.site_id_value(),
+                    GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+                return GS1_STATUS_OK;
+            }
+
+            default:
+                return GS1_STATUS_OK;
+            }
+        });
+}
 }  // namespace gs1

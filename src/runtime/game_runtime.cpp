@@ -37,6 +37,7 @@
 #include <filesystem>
 #include <limits>
 #include <string_view>
+#include <utility>
 
 namespace gs1
 {
@@ -263,6 +264,52 @@ Gs1Status dispatch_site_system_host_message(
 }
 }  // namespace
 
+RuntimeInvocation::RuntimeInvocation(GameRuntime& runtime) noexcept
+    : runtime_(&runtime)
+    , app_state_(&runtime.app_state_)
+    , campaign_(&runtime.campaign_)
+    , active_site_run_(&runtime.active_site_run_)
+    , runtime_messages_(&runtime.runtime_messages_)
+    , game_messages_(&runtime.message_queue_)
+    , fixed_step_seconds_(&runtime.fixed_step_seconds_)
+{
+}
+
+RuntimeInvocation::RuntimeInvocation(
+    Gs1AppState& app_state,
+    std::optional<CampaignState>& campaign,
+    std::optional<SiteRunState>& active_site_run,
+    std::deque<Gs1RuntimeMessage>& runtime_messages,
+    GameMessageQueue& game_messages,
+    double fixed_step_seconds,
+    float move_direction_x,
+    float move_direction_y,
+    float move_direction_z,
+    bool move_direction_present) noexcept
+    : app_state_(&app_state)
+    , campaign_(&campaign)
+    , active_site_run_(&active_site_run)
+    , runtime_messages_(&runtime_messages)
+    , game_messages_(&game_messages)
+    , fixed_step_seconds_(&fixed_step_seconds)
+    , move_direction_ {
+          move_direction_x,
+          move_direction_y,
+          move_direction_z,
+          move_direction_present}
+{
+}
+
+void RuntimeInvocation::push_game_message(const GameMessage& message)
+{
+    game_messages_->push_back(message);
+}
+
+void RuntimeInvocation::push_runtime_message(const Gs1RuntimeMessage& message)
+{
+    runtime_messages_->push_back(message);
+}
+
 GameRuntime::GameRuntime(Gs1RuntimeCreateDesc create_desc)
     : create_desc_(create_desc)
 {
@@ -295,20 +342,6 @@ GameRuntime::GameRuntime(Gs1RuntimeCreateDesc create_desc)
     }
 
     initialize_system_registry();
-}
-
-SiteMoveDirectionInput GameRuntimeTempBridge::current_move_direction() const noexcept
-{
-    if (!runtime_.active_site_run_.has_value())
-    {
-        return {};
-    }
-
-    return SiteMoveDirectionInput {
-        runtime_.active_site_run_->host_move_direction.world_move_x,
-        runtime_.active_site_run_->host_move_direction.world_move_y,
-        runtime_.active_site_run_->host_move_direction.world_move_z,
-        runtime_.active_site_run_->host_move_direction.present};
 }
 
 Gs1Status GameRuntime::get_profiling_snapshot(Gs1RuntimeProfilingSnapshot& out_snapshot) const noexcept
@@ -650,7 +683,7 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
         return status;
     };
 
-    GameRuntimeTempBridge bridge {*this};
+    RuntimeInvocation invocation {*this};
     const auto& subscribers = message_subscribers_[message_type_index(message.type)];
     for (IRuntimeSystem* system : subscribers)
     {
@@ -665,9 +698,9 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
                 *profile_id,
                 [&]() -> Gs1Status
                 {
-                    return system->process_game_message(bridge, message);
+                    return system->process_game_message(invocation, message);
                 })
-            : system->process_game_message(bridge, message);
+            : system->process_game_message(invocation, message);
         if (status != GS1_STATUS_OK)
         {
             return status;
@@ -710,7 +743,7 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
         return GS1_STATUS_INVALID_ARGUMENT;
     }
 
-    GameRuntimeTempBridge bridge {*this};
+    RuntimeInvocation invocation {*this};
     const auto& subscribers = host_message_subscribers_[host_message_type_index(message.type)];
     for (IRuntimeSystem* system : subscribers)
     {
@@ -719,7 +752,7 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
             continue;
         }
 
-        const auto status = system->process_host_message(bridge, message);
+        const auto status = system->process_host_message(invocation, message);
         if (status != GS1_STATUS_OK)
         {
             return status;
@@ -728,11 +761,14 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
 
     if (GamePresentationCoordinator::subscribes_to_host_message(message.type))
     {
-        const auto status = bridge.with_presentation_context(
-            [&](GamePresentationRuntimeContext& context) -> Gs1Status
-            {
-                return presentation_.process_host_message(context, message);
-            });
+        GamePresentationRuntimeContext context {
+            app_state_,
+            campaign_,
+            active_site_run_,
+            message_queue_,
+            runtime_messages_,
+            fixed_step_seconds_};
+        const auto status = presentation_.process_host_message(context, message);
         if (status != GS1_STATUS_OK)
         {
             return status;
@@ -769,7 +805,7 @@ void GameRuntime::run_fixed_step()
             elapsed_milliseconds_since(started_at));
     };
 
-    GameRuntimeTempBridge bridge {*this};
+    RuntimeInvocation invocation {*this};
     for (IRuntimeSystem* system : fixed_step_systems_)
     {
         if (system == nullptr)
@@ -780,7 +816,7 @@ void GameRuntime::run_fixed_step()
         const auto profile_id = system->profile_system_id();
         if (!profile_id.has_value())
         {
-            system->run(bridge);
+            system->run(invocation);
             continue;
         }
 
@@ -788,7 +824,7 @@ void GameRuntime::run_fixed_step()
             *profile_id,
             [&]()
             {
-                system->run(bridge);
+                system->run(invocation);
             });
     }
 

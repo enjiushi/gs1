@@ -40,7 +40,7 @@ void inventory_storage_open_waits_for_worker_to_reach_device_range(
     GameMessageQueue queue {};
     auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
     auto flow_context = make_site_context<SiteFlowSystem>(campaign, site_run, queue);
-    InventorySystem::run(inventory_context);
+    invoke_system_run<InventorySystem>(inventory_context);
 
     const auto storage_container = gs1::inventory_storage::starter_storage_container(site_run);
     const auto storage_id = gs1::inventory_storage::storage_id_for_container(site_run, storage_container);
@@ -48,7 +48,7 @@ void inventory_storage_open_waits_for_worker_to_reach_device_range(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::InventoryStorageViewRequest,
@@ -64,8 +64,8 @@ void inventory_storage_open_waits_for_worker_to_reach_device_range(
     const auto expected_approach_tile = site_run.inventory.pending_device_storage_open.approach_tile;
     for (int step = 0; step < 12; ++step)
     {
-        SiteFlowSystem::run(flow_context);
-        InventorySystem::run(inventory_context);
+        invoke_system_run<SiteFlowSystem>(flow_context);
+        invoke_system_run<InventorySystem>(inventory_context);
         if (site_run.inventory.opened_device_storage_id == storage_id)
         {
             break;
@@ -95,7 +95,7 @@ void opened_storage_closes_when_worker_leaves_device_range(
         queue,
         k_default_fixed_step_seconds,
         SiteMoveDirectionInput {1.0f, 0.0f, 0.0f, true});
-    InventorySystem::run(inventory_context);
+    invoke_system_run<InventorySystem>(inventory_context);
 
     const auto storage_container = gs1::inventory_storage::starter_storage_container(site_run);
     const auto storage_id = gs1::inventory_storage::storage_id_for_container(site_run, storage_container);
@@ -103,7 +103,7 @@ void opened_storage_closes_when_worker_leaves_device_range(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::InventoryStorageViewRequest,
@@ -115,8 +115,8 @@ void opened_storage_closes_when_worker_leaves_device_range(
     GS1_SYSTEM_TEST_REQUIRE(context, site_run.inventory.opened_device_storage_id == storage_id);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.pending_device_storage_open.active);
 
-    SiteFlowSystem::run(flow_context);
-    InventorySystem::run(inventory_context);
+    invoke_system_run<SiteFlowSystem>(flow_context);
+    invoke_system_run<InventorySystem>(inventory_context);
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.opened_device_storage_id == 0U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.pending_inventory_view_state_projection_update);
@@ -130,7 +130,7 @@ void medicine_item_use_keeps_pending_storage_open_chain(
     GameMessageQueue queue {};
     auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
     auto flow_context = make_site_context<SiteFlowSystem>(campaign, site_run, queue);
-    InventorySystem::run(inventory_context);
+    invoke_system_run<InventorySystem>(inventory_context);
 
     site_run.inventory.worker_pack_slots[4].occupied = true;
     site_run.inventory.worker_pack_slots[4].item_id = gs1::ItemId {gs1::k_item_medicine_pack};
@@ -144,7 +144,7 @@ void medicine_item_use_keeps_pending_storage_open_chain(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::InventoryStorageViewRequest,
@@ -157,7 +157,7 @@ void medicine_item_use_keeps_pending_storage_open_chain(
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::InventoryItemUseRequested,
@@ -172,8 +172,8 @@ void medicine_item_use_keeps_pending_storage_open_chain(
 
     for (int step = 0; step < 12; ++step)
     {
-        SiteFlowSystem::run(flow_context);
-        InventorySystem::run(inventory_context);
+        invoke_system_run<SiteFlowSystem>(flow_context);
+        invoke_system_run<InventorySystem>(inventory_context);
         if (site_run.inventory.opened_device_storage_id == storage_id)
         {
             break;
@@ -195,7 +195,7 @@ void drink_action_breaks_pending_storage_open_chain(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -213,7 +213,7 @@ void drink_action_breaks_pending_storage_open_chain(
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::InventoryStorageViewRequest,
@@ -226,7 +226,7 @@ void drink_action_breaks_pending_storage_open_chain(
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::InventoryItemUseRequested,
@@ -241,18 +241,18 @@ void drink_action_breaks_pending_storage_open_chain(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        ActionExecutionSystem::process_message(action_context, start_action_message) == GS1_STATUS_OK);
+        invoke_system_message<ActionExecutionSystem>(action_context, start_action_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(inventory_context, start_action_message) == GS1_STATUS_OK);
+        invoke_system_message<InventorySystem>(inventory_context, start_action_message) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(context, !site_run.inventory.pending_device_storage_open.active);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.opened_device_storage_id == 0U);
 
     for (int step = 0; step < 12; ++step)
     {
-        SiteFlowSystem::run(flow_context);
-        InventorySystem::run(inventory_context);
+        invoke_system_run<SiteFlowSystem>(flow_context);
+        invoke_system_run<InventorySystem>(inventory_context);
     }
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.opened_device_storage_id == 0U);
@@ -270,7 +270,7 @@ void craft_action_waits_for_worker_to_reach_device_range_before_starting(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -300,7 +300,7 @@ void craft_action_waits_for_worker_to_reach_device_range_before_starting(
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        ActionExecutionSystem::process_message(
+        invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
                 GameMessageType::StartSiteAction,
@@ -322,9 +322,9 @@ void craft_action_waits_for_worker_to_reach_device_range_before_starting(
     const auto expected_approach_tile = *site_run.site_action.approach_tile;
     for (int step = 0; step < 12; ++step)
     {
-        SiteFlowSystem::run(flow_context);
+        invoke_system_run<SiteFlowSystem>(flow_context);
         queue.clear();
-        ActionExecutionSystem::run(action_context);
+        invoke_system_run<ActionExecutionSystem>(action_context);
         if (site_run.site_action.started_at_world_minute.has_value())
         {
             break;
@@ -363,3 +363,4 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "device_interaction",
     "craft_action_waits_for_worker_to_reach_device_range_before_starting",
     craft_action_waits_for_worker_to_reach_device_range_before_starting);
+

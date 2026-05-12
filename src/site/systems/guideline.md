@@ -1,6 +1,7 @@
 # src/site/systems/
 
 Site-owned systems that declare direct message/host subscription lists and mutate only the state they own.
+The current conversion slices now wire camp durability, site flow/time, failure/completion, weather events, worker condition, action execution, craft, inventory, economy phone, phone panel, task board, device support, device maintenance, device weather contribution, local weather resolve, and modifier handling through direct `RuntimeInvocation` overrides instead of the legacy runtime bridge/macros.
 
 ## Usage
 - Read this file before scanning the folder in detail.

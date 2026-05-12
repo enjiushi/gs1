@@ -1,14 +1,19 @@
 #pragma once
 
+#include "campaign/campaign_state.h"
 #include "messages/game_message.h"
+#include "site/site_run_state.h"
 #include "gs1/status.h"
 #include "gs1/types.h"
 
 #include <array>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <optional>
 #include <span>
+#include <type_traits>
 #include <vector>
 
 namespace gs1
@@ -16,37 +21,223 @@ namespace gs1
 class GameRuntime;
 struct SiteMoveDirectionInput;
 
-class GameRuntimeTempBridge final
+struct RuntimeMoveDirectionSnapshot final
+{
+    float world_move_x {0.0f};
+    float world_move_y {0.0f};
+    float world_move_z {0.0f};
+    bool present {false};
+};
+
+template <class... Ts>
+struct type_list
+{
+};
+
+template <class T, class List>
+struct type_list_contains;
+
+template <class T, class... Ts>
+struct type_list_contains<T, type_list<Ts...>> : std::bool_constant<(std::same_as<T, Ts> || ...)>
+{
+};
+
+template <class T, class List>
+inline constexpr bool type_list_contains_v = type_list_contains<T, List>::value;
+
+struct RuntimeAppStateTag
+{
+};
+
+struct RuntimeCampaignTag
+{
+};
+
+struct RuntimeActiveSiteRunTag
+{
+};
+
+struct RuntimeFixedStepSecondsTag
+{
+};
+
+struct RuntimeMoveDirectionTag
+{
+};
+
+template <class System>
+struct system_state_tags;
+
+template <class Tag>
+struct state_owner;
+
+template <class Tag>
+struct state_traits;
+
+class RuntimeInvocation final
 {
 public:
-    explicit GameRuntimeTempBridge(GameRuntime& runtime) noexcept
-        : runtime_(runtime)
+    explicit RuntimeInvocation(GameRuntime& runtime) noexcept;
+    RuntimeInvocation(
+        Gs1AppState& app_state,
+        std::optional<CampaignState>& campaign,
+        std::optional<SiteRunState>& active_site_run,
+        std::deque<Gs1RuntimeMessage>& runtime_messages,
+        GameMessageQueue& game_messages,
+        double fixed_step_seconds,
+        float move_direction_x = 0.0f,
+        float move_direction_y = 0.0f,
+        float move_direction_z = 0.0f,
+        bool move_direction_present = false) noexcept;
+
+    [[nodiscard]] GameRuntime* runtime() noexcept { return runtime_; }
+    [[nodiscard]] const GameRuntime* runtime() const noexcept { return runtime_; }
+    [[nodiscard]] GameMessageQueue& game_message_queue() noexcept { return *game_messages_; }
+    [[nodiscard]] const GameMessageQueue& game_message_queue() const noexcept { return *game_messages_; }
+    [[nodiscard]] std::deque<Gs1RuntimeMessage>& runtime_message_queue() noexcept
+    {
+        return *runtime_messages_;
+    }
+    [[nodiscard]] const std::deque<Gs1RuntimeMessage>& runtime_message_queue() const noexcept
+    {
+        return *runtime_messages_;
+    }
+
+    void push_game_message(const GameMessage& message);
+    void push_runtime_message(const Gs1RuntimeMessage& message);
+
+private:
+    template <class Tag>
+    friend decltype(auto) runtime_invocation_state_ref(RuntimeInvocation& invocation);
+    template <class Tag>
+    friend decltype(auto) runtime_invocation_state_ref(const RuntimeInvocation& invocation);
+
+    GameRuntime* runtime_ {nullptr};
+    Gs1AppState* app_state_ {nullptr};
+    std::optional<CampaignState>* campaign_ {nullptr};
+    std::optional<SiteRunState>* active_site_run_ {nullptr};
+    std::deque<Gs1RuntimeMessage>* runtime_messages_ {nullptr};
+    GameMessageQueue* game_messages_ {nullptr};
+    double* fixed_step_seconds_ {nullptr};
+    RuntimeMoveDirectionSnapshot move_direction_ {};
+};
+
+template <class Tag>
+decltype(auto) runtime_invocation_state_ref(RuntimeInvocation& invocation);
+
+template <class Tag>
+decltype(auto) runtime_invocation_state_ref(const RuntimeInvocation& invocation);
+
+template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimeAppStateTag>(RuntimeInvocation& invocation)
+{
+    return (*invocation.app_state_);
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimeCampaignTag>(RuntimeInvocation& invocation)
+{
+    return (*invocation.campaign_);
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimeActiveSiteRunTag>(RuntimeInvocation& invocation)
+{
+    return (*invocation.active_site_run_);
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimeFixedStepSecondsTag>(RuntimeInvocation& invocation)
+{
+    return (*invocation.fixed_step_seconds_);
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimeMoveDirectionTag>(RuntimeInvocation& invocation)
+{
+    if (invocation.active_site_run_ == nullptr || !invocation.active_site_run_->has_value())
+    {
+        invocation.move_direction_ = {};
+        return (invocation.move_direction_);
+    }
+
+    if (invocation.runtime_ != nullptr)
+    {
+        invocation.move_direction_ = RuntimeMoveDirectionSnapshot {
+            invocation.active_site_run_->value().host_move_direction.world_move_x,
+            invocation.active_site_run_->value().host_move_direction.world_move_y,
+            invocation.active_site_run_->value().host_move_direction.world_move_z,
+            invocation.active_site_run_->value().host_move_direction.present};
+    }
+
+    return (invocation.move_direction_);
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimeAppStateTag>(const RuntimeInvocation& invocation)
+{
+    return (*invocation.app_state_);
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimeCampaignTag>(const RuntimeInvocation& invocation)
+{
+    return (*invocation.campaign_);
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimeActiveSiteRunTag>(const RuntimeInvocation& invocation)
+{
+    return (*invocation.active_site_run_);
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimeFixedStepSecondsTag>(const RuntimeInvocation& invocation)
+{
+    return (*invocation.fixed_step_seconds_);
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimeMoveDirectionTag>(const RuntimeInvocation& invocation)
+{
+    return runtime_invocation_state_ref<RuntimeMoveDirectionTag>(const_cast<RuntimeInvocation&>(invocation));
+}
+
+template <class System>
+class GameStateAccess final
+{
+public:
+    explicit GameStateAccess(RuntimeInvocation& invocation) noexcept
+        : invocation_(&invocation)
     {
     }
 
-    [[nodiscard]] SiteMoveDirectionInput current_move_direction() const noexcept;
+    template <class Tag>
+    [[nodiscard]] decltype(auto) read() const
+    {
+        using tags = typename system_state_tags<System>::type;
+        static_assert(type_list_contains_v<Tag, tags>, "System cannot read this state tag.");
+        return runtime_invocation_state_ref<Tag>(std::as_const(*invocation_));
+    }
 
-    template <typename Fn>
-    [[nodiscard]] Gs1Status with_campaign_flow_message_context(Fn&& fn);
-
-    template <typename Fn>
-    [[nodiscard]] Gs1Status with_campaign_context(Fn&& fn);
-
-    template <typename Fn>
-    void with_campaign_fixed_step_context(Fn&& fn);
-
-    template <typename SystemTag, typename Fn>
-    [[nodiscard]] Gs1Status with_site_context(
-        Fn&& fn,
-        SiteMoveDirectionInput move_direction = {},
-        bool missing_context_is_ok = false);
-
-    template <typename Fn>
-    [[nodiscard]] Gs1Status with_presentation_context(Fn&& fn);
+    template <class Tag>
+    [[nodiscard]] decltype(auto) write()
+        requires std::same_as<System, typename state_owner<Tag>::type>
+    {
+        using tags = typename system_state_tags<System>::type;
+        static_assert(type_list_contains_v<Tag, tags>, "System cannot access this state tag.");
+        return runtime_invocation_state_ref<Tag>(*invocation_);
+    }
 
 private:
-    GameRuntime& runtime_;
+    RuntimeInvocation* invocation_ {nullptr};
 };
+
+template <class System>
+[[nodiscard]] constexpr auto make_game_state_access(RuntimeInvocation& invocation) -> GameStateAccess<System>
+{
+    return GameStateAccess<System> {invocation};
+}
 
 inline constexpr std::size_t k_runtime_host_message_type_count =
     static_cast<std::size_t>(GS1_HOST_EVENT_SITE_SCENE_READY) + 1U;
@@ -65,12 +256,12 @@ public:
     [[nodiscard]] virtual std::optional<Gs1RuntimeProfileSystemId> profile_system_id() const noexcept = 0;
     [[nodiscard]] virtual std::optional<std::uint32_t> fixed_step_order() const noexcept = 0;
     [[nodiscard]] virtual Gs1Status process_game_message(
-        GameRuntimeTempBridge& bridge,
+        RuntimeInvocation& invocation,
         const GameMessage& message) = 0;
     [[nodiscard]] virtual Gs1Status process_host_message(
-        GameRuntimeTempBridge& bridge,
+        RuntimeInvocation& invocation,
         const Gs1HostMessage& message) = 0;
-    virtual void run(GameRuntimeTempBridge& bridge) = 0;
+    virtual void run(RuntimeInvocation& invocation) = 0;
 };
 
 using RuntimeGameMessageSubscribers = std::array<std::vector<IRuntimeSystem*>, k_game_message_type_count>;
@@ -97,320 +288,3 @@ template <typename EnumType, std::size_t Count, auto Predicate>
     return subscriptions;
 }
 }  // namespace gs1
-
-#define GS1_IMPLEMENT_RUNTIME_CAMPAIGN_FLOW_SYSTEM(ClassName)                                                     \
-    const char* ClassName::name() const noexcept                                                                  \
-    {                                                                                                             \
-        return #ClassName;                                                                                        \
-    }                                                                                                             \
-    gs1::GameMessageSubscriptionSpan ClassName::subscribed_game_messages() const noexcept                         \
-    {                                                                                                             \
-        return gs1::runtime_subscription_list<                                                                    \
-            gs1::GameMessageType,                                                                                 \
-            gs1::k_game_message_type_count,                                                                       \
-            &ClassName::subscribes_to>();                                                                         \
-    }                                                                                                             \
-    gs1::HostMessageSubscriptionSpan ClassName::subscribed_host_messages() const noexcept                         \
-    {                                                                                                             \
-        return gs1::runtime_subscription_list<                                                                    \
-            Gs1HostMessageType,                                                                                   \
-            gs1::k_runtime_host_message_type_count,                                                               \
-            &ClassName::subscribes_to_host_message>();                                                            \
-    }                                                                                                             \
-    std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
-    {                                                                                                             \
-        return GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_FLOW;                                                          \
-    }                                                                                                             \
-    std::optional<std::uint32_t> ClassName::fixed_step_order() const noexcept                                    \
-    {                                                                                                             \
-        return std::nullopt;                                                                                      \
-    }                                                                                                             \
-    Gs1Status ClassName::process_game_message(gs1::GameRuntimeTempBridge& bridge, const gs1::GameMessage& message) \
-    {                                                                                                             \
-        return bridge.with_campaign_flow_message_context(                                                         \
-            [&](gs1::CampaignFlowMessageContext& context) -> Gs1Status                                            \
-            {                                                                                                     \
-                return ClassName::process_message(context, message);                                              \
-            });                                                                                                   \
-    }                                                                                                             \
-    Gs1Status ClassName::process_host_message(gs1::GameRuntimeTempBridge& bridge, const Gs1HostMessage& message) \
-    {                                                                                                             \
-        return bridge.with_campaign_flow_message_context(                                                         \
-            [&](gs1::CampaignFlowMessageContext& context) -> Gs1Status                                            \
-            {                                                                                                     \
-                return ClassName::process_host_message(context, message);                                         \
-            });                                                                                                   \
-    }                                                                                                             \
-    void ClassName::run(gs1::GameRuntimeTempBridge&)                                                              \
-    {                                                                                                             \
-    }
-
-#define GS1_IMPLEMENT_RUNTIME_CAMPAIGN_MESSAGE_SYSTEM(ClassName, ProfileId)                                       \
-    const char* ClassName::name() const noexcept                                                                  \
-    {                                                                                                             \
-        return #ClassName;                                                                                        \
-    }                                                                                                             \
-    gs1::GameMessageSubscriptionSpan ClassName::subscribed_game_messages() const noexcept                         \
-    {                                                                                                             \
-        return gs1::runtime_subscription_list<                                                                    \
-            gs1::GameMessageType,                                                                                 \
-            gs1::k_game_message_type_count,                                                                       \
-            &ClassName::subscribes_to>();                                                                         \
-    }                                                                                                             \
-    gs1::HostMessageSubscriptionSpan ClassName::subscribed_host_messages() const noexcept                         \
-    {                                                                                                             \
-        return {};                                                                                                \
-    }                                                                                                             \
-    std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
-    {                                                                                                             \
-        return ProfileId;                                                                                         \
-    }                                                                                                             \
-    std::optional<std::uint32_t> ClassName::fixed_step_order() const noexcept                                    \
-    {                                                                                                             \
-        return std::nullopt;                                                                                      \
-    }                                                                                                             \
-    Gs1Status ClassName::process_game_message(gs1::GameRuntimeTempBridge& bridge, const gs1::GameMessage& message) \
-    {                                                                                                             \
-        return bridge.with_campaign_context(                                                                      \
-            [&](gs1::CampaignSystemContext& context) -> Gs1Status                                                 \
-            {                                                                                                     \
-                return ClassName::process_message(context, message);                                              \
-            });                                                                                                   \
-    }                                                                                                             \
-    Gs1Status ClassName::process_host_message(gs1::GameRuntimeTempBridge&, const Gs1HostMessage&)                \
-    {                                                                                                             \
-        return GS1_STATUS_OK;                                                                                     \
-    }                                                                                                             \
-    void ClassName::run(gs1::GameRuntimeTempBridge&)                                                              \
-    {                                                                                                             \
-    }
-
-#define GS1_IMPLEMENT_RUNTIME_CAMPAIGN_FIXED_STEP_SYSTEM(ClassName, ProfileId, FixedStepOrderValue, ContextType)  \
-    const char* ClassName::name() const noexcept                                                                  \
-    {                                                                                                             \
-        return #ClassName;                                                                                        \
-    }                                                                                                             \
-    gs1::GameMessageSubscriptionSpan ClassName::subscribed_game_messages() const noexcept                         \
-    {                                                                                                             \
-        return {};                                                                                                \
-    }                                                                                                             \
-    gs1::HostMessageSubscriptionSpan ClassName::subscribed_host_messages() const noexcept                         \
-    {                                                                                                             \
-        return {};                                                                                                \
-    }                                                                                                             \
-    std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
-    {                                                                                                             \
-        return ProfileId;                                                                                         \
-    }                                                                                                             \
-    std::optional<std::uint32_t> ClassName::fixed_step_order() const noexcept                                    \
-    {                                                                                                             \
-        return FixedStepOrderValue;                                                                               \
-    }                                                                                                             \
-    Gs1Status ClassName::process_game_message(gs1::GameRuntimeTempBridge&, const gs1::GameMessage&)              \
-    {                                                                                                             \
-        return GS1_STATUS_OK;                                                                                     \
-    }                                                                                                             \
-    Gs1Status ClassName::process_host_message(gs1::GameRuntimeTempBridge&, const Gs1HostMessage&)                \
-    {                                                                                                             \
-        return GS1_STATUS_OK;                                                                                     \
-    }                                                                                                             \
-    void ClassName::run(gs1::GameRuntimeTempBridge& bridge)                                                       \
-    {                                                                                                             \
-        bridge.with_campaign_fixed_step_context(                                                                  \
-            [&](ContextType& context)                                                                             \
-            {                                                                                                     \
-                ClassName::run(context);                                                                          \
-            });                                                                                                   \
-    }
-
-#define GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(ClassName, ProfileId, FixedStepOrderValue)                      \
-    const char* ClassName::name() const noexcept                                                                  \
-    {                                                                                                             \
-        return ClassName::access().system_name.data();                                                            \
-    }                                                                                                             \
-    gs1::GameMessageSubscriptionSpan ClassName::subscribed_game_messages() const noexcept                         \
-    {                                                                                                             \
-        return gs1::runtime_subscription_list<                                                                    \
-            gs1::GameMessageType,                                                                                 \
-            gs1::k_game_message_type_count,                                                                       \
-            &ClassName::subscribes_to>();                                                                         \
-    }                                                                                                             \
-    gs1::HostMessageSubscriptionSpan ClassName::subscribed_host_messages() const noexcept                         \
-    {                                                                                                             \
-        return {};                                                                                                \
-    }                                                                                                             \
-    std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
-    {                                                                                                             \
-        return ProfileId;                                                                                         \
-    }                                                                                                             \
-    std::optional<std::uint32_t> ClassName::fixed_step_order() const noexcept                                    \
-    {                                                                                                             \
-        return FixedStepOrderValue;                                                                               \
-    }                                                                                                             \
-    Gs1Status ClassName::process_game_message(gs1::GameRuntimeTempBridge& bridge, const gs1::GameMessage& message) \
-    {                                                                                                             \
-        return bridge.with_site_context<ClassName>(                                                               \
-            [&](gs1::SiteSystemContext<ClassName>& context) -> Gs1Status                                          \
-            {                                                                                                     \
-                return ClassName::process_message(context, message);                                              \
-            });                                                                                                   \
-    }                                                                                                             \
-    Gs1Status ClassName::process_host_message(gs1::GameRuntimeTempBridge&, const Gs1HostMessage&)                \
-    {                                                                                                             \
-        return GS1_STATUS_OK;                                                                                     \
-    }                                                                                                             \
-    void ClassName::run(gs1::GameRuntimeTempBridge& bridge)                                                       \
-    {                                                                                                             \
-        (void)bridge.with_site_context<ClassName>(                                                                \
-            [&](gs1::SiteSystemContext<ClassName>& context) -> Gs1Status                                          \
-            {                                                                                                     \
-                ClassName::run(context);                                                                          \
-                return GS1_STATUS_OK;                                                                             \
-            },                                                                                                    \
-            bridge.current_move_direction());                                                                     \
-    }
-
-#define GS1_IMPLEMENT_RUNTIME_SITE_HOST_AND_MESSAGE_SYSTEM(ClassName, ProfileId, FixedStepOrderValue)             \
-    const char* ClassName::name() const noexcept                                                                  \
-    {                                                                                                             \
-        return ClassName::access().system_name.data();                                                            \
-    }                                                                                                             \
-    gs1::GameMessageSubscriptionSpan ClassName::subscribed_game_messages() const noexcept                         \
-    {                                                                                                             \
-        return gs1::runtime_subscription_list<                                                                    \
-            gs1::GameMessageType,                                                                                 \
-            gs1::k_game_message_type_count,                                                                       \
-            &ClassName::subscribes_to>();                                                                         \
-    }                                                                                                             \
-    gs1::HostMessageSubscriptionSpan ClassName::subscribed_host_messages() const noexcept                         \
-    {                                                                                                             \
-        return gs1::runtime_subscription_list<                                                                    \
-            Gs1HostMessageType,                                                                                   \
-            gs1::k_runtime_host_message_type_count,                                                               \
-            &ClassName::subscribes_to_host_message>();                                                            \
-    }                                                                                                             \
-    std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
-    {                                                                                                             \
-        return ProfileId;                                                                                         \
-    }                                                                                                             \
-    std::optional<std::uint32_t> ClassName::fixed_step_order() const noexcept                                    \
-    {                                                                                                             \
-        return FixedStepOrderValue;                                                                               \
-    }                                                                                                             \
-    Gs1Status ClassName::process_game_message(gs1::GameRuntimeTempBridge& bridge, const gs1::GameMessage& message) \
-    {                                                                                                             \
-        return bridge.with_site_context<ClassName>(                                                               \
-            [&](gs1::SiteSystemContext<ClassName>& context) -> Gs1Status                                          \
-            {                                                                                                     \
-                return ClassName::process_message(context, message);                                              \
-            });                                                                                                   \
-    }                                                                                                             \
-    Gs1Status ClassName::process_host_message(gs1::GameRuntimeTempBridge& bridge, const Gs1HostMessage& message) \
-    {                                                                                                             \
-        return bridge.with_site_context<ClassName>(                                                               \
-            [&](gs1::SiteSystemContext<ClassName>& context) -> Gs1Status                                          \
-            {                                                                                                     \
-                return ClassName::process_host_message(context, message);                                         \
-            },                                                                                                    \
-            gs1::SiteMoveDirectionInput {},                                                                       \
-            true);                                                                                                \
-    }                                                                                                             \
-    void ClassName::run(gs1::GameRuntimeTempBridge& bridge)                                                       \
-    {                                                                                                             \
-        (void)bridge.with_site_context<ClassName>(                                                                \
-            [&](gs1::SiteSystemContext<ClassName>& context) -> Gs1Status                                          \
-            {                                                                                                     \
-                ClassName::run(context);                                                                          \
-                return GS1_STATUS_OK;                                                                             \
-            },                                                                                                    \
-            bridge.current_move_direction());                                                                     \
-    }
-
-#define GS1_IMPLEMENT_RUNTIME_SITE_RUN_ONLY_SYSTEM(ClassName, ProfileId, FixedStepOrderValue)                     \
-    const char* ClassName::name() const noexcept                                                                  \
-    {                                                                                                             \
-        return ClassName::access().system_name.data();                                                            \
-    }                                                                                                             \
-    gs1::GameMessageSubscriptionSpan ClassName::subscribed_game_messages() const noexcept                         \
-    {                                                                                                             \
-        return {};                                                                                                \
-    }                                                                                                             \
-    gs1::HostMessageSubscriptionSpan ClassName::subscribed_host_messages() const noexcept                         \
-    {                                                                                                             \
-        return {};                                                                                                \
-    }                                                                                                             \
-    std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
-    {                                                                                                             \
-        return ProfileId;                                                                                         \
-    }                                                                                                             \
-    std::optional<std::uint32_t> ClassName::fixed_step_order() const noexcept                                    \
-    {                                                                                                             \
-        return FixedStepOrderValue;                                                                               \
-    }                                                                                                             \
-    Gs1Status ClassName::process_game_message(gs1::GameRuntimeTempBridge&, const gs1::GameMessage&)              \
-    {                                                                                                             \
-        return GS1_STATUS_OK;                                                                                     \
-    }                                                                                                             \
-    Gs1Status ClassName::process_host_message(gs1::GameRuntimeTempBridge&, const Gs1HostMessage&)                \
-    {                                                                                                             \
-        return GS1_STATUS_OK;                                                                                     \
-    }                                                                                                             \
-    void ClassName::run(gs1::GameRuntimeTempBridge& bridge)                                                       \
-    {                                                                                                             \
-        (void)bridge.with_site_context<ClassName>(                                                                \
-            [&](gs1::SiteSystemContext<ClassName>& context) -> Gs1Status                                          \
-            {                                                                                                     \
-                ClassName::run(context);                                                                          \
-                return GS1_STATUS_OK;                                                                             \
-            },                                                                                                    \
-            bridge.current_move_direction());                                                                     \
-    }
-
-#define GS1_IMPLEMENT_RUNTIME_SITE_HOST_ONLY_RUN_SYSTEM(ClassName, ProfileId, FixedStepOrderValue)                \
-    const char* ClassName::name() const noexcept                                                                  \
-    {                                                                                                             \
-        return ClassName::access().system_name.data();                                                            \
-    }                                                                                                             \
-    gs1::GameMessageSubscriptionSpan ClassName::subscribed_game_messages() const noexcept                         \
-    {                                                                                                             \
-        return {};                                                                                                \
-    }                                                                                                             \
-    gs1::HostMessageSubscriptionSpan ClassName::subscribed_host_messages() const noexcept                         \
-    {                                                                                                             \
-        return gs1::runtime_subscription_list<                                                                    \
-            Gs1HostMessageType,                                                                                   \
-            gs1::k_runtime_host_message_type_count,                                                               \
-            &ClassName::subscribes_to_host_message>();                                                            \
-    }                                                                                                             \
-    std::optional<Gs1RuntimeProfileSystemId> ClassName::profile_system_id() const noexcept                       \
-    {                                                                                                             \
-        return ProfileId;                                                                                         \
-    }                                                                                                             \
-    std::optional<std::uint32_t> ClassName::fixed_step_order() const noexcept                                    \
-    {                                                                                                             \
-        return FixedStepOrderValue;                                                                               \
-    }                                                                                                             \
-    Gs1Status ClassName::process_game_message(gs1::GameRuntimeTempBridge&, const gs1::GameMessage&)              \
-    {                                                                                                             \
-        return GS1_STATUS_OK;                                                                                     \
-    }                                                                                                             \
-    Gs1Status ClassName::process_host_message(gs1::GameRuntimeTempBridge& bridge, const Gs1HostMessage& message) \
-    {                                                                                                             \
-        return bridge.with_site_context<ClassName>(                                                               \
-            [&](gs1::SiteSystemContext<ClassName>& context) -> Gs1Status                                          \
-            {                                                                                                     \
-                return ClassName::process_host_message(context, message);                                         \
-            },                                                                                                    \
-            gs1::SiteMoveDirectionInput {},                                                                       \
-            true);                                                                                                \
-    }                                                                                                             \
-    void ClassName::run(gs1::GameRuntimeTempBridge& bridge)                                                       \
-    {                                                                                                             \
-        (void)bridge.with_site_context<ClassName>(                                                                \
-            [&](gs1::SiteSystemContext<ClassName>& context) -> Gs1Status                                          \
-            {                                                                                                     \
-                ClassName::run(context);                                                                          \
-                return GS1_STATUS_OK;                                                                             \
-            },                                                                                                    \
-            bridge.current_move_direction());                                                                     \
-    }

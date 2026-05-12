@@ -1,5 +1,6 @@
 #include "campaign/systems/technology_system.h"
 
+#include "campaign/systems/campaign_system_context.h"
 #include "runtime/game_runtime.h"
 #include "support/currency.h"
 
@@ -123,11 +124,79 @@ const FactionProgressState* find_faction_progress(
 
     return false;
 }
+
 }  // namespace
+
+Gs1Status process_technology_message(
+    CampaignSystemContext& context,
+    const GameMessage& message);
+
+template <>
+struct system_state_tags<TechnologySystem>
+{
+    using type = type_list<RuntimeCampaignTag>;
+};
 
 bool TechnologySystem::subscribes_to(GameMessageType type) noexcept
 {
     return type == GameMessageType::CampaignReputationAwardRequested;
+}
+
+const char* TechnologySystem::name() const noexcept
+{
+    return "TechnologySystem";
+}
+
+GameMessageSubscriptionSpan TechnologySystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<
+        GameMessageType,
+        k_game_message_type_count,
+        TechnologySystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan TechnologySystem::subscribed_host_messages() const noexcept
+{
+    return {};
+}
+
+std::optional<Gs1RuntimeProfileSystemId> TechnologySystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_TECHNOLOGY;
+}
+
+std::optional<std::uint32_t> TechnologySystem::fixed_step_order() const noexcept
+{
+    return std::nullopt;
+}
+
+Gs1Status TechnologySystem::process_game_message(
+    RuntimeInvocation& invocation,
+    const GameMessage& message)
+{
+    auto access = make_game_state_access<TechnologySystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    if (!campaign.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    CampaignSystemContext context {*campaign};
+    return process_technology_message(context, message);
+}
+
+Gs1Status TechnologySystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    (void)invocation;
+    (void)message;
+    return GS1_STATUS_OK;
+}
+
+void TechnologySystem::run(RuntimeInvocation& invocation)
+{
+    (void)invocation;
 }
 
 bool TechnologySystem::node_purchased(
@@ -362,7 +431,7 @@ bool TechnologySystem::node_claimable(
     return false;
 }
 
-Gs1Status TechnologySystem::process_message(
+Gs1Status process_technology_message(
     CampaignSystemContext& context,
     const GameMessage& message)
 {
@@ -384,8 +453,4 @@ Gs1Status TechnologySystem::process_message(
         return GS1_STATUS_OK;
     }
 }
-
-GS1_IMPLEMENT_RUNTIME_CAMPAIGN_MESSAGE_SYSTEM(
-    TechnologySystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_TECHNOLOGY)
 }  // namespace gs1

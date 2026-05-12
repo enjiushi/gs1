@@ -25,6 +25,16 @@
 
 namespace gs1
 {
+template <>
+struct system_state_tags<ActionExecutionSystem>
+{
+    using type = type_list<
+        RuntimeCampaignTag,
+        RuntimeActiveSiteRunTag,
+        RuntimeFixedStepSecondsTag,
+        RuntimeMoveDirectionTag>;
+};
+
 namespace
 {
 constexpr double k_minimum_action_duration_minutes = 0.25;
@@ -2512,6 +2522,10 @@ SiteActionFailureReason validate_excavation_completion(
 
 }  // namespace
 
+Gs1Status process_game_message_impl(
+    SiteSystemContext<ActionExecutionSystem>& context,
+    const GameMessage& message);
+
 bool ActionExecutionSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
 {
     return type == GS1_HOST_EVENT_SITE_ACTION_REQUEST ||
@@ -2519,7 +2533,7 @@ bool ActionExecutionSystem::subscribes_to_host_message(Gs1HostMessageType type) 
         type == GS1_HOST_EVENT_SITE_CONTEXT_REQUEST;
 }
 
-Gs1Status ActionExecutionSystem::process_host_message(
+Gs1Status process_host_message_impl(
     SiteSystemContext<ActionExecutionSystem>& context,
     const Gs1HostMessage& message)
 {
@@ -2541,7 +2555,7 @@ Gs1Status ActionExecutionSystem::process_host_message(
             message.payload.site_action_request.primary_subject_id,
             message.payload.site_action_request.secondary_subject_id,
             message.payload.site_action_request.item_id});
-        return process_message(context, translated);
+        return process_game_message_impl(context, translated);
 
     case GS1_HOST_EVENT_SITE_ACTION_CANCEL:
         if (message.payload.site_action_cancel.action_id == 0U &&
@@ -2555,7 +2569,7 @@ Gs1Status ActionExecutionSystem::process_host_message(
         translated.set_payload(CancelSiteActionMessage {
             message.payload.site_action_cancel.action_id,
             message.payload.site_action_cancel.flags});
-        return process_message(context, translated);
+        return process_game_message_impl(context, translated);
 
     case GS1_HOST_EVENT_SITE_CONTEXT_REQUEST:
         if (!context.site_run.site_action.placement_mode.active)
@@ -2567,7 +2581,7 @@ Gs1Status ActionExecutionSystem::process_host_message(
             message.payload.site_context_request.tile_x,
             message.payload.site_context_request.tile_y,
             message.payload.site_context_request.flags});
-        return process_message(context, translated);
+        return process_game_message_impl(context, translated);
 
     default:
         return GS1_STATUS_OK;
@@ -2589,7 +2603,7 @@ bool ActionExecutionSystem::subscribes_to(GameMessageType type) noexcept
     }
 }
 
-Gs1Status ActionExecutionSystem::process_message(
+Gs1Status process_game_message_impl(
     SiteSystemContext<ActionExecutionSystem>& context,
     const GameMessage& message)
 {
@@ -3177,7 +3191,7 @@ Gs1Status ActionExecutionSystem::process_message(
     }
 }
 
-void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& context)
+void run_impl(SiteSystemContext<ActionExecutionSystem>& context)
 {
     auto& action_state = context.world.own_action();
     if (is_action_waiting_for_worker_approach(action_state) &&
@@ -3340,8 +3354,77 @@ void ActionExecutionSystem::run(SiteSystemContext<ActionExecutionSystem>& contex
     }
     context.world.mark_projection_dirty(dirty_flags);
 }
-GS1_IMPLEMENT_RUNTIME_SITE_HOST_AND_MESSAGE_SYSTEM(
-    ActionExecutionSystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_ACTION_EXECUTION,
-    5U)
+
+const char* ActionExecutionSystem::name() const noexcept
+{
+    return "ActionExecutionSystem";
+}
+
+GameMessageSubscriptionSpan ActionExecutionSystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<
+        GameMessageType,
+        k_game_message_type_count,
+        &ActionExecutionSystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan ActionExecutionSystem::subscribed_host_messages() const noexcept
+{
+    return runtime_subscription_list<
+        Gs1HostMessageType,
+        k_runtime_host_message_type_count,
+        &ActionExecutionSystem::subscribes_to_host_message>();
+}
+
+std::optional<Gs1RuntimeProfileSystemId> ActionExecutionSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_ACTION_EXECUTION;
+}
+
+std::optional<std::uint32_t> ActionExecutionSystem::fixed_step_order() const noexcept
+{
+    return 5U;
+}
+
+Gs1Status ActionExecutionSystem::process_game_message(
+    RuntimeInvocation& invocation,
+    const GameMessage& message)
+{
+    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
+    (void)access;
+    return with_site_system_context<ActionExecutionSystem>(
+        invocation,
+        [&](SiteSystemContext<ActionExecutionSystem>& context)
+        {
+            return process_game_message_impl(context, message);
+        });
+}
+
+Gs1Status ActionExecutionSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
+    (void)access;
+    return with_site_system_context<ActionExecutionSystem>(
+        invocation,
+        [&](SiteSystemContext<ActionExecutionSystem>& context)
+        {
+            return process_host_message_impl(context, message);
+        });
+}
+
+void ActionExecutionSystem::run(RuntimeInvocation& invocation)
+{
+    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
+    (void)access;
+    (void)with_site_system_context<ActionExecutionSystem>(
+        invocation,
+        [&](SiteSystemContext<ActionExecutionSystem>& context)
+        {
+            run_impl(context);
+            return GS1_STATUS_OK;
+        },
+        true);
+}
 }  // namespace gs1

@@ -1,19 +1,21 @@
 #include "campaign/campaign_state.h"
 #include "content/defs/plant_defs.h"
 #include "messages/game_message.h"
+#include "runtime/system_interface.h"
 #include "site/site_run_state.h"
 #include "site/tile_footprint.h"
 #include "site/site_world.h"
 #include "site/systems/device_weather_contribution_system.h"
 #include "site/systems/local_weather_resolve_system.h"
 #include "site/systems/plant_weather_contribution_system.h"
-#include "site/systems/site_system_context.h"
 
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <iomanip>
 #include <iostream>
+#include <optional>
 
 namespace
 {
@@ -137,34 +139,40 @@ PipelineTimings run_local_weather_pipeline(
     gs1::SiteRunState& site_run,
     gs1::GameMessageQueue& message_queue)
 {
-    auto plant_context = gs1::make_site_system_context<gs1::PlantWeatherContributionSystem>(
-        campaign,
-        site_run,
-        message_queue,
-        kFixedStepSeconds,
-        {});
-    auto device_context = gs1::make_site_system_context<gs1::DeviceWeatherContributionSystem>(
-        campaign,
-        site_run,
-        message_queue,
-        kFixedStepSeconds,
-        {});
-    auto local_weather_context = gs1::make_site_system_context<gs1::LocalWeatherResolveSystem>(
-        campaign,
-        site_run,
-        message_queue,
-        kFixedStepSeconds,
-        {});
+    std::optional<gs1::CampaignState> runtime_campaign {campaign};
+    std::optional<gs1::SiteRunState> runtime_site_run {site_run};
+    std::deque<Gs1RuntimeMessage> runtime_messages {};
+    Gs1AppState app_state = GS1_APP_STATE_SITE_ACTIVE;
+
+    auto make_invocation = [&]() -> gs1::RuntimeInvocation
+    {
+        return gs1::RuntimeInvocation {
+            app_state,
+            runtime_campaign,
+            runtime_site_run,
+            runtime_messages,
+            message_queue,
+            kFixedStepSeconds};
+    };
+
+    gs1::PlantWeatherContributionSystem plant_system {};
+    gs1::DeviceWeatherContributionSystem device_system {};
+    gs1::LocalWeatherResolveSystem resolve_system {};
 
     const auto total_started = std::chrono::steady_clock::now();
 
     const auto plant_started = std::chrono::steady_clock::now();
-    gs1::PlantWeatherContributionSystem::run(plant_context);
+    auto plant_invocation = make_invocation();
+    plant_system.run(plant_invocation);
     const auto device_started = std::chrono::steady_clock::now();
-    gs1::DeviceWeatherContributionSystem::run(device_context);
+    auto device_invocation = make_invocation();
+    device_system.run(device_invocation);
     const auto resolve_started = std::chrono::steady_clock::now();
-    gs1::LocalWeatherResolveSystem::run(local_weather_context);
+    auto resolve_invocation = make_invocation();
+    resolve_system.run(resolve_invocation);
     const auto total_ended = std::chrono::steady_clock::now();
+
+    site_run = std::move(runtime_site_run).value();
 
     return PipelineTimings {
         std::chrono::duration<double, std::milli>(device_started - plant_started).count(),

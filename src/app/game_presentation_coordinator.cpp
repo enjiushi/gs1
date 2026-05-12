@@ -14,6 +14,7 @@
 #include "site/systems/site_system_context.h"
 #include "site/tile_footprint.h"
 #include "site/weather_contribution_logic.h"
+#include "runtime/system_interface.h"
 #include "support/currency.h"
 
 #include <algorithm>
@@ -4230,13 +4231,15 @@ void GamePresentationCoordinator::flush_site_presentation_if_dirty(GamePresentat
             SITE_PROJECTION_UPDATE_TASKS |
             SITE_PROJECTION_UPDATE_INVENTORY)) != 0U)
     {
-        auto phone_panel_context = make_site_system_context<PhonePanelSystem>(
-            *campaign(),
-            *active_site_run(),
+        RuntimeInvocation invocation {
+            app_state(),
+            campaign(),
+            active_site_run(),
+            engine_messages(),
             message_queue(),
-            fixed_step_seconds(),
-            SiteMoveDirectionInput {});
-        PhonePanelSystem::run(phone_panel_context);
+            fixed_step_seconds()};
+        PhonePanelSystem system {};
+        system.run(invocation);
     }
 
     const auto projected_dirty_flags = active_site_run()->pending_projection_update_flags;

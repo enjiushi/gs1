@@ -22,6 +22,34 @@ constexpr float k_device_water_epsilon = 0.0005f;
 
 namespace gs1
 {
+const char* DeviceSupportSystem::name() const noexcept
+{
+    return access().system_name.data();
+}
+
+GameMessageSubscriptionSpan DeviceSupportSystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<
+        GameMessageType,
+        k_game_message_type_count,
+        &DeviceSupportSystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan DeviceSupportSystem::subscribed_host_messages() const noexcept
+{
+    return {};
+}
+
+std::optional<Gs1RuntimeProfileSystemId> DeviceSupportSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_DEVICE_SUPPORT;
+}
+
+std::optional<std::uint32_t> DeviceSupportSystem::fixed_step_order() const noexcept
+{
+    return 12U;
+}
+
 bool DeviceSupportSystem::subscribes_to(GameMessageType type) noexcept
 {
     (void)type;
@@ -33,6 +61,30 @@ Gs1Status DeviceSupportSystem::process_message(
     const GameMessage& message)
 {
     (void)context;
+    (void)message;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status DeviceSupportSystem::process_game_message(
+    RuntimeInvocation& invocation,
+    const GameMessage& message)
+{
+    auto access = make_game_state_access<DeviceSupportSystem>(invocation);
+    (void)access;
+    return with_site_system_context<DeviceSupportSystem>(
+        invocation,
+        [&](SiteSystemContext<DeviceSupportSystem>& context) -> Gs1Status
+        {
+            return process_message(context, message);
+        });
+}
+
+Gs1Status DeviceSupportSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    auto access = make_game_state_access<DeviceSupportSystem>(invocation);
+    (void)access;
     (void)message;
     return GS1_STATUS_OK;
 }
@@ -103,10 +155,19 @@ void DeviceSupportSystem::run(SiteSystemContext<DeviceSupportSystem>& context)
             }
         });
 }
-GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
-    DeviceSupportSystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_DEVICE_SUPPORT,
-    12U)
+
+void DeviceSupportSystem::run(RuntimeInvocation& invocation)
+{
+    auto access = make_game_state_access<DeviceSupportSystem>(invocation);
+    (void)access;
+    (void)with_site_system_context<DeviceSupportSystem>(
+        invocation,
+        [&](SiteSystemContext<DeviceSupportSystem>& context) -> Gs1Status
+        {
+            run(context);
+            return GS1_STATUS_OK;
+        });
+}
 }  // namespace gs1
 
 #ifdef _MSC_VER

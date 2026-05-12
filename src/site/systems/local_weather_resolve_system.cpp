@@ -183,6 +183,34 @@ BaseLocalWeather compute_base_local_weather(
 
 namespace gs1
 {
+const char* LocalWeatherResolveSystem::name() const noexcept
+{
+    return access().system_name.data();
+}
+
+GameMessageSubscriptionSpan LocalWeatherResolveSystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<
+        GameMessageType,
+        k_game_message_type_count,
+        &LocalWeatherResolveSystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan LocalWeatherResolveSystem::subscribed_host_messages() const noexcept
+{
+    return {};
+}
+
+std::optional<Gs1RuntimeProfileSystemId> LocalWeatherResolveSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE;
+}
+
+std::optional<std::uint32_t> LocalWeatherResolveSystem::fixed_step_order() const noexcept
+{
+    return 8U;
+}
+
 bool LocalWeatherResolveSystem::subscribes_to(GameMessageType type) noexcept
 {
     return type == GameMessageType::SiteRunStarted;
@@ -202,6 +230,30 @@ Gs1Status LocalWeatherResolveSystem::process_message(
         context.world.own_local_weather_runtime().emit_full_snapshot_on_next_run = true;
     }
 
+    return GS1_STATUS_OK;
+}
+
+Gs1Status LocalWeatherResolveSystem::process_game_message(
+    RuntimeInvocation& invocation,
+    const GameMessage& message)
+{
+    auto access = make_game_state_access<LocalWeatherResolveSystem>(invocation);
+    (void)access;
+    return with_site_system_context<LocalWeatherResolveSystem>(
+        invocation,
+        [&](SiteSystemContext<LocalWeatherResolveSystem>& context) -> Gs1Status
+        {
+            return process_message(context, message);
+        });
+}
+
+Gs1Status LocalWeatherResolveSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    auto access = make_game_state_access<LocalWeatherResolveSystem>(invocation);
+    (void)access;
+    (void)message;
     return GS1_STATUS_OK;
 }
 
@@ -325,10 +377,19 @@ void LocalWeatherResolveSystem::run(SiteSystemContext<LocalWeatherResolveSystem>
             runtime.last_total_weather_contributions[index] = total_contribution;
         });
 }
-GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
-    LocalWeatherResolveSystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE,
-    8U)
+
+void LocalWeatherResolveSystem::run(RuntimeInvocation& invocation)
+{
+    auto access = make_game_state_access<LocalWeatherResolveSystem>(invocation);
+    (void)access;
+    (void)with_site_system_context<LocalWeatherResolveSystem>(
+        invocation,
+        [&](SiteSystemContext<LocalWeatherResolveSystem>& context) -> Gs1Status
+        {
+            run(context);
+            return GS1_STATUS_OK;
+        });
+}
 }  // namespace gs1
 
 #ifdef _MSC_VER

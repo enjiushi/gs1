@@ -94,68 +94,110 @@ void apply_projection_if_needed(
 }
 }  // namespace
 
-bool CampDurabilitySystem::subscribes_to(GameMessageType type) noexcept
+const char* CampDurabilitySystem::name() const noexcept
 {
-    return type == GameMessageType::SiteRunStarted;
+    return access().system_name.data();
 }
 
-Gs1Status CampDurabilitySystem::process_message(
-    SiteSystemContext<CampDurabilitySystem>& context,
+GameMessageSubscriptionSpan CampDurabilitySystem::subscribed_game_messages() const noexcept
+{
+    static constexpr GameMessageType subscriptions[] = {GameMessageType::SiteRunStarted};
+    return subscriptions;
+}
+
+HostMessageSubscriptionSpan CampDurabilitySystem::subscribed_host_messages() const noexcept
+{
+    return {};
+}
+
+std::optional<Gs1RuntimeProfileSystemId> CampDurabilitySystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_CAMP_DURABILITY;
+}
+
+std::optional<std::uint32_t> CampDurabilitySystem::fixed_step_order() const noexcept
+{
+    return 10U;
+}
+
+Gs1Status CampDurabilitySystem::process_game_message(
+    RuntimeInvocation& invocation,
     const GameMessage& message)
 {
+    auto access = make_game_state_access<CampDurabilitySystem>(invocation);
+    (void)access;
     if (message.type != GameMessageType::SiteRunStarted)
     {
         return GS1_STATUS_OK;
     }
 
-    auto& camp = context.world.own_camp();
-    camp.camp_durability = camp_durability_tuning().durability_max;
-    camp.camp_protection_resolved = true;
-    camp.delivery_point_operational = true;
-    camp.shared_storage_access_enabled = true;
-    refresh_memory_with_current_state(context);
+    return with_site_system_context<CampDurabilitySystem>(
+        invocation,
+        [&](SiteSystemContext<CampDurabilitySystem>& context) -> Gs1Status
+        {
+            auto& camp = context.world.own_camp();
+            camp.camp_durability = camp_durability_tuning().durability_max;
+            camp.camp_protection_resolved = true;
+            camp.delivery_point_operational = true;
+            camp.shared_storage_access_enabled = true;
+            refresh_memory_with_current_state(context);
+            return GS1_STATUS_OK;
+        });
+}
+
+Gs1Status CampDurabilitySystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    auto access = make_game_state_access<CampDurabilitySystem>(invocation);
+    (void)access;
+    (void)message;
     return GS1_STATUS_OK;
 }
 
-void CampDurabilitySystem::run(SiteSystemContext<CampDurabilitySystem>& context)
+void CampDurabilitySystem::run(RuntimeInvocation& invocation)
 {
-    ensure_memory_for_run(context);
-    if (context.fixed_step_seconds <= 0.0)
-    {
-        return;
-    }
+    auto access = make_game_state_access<CampDurabilitySystem>(invocation);
+    (void)access;
+    (void)with_site_system_context<CampDurabilitySystem>(
+        invocation,
+        [&](SiteSystemContext<CampDurabilitySystem>& context) -> Gs1Status
+        {
+            ensure_memory_for_run(context);
+            if (context.fixed_step_seconds <= 0.0)
+            {
+                return GS1_STATUS_OK;
+            }
 
-    auto& camp = context.world.own_camp();
-    const auto& tuning = camp_durability_tuning();
-    const auto step_seconds = static_cast<float>(context.fixed_step_seconds);
-    const float wear_rate_per_second =
-        tuning.base_wear_per_second +
-        compute_weather_intensity(context.world.read_weather()) * tuning.weather_wear_scale +
-        (tuning.event_timeline_wear_per_second *
-            compute_event_pressure_ratio(context.world.read_event()));
-    const float wear_amount = wear_rate_per_second * step_seconds;
-    const float previous = camp.camp_durability;
-    camp.camp_durability =
-        std::clamp(previous - wear_amount, 0.0f, tuning.durability_max);
+            auto& camp = context.world.own_camp();
+            const auto& tuning = camp_durability_tuning();
+            const auto step_seconds = static_cast<float>(context.fixed_step_seconds);
+            const float wear_rate_per_second =
+                tuning.base_wear_per_second +
+                compute_weather_intensity(context.world.read_weather()) * tuning.weather_wear_scale +
+                (tuning.event_timeline_wear_per_second *
+                    compute_event_pressure_ratio(context.world.read_event()));
+            const float wear_amount = wear_rate_per_second * step_seconds;
+            const float previous = camp.camp_durability;
+            camp.camp_durability =
+                std::clamp(previous - wear_amount, 0.0f, tuning.durability_max);
 
-    const float durability = camp.camp_durability;
-    const bool protection_resolved = durability >= tuning.protection_threshold;
-    const bool delivery_operational = durability >= tuning.delivery_threshold;
-    const bool shared_storage_access_enabled = durability >= tuning.shared_storage_threshold;
+            const float durability = camp.camp_durability;
+            const bool protection_resolved = durability >= tuning.protection_threshold;
+            const bool delivery_operational = durability >= tuning.delivery_threshold;
+            const bool shared_storage_access_enabled = durability >= tuning.shared_storage_threshold;
 
-    camp.camp_protection_resolved = protection_resolved;
-    camp.delivery_point_operational = delivery_operational;
-    camp.shared_storage_access_enabled = shared_storage_access_enabled;
+            camp.camp_protection_resolved = protection_resolved;
+            camp.delivery_point_operational = delivery_operational;
+            camp.shared_storage_access_enabled = shared_storage_access_enabled;
 
-    apply_projection_if_needed(
-        context,
-        durability,
-        protection_resolved,
-        delivery_operational,
-        shared_storage_access_enabled);
+            apply_projection_if_needed(
+                context,
+                durability,
+                protection_resolved,
+                delivery_operational,
+                shared_storage_access_enabled);
+            return GS1_STATUS_OK;
+        });
 }
-GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
-    CampDurabilitySystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_CAMP_DURABILITY,
-    10U)
 }  // namespace gs1

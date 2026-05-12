@@ -25,31 +25,30 @@
 
 namespace
 {
-using gs1::CampaignFixedStepContext;
-using gs1::CampaignFlowMessageContext;
-using gs1::CampaignFlowSystem;
-using gs1::CampaignTimeSystem;
 using gs1::DayPhase;
 using gs1::DeploymentSiteSelectionChangedMessage;
-using gs1::FailureRecoverySystem;
-using gs1::FactionReputationSystem;
 using gs1::GameMessage;
 using gs1::GameMessageQueue;
 using gs1::GameMessageType;
-using gs1::LoadoutPlannerSystem;
 using gs1::SiteAttemptEndedMessage;
-using gs1::SiteCompletionSystem;
-using gs1::SiteFlowSystem;
 using gs1::SiteId;
 using gs1::SiteMoveDirectionInput;
 using gs1::SiteRunStartedMessage;
 using gs1::SiteRunStatus;
-using gs1::SiteTimeSystem;
 using gs1::StartNewCampaignMessage;
 using gs1::StartSiteAttemptMessage;
 using gs1::TileCoord;
 using gs1::TechnologySystem;
 using namespace gs1::testing::fixtures;
+
+using gs1::CampaignFlowSystem;
+using gs1::CampaignTimeSystem;
+using gs1::FailureRecoverySystem;
+using gs1::FactionReputationSystem;
+using gs1::LoadoutPlannerSystem;
+using gs1::SiteCompletionSystem;
+using gs1::SiteFlowSystem;
+using gs1::SiteTimeSystem;
 
 template <typename Payload>
 GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
@@ -92,11 +91,6 @@ void campaign_flow_start_new_campaign_initializes_state(gs1::testing::SystemTest
     Gs1AppState app_state = GS1_APP_STATE_MAIN_MENU;
     GameMessageQueue queue {};
 
-    CampaignFlowMessageContext flow_context {
-        campaign,
-        active_site_run,
-        app_state,
-        queue};
 
     const auto message = make_message(
         GameMessageType::StartNewCampaign,
@@ -104,7 +98,7 @@ void campaign_flow_start_new_campaign_initializes_state(gs1::testing::SystemTest
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        CampaignFlowSystem::process_message(flow_context, message) == GS1_STATUS_OK);
+        invoke_system_message<CampaignFlowSystem>(message, app_state, campaign, active_site_run, queue) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, campaign.has_value());
     GS1_SYSTEM_TEST_CHECK(context, !active_site_run.has_value());
     GS1_SYSTEM_TEST_CHECK(context, app_state == GS1_APP_STATE_REGIONAL_MAP);
@@ -221,18 +215,13 @@ void campaign_flow_selection_paths_update_selection_and_queue(gs1::testing::Syst
     Gs1AppState app_state = GS1_APP_STATE_REGIONAL_MAP;
     GameMessageQueue queue {};
 
-    CampaignFlowMessageContext flow_context {
-        campaign,
-        active_site_run,
-        app_state,
-        queue};
 
     auto select_available = make_message(
         GameMessageType::SelectDeploymentSite,
         gs1::SelectDeploymentSiteMessage {1U});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        CampaignFlowSystem::process_message(flow_context, select_available) == GS1_STATUS_OK);
+        invoke_system_message<CampaignFlowSystem>(select_available, app_state, campaign, active_site_run, queue) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, campaign->regional_map_state.selected_site_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.selected_site_id->value == 1U);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
@@ -244,7 +233,7 @@ void campaign_flow_selection_paths_update_selection_and_queue(gs1::testing::Syst
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        CampaignFlowSystem::process_message(flow_context, select_available) == GS1_STATUS_OK);
+        invoke_system_message<CampaignFlowSystem>(select_available, app_state, campaign, active_site_run, queue) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, queue.empty());
 
     auto clear_selection = make_message(
@@ -252,7 +241,7 @@ void campaign_flow_selection_paths_update_selection_and_queue(gs1::testing::Syst
         gs1::ClearDeploymentSiteSelectionMessage {});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        CampaignFlowSystem::process_message(flow_context, clear_selection) == GS1_STATUS_OK);
+        invoke_system_message<CampaignFlowSystem>(clear_selection, app_state, campaign, active_site_run, queue) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !campaign->regional_map_state.selected_site_id.has_value());
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(
@@ -265,14 +254,14 @@ void campaign_flow_selection_paths_update_selection_and_queue(gs1::testing::Syst
         gs1::SelectDeploymentSiteMessage {999U});
     GS1_SYSTEM_TEST_CHECK(
         context,
-        CampaignFlowSystem::process_message(flow_context, select_missing) == GS1_STATUS_NOT_FOUND);
+        invoke_system_message<CampaignFlowSystem>(select_missing, app_state, campaign, active_site_run, queue) == GS1_STATUS_NOT_FOUND);
 
     auto select_unavailable = make_message(
         GameMessageType::SelectDeploymentSite,
         gs1::SelectDeploymentSiteMessage {2U});
     GS1_SYSTEM_TEST_CHECK(
         context,
-        CampaignFlowSystem::process_message(flow_context, select_unavailable) == GS1_STATUS_INVALID_STATE);
+        invoke_system_message<CampaignFlowSystem>(select_unavailable, app_state, campaign, active_site_run, queue) == GS1_STATUS_INVALID_STATE);
 }
 
 void campaign_flow_start_attempt_and_return_to_map(gs1::testing::SystemTestExecutionContext& context)
@@ -282,11 +271,6 @@ void campaign_flow_start_attempt_and_return_to_map(gs1::testing::SystemTestExecu
     Gs1AppState app_state = GS1_APP_STATE_REGIONAL_MAP;
     GameMessageQueue queue {};
 
-    CampaignFlowMessageContext flow_context {
-        campaign,
-        active_site_run,
-        app_state,
-        queue};
 
     campaign->regional_map_state.tech_tree_open = true;
 
@@ -296,7 +280,7 @@ void campaign_flow_start_attempt_and_return_to_map(gs1::testing::SystemTestExecu
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        CampaignFlowSystem::process_message(flow_context, start_message) == GS1_STATUS_OK);
+        invoke_system_message<CampaignFlowSystem>(start_message, app_state, campaign, active_site_run, queue) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, active_site_run.has_value());
     GS1_SYSTEM_TEST_CHECK(context, active_site_run->site_id.value == 1U);
     GS1_SYSTEM_TEST_CHECK(context, active_site_run->site_run_id.value == 1U);
@@ -320,7 +304,7 @@ void campaign_flow_start_attempt_and_return_to_map(gs1::testing::SystemTestExecu
         gs1::ReturnToRegionalMapMessage {});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        CampaignFlowSystem::process_message(flow_context, return_message) == GS1_STATUS_OK);
+        invoke_system_message<CampaignFlowSystem>(return_message, app_state, campaign, active_site_run, queue) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !active_site_run.has_value());
     GS1_SYSTEM_TEST_CHECK(context, !campaign->active_site_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, app_state == GS1_APP_STATE_REGIONAL_MAP);
@@ -335,17 +319,15 @@ void campaign_flow_completed_attempt_unblocks_visible_adjacent_sites(gs1::testin
     Gs1AppState app_state = GS1_APP_STATE_REGIONAL_MAP;
     GameMessageQueue queue {};
 
-    CampaignFlowMessageContext flow_context {
-        campaign,
-        active_site_run,
-        app_state,
-        queue};
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        CampaignFlowSystem::process_message(
-            flow_context,
-            make_message(GameMessageType::StartSiteAttempt, StartSiteAttemptMessage {1U})) == GS1_STATUS_OK);
+        invoke_system_message<CampaignFlowSystem>(
+            make_message(GameMessageType::StartSiteAttempt, StartSiteAttemptMessage {1U}),
+            app_state,
+            campaign,
+            active_site_run,
+            queue) == GS1_STATUS_OK);
 
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(context, active_site_run.has_value());
@@ -355,7 +337,7 @@ void campaign_flow_completed_attempt_unblocks_visible_adjacent_sites(gs1::testin
         SiteAttemptEndedMessage {1U, GS1_SITE_ATTEMPT_RESULT_COMPLETED});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        CampaignFlowSystem::process_message(flow_context, end_message) == GS1_STATUS_OK);
+        invoke_system_message<CampaignFlowSystem>(end_message, app_state, campaign, active_site_run, queue) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(context, active_site_run->run_status == SiteRunStatus::Completed);
     GS1_SYSTEM_TEST_CHECK(context, active_site_run->result_newly_revealed_site_count == 0U);
@@ -397,28 +379,29 @@ void campaign_flow_failed_attempt_preserves_locked_neighbors(gs1::testing::Syste
     Gs1AppState app_state = GS1_APP_STATE_REGIONAL_MAP;
     GameMessageQueue queue {};
 
-    CampaignFlowMessageContext flow_context {
-        campaign,
-        active_site_run,
-        app_state,
-        queue};
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        CampaignFlowSystem::process_message(
-            flow_context,
-            make_message(GameMessageType::StartSiteAttempt, StartSiteAttemptMessage {1U})) == GS1_STATUS_OK);
+        invoke_system_message<CampaignFlowSystem>(
+            make_message(GameMessageType::StartSiteAttempt, StartSiteAttemptMessage {1U}),
+            app_state,
+            campaign,
+            active_site_run,
+            queue) == GS1_STATUS_OK);
 
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(context, active_site_run.has_value());
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        CampaignFlowSystem::process_message(
-            flow_context,
+        invoke_system_message<CampaignFlowSystem>(
             make_message(
                 GameMessageType::SiteAttemptEnded,
-                SiteAttemptEndedMessage {1U, GS1_SITE_ATTEMPT_RESULT_FAILED})) == GS1_STATUS_OK);
+                SiteAttemptEndedMessage {1U, GS1_SITE_ATTEMPT_RESULT_FAILED}),
+            app_state,
+            campaign,
+            active_site_run,
+            queue) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(context, active_site_run->run_status == SiteRunStatus::Failed);
     GS1_SYSTEM_TEST_CHECK(context, active_site_run->result_newly_revealed_site_count == 0U);
@@ -429,11 +412,17 @@ void campaign_flow_failed_attempt_preserves_locked_neighbors(gs1::testing::Syste
 void campaign_flow_run_advances_campaign_days(gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign(42ULL, 3U);
-    CampaignFixedStepContext step_context {campaign};
+    const double default_fixed_step_seconds = k_default_fixed_step_seconds;
     const double default_step_minutes =
-        gs1::runtime_minutes_from_real_seconds(step_context.fixed_step_seconds);
+        gs1::runtime_minutes_from_real_seconds(default_fixed_step_seconds);
 
-    CampaignTimeSystem::run(step_context);
+    std::optional<gs1::CampaignState> campaign_state {campaign};
+    std::optional<gs1::SiteRunState> active_site_run {};
+    Gs1AppState app_state = GS1_APP_STATE_REGIONAL_MAP;
+    GameMessageQueue queue {};
+
+    invoke_system_run<CampaignTimeSystem>(app_state, campaign_state, active_site_run, queue, default_fixed_step_seconds);
+    campaign = std::move(campaign_state.value());
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(campaign.campaign_clock_minutes_elapsed, default_step_minutes));
@@ -441,20 +430,25 @@ void campaign_flow_run_advances_campaign_days(gs1::testing::SystemTestExecutionC
 
     campaign.campaign_clock_minutes_elapsed = gs1::k_runtime_minutes_per_day - 0.1;
     campaign.campaign_days_remaining = 3U;
-    CampaignTimeSystem::run(step_context);
+    campaign_state = campaign;
+    invoke_system_run<CampaignTimeSystem>(app_state, campaign_state, active_site_run, queue, default_fixed_step_seconds);
+    campaign = std::move(campaign_state.value());
     GS1_SYSTEM_TEST_CHECK(context, campaign.campaign_days_remaining == 2U);
 
     campaign.campaign_clock_minutes_elapsed = 3.0 * gs1::k_runtime_minutes_per_day;
     campaign.campaign_days_remaining = 2U;
-    CampaignTimeSystem::run(step_context);
+    campaign_state = campaign;
+    invoke_system_run<CampaignTimeSystem>(app_state, campaign_state, active_site_run, queue, default_fixed_step_seconds);
+    campaign = std::move(campaign_state.value());
     GS1_SYSTEM_TEST_CHECK(context, campaign.campaign_days_remaining == 0U);
 
     campaign.campaign_clock_minutes_elapsed = 0.0;
     campaign.campaign_days_remaining = 3U;
-    CampaignFixedStepContext minute_step_context {campaign, 60.0};
     for (int step = 0; step < 30; ++step)
     {
-        CampaignTimeSystem::run(minute_step_context);
+        campaign_state = campaign;
+        invoke_system_run<CampaignTimeSystem>(app_state, campaign_state, active_site_run, queue, 60.0);
+        campaign = std::move(campaign_state.value());
     }
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -472,7 +466,7 @@ void loadout_planner_tracks_selected_target_site(gs1::testing::SystemTestExecuti
         DeploymentSiteSelectionChangedMessage {3U});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        LoadoutPlannerSystem::process_message(campaign_context, select_message) == GS1_STATUS_OK);
+        invoke_system_message<LoadoutPlannerSystem>(campaign_context, select_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, campaign.loadout_planner_state.selected_target_site_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.selected_target_site_id->value == 3U);
     GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.selected_loadout_slots.size() == 2U);
@@ -482,7 +476,7 @@ void loadout_planner_tracks_selected_target_site(gs1::testing::SystemTestExecuti
         DeploymentSiteSelectionChangedMessage {0U});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        LoadoutPlannerSystem::process_message(campaign_context, clear_message) == GS1_STATUS_OK);
+        invoke_system_message<LoadoutPlannerSystem>(campaign_context, clear_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !campaign.loadout_planner_state.selected_target_site_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.selected_loadout_slots.size() == 2U);
 }
@@ -503,7 +497,7 @@ void loadout_planner_builds_adjacent_completed_site_support(gs1::testing::System
         DeploymentSiteSelectionChangedMessage {2U});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        LoadoutPlannerSystem::process_message(campaign_context, select_message) == GS1_STATUS_OK);
+        invoke_system_message<LoadoutPlannerSystem>(campaign_context, select_message) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_REQUIRE(context, campaign.loadout_planner_state.selected_target_site_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.selected_target_site_id->value == 2U);
@@ -547,7 +541,7 @@ void site_flow_moves_worker_and_marks_projection_dirty(gs1::testing::SystemTestE
         1.0,
         SiteMoveDirectionInput {1.0f, 0.0f, 0.0f, true});
 
-    SiteFlowSystem::run(site_context);
+    invoke_system_run<SiteFlowSystem>(site_context);
 
     const auto worker = gs1::site_world_access::worker_position(site_run);
     GS1_SYSTEM_TEST_CHECK(context, worker.tile_x > 2.0f);
@@ -586,8 +580,8 @@ void site_flow_respects_traversability_and_time_system_updates_phase(
         0.25,
         SiteMoveDirectionInput {1.0f, 0.0f, 0.0f, true});
 
-    SiteTimeSystem::run(time_context);
-    SiteFlowSystem::run(site_context);
+    invoke_system_run<SiteTimeSystem>(time_context);
+    invoke_system_run<SiteFlowSystem>(site_context);
 
     const auto worker = gs1::site_world_access::worker_position(site_run);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(worker.tile_x, 2.0f));
@@ -608,7 +602,7 @@ void site_completion_only_emits_when_threshold_is_met(gs1::testing::SystemTestEx
     site_run.counters.fully_grown_tile_count = 2U;
 
     auto site_context = make_site_context<SiteCompletionSystem>(campaign, site_run, queue);
-    SiteCompletionSystem::run(site_context);
+    invoke_system_run<SiteCompletionSystem>(site_context);
 
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteAttemptEnded);
@@ -616,12 +610,12 @@ void site_completion_only_emits_when_threshold_is_met(gs1::testing::SystemTestEx
         context,
         queue.front().payload_as<SiteAttemptEndedMessage>().result == GS1_SITE_ATTEMPT_RESULT_COMPLETED);
 
-    SiteCompletionSystem::run(site_context);
+    invoke_system_run<SiteCompletionSystem>(site_context);
     GS1_SYSTEM_TEST_CHECK(context, queue.size() == 1U);
 
     queue.clear();
     site_run.counters.site_completion_tile_threshold = 0U;
-    SiteCompletionSystem::run(site_context);
+    invoke_system_run<SiteCompletionSystem>(site_context);
     GS1_SYSTEM_TEST_CHECK(context, queue.empty());
 }
 
@@ -642,7 +636,7 @@ void site_completion_highway_protection_fails_when_average_cover_reaches_target(
     site_run.counters.objective_progress_normalized = 0.0f;
 
     auto site_context = make_site_context<SiteCompletionSystem>(campaign, site_run, queue);
-    SiteCompletionSystem::run(site_context);
+    invoke_system_run<SiteCompletionSystem>(site_context);
 
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteAttemptEnded);
@@ -669,7 +663,7 @@ void site_completion_highway_protection_completes_at_time_limit_when_cover_stays
     site_run.counters.objective_progress_normalized = 0.3f;
 
     auto site_context = make_site_context<SiteCompletionSystem>(campaign, site_run, queue);
-    SiteCompletionSystem::run(site_context);
+    invoke_system_run<SiteCompletionSystem>(site_context);
 
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteAttemptEnded);
@@ -689,7 +683,7 @@ void site_completion_pure_survival_completes_at_time_limit(
     site_run.clock.world_time_minutes = 8.0;
 
     auto site_context = make_site_context<SiteCompletionSystem>(campaign, site_run, queue);
-    SiteCompletionSystem::run(site_context);
+    invoke_system_run<SiteCompletionSystem>(site_context);
 
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteAttemptEnded);
@@ -713,7 +707,7 @@ void site_completion_cash_target_survival_tracks_progress_and_completes_at_targe
     site_run.economy.current_cash = gs1::cash_points_from_cash(20);
 
     auto site_context = make_site_context<SiteCompletionSystem>(campaign, site_run, queue);
-    SiteCompletionSystem::run(site_context);
+    invoke_system_run<SiteCompletionSystem>(site_context);
 
     GS1_SYSTEM_TEST_CHECK(context, queue.empty());
     GS1_SYSTEM_TEST_CHECK(
@@ -721,7 +715,7 @@ void site_completion_cash_target_survival_tracks_progress_and_completes_at_targe
         approx_equal(site_run.counters.objective_progress_normalized, 20.0f / 45.0f, 0.001f));
 
     site_run.economy.current_cash = gs1::cash_points_from_cash(45);
-    SiteCompletionSystem::run(site_context);
+    invoke_system_run<SiteCompletionSystem>(site_context);
 
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteAttemptEnded);
@@ -760,14 +754,14 @@ void site_completion_green_wall_completes_after_stable_hold_and_pauses_main_time
 
     auto site_context = make_site_context<SiteCompletionSystem>(campaign, site_run, queue);
     site_run.clock.world_time_minutes = 0.2;
-    SiteCompletionSystem::run(site_context);
+    invoke_system_run<SiteCompletionSystem>(site_context);
     GS1_SYSTEM_TEST_CHECK(context, queue.empty());
     GS1_SYSTEM_TEST_CHECK(context, site_run.objective.completion_hold_progress_minutes >= 0.19);
     GS1_SYSTEM_TEST_CHECK(context, site_run.objective.paused_main_timer_minutes >= 0.19);
     GS1_SYSTEM_TEST_CHECK(context, site_run.counters.objective_progress_normalized >= 0.74f);
 
     site_run.clock.world_time_minutes = 0.4;
-    SiteCompletionSystem::run(site_context);
+    invoke_system_run<SiteCompletionSystem>(site_context);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -804,14 +798,14 @@ void site_completion_green_wall_resets_hold_when_target_band_worsens(
 
     auto site_context = make_site_context<SiteCompletionSystem>(campaign, site_run, queue);
     site_run.clock.world_time_minutes = 0.2;
-    SiteCompletionSystem::run(site_context);
+    invoke_system_run<SiteCompletionSystem>(site_context);
     GS1_SYSTEM_TEST_CHECK(context, site_run.objective.completion_hold_progress_minutes >= 0.19);
 
     target_tile = site_run.site_world->tile_at(TileCoord {5, 2});
     target_tile.ecology.sand_burial = 0.35f;
     site_run.site_world->set_tile(TileCoord {5, 2}, target_tile);
     site_run.clock.world_time_minutes = 0.4;
-    SiteCompletionSystem::run(site_context);
+    invoke_system_run<SiteCompletionSystem>(site_context);
 
     GS1_SYSTEM_TEST_CHECK(context, queue.empty());
     GS1_SYSTEM_TEST_CHECK(context, site_run.objective.completion_hold_progress_minutes <= 0.001);
@@ -826,13 +820,13 @@ void failure_recovery_only_emits_when_worker_health_is_zero(gs1::testing::System
 
     auto site_context = make_site_context<FailureRecoverySystem>(campaign, site_run, queue);
 
-    FailureRecoverySystem::run(site_context);
+    invoke_system_run<FailureRecoverySystem>(site_context);
     GS1_SYSTEM_TEST_CHECK(context, queue.empty());
 
     auto worker = gs1::site_world_access::worker_conditions(site_run);
     worker.health = 0.0f;
     gs1::site_world_access::set_worker_conditions(site_run, worker);
-    FailureRecoverySystem::run(site_context);
+    invoke_system_run<FailureRecoverySystem>(site_context);
 
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteAttemptEnded);
@@ -840,7 +834,7 @@ void failure_recovery_only_emits_when_worker_health_is_zero(gs1::testing::System
         context,
         queue.front().payload_as<SiteAttemptEndedMessage>().result == GS1_SITE_ATTEMPT_RESULT_FAILED);
 
-    FailureRecoverySystem::run(site_context);
+    invoke_system_run<FailureRecoverySystem>(site_context);
     GS1_SYSTEM_TEST_CHECK(context, queue.size() == 1U);
 }
 
@@ -854,28 +848,28 @@ void campaign_flow_tech_tree_open_and_close_toggles_regional_map_state(
         Gs1AppState app_state = supported_app_state;
         GameMessageQueue queue {};
 
-        CampaignFlowMessageContext flow_context {
-            campaign,
-            active_site_run,
-            app_state,
-            queue};
-
         GS1_SYSTEM_TEST_REQUIRE(
             context,
-            CampaignFlowSystem::process_message(
-                flow_context,
+            invoke_system_message<CampaignFlowSystem>(
                 make_message(
                     GameMessageType::OpenRegionalMapTechTree,
-                    gs1::OpenRegionalMapTechTreeMessage {})) == GS1_STATUS_OK);
+                    gs1::OpenRegionalMapTechTreeMessage {}),
+                app_state,
+                campaign,
+                active_site_run,
+                queue) == GS1_STATUS_OK);
         GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.tech_tree_open);
 
         GS1_SYSTEM_TEST_REQUIRE(
             context,
-            CampaignFlowSystem::process_message(
-                flow_context,
+            invoke_system_message<CampaignFlowSystem>(
                 make_message(
                     GameMessageType::CloseRegionalMapTechTree,
-                    gs1::CloseRegionalMapTechTreeMessage {})) == GS1_STATUS_OK);
+                    gs1::CloseRegionalMapTechTreeMessage {}),
+                app_state,
+                campaign,
+                active_site_run,
+                queue) == GS1_STATUS_OK);
         GS1_SYSTEM_TEST_CHECK(context, !campaign->regional_map_state.tech_tree_open);
     }
 }
@@ -889,20 +883,17 @@ void campaign_flow_selects_tech_tree_faction_tab(gs1::testing::SystemTestExecuti
         Gs1AppState app_state = supported_app_state;
         GameMessageQueue queue {};
 
-        CampaignFlowMessageContext flow_context {
-            campaign,
-            active_site_run,
-            app_state,
-            queue};
-
         GS1_SYSTEM_TEST_REQUIRE(
             context,
-            CampaignFlowSystem::process_message(
-                flow_context,
+            invoke_system_message<CampaignFlowSystem>(
                 make_message(
                     GameMessageType::SelectRegionalMapTechTreeFaction,
                     gs1::SelectRegionalMapTechTreeFactionMessage {
-                        gs1::k_faction_forestry_bureau})) == GS1_STATUS_OK);
+                        gs1::k_faction_forestry_bureau}),
+                app_state,
+                campaign,
+                active_site_run,
+                queue) == GS1_STATUS_OK);
         GS1_SYSTEM_TEST_CHECK(
             context,
             campaign->regional_map_state.selected_tech_tree_faction_id.value == gs1::k_faction_forestry_bureau);
@@ -917,7 +908,7 @@ void faction_reputation_awards_unlock_assistant_at_threshold(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        FactionReputationSystem::process_message(
+        invoke_system_message<FactionReputationSystem>(
             campaign_context,
             make_message(
                 GameMessageType::FactionReputationAwardRequested,
@@ -942,7 +933,7 @@ void faction_reputation_awards_do_not_reduce_total_reputation(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        FactionReputationSystem::process_message(
+        invoke_system_message<FactionReputationSystem>(
             campaign_context,
             make_message(
                 GameMessageType::FactionReputationAwardRequested,
@@ -951,7 +942,7 @@ void faction_reputation_awards_do_not_reduce_total_reputation(
                     10})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        FactionReputationSystem::process_message(
+        invoke_system_message<FactionReputationSystem>(
             campaign_context,
             make_message(
                 GameMessageType::FactionReputationAwardRequested,
@@ -1494,3 +1485,4 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "regional_support",
     "placeholder_test_plan_is_recorded",
     regional_support_placeholder_test_plan_is_recorded);
+

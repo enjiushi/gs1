@@ -5,23 +5,75 @@
 
 namespace gs1
 {
-void CampaignTimeSystem::run(CampaignFixedStepContext& context)
+template <>
+struct system_state_tags<CampaignTimeSystem>
 {
-    context.campaign.campaign_clock_minutes_elapsed +=
-        runtime_minutes_from_real_seconds(context.fixed_step_seconds);
+    using type = type_list<RuntimeCampaignTag, RuntimeFixedStepSecondsTag>;
+};
+
+const char* CampaignTimeSystem::name() const noexcept
+{
+    return "CampaignTimeSystem";
+}
+
+GameMessageSubscriptionSpan CampaignTimeSystem::subscribed_game_messages() const noexcept
+{
+    return {};
+}
+
+HostMessageSubscriptionSpan CampaignTimeSystem::subscribed_host_messages() const noexcept
+{
+    return {};
+}
+
+std::optional<Gs1RuntimeProfileSystemId> CampaignTimeSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_TIME;
+}
+
+std::optional<std::uint32_t> CampaignTimeSystem::fixed_step_order() const noexcept
+{
+    return 0U;
+}
+
+Gs1Status CampaignTimeSystem::process_game_message(
+    RuntimeInvocation& invocation,
+    const GameMessage& message)
+{
+    (void)invocation;
+    (void)message;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status CampaignTimeSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    (void)invocation;
+    (void)message;
+    return GS1_STATUS_OK;
+}
+
+void CampaignTimeSystem::run(RuntimeInvocation& invocation)
+{
+    auto access = make_game_state_access<CampaignTimeSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    if (!campaign.has_value())
+    {
+        return;
+    }
+
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+
+    campaign->campaign_clock_minutes_elapsed +=
+        runtime_minutes_from_real_seconds(fixed_step_seconds);
 
     const auto elapsed_days =
         static_cast<std::uint32_t>(
-            context.campaign.campaign_clock_minutes_elapsed / k_runtime_minutes_per_day);
-    context.campaign.campaign_days_remaining =
-        (elapsed_days >= context.campaign.campaign_days_total)
+            campaign->campaign_clock_minutes_elapsed / k_runtime_minutes_per_day);
+    campaign->campaign_days_remaining =
+        (elapsed_days >= campaign->campaign_days_total)
             ? 0U
-            : (context.campaign.campaign_days_total - elapsed_days);
+            : (campaign->campaign_days_total - elapsed_days);
 }
-
-GS1_IMPLEMENT_RUNTIME_CAMPAIGN_FIXED_STEP_SYSTEM(
-    CampaignTimeSystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_TIME,
-    0U,
-    CampaignFixedStepContext)
 }  // namespace gs1

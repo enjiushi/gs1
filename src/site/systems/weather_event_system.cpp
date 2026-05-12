@@ -387,160 +387,215 @@ void start_next_wave(SiteSystemContext<WeatherEventSystem>& context)
 }
 }  // namespace
 
-bool WeatherEventSystem::subscribes_to(GameMessageType type) noexcept
+const char* WeatherEventSystem::name() const noexcept
 {
-    return type == GameMessageType::SiteRunStarted;
+    return access().system_name.data();
 }
 
-Gs1Status WeatherEventSystem::process_message(
-    SiteSystemContext<WeatherEventSystem>& context,
+GameMessageSubscriptionSpan WeatherEventSystem::subscribed_game_messages() const noexcept
+{
+    static constexpr GameMessageType subscriptions[] = {GameMessageType::SiteRunStarted};
+    return subscriptions;
+}
+
+HostMessageSubscriptionSpan WeatherEventSystem::subscribed_host_messages() const noexcept
+{
+    return {};
+}
+
+std::optional<Gs1RuntimeProfileSystemId> WeatherEventSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_WEATHER_EVENT;
+}
+
+std::optional<std::uint32_t> WeatherEventSystem::fixed_step_order() const noexcept
+{
+    return 4U;
+}
+
+Gs1Status WeatherEventSystem::process_game_message(
+    RuntimeInvocation& invocation,
     const GameMessage& message)
 {
+    auto access = make_game_state_access<WeatherEventSystem>(invocation);
+    (void)access;
     if (message.type != GameMessageType::SiteRunStarted)
     {
         return GS1_STATUS_OK;
     }
 
-    auto& weather = context.world.own_weather();
-    auto& event = context.world.own_event();
-    const auto& objective = context.world.read_objective();
-    const auto baseline_weather = resolve_site_baseline_weather(context.world.site_id_value());
-    if (has_active_event(event))
-    {
-        return GS1_STATUS_OK;
-    }
+    return with_site_system_context<WeatherEventSystem>(
+        invocation,
+        [&](SiteSystemContext<WeatherEventSystem>& context) -> Gs1Status
+        {
+            auto& weather = context.world.own_weather();
+            auto& event = context.world.own_event();
+            const auto& objective = context.world.read_objective();
+            const auto baseline_weather =
+                resolve_site_baseline_weather(context.world.site_id_value());
+            if (has_active_event(event))
+            {
+                return GS1_STATUS_OK;
+            }
 
-    if (objective_uses_repeating_weather_waves(objective))
-    {
-        weather.forecast_profile_state.forecast_profile_id = 2U;
-        weather.site_weather_bias = 0.0f;
-        event.minutes_until_next_wave = resolve_next_wave_delay_minutes(context, event.wave_sequence_index);
-        apply_site_weather(
-            context,
-            baseline_weather.heat,
-            baseline_weather.wind,
-            baseline_weather.dust,
-            baseline_weather.wind_direction_degrees);
-        emit_site_one_weather_probe_log(
-            context,
-            "start",
-            baseline_weather.heat,
-            baseline_weather.wind,
-            baseline_weather.dust,
-            baseline_weather.wind_direction_degrees);
-        return GS1_STATUS_OK;
-    }
+            if (objective_uses_repeating_weather_waves(objective))
+            {
+                weather.forecast_profile_state.forecast_profile_id = 2U;
+                weather.site_weather_bias = 0.0f;
+                event.minutes_until_next_wave =
+                    resolve_next_wave_delay_minutes(context, event.wave_sequence_index);
+                apply_site_weather(
+                    context,
+                    baseline_weather.heat,
+                    baseline_weather.wind,
+                    baseline_weather.dust,
+                    baseline_weather.wind_direction_degrees);
+                emit_site_one_weather_probe_log(
+                    context,
+                    "start",
+                    baseline_weather.heat,
+                    baseline_weather.wind,
+                    baseline_weather.dust,
+                    baseline_weather.wind_direction_degrees);
+                return GS1_STATUS_OK;
+            }
 
-    if (context.world.site_id_value() == 1U)
-    {
-        weather.forecast_profile_state.forecast_profile_id = 1U;
-    }
+            if (context.world.site_id_value() == 1U)
+            {
+                weather.forecast_profile_state.forecast_profile_id = 1U;
+            }
 
-    weather.site_weather_bias = 0.0f;
-    apply_site_weather(
-        context,
-        baseline_weather.heat,
-        baseline_weather.wind,
-        baseline_weather.dust,
-        baseline_weather.wind_direction_degrees);
-    emit_site_one_weather_probe_log(
-        context,
-        "start",
-        baseline_weather.heat,
-        baseline_weather.wind,
-        baseline_weather.dust,
-        baseline_weather.wind_direction_degrees);
+            weather.site_weather_bias = 0.0f;
+            apply_site_weather(
+                context,
+                baseline_weather.heat,
+                baseline_weather.wind,
+                baseline_weather.dust,
+                baseline_weather.wind_direction_degrees);
+            emit_site_one_weather_probe_log(
+                context,
+                "start",
+                baseline_weather.heat,
+                baseline_weather.wind,
+                baseline_weather.dust,
+                baseline_weather.wind_direction_degrees);
 
+            return GS1_STATUS_OK;
+        });
+}
+
+Gs1Status WeatherEventSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    auto access = make_game_state_access<WeatherEventSystem>(invocation);
+    (void)access;
+    (void)message;
     return GS1_STATUS_OK;
 }
 
-void WeatherEventSystem::run(SiteSystemContext<WeatherEventSystem>& context)
+void WeatherEventSystem::run(RuntimeInvocation& invocation)
 {
-    const double step_minutes =
-        runtime_minutes_from_real_seconds(context.fixed_step_seconds);
-    auto& event = context.world.own_event();
-    const auto& objective = context.world.read_objective();
-    const auto& board = context.world.read_task_board();
-    const auto baseline_weather = resolve_site_baseline_weather(context.world.site_id_value());
-    const double world_time_minutes = context.world.read_time().world_time_minutes;
-    if (onboarding_chain_weather_locked(context.world.site_id(), board))
-    {
-        clear_event_timeline(event);
-        event.minutes_until_next_wave = 0.0;
-        smooth_site_weather_toward(
-            context,
-            baseline_weather.heat,
-            baseline_weather.wind,
-            baseline_weather.dust,
-            baseline_weather.wind_direction_degrees);
-        return;
-    }
-
-    if (!has_active_event(event))
-    {
-        clear_event_timeline(event);
-        if (objective_wave_window_is_active(objective, world_time_minutes) &&
-            !has_pending_site_transition_message(
-                context.message_queue,
-                context.world.site_id_value()))
+    auto access = make_game_state_access<WeatherEventSystem>(invocation);
+    (void)access;
+    (void)with_site_system_context<WeatherEventSystem>(
+        invocation,
+        [&](SiteSystemContext<WeatherEventSystem>& context) -> Gs1Status
         {
-            event.minutes_until_next_wave =
-                std::max(0.0, event.minutes_until_next_wave - step_minutes);
-            if (event.minutes_until_next_wave <= 0.0)
+            const double step_minutes =
+                runtime_minutes_from_real_seconds(context.fixed_step_seconds);
+            auto& event = context.world.own_event();
+            const auto& objective = context.world.read_objective();
+            const auto& board = context.world.read_task_board();
+            const auto baseline_weather =
+                resolve_site_baseline_weather(context.world.site_id_value());
+            const double world_time_minutes = context.world.read_time().world_time_minutes;
+            if (onboarding_chain_weather_locked(context.world.site_id(), board))
             {
-                start_next_wave(context);
+                clear_event_timeline(event);
+                event.minutes_until_next_wave = 0.0;
+                smooth_site_weather_toward(
+                    context,
+                    baseline_weather.heat,
+                    baseline_weather.wind,
+                    baseline_weather.dust,
+                    baseline_weather.wind_direction_degrees);
+                return GS1_STATUS_OK;
             }
-        }
 
-        smooth_site_weather_toward(
-            context,
-            baseline_weather.heat,
-            baseline_weather.wind,
-            baseline_weather.dust,
-            baseline_weather.wind_direction_degrees);
-        return;
-    }
+            if (!has_active_event(event))
+            {
+                clear_event_timeline(event);
+                if (objective_wave_window_is_active(objective, world_time_minutes) &&
+                    !has_pending_site_transition_message(
+                        context.message_queue,
+                        context.world.site_id_value()))
+                {
+                    event.minutes_until_next_wave =
+                        std::max(0.0, event.minutes_until_next_wave - step_minutes);
+                    if (event.minutes_until_next_wave <= 0.0)
+                    {
+                        start_next_wave(context);
+                    }
+                }
 
-    const auto previous_template_id = event.active_event_template_id;
-    const double end_time_minutes = resolve_end_time_minutes(event);
-    if (world_time_minutes >= end_time_minutes)
-    {
-        clear_event_timeline(event);
-        if (objective_wave_window_is_active(objective, world_time_minutes) &&
-            !has_pending_site_transition_message(
-                context.message_queue,
-                context.world.site_id_value()))
-        {
-            event.minutes_until_next_wave =
-                resolve_next_wave_delay_minutes(context, event.wave_sequence_index);
-        }
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
-        smooth_site_weather_toward(
-            context,
-            baseline_weather.heat,
-            baseline_weather.wind,
-            baseline_weather.dust,
-            baseline_weather.wind_direction_degrees);
-        return;
-    }
+                smooth_site_weather_toward(
+                    context,
+                    baseline_weather.heat,
+                    baseline_weather.wind,
+                    baseline_weather.dust,
+                    baseline_weather.wind_direction_degrees);
+                return GS1_STATUS_OK;
+            }
 
-    const float pressure_scale = resolve_event_pressure_scale(event, world_time_minutes);
-    event.event_heat_pressure = k_mild_weather_heat * pressure_scale;
-    event.event_wind_pressure = k_mild_weather_wind * pressure_scale;
-    event.event_dust_pressure = k_mild_weather_dust * pressure_scale;
-    if (event.active_event_template_id != previous_template_id)
-    {
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
-    }
-    smooth_site_weather_toward(
-        context,
-        std::clamp(baseline_weather.heat + event.event_heat_pressure, 0.0f, k_weather_meter_max),
-        std::clamp(baseline_weather.wind + event.event_wind_pressure, 0.0f, k_weather_meter_max),
-        std::clamp(baseline_weather.dust + event.event_dust_pressure, 0.0f, k_weather_meter_max),
-        resolve_event_wind_direction(context));
+            const auto previous_template_id = event.active_event_template_id;
+            const double end_time_minutes = resolve_end_time_minutes(event);
+            if (world_time_minutes >= end_time_minutes)
+            {
+                clear_event_timeline(event);
+                if (objective_wave_window_is_active(objective, world_time_minutes) &&
+                    !has_pending_site_transition_message(
+                        context.message_queue,
+                        context.world.site_id_value()))
+                {
+                    event.minutes_until_next_wave =
+                        resolve_next_wave_delay_minutes(context, event.wave_sequence_index);
+                }
+                context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
+                smooth_site_weather_toward(
+                    context,
+                    baseline_weather.heat,
+                    baseline_weather.wind,
+                    baseline_weather.dust,
+                    baseline_weather.wind_direction_degrees);
+                return GS1_STATUS_OK;
+            }
+
+            const float pressure_scale =
+                resolve_event_pressure_scale(event, world_time_minutes);
+            event.event_heat_pressure = k_mild_weather_heat * pressure_scale;
+            event.event_wind_pressure = k_mild_weather_wind * pressure_scale;
+            event.event_dust_pressure = k_mild_weather_dust * pressure_scale;
+            if (event.active_event_template_id != previous_template_id)
+            {
+                context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
+            }
+            smooth_site_weather_toward(
+                context,
+                std::clamp(
+                    baseline_weather.heat + event.event_heat_pressure,
+                    0.0f,
+                    k_weather_meter_max),
+                std::clamp(
+                    baseline_weather.wind + event.event_wind_pressure,
+                    0.0f,
+                    k_weather_meter_max),
+                std::clamp(
+                    baseline_weather.dust + event.event_dust_pressure,
+                    0.0f,
+                    k_weather_meter_max),
+                resolve_event_wind_direction(context));
+            return GS1_STATUS_OK;
+        });
 }
-GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
-    WeatherEventSystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_WEATHER_EVENT,
-    4U)
 }  // namespace gs1

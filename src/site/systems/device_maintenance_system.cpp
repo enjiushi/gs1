@@ -18,6 +18,34 @@
 #include <vector>
 namespace gs1
 {
+const char* DeviceMaintenanceSystem::name() const noexcept
+{
+    return access().system_name.data();
+}
+
+GameMessageSubscriptionSpan DeviceMaintenanceSystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<
+        GameMessageType,
+        k_game_message_type_count,
+        &DeviceMaintenanceSystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan DeviceMaintenanceSystem::subscribed_host_messages() const noexcept
+{
+    return {};
+}
+
+std::optional<Gs1RuntimeProfileSystemId> DeviceMaintenanceSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_DEVICE_MAINTENANCE;
+}
+
+std::optional<std::uint32_t> DeviceMaintenanceSystem::fixed_step_order() const noexcept
+{
+    return 11U;
+}
+
 namespace
 {
 constexpr float k_integrity_epsilon = 0.0001f;
@@ -192,6 +220,30 @@ Gs1Status DeviceMaintenanceSystem::process_message(
     return GS1_STATUS_OK;
 }
 
+Gs1Status DeviceMaintenanceSystem::process_game_message(
+    RuntimeInvocation& invocation,
+    const GameMessage& message)
+{
+    auto access = make_game_state_access<DeviceMaintenanceSystem>(invocation);
+    (void)access;
+    return with_site_system_context<DeviceMaintenanceSystem>(
+        invocation,
+        [&](SiteSystemContext<DeviceMaintenanceSystem>& context) -> Gs1Status
+        {
+            return process_message(context, message);
+        });
+}
+
+Gs1Status DeviceMaintenanceSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    auto access = make_game_state_access<DeviceMaintenanceSystem>(invocation);
+    (void)access;
+    (void)message;
+    return GS1_STATUS_OK;
+}
+
 void DeviceMaintenanceSystem::run(SiteSystemContext<DeviceMaintenanceSystem>& context)
 {
     if (!context.world.has_world())
@@ -295,13 +347,22 @@ void DeviceMaintenanceSystem::run(SiteSystemContext<DeviceMaintenanceSystem>& co
                 broken.device_entity_id,
                 broken.coord,
                 broken.structure_id);
-        }
+            }
     }
 }
-GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
-    DeviceMaintenanceSystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_DEVICE_MAINTENANCE,
-    11U)
+
+void DeviceMaintenanceSystem::run(RuntimeInvocation& invocation)
+{
+    auto access = make_game_state_access<DeviceMaintenanceSystem>(invocation);
+    (void)access;
+    (void)with_site_system_context<DeviceMaintenanceSystem>(
+        invocation,
+        [&](SiteSystemContext<DeviceMaintenanceSystem>& context) -> Gs1Status
+        {
+            run(context);
+            return GS1_STATUS_OK;
+        });
+}
 }  // namespace gs1
 
 #ifdef _MSC_VER

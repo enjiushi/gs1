@@ -305,7 +305,7 @@ void inventory_regression_runner(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             site_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -322,7 +322,7 @@ void inventory_regression_runner(
 
     if (scenario == "use_item")
     {
-        const auto status = InventorySystem::process_message(
+        const auto status = invoke_system_message<InventorySystem>(
             site_context,
             make_message(
                 GameMessageType::InventoryItemUseRequested,
@@ -354,7 +354,7 @@ void inventory_regression_runner(
                 parse_u32(context, values, "prefill_destination_quantity", 1U);
         }
 
-        const auto status = InventorySystem::process_message(
+        const auto status = invoke_system_message<InventorySystem>(
             site_context,
             make_message(
                 GameMessageType::InventoryTransferRequested,
@@ -398,7 +398,7 @@ void economy_phone_regression_runner(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        EconomyPhoneSystem::process_message(
+        invoke_system_message<EconomyPhoneSystem>(
             site_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -406,7 +406,7 @@ void economy_phone_regression_runner(
 
     if (scenario == "purchase_unlockable_listing")
     {
-        const auto status = EconomyPhoneSystem::process_message(
+        const auto status = invoke_system_message<EconomyPhoneSystem>(
             site_context,
             make_message(
                 GameMessageType::PhoneListingPurchaseRequested,
@@ -429,7 +429,7 @@ void economy_phone_regression_runner(
 
     if (scenario == "purchase_listing")
     {
-        const auto status = EconomyPhoneSystem::process_message(
+        const auto status = invoke_system_message<EconomyPhoneSystem>(
             site_context,
             make_message(
                 GameMessageType::PhoneListingPurchaseRequested,
@@ -456,7 +456,7 @@ void economy_phone_regression_runner(
                 gs1::cash_points_from_cash(static_cast<std::int32_t>(parse_u32(context, values, "override_money")));
         }
 
-        const auto status = EconomyPhoneSystem::process_message(
+        const auto status = invoke_system_message<EconomyPhoneSystem>(
             site_context,
             make_message(
                 GameMessageType::ContractorHireRequested,
@@ -504,7 +504,7 @@ void task_board_regression_runner(
     {
         GS1_SYSTEM_TEST_REQUIRE(
             context,
-            TaskBoardSystem::process_message(
+            invoke_system_message<TaskBoardSystem>(
                 site_context,
                 make_message(
                     GameMessageType::SiteRunStarted,
@@ -558,7 +558,7 @@ void placement_validation_regression_runner(
                 : gs1::PlacementReservationSubjectKind::GroundCoverType;
             GS1_SYSTEM_TEST_REQUIRE(
                 context,
-                PlacementValidationSystem::process_message(
+                invoke_system_message<PlacementValidationSystem>(
                     site_context,
                     make_message(
                         GameMessageType::PlacementReservationRequested,
@@ -580,7 +580,7 @@ void placement_validation_regression_runner(
             : gs1::PlacementReservationSubjectKind::GroundCoverType;
         GS1_SYSTEM_TEST_REQUIRE(
             context,
-            PlacementValidationSystem::process_message(
+            invoke_system_message<PlacementValidationSystem>(
                 site_context,
                 make_message(
                     GameMessageType::PlacementReservationRequested,
@@ -652,7 +652,7 @@ void ecology_regression_runner(
     {
         GS1_SYSTEM_TEST_REQUIRE(
             context,
-            EcologySystem::process_message(
+            invoke_system_message<EcologySystem>(
                 site_context,
                 make_message(
                     GameMessageType::SiteTileWatered,
@@ -690,7 +690,7 @@ void ecology_regression_runner(
     {
         GS1_SYSTEM_TEST_REQUIRE(
             context,
-            EcologySystem::process_message(
+            invoke_system_message<EcologySystem>(
                 site_context,
                 make_message(
                     GameMessageType::SiteTileBurialCleared,
@@ -717,7 +717,7 @@ void ecology_regression_runner(
     {
         site_run.counters.site_completion_tile_threshold =
             parse_u32(context, values, "site_completion_tile_threshold", 1U);
-        EcologySystem::run(site_context);
+        invoke_system_run<EcologySystem>(site_context);
         const auto tile = site_run.site_world->tile_at(coord);
         GS1_SYSTEM_TEST_CHECK(
             context,
@@ -744,3 +744,4 @@ GS1_REGISTER_SYSTEM_TEST_ASSET_RUNNER("economy_phone_regression", economy_phone_
 GS1_REGISTER_SYSTEM_TEST_ASSET_RUNNER("task_board_regression", task_board_regression_runner);
 GS1_REGISTER_SYSTEM_TEST_ASSET_RUNNER("placement_validation_regression", placement_validation_regression_runner);
 GS1_REGISTER_SYSTEM_TEST_ASSET_RUNNER("ecology_regression", ecology_regression_runner);
+

@@ -51,7 +51,7 @@ void seed_site_one_inventory(gs1::CampaignState& campaign, gs1::SiteRunState& si
 {
     GameMessageQueue queue {};
     auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
-    const auto status = InventorySystem::process_message(
+    const auto status = invoke_system_message<InventorySystem>(
         inventory_context,
         make_message(
             GameMessageType::SiteRunStarted,
@@ -74,16 +74,16 @@ void phone_panel_site_run_started_seeds_home_snapshot(
         make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(inventory_context, start_message) == GS1_STATUS_OK);
+        invoke_system_message<InventorySystem>(inventory_context, start_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        TaskBoardSystem::process_message(task_context, start_message) == GS1_STATUS_OK);
+        invoke_system_message<TaskBoardSystem>(task_context, start_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        EconomyPhoneSystem::process_message(economy_context, start_message) == GS1_STATUS_OK);
+        invoke_system_message<EconomyPhoneSystem>(economy_context, start_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        PhonePanelSystem::process_message(phone_context, start_message) == GS1_STATUS_OK);
+        invoke_system_message<PhonePanelSystem>(phone_context, start_message) == GS1_STATUS_OK);
 
     const auto& phone_panel = site_run.phone_panel;
     GS1_SYSTEM_TEST_CHECK(context, phone_panel.active_section == PhonePanelSection::Home);
@@ -129,7 +129,7 @@ void phone_panel_section_request_switches_authoritative_section(
     {
         GS1_SYSTEM_TEST_REQUIRE(
             context,
-            PhonePanelSystem::process_message(
+            invoke_system_message<PhonePanelSystem>(
                 phone_context,
                 make_message(
                     GameMessageType::PhonePanelSectionRequested,
@@ -150,7 +150,7 @@ void phone_panel_rejects_unknown_section_request(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        PhonePanelSystem::process_message(
+        invoke_system_message<PhonePanelSystem>(
             phone_context,
             make_message(
                 GameMessageType::PhonePanelSectionRequested,
@@ -175,10 +175,10 @@ void phone_panel_sell_list_refreshes_when_purchase_delivery_arrives(
         make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        EconomyPhoneSystem::process_message(economy_context, start_message) == GS1_STATUS_OK);
+        invoke_system_message<EconomyPhoneSystem>(economy_context, start_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        PhonePanelSystem::process_message(phone_context, start_message) == GS1_STATUS_OK);
+        invoke_system_message<PhonePanelSystem>(phone_context, start_message) == GS1_STATUS_OK);
 
     const auto buy_listing_it = std::find_if(
         site_run.economy.available_phone_listings.begin(),
@@ -210,7 +210,7 @@ void phone_panel_sell_list_refreshes_when_purchase_delivery_arrives(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        EconomyPhoneSystem::process_message(
+        invoke_system_message<EconomyPhoneSystem>(
             economy_context,
             make_message(
                 GameMessageType::PhoneListingPurchaseRequested,
@@ -224,7 +224,7 @@ void phone_panel_sell_list_refreshes_when_purchase_delivery_arrives(
         {
             GS1_SYSTEM_TEST_REQUIRE(
                 context,
-                InventorySystem::process_message(inventory_context, message) == GS1_STATUS_OK);
+                invoke_system_message<InventorySystem>(inventory_context, message) == GS1_STATUS_OK);
             processed_delivery = true;
         }
     }
@@ -232,7 +232,7 @@ void phone_panel_sell_list_refreshes_when_purchase_delivery_arrives(
     queue.clear();
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.pending_delivery_queue.empty());
-    PhonePanelSystem::run(phone_context);
+    invoke_system_run<PhonePanelSystem>(phone_context);
 
     const auto quantity_after = gs1::inventory_storage::available_item_quantity_in_container(
         site_run,
@@ -262,7 +262,7 @@ void phone_panel_task_counts_follow_pending_claim_until_reward_claim(
         make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        PhonePanelSystem::process_message(phone_context, start_message) == GS1_STATUS_OK);
+        invoke_system_message<PhonePanelSystem>(phone_context, start_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.accepted_task_count == 1U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.completed_task_count == 0U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.claimed_task_count == 0U);
@@ -270,7 +270,7 @@ void phone_panel_task_counts_follow_pending_claim_until_reward_claim(
     task.runtime_list_kind = gs1::TaskRuntimeListKind::PendingClaim;
     site_run.task_board.accepted_task_ids.clear();
     site_run.task_board.completed_task_ids.push_back(task.task_instance_id);
-    PhonePanelSystem::run(phone_context);
+    invoke_system_run<PhonePanelSystem>(phone_context);
     GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.accepted_task_count == 0U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.completed_task_count == 1U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.claimed_task_count == 0U);
@@ -278,7 +278,7 @@ void phone_panel_task_counts_follow_pending_claim_until_reward_claim(
     task.runtime_list_kind = gs1::TaskRuntimeListKind::Claimed;
     site_run.task_board.completed_task_ids.clear();
     site_run.task_board.claimed_task_ids.push_back(task.task_instance_id);
-    PhonePanelSystem::run(phone_context);
+    invoke_system_run<PhonePanelSystem>(phone_context);
     GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.accepted_task_count == 0U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.completed_task_count == 0U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.claimed_task_count == 1U);
@@ -299,17 +299,17 @@ void phone_panel_unread_badges_follow_launcher_and_app_visibility(
         make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        EconomyPhoneSystem::process_message(economy_context, start_message) == GS1_STATUS_OK);
+        invoke_system_message<EconomyPhoneSystem>(economy_context, start_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        PhonePanelSystem::process_message(phone_context, start_message) == GS1_STATUS_OK);
+        invoke_system_message<PhonePanelSystem>(phone_context, start_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.phone_panel.badge_flags == 0U);
 
     auto& task = site_run.task_board.visible_tasks.emplace_back();
     task.task_instance_id = gs1::TaskInstanceId {9U};
     task.runtime_list_kind = gs1::TaskRuntimeListKind::PendingClaim;
     site_run.task_board.completed_task_ids.push_back(task.task_instance_id);
-    PhonePanelSystem::run(phone_context);
+    invoke_system_run<PhonePanelSystem>(phone_context);
     GS1_SYSTEM_TEST_CHECK(
         context,
         (site_run.phone_panel.badge_flags & GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) != 0U);
@@ -319,7 +319,7 @@ void phone_panel_unread_badges_follow_launcher_and_app_visibility(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        PhonePanelSystem::process_message(
+        invoke_system_message<PhonePanelSystem>(
             phone_context,
             make_message(
                 GameMessageType::PhonePanelSectionRequested,
@@ -335,7 +335,7 @@ void phone_panel_unread_badges_follow_launcher_and_app_visibility(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        PhonePanelSystem::process_message(
+        invoke_system_message<PhonePanelSystem>(
             phone_context,
             make_message(
                 GameMessageType::PhonePanelSectionRequested,
@@ -367,7 +367,7 @@ void phone_panel_unread_badges_follow_launcher_and_app_visibility(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        EconomyPhoneSystem::process_message(
+        invoke_system_message<EconomyPhoneSystem>(
             economy_context,
             make_message(
                 GameMessageType::PhoneListingPurchaseRequested,
@@ -380,13 +380,13 @@ void phone_panel_unread_badges_follow_launcher_and_app_visibility(
         {
             GS1_SYSTEM_TEST_REQUIRE(
                 context,
-                InventorySystem::process_message(inventory_context, message) == GS1_STATUS_OK);
+                invoke_system_message<InventorySystem>(inventory_context, message) == GS1_STATUS_OK);
         }
     }
 
     site_run.phone_panel.open = false;
     site_run.phone_panel.active_section = PhonePanelSection::Home;
-    PhonePanelSystem::run(phone_context);
+    invoke_system_run<PhonePanelSystem>(phone_context);
     GS1_SYSTEM_TEST_CHECK(
         context,
         (site_run.phone_panel.badge_flags & GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) != 0U);
@@ -396,7 +396,7 @@ void phone_panel_unread_badges_follow_launcher_and_app_visibility(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        PhonePanelSystem::process_message(
+        invoke_system_message<PhonePanelSystem>(
             phone_context,
             make_message(
                 GameMessageType::PhonePanelSectionRequested,
@@ -436,3 +436,4 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "unread_badges_follow_launcher_and_app_visibility",
     phone_panel_unread_badges_follow_launcher_and_app_visibility);
 }  // namespace
+

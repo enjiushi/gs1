@@ -233,39 +233,88 @@ bool PlacementValidationSystem::subscribes_to(GameMessageType type) noexcept
     }
 }
 
-Gs1Status PlacementValidationSystem::process_message(
-    SiteSystemContext<PlacementValidationSystem>& context,
+const char* PlacementValidationSystem::name() const noexcept
+{
+    return access().system_name.data();
+}
+
+GameMessageSubscriptionSpan PlacementValidationSystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<
+        GameMessageType,
+        k_game_message_type_count,
+        &PlacementValidationSystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan PlacementValidationSystem::subscribed_host_messages() const noexcept
+{
+    return {};
+}
+
+std::optional<Gs1RuntimeProfileSystemId> PlacementValidationSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_PLACEMENT_VALIDATION;
+}
+
+std::optional<std::uint32_t> PlacementValidationSystem::fixed_step_order() const noexcept
+{
+    return std::nullopt;
+}
+
+Gs1Status PlacementValidationSystem::process_game_message(
+    RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        handle_site_run_started(context);
-        break;
+    auto access = make_game_state_access<PlacementValidationSystem>(invocation);
+    (void)access;
+    return with_site_system_context<PlacementValidationSystem>(
+        invocation,
+        [&](SiteSystemContext<PlacementValidationSystem>& context) -> Gs1Status
+        {
+            switch (message.type)
+            {
+            case GameMessageType::SiteRunStarted:
+                handle_site_run_started(context);
+                break;
 
-    case GameMessageType::PlacementReservationRequested:
-        handle_reservation_requested(
-            context,
-            message.payload_as<PlacementReservationRequestedMessage>());
-        break;
+            case GameMessageType::PlacementReservationRequested:
+                handle_reservation_requested(
+                    context,
+                    message.payload_as<PlacementReservationRequestedMessage>());
+                break;
 
-    case GameMessageType::PlacementReservationReleased:
-        handle_reservation_released(message.payload_as<PlacementReservationReleasedMessage>());
-        break;
+            case GameMessageType::PlacementReservationReleased:
+                handle_reservation_released(message.payload_as<PlacementReservationReleasedMessage>());
+                break;
 
-    default:
-        break;
-    }
+            default:
+                break;
+            }
 
+            return GS1_STATUS_OK;
+        });
+}
+
+Gs1Status PlacementValidationSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    auto access = make_game_state_access<PlacementValidationSystem>(invocation);
+    (void)access;
+    (void)message;
     return GS1_STATUS_OK;
 }
 
-void PlacementValidationSystem::run(SiteSystemContext<PlacementValidationSystem>& context)
+void PlacementValidationSystem::run(RuntimeInvocation& invocation)
 {
-    (void)context;
+    auto access = make_game_state_access<PlacementValidationSystem>(invocation);
+    (void)access;
+    (void)with_site_system_context<PlacementValidationSystem>(
+        invocation,
+        [&](SiteSystemContext<PlacementValidationSystem>& context) -> Gs1Status
+        {
+            (void)context;
+            return GS1_STATUS_OK;
+        });
 }
-GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
-    PlacementValidationSystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_PLACEMENT_VALIDATION,
-    std::nullopt)
 }  // namespace gs1

@@ -15,12 +15,12 @@ public:
     [[nodiscard]] std::optional<Gs1RuntimeProfileSystemId> profile_system_id() const noexcept override;
     [[nodiscard]] std::optional<std::uint32_t> fixed_step_order() const noexcept override;
     [[nodiscard]] Gs1Status process_game_message(
-        GameRuntimeTempBridge& bridge,
+        RuntimeInvocation& invocation,
         const GameMessage& message) override;
     [[nodiscard]] Gs1Status process_host_message(
-        GameRuntimeTempBridge& bridge,
+        RuntimeInvocation& invocation,
         const Gs1HostMessage& message) override;
-    void run(GameRuntimeTempBridge& bridge) override;
+    void run(RuntimeInvocation& invocation) override;
 
     [[nodiscard]] static constexpr SiteSystemAccess access() noexcept
     {
@@ -41,5 +41,15 @@ public:
         SiteSystemContext<ModifierSystem>& context,
         const GameMessage& message);
     static void run(SiteSystemContext<ModifierSystem>& context);
+};
+
+template <>
+struct system_state_tags<ModifierSystem>
+{
+    using type = type_list<
+        RuntimeCampaignTag,
+        RuntimeActiveSiteRunTag,
+        RuntimeFixedStepSecondsTag,
+        RuntimeMoveDirectionTag>;
 };
 }  // namespace gs1

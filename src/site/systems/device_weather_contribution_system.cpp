@@ -225,6 +225,34 @@ void write_tile_contribution(
 
 namespace gs1
 {
+const char* DeviceWeatherContributionSystem::name() const noexcept
+{
+    return access().system_name.data();
+}
+
+GameMessageSubscriptionSpan DeviceWeatherContributionSystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<
+        GameMessageType,
+        k_game_message_type_count,
+        &DeviceWeatherContributionSystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan DeviceWeatherContributionSystem::subscribed_host_messages() const noexcept
+{
+    return {};
+}
+
+std::optional<Gs1RuntimeProfileSystemId> DeviceWeatherContributionSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE;
+}
+
+std::optional<std::uint32_t> DeviceWeatherContributionSystem::fixed_step_order() const noexcept
+{
+    return 7U;
+}
+
 bool DeviceWeatherContributionSystem::subscribes_to(GameMessageType type) noexcept
 {
     return type == GameMessageType::SiteRunStarted ||
@@ -297,6 +325,30 @@ Gs1Status DeviceWeatherContributionSystem::process_message(
     }
 }
 
+Gs1Status DeviceWeatherContributionSystem::process_game_message(
+    RuntimeInvocation& invocation,
+    const GameMessage& message)
+{
+    auto access = make_game_state_access<DeviceWeatherContributionSystem>(invocation);
+    (void)access;
+    return with_site_system_context<DeviceWeatherContributionSystem>(
+        invocation,
+        [&](SiteSystemContext<DeviceWeatherContributionSystem>& context) -> Gs1Status
+        {
+            return process_message(context, message);
+        });
+}
+
+Gs1Status DeviceWeatherContributionSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    auto access = make_game_state_access<DeviceWeatherContributionSystem>(invocation);
+    (void)access;
+    (void)message;
+    return GS1_STATUS_OK;
+}
+
 void DeviceWeatherContributionSystem::run(SiteSystemContext<DeviceWeatherContributionSystem>& context)
 {
     if (!context.world.has_world())
@@ -338,10 +390,19 @@ void DeviceWeatherContributionSystem::run(SiteSystemContext<DeviceWeatherContrib
 
     clear_dirty_tiles(runtime);
 }
-GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
-    DeviceWeatherContributionSystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE,
-    7U)
+
+void DeviceWeatherContributionSystem::run(RuntimeInvocation& invocation)
+{
+    auto access = make_game_state_access<DeviceWeatherContributionSystem>(invocation);
+    (void)access;
+    (void)with_site_system_context<DeviceWeatherContributionSystem>(
+        invocation,
+        [&](SiteSystemContext<DeviceWeatherContributionSystem>& context) -> Gs1Status
+        {
+            run(context);
+            return GS1_STATUS_OK;
+        });
+}
 }  // namespace gs1
 
 #ifdef _MSC_VER

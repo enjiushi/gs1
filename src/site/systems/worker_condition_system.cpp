@@ -629,92 +629,137 @@ SiteWorld::WorkerConditionData resolve_worker_conditions(
 }
 }  // namespace
 
-bool WorkerConditionSystem::subscribes_to(GameMessageType type) noexcept
+const char* WorkerConditionSystem::name() const noexcept
 {
-    return type == GameMessageType::SiteRunStarted ||
-        type == GameMessageType::WorkerMeterDeltaRequested ||
-        type == GameMessageType::InventoryItemUseCompleted;
+    return access().system_name.data();
 }
 
-Gs1Status WorkerConditionSystem::process_message(
-    SiteSystemContext<WorkerConditionSystem>& context,
+GameMessageSubscriptionSpan WorkerConditionSystem::subscribed_game_messages() const noexcept
+{
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::SiteRunStarted,
+        GameMessageType::WorkerMeterDeltaRequested,
+        GameMessageType::InventoryItemUseCompleted};
+    return subscriptions;
+}
+
+HostMessageSubscriptionSpan WorkerConditionSystem::subscribed_host_messages() const noexcept
+{
+    return {};
+}
+
+std::optional<Gs1RuntimeProfileSystemId> WorkerConditionSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_WORKER_CONDITION;
+}
+
+std::optional<std::uint32_t> WorkerConditionSystem::fixed_step_order() const noexcept
+{
+    return 9U;
+}
+
+Gs1Status WorkerConditionSystem::process_game_message(
+    RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    if (message.type == GameMessageType::SiteRunStarted)
-    {
-        emit_worker_meters_changed_if_needed(context);
-        return GS1_STATUS_OK;
-    }
+    auto access = make_game_state_access<WorkerConditionSystem>(invocation);
+    (void)access;
+    return with_site_system_context<WorkerConditionSystem>(
+        invocation,
+        [&](SiteSystemContext<WorkerConditionSystem>& context) -> Gs1Status
+        {
+            if (message.type == GameMessageType::SiteRunStarted)
+            {
+                emit_worker_meters_changed_if_needed(context);
+                return GS1_STATUS_OK;
+            }
 
-    if (message.type != GameMessageType::WorkerMeterDeltaRequested &&
-        message.type != GameMessageType::InventoryItemUseCompleted)
-    {
-        return GS1_STATUS_OK;
-    }
+            if (message.type != GameMessageType::WorkerMeterDeltaRequested &&
+                message.type != GameMessageType::InventoryItemUseCompleted)
+            {
+                return GS1_STATUS_OK;
+            }
 
-    if (!context.world.has_world())
-    {
-        return GS1_STATUS_OK;
-    }
+            if (!context.world.has_world())
+            {
+                return GS1_STATUS_OK;
+            }
 
-    auto worker = context.world.read_worker();
-    const auto previous = worker.conditions;
-    const auto deltas =
-        message.type == GameMessageType::WorkerMeterDeltaRequested
-        ? deltas_from_message(message.payload_as<WorkerMeterDeltaRequestedMessage>())
-        : deltas_from_item_use_completed(message.payload_as<InventoryItemUseCompletedMessage>());
-    worker.conditions = resolve_worker_conditions(
-        previous,
-        deltas,
-        context.world.read_modifier().resolved_channel_totals,
-        0.0f,
-        0.0f);
-    const bool modified = worker_conditions_changed(previous, worker.conditions);
-    if (modified)
-    {
-        context.world.write_worker(worker);
-        emit_worker_meters_changed_if_needed(context);
-    }
+            auto worker = context.world.read_worker();
+            const auto previous = worker.conditions;
+            const auto deltas =
+                message.type == GameMessageType::WorkerMeterDeltaRequested
+                ? deltas_from_message(message.payload_as<WorkerMeterDeltaRequestedMessage>())
+                : deltas_from_item_use_completed(
+                      message.payload_as<InventoryItemUseCompletedMessage>());
+            worker.conditions = resolve_worker_conditions(
+                previous,
+                deltas,
+                context.world.read_modifier().resolved_channel_totals,
+                0.0f,
+                0.0f);
+            const bool modified = worker_conditions_changed(previous, worker.conditions);
+            if (modified)
+            {
+                context.world.write_worker(worker);
+                emit_worker_meters_changed_if_needed(context);
+            }
+            return GS1_STATUS_OK;
+        });
+}
+
+Gs1Status WorkerConditionSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    auto access = make_game_state_access<WorkerConditionSystem>(invocation);
+    (void)access;
+    (void)message;
     return GS1_STATUS_OK;
 }
 
-void WorkerConditionSystem::run(SiteSystemContext<WorkerConditionSystem>& context)
+void WorkerConditionSystem::run(RuntimeInvocation& invocation)
 {
-    if (!context.world.has_world())
-    {
-        return;
-    }
+    auto access = make_game_state_access<WorkerConditionSystem>(invocation);
+    (void)access;
+    (void)with_site_system_context<WorkerConditionSystem>(
+        invocation,
+        [&](SiteSystemContext<WorkerConditionSystem>& context) -> Gs1Status
+        {
+            if (!context.world.has_world())
+            {
+                return GS1_STATUS_OK;
+            }
 
-    auto worker = context.world.read_worker();
-    const auto previous = worker.conditions;
-    WorkerMeterDeltas deltas {};
-    const float step_real_seconds = static_cast<float>(std::max(0.0, context.fixed_step_seconds));
-    accumulate_passive_deltas(
-        deltas,
-        previous,
-        context.world.read_tile_local_weather(worker.position.tile_coord),
-        context.world.read_modifier(),
-        static_cast<float>(runtime_minutes_from_real_seconds(context.fixed_step_seconds)),
-        step_real_seconds);
-    const float passive_energy_step_real_seconds =
-        action_is_executing(context.world.read_action()) ? 0.0f : step_real_seconds;
-    const float passive_energy_bonus =
-        special_energy_recovery_bonus(context.world.read_modifier());
-    worker.conditions = resolve_worker_conditions(
-        previous,
-        deltas,
-        context.world.read_modifier().resolved_channel_totals,
-        passive_energy_step_real_seconds,
-        passive_energy_bonus);
-    const bool modified = worker_conditions_changed(previous, worker.conditions);
-    if (modified)
-    {
-        context.world.write_worker(worker);
-        emit_worker_meters_changed_if_needed(context);
-    }
+            auto worker = context.world.read_worker();
+            const auto previous = worker.conditions;
+            WorkerMeterDeltas deltas {};
+            const float step_real_seconds =
+                static_cast<float>(std::max(0.0, context.fixed_step_seconds));
+            accumulate_passive_deltas(
+                deltas,
+                previous,
+                context.world.read_tile_local_weather(worker.position.tile_coord),
+                context.world.read_modifier(),
+                static_cast<float>(runtime_minutes_from_real_seconds(context.fixed_step_seconds)),
+                step_real_seconds);
+            const float passive_energy_step_real_seconds =
+                action_is_executing(context.world.read_action()) ? 0.0f : step_real_seconds;
+            const float passive_energy_bonus =
+                special_energy_recovery_bonus(context.world.read_modifier());
+            worker.conditions = resolve_worker_conditions(
+                previous,
+                deltas,
+                context.world.read_modifier().resolved_channel_totals,
+                passive_energy_step_real_seconds,
+                passive_energy_bonus);
+            const bool modified = worker_conditions_changed(previous, worker.conditions);
+            if (modified)
+            {
+                context.world.write_worker(worker);
+                emit_worker_meters_changed_if_needed(context);
+            }
+            return GS1_STATUS_OK;
+        });
 }
-GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
-    WorkerConditionSystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_WORKER_CONDITION,
-    9U)
 }  // namespace gs1

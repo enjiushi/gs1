@@ -1,6 +1,7 @@
 #include "campaign/systems/loadout_planner_system.h"
 
 #include "campaign/campaign_state.h"
+#include "campaign/systems/campaign_system_context.h"
 #include "content/defs/item_defs.h"
 #include "content/prototype_content.h"
 #include "runtime/game_runtime.h"
@@ -118,7 +119,18 @@ void rebuild_selected_loadout(CampaignState& campaign)
             contributor->nearby_aura_modifier_ids.end());
     }
 }
+
 }  // namespace
+
+Gs1Status process_loadout_planner_message(
+    CampaignSystemContext& context,
+    const GameMessage& message);
+
+template <>
+struct system_state_tags<LoadoutPlannerSystem>
+{
+    using type = type_list<RuntimeCampaignTag>;
+};
 
 void LoadoutPlannerSystem::initialize_campaign_state(CampaignState& campaign)
 {
@@ -141,11 +153,68 @@ bool LoadoutPlannerSystem::subscribes_to(GameMessageType type) noexcept
         type == GameMessageType::DeploymentSiteSelectionChanged;
 }
 
-Gs1Status LoadoutPlannerSystem::process_message(
+const char* LoadoutPlannerSystem::name() const noexcept
+{
+    return "LoadoutPlannerSystem";
+}
+
+GameMessageSubscriptionSpan LoadoutPlannerSystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<
+        GameMessageType,
+        k_game_message_type_count,
+        LoadoutPlannerSystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan LoadoutPlannerSystem::subscribed_host_messages() const noexcept
+{
+    return {};
+}
+
+std::optional<Gs1RuntimeProfileSystemId> LoadoutPlannerSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_LOADOUT_PLANNER;
+}
+
+std::optional<std::uint32_t> LoadoutPlannerSystem::fixed_step_order() const noexcept
+{
+    return std::nullopt;
+}
+
+Gs1Status LoadoutPlannerSystem::process_game_message(
+    RuntimeInvocation& invocation,
+    const GameMessage& message)
+{
+    auto access = make_game_state_access<LoadoutPlannerSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    if (!campaign.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    CampaignSystemContext context {*campaign};
+    return process_loadout_planner_message(context, message);
+}
+
+Gs1Status LoadoutPlannerSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    (void)invocation;
+    (void)message;
+    return GS1_STATUS_OK;
+}
+
+void LoadoutPlannerSystem::run(RuntimeInvocation& invocation)
+{
+    (void)invocation;
+}
+
+Gs1Status process_loadout_planner_message(
     CampaignSystemContext& context,
     const GameMessage& message)
 {
-    if (!subscribes_to(message.type))
+    if (!LoadoutPlannerSystem::subscribes_to(message.type))
     {
         return GS1_STATUS_OK;
     }
@@ -181,8 +250,4 @@ Gs1Status LoadoutPlannerSystem::process_message(
     rebuild_selected_loadout(context.campaign);
     return GS1_STATUS_OK;
 }
-
-GS1_IMPLEMENT_RUNTIME_CAMPAIGN_MESSAGE_SYSTEM(
-    LoadoutPlannerSystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_LOADOUT_PLANNER)
 }  // namespace gs1

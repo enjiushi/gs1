@@ -18,6 +18,16 @@
 
 namespace gs1
 {
+template <>
+struct system_state_tags<EconomyPhoneSystem>
+{
+    using type = type_list<
+        RuntimeCampaignTag,
+        RuntimeActiveSiteRunTag,
+        RuntimeFixedStepSecondsTag,
+        RuntimeMoveDirectionTag>;
+};
+
 namespace
 {
 constexpr std::uint32_t k_sell_listing_id_base = 1000U;
@@ -999,12 +1009,16 @@ void seed_site_economy(SiteSystemContext<EconomyPhoneSystem>& context, std::uint
 }
 }  // namespace
 
+Gs1Status process_game_message_impl(
+    SiteSystemContext<EconomyPhoneSystem>& context,
+    const GameMessage& message);
+
 bool EconomyPhoneSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
 {
     return type == GS1_HOST_EVENT_UI_ACTION;
 }
 
-Gs1Status EconomyPhoneSystem::process_host_message(
+Gs1Status process_host_message_impl(
     SiteSystemContext<EconomyPhoneSystem>& context,
     const Gs1HostMessage& message)
 {
@@ -1027,7 +1041,7 @@ Gs1Status EconomyPhoneSystem::process_host_message(
             action.target_id,
             static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
             0U});
-        return process_message(context, translated);
+        return process_game_message_impl(context, translated);
 
     case GS1_UI_ACTION_ADD_PHONE_LISTING_TO_CART:
         if (action.target_id == 0U)
@@ -1039,7 +1053,7 @@ Gs1Status EconomyPhoneSystem::process_host_message(
             action.target_id,
             static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
             0U});
-        return process_message(context, translated);
+        return process_game_message_impl(context, translated);
 
     case GS1_UI_ACTION_REMOVE_PHONE_LISTING_FROM_CART:
         if (action.target_id == 0U)
@@ -1051,12 +1065,12 @@ Gs1Status EconomyPhoneSystem::process_host_message(
             action.target_id,
             static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
             0U});
-        return process_message(context, translated);
+        return process_game_message_impl(context, translated);
 
     case GS1_UI_ACTION_CHECKOUT_PHONE_CART:
         translated.type = GameMessageType::PhoneCartCheckoutRequested;
         translated.set_payload(PhoneCartCheckoutRequestedMessage {});
-        return process_message(context, translated);
+        return process_game_message_impl(context, translated);
 
     case GS1_UI_ACTION_SELL_PHONE_LISTING:
         if (action.target_id == 0U)
@@ -1068,7 +1082,7 @@ Gs1Status EconomyPhoneSystem::process_host_message(
             action.target_id,
             static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
             0U});
-        return process_message(context, translated);
+        return process_game_message_impl(context, translated);
 
     case GS1_UI_ACTION_HIRE_CONTRACTOR:
         if (action.target_id == 0U)
@@ -1079,7 +1093,7 @@ Gs1Status EconomyPhoneSystem::process_host_message(
         translated.set_payload(ContractorHireRequestedMessage {
             action.target_id,
             static_cast<std::uint32_t>(action.arg0)});
-        return process_message(context, translated);
+        return process_game_message_impl(context, translated);
 
     case GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE:
         if (action.target_id == 0U)
@@ -1088,7 +1102,7 @@ Gs1Status EconomyPhoneSystem::process_host_message(
         }
         translated.type = GameMessageType::SiteUnlockablePurchaseRequested;
         translated.set_payload(SiteUnlockablePurchaseRequestedMessage {action.target_id});
-        return process_message(context, translated);
+        return process_game_message_impl(context, translated);
 
     default:
         return GS1_STATUS_OK;
@@ -1116,7 +1130,7 @@ bool EconomyPhoneSystem::subscribes_to(GameMessageType type) noexcept
     }
 }
 
-Gs1Status EconomyPhoneSystem::process_message(
+Gs1Status process_game_message_impl(
     SiteSystemContext<EconomyPhoneSystem>& context,
     const GameMessage& message)
 {
@@ -1250,12 +1264,78 @@ Gs1Status EconomyPhoneSystem::process_message(
     }
 }
 
-void EconomyPhoneSystem::run(SiteSystemContext<EconomyPhoneSystem>& context)
+void run_impl(SiteSystemContext<EconomyPhoneSystem>& context)
 {
     refresh_dynamic_sell_listings(context);
 }
-GS1_IMPLEMENT_RUNTIME_SITE_HOST_AND_MESSAGE_SYSTEM(
-    EconomyPhoneSystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_ECONOMY_PHONE,
-    17U)
+
+const char* EconomyPhoneSystem::name() const noexcept
+{
+    return "EconomyPhoneSystem";
+}
+
+GameMessageSubscriptionSpan EconomyPhoneSystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<GameMessageType, k_game_message_type_count, &EconomyPhoneSystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan EconomyPhoneSystem::subscribed_host_messages() const noexcept
+{
+    return runtime_subscription_list<
+        Gs1HostMessageType,
+        k_runtime_host_message_type_count,
+        &EconomyPhoneSystem::subscribes_to_host_message>();
+}
+
+std::optional<Gs1RuntimeProfileSystemId> EconomyPhoneSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_ECONOMY_PHONE;
+}
+
+std::optional<std::uint32_t> EconomyPhoneSystem::fixed_step_order() const noexcept
+{
+    return 17U;
+}
+
+Gs1Status EconomyPhoneSystem::process_game_message(
+    RuntimeInvocation& invocation,
+    const GameMessage& message)
+{
+    auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
+    (void)access;
+    return with_site_system_context<EconomyPhoneSystem>(
+        invocation,
+        [&](SiteSystemContext<EconomyPhoneSystem>& context)
+        {
+            return process_game_message_impl(context, message);
+        });
+}
+
+Gs1Status EconomyPhoneSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
+    (void)access;
+    return with_site_system_context<EconomyPhoneSystem>(
+        invocation,
+        [&](SiteSystemContext<EconomyPhoneSystem>& context)
+        {
+            return process_host_message_impl(context, message);
+        });
+}
+
+void EconomyPhoneSystem::run(RuntimeInvocation& invocation)
+{
+    auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
+    (void)access;
+    (void)with_site_system_context<EconomyPhoneSystem>(
+        invocation,
+        [&](SiteSystemContext<EconomyPhoneSystem>& context)
+        {
+            run_impl(context);
+            return GS1_STATUS_OK;
+        },
+        true);
+}
 }  // namespace gs1

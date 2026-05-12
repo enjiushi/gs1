@@ -1073,6 +1073,37 @@ bool ModifierSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcep
     return type == GS1_HOST_EVENT_UI_ACTION;
 }
 
+const char* ModifierSystem::name() const noexcept
+{
+    return access().system_name.data();
+}
+
+GameMessageSubscriptionSpan ModifierSystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<
+        GameMessageType,
+        k_game_message_type_count,
+        &ModifierSystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan ModifierSystem::subscribed_host_messages() const noexcept
+{
+    return runtime_subscription_list<
+        Gs1HostMessageType,
+        k_runtime_host_message_type_count,
+        &ModifierSystem::subscribes_to_host_message>();
+}
+
+std::optional<Gs1RuntimeProfileSystemId> ModifierSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_MODIFIER;
+}
+
+std::optional<std::uint32_t> ModifierSystem::fixed_step_order() const noexcept
+{
+    return 3U;
+}
+
 Gs1Status ModifierSystem::process_host_message(
     SiteSystemContext<ModifierSystem>& context,
     const Gs1HostMessage& message)
@@ -1097,6 +1128,35 @@ Gs1Status ModifierSystem::process_host_message(
         context,
         SiteModifierEndRequestedMessage {action.target_id});
     return GS1_STATUS_OK;
+}
+
+Gs1Status ModifierSystem::process_game_message(
+    RuntimeInvocation& invocation,
+    const GameMessage& message)
+{
+    auto access = make_game_state_access<ModifierSystem>(invocation);
+    (void)access;
+    return with_site_system_context<ModifierSystem>(
+        invocation,
+        [&](SiteSystemContext<ModifierSystem>& context) -> Gs1Status
+        {
+            return process_message(context, message);
+        });
+}
+
+Gs1Status ModifierSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    auto access = make_game_state_access<ModifierSystem>(invocation);
+    (void)access;
+    return with_site_system_context<ModifierSystem>(
+        invocation,
+        [&](SiteSystemContext<ModifierSystem>& context) -> Gs1Status
+        {
+            return process_host_message(context, message);
+        },
+        true);
 }
 
 bool ModifierSystem::subscribes_to(GameMessageType type) noexcept
@@ -1154,8 +1214,17 @@ void ModifierSystem::run(SiteSystemContext<ModifierSystem>& context)
 
     resolve_modifier_totals(context);
 }
-GS1_IMPLEMENT_RUNTIME_SITE_HOST_AND_MESSAGE_SYSTEM(
-    ModifierSystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_MODIFIER,
-    3U)
+
+void ModifierSystem::run(RuntimeInvocation& invocation)
+{
+    auto access = make_game_state_access<ModifierSystem>(invocation);
+    (void)access;
+    (void)with_site_system_context<ModifierSystem>(
+        invocation,
+        [&](SiteSystemContext<ModifierSystem>& context) -> Gs1Status
+        {
+            run(context);
+            return GS1_STATUS_OK;
+        });
+}
 }  // namespace gs1

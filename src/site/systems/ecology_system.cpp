@@ -26,6 +26,34 @@
 
 namespace gs1
 {
+const char* EcologySystem::name() const noexcept
+{
+    return access().system_name.data();
+}
+
+GameMessageSubscriptionSpan EcologySystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<
+        GameMessageType,
+        k_game_message_type_count,
+        &EcologySystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan EcologySystem::subscribed_host_messages() const noexcept
+{
+    return {};
+}
+
+std::optional<Gs1RuntimeProfileSystemId> EcologySystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_ECOLOGY;
+}
+
+std::optional<std::uint32_t> EcologySystem::fixed_step_order() const noexcept
+{
+    return 13U;
+}
+
 namespace
 {
 constexpr float k_density_epsilon = 0.0001f;
@@ -1240,157 +1268,180 @@ bool EcologySystem::subscribes_to(GameMessageType type) noexcept
     }
 }
 
-Gs1Status EcologySystem::process_message(
-    SiteSystemContext<EcologySystem>& context,
+Gs1Status EcologySystem::process_game_message(
+    RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        emit_startup_ecology_snapshots(context);
-        break;
-    case GameMessageType::SiteGroundCoverPlaced:
-    {
-        const auto& payload = message.payload_as<SiteGroundCoverPlacedMessage>();
-        const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
-        const std::uint32_t changed_mask = apply_ground_cover(context.world, coord, payload);
-        if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
+    auto access = make_game_state_access<EcologySystem>(invocation);
+    (void)access;
+    return with_site_system_context<EcologySystem>(
+        invocation,
+        [&](SiteSystemContext<EcologySystem>& context) -> Gs1Status
         {
-            mark_dirty_tile_ecology(context, coord, changed_mask);
-        }
-        break;
-    }
-
-    case GameMessageType::SiteTilePlantingCompleted:
-    {
-        const auto& payload = message.payload_as<SiteTilePlantingCompletedMessage>();
-        const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
-        const TileFootprint footprint =
-            resolve_plant_tile_footprint(PlantId {payload.plant_type_id});
-        const TileCoord anchor = align_tile_anchor_to_footprint(coord, footprint);
-        for_each_tile_in_footprint(
-            anchor,
-            footprint,
-            [&](TileCoord footprint_coord) {
-                const std::uint32_t changed_mask = apply_planting(context, footprint_coord, payload);
+            switch (message.type)
+            {
+            case GameMessageType::SiteRunStarted:
+                emit_startup_ecology_snapshots(context);
+                break;
+            case GameMessageType::SiteGroundCoverPlaced:
+            {
+                const auto& payload = message.payload_as<SiteGroundCoverPlacedMessage>();
+                const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
+                const std::uint32_t changed_mask = apply_ground_cover(context.world, coord, payload);
                 if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
                 {
-                    mark_dirty_tile_ecology(context, footprint_coord, changed_mask);
+                    mark_dirty_tile_ecology(context, coord, changed_mask);
                 }
-            });
-        break;
-    }
+                break;
+            }
 
-    case GameMessageType::SiteTileWatered:
-    {
-        const auto& payload = message.payload_as<SiteTileWateredMessage>();
-        const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
-        const std::uint32_t changed_mask = apply_watering(context.world, coord, payload);
-        if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
-        {
-            mark_dirty_tile_ecology(context, coord, changed_mask);
-        }
-        break;
-    }
+            case GameMessageType::SiteTilePlantingCompleted:
+            {
+                const auto& payload = message.payload_as<SiteTilePlantingCompletedMessage>();
+                const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
+                const TileFootprint footprint =
+                    resolve_plant_tile_footprint(PlantId {payload.plant_type_id});
+                const TileCoord anchor = align_tile_anchor_to_footprint(coord, footprint);
+                for_each_tile_in_footprint(
+                    anchor,
+                    footprint,
+                    [&](TileCoord footprint_coord) {
+                        const std::uint32_t changed_mask = apply_planting(context, footprint_coord, payload);
+                        if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
+                        {
+                            mark_dirty_tile_ecology(context, footprint_coord, changed_mask);
+                        }
+                    });
+                break;
+            }
 
-    case GameMessageType::SiteTileBurialCleared:
-    {
-        const auto& payload = message.payload_as<SiteTileBurialClearedMessage>();
-        const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
-        const std::uint32_t changed_mask = apply_burial_cleared(context, coord, payload);
-        if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
-        {
-            mark_dirty_tile_ecology(context, coord, changed_mask);
-        }
-        break;
-    }
-
-    case GameMessageType::SiteTileHarvested:
-    {
-        const auto& payload = message.payload_as<SiteTileHarvestedMessage>();
-        const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
-        const TileFootprint footprint =
-            resolve_plant_tile_footprint(PlantId {payload.plant_type_id});
-        const TileCoord anchor = align_tile_anchor_to_footprint(coord, footprint);
-        for_each_tile_in_footprint(
-            anchor,
-            footprint,
-            [&](TileCoord footprint_coord) {
-                const std::uint32_t changed_mask = apply_harvest(context, footprint_coord, payload);
+            case GameMessageType::SiteTileWatered:
+            {
+                const auto& payload = message.payload_as<SiteTileWateredMessage>();
+                const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
+                const std::uint32_t changed_mask = apply_watering(context.world, coord, payload);
                 if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
                 {
-                    mark_dirty_tile_ecology(context, footprint_coord, changed_mask);
+                    mark_dirty_tile_ecology(context, coord, changed_mask);
                 }
-            });
-        break;
-    }
+                break;
+            }
 
-    default:
-        break;
-    }
+            case GameMessageType::SiteTileBurialCleared:
+            {
+                const auto& payload = message.payload_as<SiteTileBurialClearedMessage>();
+                const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
+                const std::uint32_t changed_mask = apply_burial_cleared(context, coord, payload);
+                if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
+                {
+                    mark_dirty_tile_ecology(context, coord, changed_mask);
+                }
+                break;
+            }
 
-    flush_dirty_tile_ecology_batches(context);
+            case GameMessageType::SiteTileHarvested:
+            {
+                const auto& payload = message.payload_as<SiteTileHarvestedMessage>();
+                const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
+                const TileFootprint footprint =
+                    resolve_plant_tile_footprint(PlantId {payload.plant_type_id});
+                const TileCoord anchor = align_tile_anchor_to_footprint(coord, footprint);
+                for_each_tile_in_footprint(
+                    anchor,
+                    footprint,
+                    [&](TileCoord footprint_coord) {
+                        const std::uint32_t changed_mask = apply_harvest(context, footprint_coord, payload);
+                        if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
+                        {
+                            mark_dirty_tile_ecology(context, footprint_coord, changed_mask);
+                        }
+                    });
+                break;
+            }
+
+            default:
+                break;
+            }
+
+            flush_dirty_tile_ecology_batches(context);
+            return GS1_STATUS_OK;
+        });
+}
+
+Gs1Status EcologySystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    auto access = make_game_state_access<EcologySystem>(invocation);
+    (void)access;
+    (void)message;
     return GS1_STATUS_OK;
 }
 
-void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
+void EcologySystem::run(RuntimeInvocation& invocation)
 {
-    if (!context.world.has_world())
-    {
-        return;
-    }
+    auto access = make_game_state_access<EcologySystem>(invocation);
+    (void)access;
+    (void)with_site_system_context<EcologySystem>(
+        invocation,
+        [&](SiteSystemContext<EcologySystem>& context) -> Gs1Status
+        {
+            if (!context.world.has_world())
+            {
+                return GS1_STATUS_OK;
+            }
 
-    const auto& modifiers = context.world.read_modifier().resolved_channel_totals;
-    const auto& terrain_factor_modifiers =
-        context.world.read_modifier().resolved_terrain_factor_modifiers;
-    const auto& objective = context.world.read_objective();
-    const float simulation_dt_minutes = static_cast<float>(
-        runtime_minutes_from_real_seconds(context.fixed_step_seconds));
-    std::uint32_t fully_grown_count = 0U;
-    std::uint32_t tracked_living_plant_count = 0U;
-    bool any_tracked_plant_withering = false;
-    float highway_cover_sum = 0.0f;
-    std::uint32_t highway_tile_count = 0U;
-    auto& ecs_world = context.site_run.site_world->ecs_world();
-    TileEcologyBatchChangedMessage run_batch {};
-    std::vector<std::uint64_t> cleared_active_entities {};
-    auto active_query =
-        ecs_world.query_builder<
-            const site_ecs::TileCoordComponent,
-            site_ecs::TileSoilFertility,
-            site_ecs::TileMoisture,
-            site_ecs::TileSoilSalinity,
-            site_ecs::TileSandBurial,
-            site_ecs::TilePlantSlot,
-            site_ecs::TileGroundCoverSlot,
-            site_ecs::TilePlantDensity,
-            site_ecs::TileGrowthPressure,
-            const site_ecs::TileHeat,
-            const site_ecs::TileWind,
-            const site_ecs::TileDust,
-            const site_ecs::TilePlantWeatherContribution,
-            const site_ecs::TileDeviceWeatherContribution,
-            site_ecs::TileEcologyReportState>()
-            .with<site_ecs::ActiveEcologyTag>()
-            .build();
+            const auto& modifiers = context.world.read_modifier().resolved_channel_totals;
+            const auto& terrain_factor_modifiers =
+                context.world.read_modifier().resolved_terrain_factor_modifiers;
+            const auto& objective = context.world.read_objective();
+            const float simulation_dt_minutes = static_cast<float>(
+                runtime_minutes_from_real_seconds(context.fixed_step_seconds));
+            std::uint32_t fully_grown_count = 0U;
+            std::uint32_t tracked_living_plant_count = 0U;
+            bool any_tracked_plant_withering = false;
+            float highway_cover_sum = 0.0f;
+            std::uint32_t highway_tile_count = 0U;
+            auto& ecs_world = context.site_run.site_world->ecs_world();
+            TileEcologyBatchChangedMessage run_batch {};
+            std::vector<std::uint64_t> cleared_active_entities {};
+            auto active_query =
+                ecs_world.query_builder<
+                    const site_ecs::TileCoordComponent,
+                    site_ecs::TileSoilFertility,
+                    site_ecs::TileMoisture,
+                    site_ecs::TileSoilSalinity,
+                    site_ecs::TileSandBurial,
+                    site_ecs::TilePlantSlot,
+                    site_ecs::TileGroundCoverSlot,
+                    site_ecs::TilePlantDensity,
+                    site_ecs::TileGrowthPressure,
+                    const site_ecs::TileHeat,
+                    const site_ecs::TileWind,
+                    const site_ecs::TileDust,
+                    const site_ecs::TilePlantWeatherContribution,
+                    const site_ecs::TileDeviceWeatherContribution,
+                    site_ecs::TileEcologyReportState>()
+                    .with<site_ecs::ActiveEcologyTag>()
+                    .build();
 
-    active_query.each(
-        [&](flecs::entity entity,
-            const site_ecs::TileCoordComponent& coord_component,
-            site_ecs::TileSoilFertility& fertility_component,
-            site_ecs::TileMoisture& moisture_component,
-            site_ecs::TileSoilSalinity& salinity_component,
-            site_ecs::TileSandBurial& burial_component,
-            site_ecs::TilePlantSlot& plant_component,
-            site_ecs::TileGroundCoverSlot& ground_cover_component,
-            site_ecs::TilePlantDensity& density_component,
-            site_ecs::TileGrowthPressure& growth_component,
-            const site_ecs::TileHeat& heat_component,
-            const site_ecs::TileWind& wind_component,
-            const site_ecs::TileDust& dust_component,
-            const site_ecs::TilePlantWeatherContribution& plant_weather_component,
-            const site_ecs::TileDeviceWeatherContribution& device_weather_component,
-            site_ecs::TileEcologyReportState& report_component) {
+            active_query.each(
+                [&](flecs::entity entity,
+                    const site_ecs::TileCoordComponent& coord_component,
+                    site_ecs::TileSoilFertility& fertility_component,
+                    site_ecs::TileMoisture& moisture_component,
+                    site_ecs::TileSoilSalinity& salinity_component,
+                    site_ecs::TileSandBurial& burial_component,
+                    site_ecs::TilePlantSlot& plant_component,
+                    site_ecs::TileGroundCoverSlot& ground_cover_component,
+                    site_ecs::TilePlantDensity& density_component,
+                    site_ecs::TileGrowthPressure& growth_component,
+                    const site_ecs::TileHeat& heat_component,
+                    const site_ecs::TileWind& wind_component,
+                    const site_ecs::TileDust& dust_component,
+                    const site_ecs::TilePlantWeatherContribution& plant_weather_component,
+                    const site_ecs::TileDeviceWeatherContribution& device_weather_component,
+                    site_ecs::TileEcologyReportState& report_component) {
             SiteWorld::TileEcologyData ecology {
                 fertility_component.value,
                 moisture_component.value,
@@ -1596,77 +1647,75 @@ void EcologySystem::run(SiteSystemContext<EcologySystem>& context)
             {
                 ++fully_grown_count;
             }
+                });
+
+            if (objective.type == SiteObjectiveType::HighwayProtection)
+            {
+                const auto tile_count = context.world.tile_count();
+                for (std::size_t index = 0U; index < tile_count; ++index)
+                {
+                    if (index >= objective.target_tile_mask.size() || objective.target_tile_mask[index] == 0U)
+                    {
+                        continue;
+                    }
+
+                    const TileCoord coord = context.world.tile_coord(index);
+                    auto ecology = context.world.read_tile_ecology_at_index(index);
+                    const auto local_weather = context.world.read_tile_local_weather_at_index(index);
+                    const float next_cover = std::clamp(
+                        ecology.soil_fertility +
+                            compute_highway_sand_cover_delta(local_weather, simulation_dt_minutes),
+                        0.0f,
+                        k_meter_scale);
+                    if (std::fabs(next_cover - ecology.soil_fertility) > k_density_epsilon_raw)
+                    {
+                        ecology.soil_fertility = next_cover;
+                        context.world.write_tile_ecology_at_index(index, ecology);
+                        append_tile_ecology_batch_entry(
+                            context.message_queue,
+                            run_batch,
+                            coord,
+                            TILE_ECOLOGY_CHANGED_FERTILITY,
+                            ecology);
+                    }
+
+                    highway_cover_sum += ecology.soil_fertility;
+                    highway_tile_count += 1U;
+                }
+            }
+
+            for (const auto entity_id : cleared_active_entities)
+            {
+                auto entity = ecs_world.entity(entity_id);
+                entity.remove<site_ecs::TileOccupantTag>();
+                entity.remove<site_ecs::ActiveEcologyTag>();
+                entity.remove<site_ecs::TileEcologyReportState>();
+            }
+
+            flush_tile_ecology_batch_message(context.message_queue, run_batch);
+
+            if (objective.type == SiteObjectiveType::HighwayProtection)
+            {
+                const float average_cover =
+                    highway_tile_count == 0U
+                    ? 0.0f
+                    : (highway_cover_sum / static_cast<float>(highway_tile_count));
+                update_living_plant_stability(
+                    context,
+                    tracked_living_plant_count,
+                    any_tracked_plant_withering);
+                update_highway_protection_progress(context, average_cover);
+                return GS1_STATUS_OK;
+            }
+
+            update_living_plant_stability(
+                context,
+                tracked_living_plant_count,
+                any_tracked_plant_withering);
+            update_restoration_progress(context, fully_grown_count);
+            return GS1_STATUS_OK;
         });
-
-    if (objective.type == SiteObjectiveType::HighwayProtection)
-    {
-        const auto tile_count = context.world.tile_count();
-        for (std::size_t index = 0U; index < tile_count; ++index)
-        {
-            if (index >= objective.target_tile_mask.size() || objective.target_tile_mask[index] == 0U)
-            {
-                continue;
-            }
-
-            const TileCoord coord = context.world.tile_coord(index);
-            auto ecology = context.world.read_tile_ecology_at_index(index);
-            const auto local_weather = context.world.read_tile_local_weather_at_index(index);
-            const float next_cover = std::clamp(
-                ecology.soil_fertility +
-                    compute_highway_sand_cover_delta(local_weather, simulation_dt_minutes),
-                0.0f,
-                k_meter_scale);
-            if (std::fabs(next_cover - ecology.soil_fertility) > k_density_epsilon_raw)
-            {
-                ecology.soil_fertility = next_cover;
-                context.world.write_tile_ecology_at_index(index, ecology);
-                append_tile_ecology_batch_entry(
-                    context.message_queue,
-                    run_batch,
-                    coord,
-                    TILE_ECOLOGY_CHANGED_FERTILITY,
-                    ecology);
-            }
-
-            highway_cover_sum += ecology.soil_fertility;
-            highway_tile_count += 1U;
-        }
-    }
-
-    for (const auto entity_id : cleared_active_entities)
-    {
-        auto entity = ecs_world.entity(entity_id);
-        entity.remove<site_ecs::TileOccupantTag>();
-        entity.remove<site_ecs::ActiveEcologyTag>();
-        entity.remove<site_ecs::TileEcologyReportState>();
-    }
-
-    flush_tile_ecology_batch_message(context.message_queue, run_batch);
-
-    if (objective.type == SiteObjectiveType::HighwayProtection)
-    {
-        const float average_cover =
-            highway_tile_count == 0U
-            ? 0.0f
-            : (highway_cover_sum / static_cast<float>(highway_tile_count));
-        update_living_plant_stability(
-            context,
-            tracked_living_plant_count,
-            any_tracked_plant_withering);
-        update_highway_protection_progress(context, average_cover);
-        return;
-    }
-
-    update_living_plant_stability(
-        context,
-        tracked_living_plant_count,
-        any_tracked_plant_withering);
-    update_restoration_progress(context, fully_grown_count);
 }
-GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
-    EcologySystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_ECOLOGY,
-    13U)
 }  // namespace gs1
 
 #ifdef _MSC_VER

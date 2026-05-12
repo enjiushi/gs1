@@ -31,6 +31,16 @@
 
 namespace gs1
 {
+template <>
+struct system_state_tags<InventorySystem>
+{
+    using type = type_list<
+        RuntimeCampaignTag,
+        RuntimeActiveSiteRunTag,
+        RuntimeFixedStepSecondsTag,
+        RuntimeMoveDirectionTag>;
+};
+
 namespace
 {
 constexpr std::uint32_t k_delivery_box_storage_flags =
@@ -1555,7 +1565,7 @@ bool InventorySystem::subscribes_to_host_message(Gs1HostMessageType type) noexce
         type == GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP;
 }
 
-Gs1Status InventorySystem::process_host_message(
+Gs1Status process_host_message_impl(
     SiteSystemContext<InventorySystem>& context,
     const Gs1HostMessage& message)
 {
@@ -1623,7 +1633,7 @@ bool InventorySystem::subscribes_to(GameMessageType type) noexcept
     }
 }
 
-Gs1Status InventorySystem::process_message(
+Gs1Status process_game_message_impl(
     SiteSystemContext<InventorySystem>& context,
     const GameMessage& message)
 {
@@ -1711,7 +1721,7 @@ Gs1Status InventorySystem::process_message(
     }
 }
 
-void InventorySystem::run(SiteSystemContext<InventorySystem>& context)
+void run_impl(SiteSystemContext<InventorySystem>& context)
 {
     if (ensure_inventory_storage_initialized(context))
     {
@@ -1721,8 +1731,74 @@ void InventorySystem::run(SiteSystemContext<InventorySystem>& context)
     progress_pending_device_storage_open(context);
     progress_pending_deliveries(context);
 }
-GS1_IMPLEMENT_RUNTIME_SITE_HOST_AND_MESSAGE_SYSTEM(
-    InventorySystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_INVENTORY,
-    14U)
+
+const char* InventorySystem::name() const noexcept
+{
+    return "InventorySystem";
+}
+
+GameMessageSubscriptionSpan InventorySystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<GameMessageType, k_game_message_type_count, &InventorySystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan InventorySystem::subscribed_host_messages() const noexcept
+{
+    return runtime_subscription_list<
+        Gs1HostMessageType,
+        k_runtime_host_message_type_count,
+        &InventorySystem::subscribes_to_host_message>();
+}
+
+std::optional<Gs1RuntimeProfileSystemId> InventorySystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_INVENTORY;
+}
+
+std::optional<std::uint32_t> InventorySystem::fixed_step_order() const noexcept
+{
+    return 14U;
+}
+
+Gs1Status InventorySystem::process_game_message(
+    RuntimeInvocation& invocation,
+    const GameMessage& message)
+{
+    auto access = make_game_state_access<InventorySystem>(invocation);
+    (void)access;
+    return with_site_system_context<InventorySystem>(
+        invocation,
+        [&](SiteSystemContext<InventorySystem>& context)
+        {
+            return process_game_message_impl(context, message);
+        });
+}
+
+Gs1Status InventorySystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
+{
+    auto access = make_game_state_access<InventorySystem>(invocation);
+    (void)access;
+    return with_site_system_context<InventorySystem>(
+        invocation,
+        [&](SiteSystemContext<InventorySystem>& context)
+        {
+            return process_host_message_impl(context, message);
+        });
+}
+
+void InventorySystem::run(RuntimeInvocation& invocation)
+{
+    auto access = make_game_state_access<InventorySystem>(invocation);
+    (void)access;
+    (void)with_site_system_context<InventorySystem>(
+        invocation,
+        [&](SiteSystemContext<InventorySystem>& context)
+        {
+            run_impl(context);
+            return GS1_STATUS_OK;
+        },
+        true);
+}
 }  // namespace gs1

@@ -60,7 +60,7 @@ void action_execution_build_completion_consumes_deployable_and_emits_device_plac
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -74,7 +74,7 @@ void action_execution_build_completion_consumes_deployable_and_emits_device_plac
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        ActionExecutionSystem::process_message(
+        invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
                 GameMessageType::StartSiteAction,
@@ -92,7 +92,7 @@ void action_execution_build_completion_consumes_deployable_and_emits_device_plac
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        ActionExecutionSystem::process_message(
+        invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
                 GameMessageType::PlacementReservationAccepted,
@@ -111,16 +111,16 @@ void action_execution_build_completion_consumes_deployable_and_emits_device_plac
     queue.clear();
     for (int step = 0; step < 9; ++step)
     {
-        ActionExecutionSystem::run(action_context);
+        invoke_system_run<ActionExecutionSystem>(action_context);
     }
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 0U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.remaining_action_minutes > 0.0);
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.remaining_action_minutes <= 0.81);
 
-    ActionExecutionSystem::run(action_context);
+    invoke_system_run<ActionExecutionSystem>(action_context);
     if (count_messages(queue, GameMessageType::SiteActionCompleted) == 0U)
     {
-        ActionExecutionSystem::run(action_context);
+        invoke_system_run<ActionExecutionSystem>(action_context);
     }
     GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 1U);
     GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::InventoryItemConsumeRequested) == 1U);
@@ -148,7 +148,7 @@ void action_execution_craft_requires_hammer_for_shovel_recipe(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -170,7 +170,7 @@ void action_execution_craft_requires_hammer_for_shovel_recipe(
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        ActionExecutionSystem::process_message(
+        invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
                 GameMessageType::StartSiteAction,
@@ -199,7 +199,7 @@ void action_execution_craft_requires_hammer_for_shovel_recipe(
     queue.clear();
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        ActionExecutionSystem::process_message(
+        invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
                 GameMessageType::StartSiteAction,
@@ -228,7 +228,7 @@ void inventory_craft_commit_consumes_nearby_ingredients_and_outputs_to_device_st
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -254,7 +254,7 @@ void inventory_craft_commit_consumes_nearby_ingredients_and_outputs_to_device_st
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::InventoryCraftCommitRequested,
@@ -297,7 +297,7 @@ void inventory_craft_commit_requires_hammer_for_storage_crate_recipe(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -318,7 +318,7 @@ void inventory_craft_commit_requires_hammer_for_storage_crate_recipe(
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::InventoryCraftCommitRequested,
@@ -340,7 +340,7 @@ void inventory_craft_commit_crafts_hammer_from_wood_and_iron(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -361,7 +361,7 @@ void inventory_craft_commit_crafts_hammer_from_wood_and_iron(
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::InventoryCraftCommitRequested,
@@ -405,7 +405,7 @@ void craft_commit_crafts_chemistry_station_kit_from_workbench_when_unlocked(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -431,7 +431,7 @@ void craft_commit_crafts_chemistry_station_kit_from_workbench_when_unlocked(
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::InventoryCraftCommitRequested,
@@ -477,10 +477,10 @@ void craft_context_omits_hammer_gated_device_recipe_without_hammer(
         make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(inventory_context, start_message) == GS1_STATUS_OK);
+        invoke_system_message<InventorySystem>(inventory_context, start_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        CraftSystem::process_message(craft_context, start_message) == GS1_STATUS_OK);
+        invoke_system_message<CraftSystem>(craft_context, start_message) == GS1_STATUS_OK);
 
     const auto delivery_box = gs1::inventory_storage::delivery_box_container(site_run);
     (void)gs1::inventory_storage::add_item_to_container(
@@ -497,7 +497,7 @@ void craft_context_omits_hammer_gated_device_recipe_without_hammer(
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        CraftSystem::process_message(
+        invoke_system_message<CraftSystem>(
             craft_context,
             make_message(
                 GameMessageType::InventoryCraftContextRequested,
@@ -530,7 +530,7 @@ void craft_context_omits_hammer_gated_device_recipe_without_hammer(
         1U);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        CraftSystem::process_message(
+        invoke_system_message<CraftSystem>(
             craft_context,
             make_message(
                 GameMessageType::InventoryCraftContextRequested,
@@ -559,7 +559,7 @@ void craft_cache_tracks_worker_pack_membership_by_distance(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -594,7 +594,7 @@ void craft_cache_tracks_worker_pack_membership_by_distance(
     }
     GS1_SYSTEM_TEST_REQUIRE(context, worker_pack_item_instance_id != 0U);
 
-    CraftSystem::run(craft_context);
+    invoke_system_run<CraftSystem>(craft_context);
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
     const auto workbench_entity_id = site_run.site_world->device_entity_id(workbench_tile);
     const auto* initial_cache = gs1::craft_logic::find_device_cache(site_run.craft, workbench_entity_id);
@@ -613,7 +613,7 @@ void craft_cache_tracks_worker_pack_membership_by_distance(
     worker.tile_y = 15.0f;
     gs1::site_world_access::set_worker_position(site_run, worker);
 
-    CraftSystem::run(craft_context);
+    invoke_system_run<CraftSystem>(craft_context);
     const auto* far_cache = gs1::craft_logic::find_device_cache(site_run.craft, workbench_entity_id);
     GS1_SYSTEM_TEST_REQUIRE(context, far_cache != nullptr);
     GS1_SYSTEM_TEST_CHECK(context, !far_cache->worker_pack_included);
@@ -636,13 +636,13 @@ void craft_cache_skips_refresh_while_idle(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
-    CraftSystem::run(craft_context);
+    invoke_system_run<CraftSystem>(craft_context);
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
     const auto workbench_entity_id = site_run.site_world->device_entity_id(workbench_tile);
     auto* cache = gs1::craft_logic::find_device_cache(site_run.craft, workbench_entity_id);
@@ -654,7 +654,7 @@ void craft_cache_skips_refresh_while_idle(
         site_run.craft.device_cache_source_membership_revision;
     const auto expected_worker_tile = site_run.craft.device_cache_worker_tile;
 
-    CraftSystem::run(craft_context);
+    invoke_system_run<CraftSystem>(craft_context);
 
     const auto* idle_cache =
         gs1::craft_logic::find_device_cache(site_run.craft, workbench_entity_id);
@@ -688,10 +688,10 @@ void craft_context_recognizes_nearby_inputs_with_64bit_item_entity_ids(
         make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(inventory_context, start_message) == GS1_STATUS_OK);
+        invoke_system_message<InventorySystem>(inventory_context, start_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        CraftSystem::process_message(craft_context, start_message) == GS1_STATUS_OK);
+        invoke_system_message<CraftSystem>(craft_context, start_message) == GS1_STATUS_OK);
 
     const auto delivery_box = gs1::inventory_storage::delivery_box_container(site_run);
     GS1_SYSTEM_TEST_REQUIRE(context, delivery_box.is_valid());
@@ -758,7 +758,7 @@ void craft_context_recognizes_nearby_inputs_with_64bit_item_entity_ids(
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        CraftSystem::process_message(
+        invoke_system_message<CraftSystem>(
             craft_context,
             make_message(
                 GameMessageType::InventoryCraftContextRequested,
@@ -788,7 +788,7 @@ void dynamically_placed_storage_device_reuses_single_inventory_container(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -823,7 +823,7 @@ void dynamically_placed_storage_device_reuses_single_inventory_container(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::InventoryItemConsumeRequested,
@@ -844,7 +844,7 @@ void dynamically_placed_storage_device_reuses_single_inventory_container(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        DeviceMaintenanceSystem::process_message(maintenance_context, placed_message) == GS1_STATUS_OK);
+        invoke_system_message<DeviceMaintenanceSystem>(maintenance_context, placed_message) == GS1_STATUS_OK);
     const auto placed_device_entity_id = site_run.site_world->device_entity_id(target_tile);
     GS1_SYSTEM_TEST_REQUIRE(context, placed_device_entity_id != 0U);
     GS1_SYSTEM_TEST_CHECK(
@@ -854,10 +854,10 @@ void dynamically_placed_storage_device_reuses_single_inventory_container(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(inventory_context, placed_message) == GS1_STATUS_OK);
+        invoke_system_message<InventorySystem>(inventory_context, placed_message) == GS1_STATUS_OK);
 
-    InventorySystem::run(inventory_context);
-    InventorySystem::run(inventory_context);
+    invoke_system_run<InventorySystem>(inventory_context);
+    invoke_system_run<InventorySystem>(inventory_context);
 
     std::size_t matching_storage_count = 0U;
     for (const auto& storage : site_run.inventory.storage_containers)
@@ -892,7 +892,7 @@ void repair_action_requires_hammer_and_restores_device_integrity(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        ActionExecutionSystem::process_message(
+        invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
                 GameMessageType::StartSiteAction,
@@ -923,7 +923,7 @@ void repair_action_requires_hammer_and_restores_device_integrity(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        ActionExecutionSystem::process_message(
+        invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
                 GameMessageType::StartSiteAction,
@@ -939,7 +939,7 @@ void repair_action_requires_hammer_and_restores_device_integrity(
     GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteActionStarted) == 1U);
 
     queue.clear();
-    ActionExecutionSystem::run(action_context);
+    invoke_system_run<ActionExecutionSystem>(action_context);
     GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteActionCompleted) == 1U);
     GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteDeviceRepaired) == 1U);
     GS1_SYSTEM_TEST_CHECK(context, count_messages(queue, GameMessageType::InventoryItemConsumeRequested) == 0U);
@@ -949,7 +949,7 @@ void repair_action_requires_hammer_and_restores_device_integrity(
     GS1_SYSTEM_TEST_REQUIRE(context, repaired_message != nullptr);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        DeviceMaintenanceSystem::process_message(maintenance_context, *repaired_message) == GS1_STATUS_OK);
+        invoke_system_message<DeviceMaintenanceSystem>(maintenance_context, *repaired_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(
         context,
         approx_equal(site_run.site_world->tile_device(repair_tile).device_integrity, 1.0f));
@@ -966,7 +966,7 @@ void storage_device_breakage_destroys_owned_storage_and_items(
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(
+        invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
                 GameMessageType::SiteRunStarted,
@@ -995,7 +995,7 @@ void storage_device_breakage_destroys_owned_storage_and_items(
     site_run.weather.weather_heat = 100.0f;
 
     queue.clear();
-    DeviceMaintenanceSystem::run(maintenance_context);
+    invoke_system_run<DeviceMaintenanceSystem>(maintenance_context);
     GS1_SYSTEM_TEST_REQUIRE(context, count_messages(queue, GameMessageType::SiteDeviceBroken) == 1U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_world->tile_device(storage_tile).structure_id.value == 0U);
 
@@ -1004,7 +1004,7 @@ void storage_device_breakage_destroys_owned_storage_and_items(
     GS1_SYSTEM_TEST_REQUIRE(context, broken_message != nullptr);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
-        InventorySystem::process_message(inventory_context, *broken_message) == GS1_STATUS_OK);
+        invoke_system_message<InventorySystem>(inventory_context, *broken_message) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(
         context,
         !gs1::inventory_storage::find_device_storage_container(site_run, broken_device_entity_id).is_valid());
@@ -1067,3 +1067,4 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "inventory",
     "storage_device_breakage_destroys_owned_storage_and_items",
     storage_device_breakage_destroys_owned_storage_and_items);
+

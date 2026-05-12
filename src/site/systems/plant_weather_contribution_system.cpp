@@ -528,6 +528,34 @@ void write_tile_contribution(
 
 namespace gs1
 {
+const char* PlantWeatherContributionSystem::name() const noexcept
+{
+    return access().system_name.data();
+}
+
+GameMessageSubscriptionSpan PlantWeatherContributionSystem::subscribed_game_messages() const noexcept
+{
+    return runtime_subscription_list<
+        GameMessageType,
+        k_game_message_type_count,
+        &PlantWeatherContributionSystem::subscribes_to>();
+}
+
+HostMessageSubscriptionSpan PlantWeatherContributionSystem::subscribed_host_messages() const noexcept
+{
+    return {};
+}
+
+std::optional<Gs1RuntimeProfileSystemId> PlantWeatherContributionSystem::profile_system_id() const noexcept
+{
+    return GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE;
+}
+
+std::optional<std::uint32_t> PlantWeatherContributionSystem::fixed_step_order() const noexcept
+{
+    return 6U;
+}
+
 bool PlantWeatherContributionSystem::subscribes_to(GameMessageType type) noexcept
 {
     return type == GameMessageType::SiteRunStarted ||
@@ -535,109 +563,130 @@ bool PlantWeatherContributionSystem::subscribes_to(GameMessageType type) noexcep
         type == GameMessageType::TileEcologyBatchChanged;
 }
 
-Gs1Status PlantWeatherContributionSystem::process_message(
-    SiteSystemContext<PlantWeatherContributionSystem>& context,
+Gs1Status PlantWeatherContributionSystem::process_game_message(
+    RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    if (!context.world.has_world())
-    {
-        return GS1_STATUS_OK;
-    }
-
-    auto& runtime = context.world.own_plant_weather_runtime();
-    ensure_runtime_buffers(runtime, context.world.tile_count());
-
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        runtime.full_rebuild_pending = true;
-        return GS1_STATUS_OK;
-
-    case GameMessageType::TileEcologyChanged:
-    {
-        const auto& payload = message.payload_as<TileEcologyChangedMessage>();
-        if ((payload.changed_mask & (TILE_ECOLOGY_CHANGED_OCCUPANCY | TILE_ECOLOGY_CHANGED_DENSITY)) == 0U)
+    auto access = make_game_state_access<PlantWeatherContributionSystem>(invocation);
+    (void)access;
+    return with_site_system_context<PlantWeatherContributionSystem>(
+        invocation,
+        [&](SiteSystemContext<PlantWeatherContributionSystem>& context) -> Gs1Status
         {
-            return GS1_STATUS_OK;
-        }
-
-        mark_tiles_affected_by_source(
-            context,
-            runtime,
-            TileCoord {payload.target_tile_x, payload.target_tile_y});
-        return GS1_STATUS_OK;
-    }
-
-    case GameMessageType::TileEcologyBatchChanged:
-    {
-        const auto& payload = message.payload_as<TileEcologyBatchChangedMessage>();
-        for (std::uint32_t index = 0U; index < payload.entry_count; ++index)
-        {
-            const auto& entry = payload.entries[index];
-            if ((entry.changed_mask & (TILE_ECOLOGY_CHANGED_OCCUPANCY | TILE_ECOLOGY_CHANGED_DENSITY)) == 0U)
+            if (!context.world.has_world())
             {
-                continue;
+                return GS1_STATUS_OK;
             }
 
-            mark_tiles_affected_by_source(
-                context,
-                runtime,
-                TileCoord {entry.target_tile_x, entry.target_tile_y});
-        }
-        return GS1_STATUS_OK;
-    }
+            auto& runtime = context.world.own_plant_weather_runtime();
+            ensure_runtime_buffers(runtime, context.world.tile_count());
 
-    default:
-        return GS1_STATUS_OK;
-    }
+            switch (message.type)
+            {
+            case GameMessageType::SiteRunStarted:
+                runtime.full_rebuild_pending = true;
+                return GS1_STATUS_OK;
+
+            case GameMessageType::TileEcologyChanged:
+            {
+                const auto& payload = message.payload_as<TileEcologyChangedMessage>();
+                if ((payload.changed_mask & (TILE_ECOLOGY_CHANGED_OCCUPANCY | TILE_ECOLOGY_CHANGED_DENSITY)) == 0U)
+                {
+                    return GS1_STATUS_OK;
+                }
+
+                mark_tiles_affected_by_source(
+                    context,
+                    runtime,
+                    TileCoord {payload.target_tile_x, payload.target_tile_y});
+                return GS1_STATUS_OK;
+            }
+
+            case GameMessageType::TileEcologyBatchChanged:
+            {
+                const auto& payload = message.payload_as<TileEcologyBatchChangedMessage>();
+                for (std::uint32_t index = 0U; index < payload.entry_count; ++index)
+                {
+                    const auto& entry = payload.entries[index];
+                    if ((entry.changed_mask & (TILE_ECOLOGY_CHANGED_OCCUPANCY | TILE_ECOLOGY_CHANGED_DENSITY)) == 0U)
+                    {
+                        continue;
+                    }
+
+                    mark_tiles_affected_by_source(
+                        context,
+                        runtime,
+                        TileCoord {entry.target_tile_x, entry.target_tile_y});
+                }
+                return GS1_STATUS_OK;
+            }
+
+            default:
+                return GS1_STATUS_OK;
+            }
+        });
 }
 
-void PlantWeatherContributionSystem::run(SiteSystemContext<PlantWeatherContributionSystem>& context)
+Gs1Status PlantWeatherContributionSystem::process_host_message(
+    RuntimeInvocation& invocation,
+    const Gs1HostMessage& message)
 {
-    if (!context.world.has_world())
-    {
-        return;
-    }
-
-    auto& runtime = context.world.own_plant_weather_runtime();
-    ensure_runtime_buffers(runtime, context.world.tile_count());
-
-    const std::uint8_t wind_sector = quantize_wind_direction_sector(
-        context.world.read_weather().weather_wind_direction_degrees);
-    if (runtime.last_wind_direction_sector != wind_sector)
-    {
-        runtime.last_wind_direction_sector = wind_sector;
-        runtime.full_rebuild_pending = true;
-    }
-
-    if (runtime.full_rebuild_pending)
-    {
-        mark_all_tiles_dirty(runtime, context.world.tile_count());
-    }
-
-    if (runtime.dirty_tile_indices.empty())
-    {
-        return;
-    }
-
-    const WeatherDirectionStep wind_direction =
-        resolve_wind_direction_step(context.world.read_weather().weather_wind_direction_degrees);
-    const std::uint8_t max_distance = resolve_max_plant_contribution_distance();
-    for (const std::uint32_t tile_index : runtime.dirty_tile_indices)
-    {
-        const TileCoord target_coord = context.world.tile_coord(tile_index);
-        write_tile_contribution(
-            context,
-            tile_index,
-            recompute_tile_contribution(context, wind_direction, max_distance, target_coord));
-    }
-
-    clear_dirty_tiles(runtime);
+    auto access = make_game_state_access<PlantWeatherContributionSystem>(invocation);
+    (void)access;
+    (void)message;
+    return GS1_STATUS_OK;
 }
-GS1_IMPLEMENT_RUNTIME_SITE_MESSAGE_SYSTEM(
-    PlantWeatherContributionSystem,
-    GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE,
-    6U)
+
+void PlantWeatherContributionSystem::run(RuntimeInvocation& invocation)
+{
+    auto access = make_game_state_access<PlantWeatherContributionSystem>(invocation);
+    (void)access;
+    (void)with_site_system_context<PlantWeatherContributionSystem>(
+        invocation,
+        [&](SiteSystemContext<PlantWeatherContributionSystem>& context) -> Gs1Status
+        {
+            if (!context.world.has_world())
+            {
+                return GS1_STATUS_OK;
+            }
+
+            auto& runtime = context.world.own_plant_weather_runtime();
+            ensure_runtime_buffers(runtime, context.world.tile_count());
+
+            const std::uint8_t wind_sector = quantize_wind_direction_sector(
+                context.world.read_weather().weather_wind_direction_degrees);
+            if (runtime.last_wind_direction_sector != wind_sector)
+            {
+                runtime.last_wind_direction_sector = wind_sector;
+                runtime.full_rebuild_pending = true;
+            }
+
+            if (runtime.full_rebuild_pending)
+            {
+                mark_all_tiles_dirty(runtime, context.world.tile_count());
+            }
+
+            if (runtime.dirty_tile_indices.empty())
+            {
+                return GS1_STATUS_OK;
+            }
+
+            const WeatherDirectionStep wind_direction =
+                resolve_wind_direction_step(context.world.read_weather().weather_wind_direction_degrees);
+            const std::uint8_t max_distance = resolve_max_plant_contribution_distance();
+            for (const std::uint32_t tile_index : runtime.dirty_tile_indices)
+            {
+                const TileCoord target_coord = context.world.tile_coord(tile_index);
+                write_tile_contribution(
+                    context,
+                    tile_index,
+                    recompute_tile_contribution(context, wind_direction, max_distance, target_coord));
+            }
+
+            clear_dirty_tiles(runtime);
+            return GS1_STATUS_OK;
+        });
+}
 }  // namespace gs1
 
 #ifdef _MSC_VER
