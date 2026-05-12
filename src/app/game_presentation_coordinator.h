@@ -3,7 +3,9 @@
 #include "campaign/campaign_state.h"
 #include "messages/game_message.h"
 #include "runtime/message_queue.h"
+#include "runtime/presentation_runtime_state.h"
 #include "runtime/site_protection_presentation_state.h"
+#include "runtime/ui_presentation_state.h"
 #include "site/site_run_state.h"
 #include "gs1/status.h"
 #include "gs1/types.h"
@@ -17,12 +19,36 @@
 
 namespace gs1
 {
+class GamePresentationCoordinator;
+struct GamePresentationRuntimeContext;
+void campaign_presentation_handle_message(
+    GamePresentationCoordinator& owner,
+    GamePresentationRuntimeContext& context,
+    const GameMessage& message);
+void site_presentation_handle_message(
+    GamePresentationCoordinator& owner,
+    GamePresentationRuntimeContext& context,
+    const GameMessage& message);
+void site_presentation_mark_projection_dirty(
+    GamePresentationCoordinator& owner,
+    GamePresentationRuntimeContext& context,
+    std::uint64_t dirty_flags) noexcept;
+void site_presentation_mark_tile_dirty(
+    GamePresentationCoordinator& owner,
+    GamePresentationRuntimeContext& context,
+    TileCoord coord) noexcept;
+void site_presentation_flush_if_dirty(
+    GamePresentationCoordinator& owner,
+    GamePresentationRuntimeContext& context);
+
 struct GamePresentationRuntimeContext final
 {
     Gs1AppState& app_state;
     std::optional<CampaignState>& campaign;
     std::optional<SiteRunState>& active_site_run;
     SiteProtectionPresentationState& protection_presentation;
+    UiPresentationState& ui_presentation;
+    PresentationRuntimeState& presentation_runtime;
     GameMessageQueue& message_queue;
     std::deque<Gs1RuntimeMessage>& engine_messages;
     double fixed_step_seconds {0.0};
@@ -31,14 +57,9 @@ struct GamePresentationRuntimeContext final
 class GamePresentationCoordinator final
 {
 public:
-    [[nodiscard]] static bool subscribes_to_host_message(Gs1HostMessageType type) noexcept;
-    [[nodiscard]] Gs1Status process_host_message(
-        GamePresentationRuntimeContext& context,
-        const Gs1HostMessage& message);
     void on_message_processed(
         GamePresentationRuntimeContext& context,
         const GameMessage& message);
-    void activate_loaded_site_scene(GamePresentationRuntimeContext& context);
     void mark_site_projection_update_dirty(
         GamePresentationRuntimeContext& context,
         std::uint64_t dirty_flags) noexcept;
@@ -58,6 +79,26 @@ public:
     }
 
 private:
+    friend void campaign_presentation_handle_message(
+        GamePresentationCoordinator& owner,
+        GamePresentationRuntimeContext& context,
+        const GameMessage& message);
+    friend void site_presentation_handle_message(
+        GamePresentationCoordinator& owner,
+        GamePresentationRuntimeContext& context,
+        const GameMessage& message);
+    friend void site_presentation_mark_projection_dirty(
+        GamePresentationCoordinator& owner,
+        GamePresentationRuntimeContext& context,
+        std::uint64_t dirty_flags) noexcept;
+    friend void site_presentation_mark_tile_dirty(
+        GamePresentationCoordinator& owner,
+        GamePresentationRuntimeContext& context,
+        TileCoord coord) noexcept;
+    friend void site_presentation_flush_if_dirty(
+        GamePresentationCoordinator& owner,
+        GamePresentationRuntimeContext& context);
+
     [[nodiscard]] GamePresentationRuntimeContext& context() noexcept { return *active_context_; }
     [[nodiscard]] const GamePresentationRuntimeContext& context() const noexcept { return *active_context_; }
     [[nodiscard]] Gs1AppState& app_state() noexcept { return context().app_state; }
@@ -71,15 +112,25 @@ private:
     {
         return context().protection_presentation;
     }
+    [[nodiscard]] UiPresentationState& ui_presentation_state() noexcept
+    {
+        return context().ui_presentation;
+    }
+    [[nodiscard]] const UiPresentationState& ui_presentation_state() const noexcept
+    {
+        return context().ui_presentation;
+    }
+    [[nodiscard]] PresentationRuntimeState& presentation_runtime_state() noexcept
+    {
+        return context().presentation_runtime;
+    }
+    [[nodiscard]] const PresentationRuntimeState& presentation_runtime_state() const noexcept
+    {
+        return context().presentation_runtime;
+    }
     [[nodiscard]] GameMessageQueue& message_queue() noexcept { return context().message_queue; }
     [[nodiscard]] std::deque<Gs1RuntimeMessage>& engine_messages() noexcept { return context().engine_messages; }
     [[nodiscard]] double fixed_step_seconds() const noexcept { return context().fixed_step_seconds; }
-
-    struct CampaignUnlockSnapshot final
-    {
-        std::vector<std::uint32_t> unlocked_reputation_unlock_ids {};
-        std::vector<std::uint32_t> unlocked_technology_node_ids {};
-    };
 
     void queue_log_message(const char* message, Gs1LogLevel level = GS1_LOG_LEVEL_INFO);
     void queue_app_state_message(Gs1AppState app_state);
@@ -288,12 +339,6 @@ private:
 
 private:
     GamePresentationRuntimeContext* active_context_ {nullptr};
-    std::map<Gs1UiSetupId, Gs1UiSetupPresentationType> active_ui_setups_ {};
-    std::unordered_set<Gs1UiPanelId> active_ui_panels_ {};
-    std::optional<Gs1UiSetupId> active_normal_ui_setup_ {};
-    std::optional<Gs1AppState> last_emitted_app_state_ {};
-    std::vector<std::uint32_t> last_emitted_phone_listing_ids_ {};
-    CampaignUnlockSnapshot last_campaign_unlock_snapshot_ {};
 };
 }  // namespace gs1
 

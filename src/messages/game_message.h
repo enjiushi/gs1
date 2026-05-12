@@ -45,6 +45,7 @@ enum class GameMessageType : std::uint8_t
     SiteAttemptEnded,
     PresentLog,
     SiteRunStarted,
+    SiteSceneActivated,
     StartSiteAction,
     CancelSiteAction,
     SiteActionStarted,
@@ -275,6 +276,10 @@ struct SiteRunStartedMessage final
     std::uint32_t site_archetype_id;
     std::uint32_t attempt_index;
     std::uint64_t attempt_seed;
+};
+
+struct SiteSceneActivatedMessage final
+{
 };
 
 struct StartSiteActionMessage final
@@ -837,6 +842,7 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ReturnToRegionalMapMessage, 1U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteAttemptEndedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PresentLogMessage, 63U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteRunStartedMessage, 24U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteSceneActivatedMessage, 1U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(StartSiteActionMessage, 24U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CancelSiteActionMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteActionStartedMessage, 24U);

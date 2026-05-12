@@ -121,8 +121,7 @@ std::optional<std::uint32_t> SiteProtectionPresentationSystem::fixed_step_order(
 
 bool SiteProtectionPresentationSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
 {
-    return type == GS1_HOST_EVENT_UI_ACTION ||
-        type == GS1_HOST_EVENT_SITE_STORAGE_VIEW;
+    return type == GS1_HOST_EVENT_SITE_STORAGE_VIEW;
 }
 
 bool SiteProtectionPresentationSystem::subscribes_to(GameMessageType type) noexcept
@@ -176,94 +175,7 @@ Gs1Status SiteProtectionPresentationSystem::process_host_message(
         return GS1_STATUS_OK;
     }
 
-    if (message.type != GS1_HOST_EVENT_UI_ACTION)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    const auto& action = message.payload.ui_action.action;
-    switch (action.type)
-    {
-    case GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
-        if (protection.selector_open || protection.overlay_mode != GS1_SITE_PROTECTION_OVERLAY_NONE)
-        {
-            clear_protection_ui_state(protection);
-        }
-        if (active_site_run.has_value())
-        {
-            queue_close_site_inventory_panels(invocation, *active_site_run);
-            if (active_site_run->phone_panel.open)
-            {
-                queue_close_phone_panel(invocation);
-            }
-        }
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
-        if (protection.selector_open || protection.overlay_mode != GS1_SITE_PROTECTION_OVERLAY_NONE)
-        {
-            clear_protection_ui_state(protection);
-        }
-        if (active_site_run.has_value())
-        {
-            queue_close_site_inventory_panels(invocation, *active_site_run);
-        }
-        if (campaign.has_value() &&
-            app_state_supports_technology_tree(app_state) &&
-            campaign->regional_map_state.tech_tree_open)
-        {
-            queue_close_regional_map_tech_tree(invocation);
-        }
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_START_SITE_ATTEMPT:
-    case GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP:
-        clear_protection_ui_state(protection);
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR:
-        if (!active_site_run.has_value() || app_state != GS1_APP_STATE_SITE_ACTIVE)
-        {
-            return GS1_STATUS_OK;
-        }
-        queue_close_site_inventory_panels(invocation, *active_site_run);
-        if (active_site_run->phone_panel.open)
-        {
-            queue_close_phone_panel(invocation);
-        }
-        if (campaign.has_value() &&
-            app_state_supports_technology_tree(app_state) &&
-            campaign->regional_map_state.tech_tree_open)
-        {
-            queue_close_regional_map_tech_tree(invocation);
-        }
-        protection.selector_open = true;
-        protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI:
-        if (protection.selector_open)
-        {
-            protection.selector_open = false;
-        }
-        else if (protection.overlay_mode != GS1_SITE_PROTECTION_OVERLAY_NONE)
-        {
-            protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
-        }
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
-        if (!active_site_run.has_value() || app_state != GS1_APP_STATE_SITE_ACTIVE)
-        {
-            return GS1_STATUS_OK;
-        }
-        protection.selector_open = false;
-        protection.overlay_mode = static_cast<Gs1SiteProtectionOverlayMode>(action.arg0);
-        return GS1_STATUS_OK;
-
-    default:
-        return GS1_STATUS_OK;
-    }
+    return GS1_STATUS_OK;
 }
 
 Gs1Status SiteProtectionPresentationSystem::process_game_message(

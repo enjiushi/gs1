@@ -2703,7 +2703,8 @@ void handle_money_award_requested(
 
 bool TaskBoardSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
 {
-    return type == GS1_HOST_EVENT_UI_ACTION;
+    (void)type;
+    return false;
 }
 
 bool TaskBoardSystem::subscribes_to(GameMessageType type) noexcept
@@ -2880,49 +2881,8 @@ Gs1Status TaskBoardSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto access = make_game_state_access<TaskBoardSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-    if (message.type != GS1_HOST_EVENT_UI_ACTION)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    const auto& action = message.payload.ui_action.action;
-    if (action.type == GS1_UI_ACTION_ACCEPT_TASK)
-    {
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-
-        handle_task_accept_requested(
-            invocation,
-            TaskAcceptRequestedMessage {action.target_id});
-        return GS1_STATUS_OK;
-    }
-
-    if (action.type == GS1_UI_ACTION_CLAIM_TASK_REWARD)
-    {
-        if (action.target_id == 0U ||
-            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-
-        handle_task_reward_claim_requested(
-            invocation,
-            TaskRewardClaimRequestedMessage {
-                action.target_id,
-                static_cast<std::uint32_t>(action.arg0)});
-        return GS1_STATUS_OK;
-    }
-
+    (void)invocation;
+    (void)message;
     return GS1_STATUS_OK;
 }
 

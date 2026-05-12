@@ -2,9 +2,11 @@
 
 #include "campaign/campaign_state.h"
 #include "messages/game_message.h"
+#include "runtime/presentation_runtime_state.h"
 #include "site/site_run_state.h"
 #include "runtime/runtime_clock.h"
 #include "runtime/site_protection_presentation_state.h"
+#include "runtime/ui_presentation_state.h"
 #include "gs1/types.h"
 
 #include <deque>
@@ -19,6 +21,8 @@ struct GameState final
     std::optional<CampaignState> campaign {};
     std::optional<SiteRunState> active_site_run {};
     SiteProtectionPresentationState site_protection_presentation {};
+    UiPresentationState ui_presentation {};
+    PresentationRuntimeState presentation_runtime {};
     GameMessageQueue message_queue {};
     std::deque<Gs1RuntimeMessage> runtime_messages {};
 };

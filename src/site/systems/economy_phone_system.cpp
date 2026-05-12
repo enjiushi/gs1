@@ -1056,7 +1056,8 @@ void seed_site_economy(RuntimeInvocation& invocation, std::uint32_t site_id)
 
 bool EconomyPhoneSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
 {
-    return type == GS1_HOST_EVENT_UI_ACTION;
+    (void)type;
+    return false;
 }
 
 bool EconomyPhoneSystem::subscribes_to(GameMessageType type) noexcept
@@ -1253,127 +1254,9 @@ Gs1Status EconomyPhoneSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-    if (message.type != GS1_HOST_EVENT_UI_ACTION)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    const auto& action = message.payload.ui_action.action;
-    switch (action.type)
-    {
-    case GS1_UI_ACTION_BUY_PHONE_LISTING:
-    {
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        auto* listing = find_listing(economy_phone_world(invocation).own_economy(), action.target_id);
-        if (listing == nullptr)
-        {
-            return GS1_STATUS_NOT_FOUND;
-        }
-        return process_buy_listing(
-            invocation,
-            *listing,
-            normalize_quantity(static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0)));
-    }
-
-    case GS1_UI_ACTION_ADD_PHONE_LISTING_TO_CART:
-    {
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        auto* listing = find_listing(economy_phone_world(invocation).own_economy(), action.target_id);
-        if (listing == nullptr)
-        {
-            return GS1_STATUS_NOT_FOUND;
-        }
-        return process_cart_add(
-            invocation,
-            *listing,
-            normalize_quantity(static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0)));
-    }
-
-    case GS1_UI_ACTION_REMOVE_PHONE_LISTING_FROM_CART:
-    {
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        auto* listing = find_listing(economy_phone_world(invocation).own_economy(), action.target_id);
-        if (listing == nullptr)
-        {
-            return GS1_STATUS_NOT_FOUND;
-        }
-        return process_cart_remove(
-            invocation,
-            *listing,
-            normalize_quantity(static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0)));
-    }
-
-    case GS1_UI_ACTION_CHECKOUT_PHONE_CART:
-        return process_cart_checkout(invocation);
-
-    case GS1_UI_ACTION_SELL_PHONE_LISTING:
-    {
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        auto* listing = find_listing(economy_phone_world(invocation).own_economy(), action.target_id);
-        if (listing == nullptr)
-        {
-            listing = find_sell_listing_for_item(
-                economy_phone_world(invocation).own_economy(),
-                action.target_id);
-            if (listing == nullptr)
-            {
-                refresh_dynamic_sell_listings(invocation, true);
-                return GS1_STATUS_OK;
-            }
-        }
-        return process_sell_listing(
-            invocation,
-            *listing,
-            normalize_quantity(static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0)));
-    }
-
-    case GS1_UI_ACTION_HIRE_CONTRACTOR:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return process_contractor_hire(
-            invocation,
-            ContractorHireRequestedMessage {
-                action.target_id,
-                static_cast<std::uint32_t>(action.arg0)});
-
-    case GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        {
-            const auto* listing = find_unlockable_listing(economy_phone_world(invocation).own_economy(), action.target_id);
-            if (listing == nullptr)
-            {
-                return GS1_STATUS_NOT_FOUND;
-            }
-            return process_unlockable_purchase(invocation, action.target_id, listing->price);
-        }
-
-    default:
-        return GS1_STATUS_OK;
-    }
+    (void)invocation;
+    (void)message;
+    return GS1_STATUS_OK;
 }
 
 void EconomyPhoneSystem::run(RuntimeInvocation& invocation)

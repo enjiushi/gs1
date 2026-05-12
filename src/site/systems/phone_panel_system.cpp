@@ -471,7 +471,8 @@ void sync_phone_panel_projection(
 
 bool PhonePanelSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
 {
-    return type == GS1_HOST_EVENT_UI_ACTION;
+    (void)type;
+    return false;
 }
 
 bool PhonePanelSystem::subscribes_to(GameMessageType type) noexcept
@@ -601,85 +602,9 @@ Gs1Status PhonePanelSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto access = make_game_state_access<PhonePanelSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (message.type != GS1_HOST_EVENT_UI_ACTION)
-    {
-        return GS1_STATUS_OK;
-    }
-    if (!site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-    const auto& action = message.payload.ui_action.action;
-    switch (action.type)
-    {
-    case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
-    {
-        if (action.arg0 > static_cast<std::uint64_t>(GS1_PHONE_PANEL_SECTION_CART))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-
-        PhonePanelSection section = PhonePanelSection::Home;
-        if (!try_map_phone_panel_section(static_cast<Gs1PhonePanelSection>(action.arg0), section))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-
-        auto& phone_panel = phone_panel_world(invocation).own_phone_panel();
-        bool dirty = false;
-        const auto updated_badge_flags =
-            (phone_panel.badge_flags & ~GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) &
-            ~badge_flag_for_section(section);
-        if (phone_panel.badge_flags != updated_badge_flags)
-        {
-            phone_panel.badge_flags = updated_badge_flags;
-            dirty = true;
-        }
-        if (!phone_panel.open)
-        {
-            phone_panel.open = true;
-            dirty = true;
-        }
-        if (phone_panel.active_section != section)
-        {
-            phone_panel.active_section = section;
-            dirty = true;
-        }
-        if (dirty)
-        {
-            mark_phone_dirty(invocation);
-        }
-        return GS1_STATUS_OK;
-    }
-
-    case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
-    {
-        auto& phone_panel = phone_panel_world(invocation).own_phone_panel();
-        bool dirty = false;
-        const auto updated_badge_flags =
-            phone_panel.badge_flags & ~GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE;
-        if (phone_panel.badge_flags != updated_badge_flags)
-        {
-            phone_panel.badge_flags = updated_badge_flags;
-            dirty = true;
-        }
-        if (phone_panel.open)
-        {
-            phone_panel.open = false;
-            dirty = true;
-        }
-        if (dirty)
-        {
-            mark_phone_dirty(invocation);
-        }
-        return GS1_STATUS_OK;
-    }
-
-    default:
-        return GS1_STATUS_OK;
-    }
+    (void)invocation;
+    (void)message;
+    return GS1_STATUS_OK;
 }
 
 void PhonePanelSystem::run(RuntimeInvocation& invocation)

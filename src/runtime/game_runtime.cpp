@@ -16,6 +16,7 @@
 #include "site/systems/ecology_system.h"
 #include "site/systems/economy_phone_system.h"
 #include "site/systems/failure_recovery_system.h"
+#include "site/systems/host_ui_action_router_system.h"
 #include "site/systems/inventory_system.h"
 #include "site/systems/local_weather_resolve_system.h"
 #include "site/systems/modifier_system.h"
@@ -459,6 +460,7 @@ void GameRuntime::initialize_system_registry()
     systems_.push_back(std::make_unique<LoadoutPlannerSystem>());
     systems_.push_back(std::make_unique<FactionReputationSystem>());
     systems_.push_back(std::make_unique<TechnologySystem>());
+    systems_.push_back(std::make_unique<HostUiActionRouterSystem>());
     systems_.push_back(std::make_unique<ActionExecutionSystem>());
     systems_.push_back(std::make_unique<WeatherEventSystem>());
     systems_.push_back(std::make_unique<WorkerConditionSystem>());
@@ -586,14 +588,16 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
         out_result.fixed_steps_executed += 1U;
     }
 
-    GamePresentationRuntimeContext presentation_context {
-        state_.app_state,
-        state_.campaign,
-        state_.active_site_run,
-        state_.site_protection_presentation,
-        state_.message_queue,
-        state_.runtime_messages,
-        state_.fixed_step_seconds};
+        GamePresentationRuntimeContext presentation_context {
+            state_.app_state,
+            state_.campaign,
+            state_.active_site_run,
+            state_.site_protection_presentation,
+            state_.ui_presentation,
+            state_.presentation_runtime,
+            state_.message_queue,
+            state_.runtime_messages,
+            state_.fixed_step_seconds};
     presentation_.flush_site_presentation_if_dirty(presentation_context);
 
     status = dispatch_queued_messages();
@@ -668,6 +672,8 @@ Gs1Status GameRuntime::dispatch_queued_messages()
             state_.campaign,
             state_.active_site_run,
             state_.site_protection_presentation,
+            state_.ui_presentation,
+            state_.presentation_runtime,
             state_.message_queue,
             state_.runtime_messages,
             state_.fixed_step_seconds};
@@ -770,23 +776,6 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
         }
 
         const auto status = system->process_host_message(invocation, message);
-        if (status != GS1_STATUS_OK)
-        {
-            return status;
-        }
-    }
-
-    if (GamePresentationCoordinator::subscribes_to_host_message(message.type))
-    {
-        GamePresentationRuntimeContext context {
-            state_.app_state,
-            state_.campaign,
-            state_.active_site_run,
-            state_.site_protection_presentation,
-            state_.message_queue,
-            state_.runtime_messages,
-            state_.fixed_step_seconds};
-        const auto status = presentation_.process_host_message(context, message);
         if (status != GS1_STATUS_OK)
         {
             return status;

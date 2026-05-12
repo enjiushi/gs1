@@ -64,6 +64,10 @@ struct RuntimeSiteProtectionPresentationTag
 {
 };
 
+struct RuntimeUiPresentationTag
+{
+};
+
 template <class System>
 struct system_state_tags;
 
@@ -191,6 +195,12 @@ inline decltype(auto) runtime_invocation_state_ref<RuntimeSiteProtectionPresenta
 }
 
 template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimeUiPresentationTag>(RuntimeInvocation& invocation)
+{
+    return (invocation.owned_state_->ui_presentation);
+}
+
+template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeAppStateTag>(const RuntimeInvocation& invocation)
 {
     return (*invocation.app_state_);
@@ -225,6 +235,13 @@ inline decltype(auto) runtime_invocation_state_ref<RuntimeSiteProtectionPresenta
     const RuntimeInvocation& invocation)
 {
     return (invocation.owned_state_->site_protection_presentation);
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimeUiPresentationTag>(
+    const RuntimeInvocation& invocation)
+{
+    return (invocation.owned_state_->ui_presentation);
 }
 
 template <class System>

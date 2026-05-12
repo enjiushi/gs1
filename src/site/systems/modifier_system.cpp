@@ -1112,7 +1112,8 @@ void handle_site_modifier_end_requested(
 
 bool ModifierSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
 {
-    return type == GS1_HOST_EVENT_UI_ACTION;
+    (void)type;
+    return false;
 }
 
 const char* ModifierSystem::name() const noexcept
@@ -1188,33 +1189,8 @@ Gs1Status ModifierSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto access = make_game_state_access<ModifierSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return GS1_STATUS_OK;
-    }
-
-    if (message.type != GS1_HOST_EVENT_UI_ACTION)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    const auto& action = message.payload.ui_action.action;
-    if (action.type != GS1_UI_ACTION_END_SITE_MODIFIER)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    if (action.target_id == 0U)
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    handle_site_modifier_end_requested(
-        invocation,
-        SiteModifierEndRequestedMessage {action.target_id});
+    (void)invocation;
+    (void)message;
     return GS1_STATUS_OK;
 }
 

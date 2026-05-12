@@ -1,5 +1,7 @@
 #include "app/game_presentation_coordinator.h"
 
+#include "app/campaign_presentation_ops.h"
+#include "app/site_presentation_ops.h"
 #include "campaign/systems/technology_system.h"
 #include "content/defs/faction_defs.h"
 #include "content/defs/item_defs.h"
@@ -1048,347 +1050,10 @@ Gs1PhonePanelSection to_phone_panel_section(PhonePanelSection section) noexcept
 
 }  // namespace
 
-bool GamePresentationCoordinator::subscribes_to_host_message(Gs1HostMessageType type) noexcept
-{
-    return type == GS1_HOST_EVENT_SITE_SCENE_READY ||
-        type == GS1_HOST_EVENT_UI_ACTION;
-}
-
-Gs1Status GamePresentationCoordinator::process_host_message(
-    GamePresentationRuntimeContext& context,
-    const Gs1HostMessage& message)
-{
-    active_context_ = &context;
-    if (message.type == GS1_HOST_EVENT_SITE_SCENE_READY)
-    {
-        activate_loaded_site_scene(context);
-        return GS1_STATUS_OK;
-    }
-
-    if (message.type == GS1_HOST_EVENT_UI_ACTION)
-    {
-        const auto& action = message.payload.ui_action.action;
-        switch (action.type)
-        {
-        case GS1_UI_ACTION_START_NEW_CAMPAIGN:
-            queue_clear_ui_panel_messages(GS1_UI_PANEL_MAIN_MENU);
-            queue_app_state_message(app_state());
-            queue_campaign_resources_message();
-            queue_regional_map_snapshot_messages();
-            queue_regional_map_menu_ui_messages();
-            queue_regional_map_selection_ui_messages();
-            queue_log_message("Started new GS1 campaign.");
-            return GS1_STATUS_OK;
-
-        case GS1_UI_ACTION_SELECT_DEPLOYMENT_SITE:
-            queue_regional_map_snapshot_messages();
-            queue_regional_map_menu_ui_messages();
-            queue_regional_map_selection_ui_messages();
-            queue_log_message("Selected deployment site.");
-            return GS1_STATUS_OK;
-
-        case GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
-            queue_regional_map_snapshot_messages();
-            queue_regional_map_menu_ui_messages();
-            queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
-            queue_log_message("Cleared deployment site selection.");
-            return GS1_STATUS_OK;
-
-        case GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
-            queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-            queue_site_protection_overlay_state_message();
-            queue_regional_map_menu_ui_messages();
-            queue_regional_map_tech_tree_ui_messages();
-            return GS1_STATUS_OK;
-
-        case GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
-            queue_regional_map_menu_ui_messages();
-            queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
-            queue_close_progression_view_if_open(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
-            return GS1_STATUS_OK;
-
-        case GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB:
-            queue_regional_map_menu_ui_messages();
-            queue_regional_map_tech_tree_ui_messages();
-            return GS1_STATUS_OK;
-
-        case GS1_UI_ACTION_START_SITE_ATTEMPT:
-            queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-            queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
-            queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP);
-            queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
-            queue_close_progression_view_if_open(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
-            queue_app_state_message(app_state());
-            return GS1_STATUS_OK;
-
-        case GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP:
-            queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-            queue_app_state_message(app_state());
-            queue_campaign_resources_message();
-            queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_RESULT);
-            queue_regional_map_snapshot_messages();
-            queue_regional_map_menu_ui_messages();
-            queue_regional_map_selection_ui_messages();
-            return GS1_STATUS_OK;
-
-        case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
-            queue_site_protection_overlay_state_message();
-            return GS1_STATUS_OK;
-
-        case GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR:
-            queue_site_protection_selector_ui_messages();
-            return GS1_STATUS_OK;
-
-        case GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI:
-        case GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
-            queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-            queue_site_protection_overlay_state_message();
-            return GS1_STATUS_OK;
-
-        case GS1_UI_ACTION_CHECKOUT_PHONE_CART:
-        case GS1_UI_ACTION_BUY_PHONE_LISTING:
-        case GS1_UI_ACTION_SELL_PHONE_LISTING:
-        case GS1_UI_ACTION_HIRE_CONTRACTOR:
-        case GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE:
-            queue_campaign_resources_message();
-            return GS1_STATUS_OK;
-
-        default:
-            return GS1_STATUS_OK;
-        }
-    }
-
-    return GS1_STATUS_OK;
-}
-
 void GamePresentationCoordinator::on_message_processed(GamePresentationRuntimeContext& context, const GameMessage& message)
 {
-    active_context_ = &context;
-    switch (message.type)
-    {
-    case GameMessageType::OpenMainMenu:
-        queue_close_active_normal_ui_if_open();
-        queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
-        queue_close_progression_view_if_open(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
-        queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP);
-        queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
-        queue_app_state_message(app_state());
-        queue_main_menu_ui_messages();
-        queue_log_message("Entered main menu.");
-        break;
-
-    case GameMessageType::StartNewCampaign:
-        queue_clear_ui_panel_messages(GS1_UI_PANEL_MAIN_MENU);
-        queue_app_state_message(app_state());
-        queue_campaign_resources_message();
-        queue_regional_map_snapshot_messages();
-        queue_regional_map_menu_ui_messages();
-        queue_regional_map_selection_ui_messages();
-        queue_log_message("Started new GS1 campaign.");
-        break;
-
-    case GameMessageType::SelectDeploymentSite:
-        queue_regional_map_snapshot_messages();
-        queue_regional_map_menu_ui_messages();
-        queue_regional_map_selection_ui_messages();
-        queue_log_message("Selected deployment site.");
-        break;
-
-    case GameMessageType::ClearDeploymentSiteSelection:
-        queue_regional_map_snapshot_messages();
-        queue_regional_map_menu_ui_messages();
-        queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
-        queue_log_message("Cleared deployment site selection.");
-        break;
-
-    case GameMessageType::OpenRegionalMapTechTree:
-        queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-        queue_site_protection_overlay_state_message();
-        queue_regional_map_menu_ui_messages();
-        queue_regional_map_tech_tree_ui_messages();
-        break;
-
-    case GameMessageType::CloseRegionalMapTechTree:
-        queue_regional_map_menu_ui_messages();
-        queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
-        queue_close_progression_view_if_open(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
-        break;
-
-    case GameMessageType::SelectRegionalMapTechTreeFaction:
-        queue_regional_map_menu_ui_messages();
-        queue_regional_map_tech_tree_ui_messages();
-        break;
-
-    case GameMessageType::CampaignCashDeltaRequested:
-    case GameMessageType::CampaignReputationAwardRequested:
-    case GameMessageType::FactionReputationAwardRequested:
-    case GameMessageType::TechnologyNodeClaimRequested:
-    case GameMessageType::TechnologyNodeRefundRequested:
-    case GameMessageType::EconomyMoneyAwardRequested:
-    case GameMessageType::PhoneCartCheckoutRequested:
-        queue_campaign_resources_message();
-        if (app_state_supports_technology_tree(app_state()))
-        {
-            queue_regional_map_menu_ui_messages();
-            queue_regional_map_tech_tree_ui_messages();
-        }
-        if (message.type == GameMessageType::CampaignReputationAwardRequested ||
-            message.type == GameMessageType::FactionReputationAwardRequested ||
-            message.type == GameMessageType::TechnologyNodeClaimRequested ||
-            message.type == GameMessageType::TechnologyNodeRefundRequested)
-        {
-            sync_campaign_unlock_presentations();
-        }
-        break;
-
-    case GameMessageType::PhonePanelSectionRequested:
-        queue_site_protection_overlay_state_message();
-        break;
-
-    case GameMessageType::ClosePhonePanel:
-        break;
-
-    case GameMessageType::InventoryStorageViewRequest:
-    {
-        const auto& payload = message.payload_as<InventoryStorageViewRequestMessage>();
-        if (payload.event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT)
-        {
-            queue_site_protection_overlay_state_message();
-        }
-        break;
-    }
-
-    case GameMessageType::StartSiteAttempt:
-        queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-        queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
-        queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP);
-        queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
-        queue_close_progression_view_if_open(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
-        queue_app_state_message(app_state());
-        break;
-
-    case GameMessageType::SiteRunStarted:
-        break;
-
-    case GameMessageType::ReturnToRegionalMap:
-        queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-        queue_app_state_message(app_state());
-        queue_campaign_resources_message();
-        queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_RESULT);
-        queue_regional_map_snapshot_messages();
-        queue_regional_map_menu_ui_messages();
-        queue_regional_map_selection_ui_messages();
-        break;
-
-    case GameMessageType::SiteAttemptEnded:
-    {
-        const auto& payload = message.payload_as<SiteAttemptEndedMessage>();
-        const auto newly_revealed_site_count =
-            active_site_run().has_value() ? active_site_run()->result_newly_revealed_site_count : 0U;
-        queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-        queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
-        queue_close_progression_view_if_open(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
-        queue_app_state_message(app_state());
-        queue_site_result_ui_messages(payload.site_id, payload.result);
-        queue_site_result_ready_message(
-            payload.site_id,
-            payload.result,
-            newly_revealed_site_count);
-        break;
-    }
-
-    case GameMessageType::PresentLog:
-    {
-        const auto& payload = message.payload_as<PresentLogMessage>();
-        queue_log_message(payload.text, payload.level);
-        break;
-    }
-
-    case GameMessageType::TaskRewardClaimResolved:
-    {
-        const auto& payload = message.payload_as<TaskRewardClaimResolvedMessage>();
-        flush_site_presentation_if_dirty(context);
-        queue_task_reward_claimed_cue_message(
-            payload.task_instance_id,
-            payload.task_template_id,
-            payload.reward_candidate_count);
-        break;
-    }
-
-    case GameMessageType::InventoryCraftCompleted:
-    {
-        const auto& payload = message.payload_as<InventoryCraftCompletedMessage>();
-        if (active_site_run().has_value() && payload.output_storage_id != 0U)
-        {
-            queue_storage_open_request(message_queue(), payload.output_storage_id);
-            flush_site_presentation_if_dirty(context);
-            queue_craft_output_stored_cue_message(
-                payload.output_storage_id,
-                payload.output_item_id,
-                payload.output_quantity == 0U ? 1U : payload.output_quantity);
-        }
-        break;
-    }
-
-    case GameMessageType::SiteActionStarted:
-    case GameMessageType::SiteActionCompleted:
-    case GameMessageType::SiteActionFailed:
-        queue_site_action_update_message();
-        break;
-
-    case GameMessageType::PlacementModeCommitRejected:
-        queue_site_placement_failure_message(
-            message.payload_as<PlacementModeCommitRejectedMessage>());
-        break;
-
-    case GameMessageType::OpenSiteProtectionSelector:
-        queue_site_protection_selector_ui_messages();
-        break;
-
-    case GameMessageType::CloseSiteProtectionUi:
-    case GameMessageType::SetSiteProtectionOverlayMode:
-        queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-        queue_site_protection_overlay_state_message();
-        break;
-
-    case GameMessageType::DeploymentSiteSelectionChanged:
-    case GameMessageType::StartSiteAction:
-    case GameMessageType::CancelSiteAction:
-    case GameMessageType::SiteGroundCoverPlaced:
-    case GameMessageType::SiteTilePlantingCompleted:
-    case GameMessageType::SiteTileWatered:
-    case GameMessageType::SiteTileBurialCleared:
-    case GameMessageType::WorkerMeterDeltaRequested:
-    case GameMessageType::WorkerMetersChanged:
-    case GameMessageType::TileEcologyChanged:
-    case GameMessageType::TileEcologyBatchChanged:
-    case GameMessageType::RestorationProgressChanged:
-    case GameMessageType::TaskAcceptRequested:
-    case GameMessageType::TaskRewardClaimRequested:
-    case GameMessageType::PhoneListingPurchased:
-    case GameMessageType::PhoneListingSold:
-    case GameMessageType::InventoryTransferCompleted:
-    case GameMessageType::InventoryItemSubmitted:
-    case GameMessageType::InventoryItemUseCompleted:
-        break;
-
-    case GameMessageType::InventoryDeliveryRequested:
-    case GameMessageType::InventoryItemUseRequested:
-    case GameMessageType::InventoryItemConsumeRequested:
-    case GameMessageType::InventoryTransferRequested:
-    case GameMessageType::InventoryItemSubmitRequested:
-    case GameMessageType::InventoryCraftContextRequested:
-        break;
-
-    case GameMessageType::PhoneListingPurchaseRequested:
-    case GameMessageType::PhoneListingSaleRequested:
-    case GameMessageType::ContractorHireRequested:
-    case GameMessageType::SiteUnlockablePurchaseRequested:
-        queue_campaign_resources_message();
-        [[fallthrough]];
-    default:
-        break;
-    }
+    campaign_presentation_handle_message(*this, context, message);
+    site_presentation_handle_message(*this, context, message);
 }
 
 
@@ -1407,7 +1072,8 @@ void GamePresentationCoordinator::queue_log_message(const char* message, Gs1LogL
 
 void GamePresentationCoordinator::queue_app_state_message(Gs1AppState app_state)
 {
-    if (last_emitted_app_state_.has_value() && last_emitted_app_state_.value() == app_state)
+    if (ui_presentation_state().last_emitted_app_state.has_value() &&
+        ui_presentation_state().last_emitted_app_state.value() == app_state)
     {
         return;
     }
@@ -1416,7 +1082,7 @@ void GamePresentationCoordinator::queue_app_state_message(Gs1AppState app_state)
     auto& payload = message.emplace_payload<Gs1EngineMessageSetAppStateData>();
     payload.app_state = app_state;
     engine_messages().push_back(message);
-    last_emitted_app_state_ = app_state;
+    ui_presentation_state().last_emitted_app_state = app_state;
 }
 
 void GamePresentationCoordinator::queue_ui_setup_begin_message(
@@ -1434,10 +1100,10 @@ void GamePresentationCoordinator::queue_ui_setup_begin_message(
     payload.context_id = context_id;
     engine_messages().push_back(message);
 
-    active_ui_setups_[setup_id] = presentation_type;
+    ui_presentation_state().active_ui_setups[setup_id] = presentation_type;
     if (presentation_type == GS1_UI_SETUP_PRESENTATION_NORMAL)
     {
-        active_normal_ui_setup_ = setup_id;
+        ui_presentation_state().active_normal_ui_setup = setup_id;
     }
 }
 
@@ -1451,10 +1117,11 @@ void GamePresentationCoordinator::queue_ui_setup_close_message(
     payload.presentation_type = presentation_type;
     engine_messages().push_back(message);
 
-    active_ui_setups_.erase(setup_id);
-    if (active_normal_ui_setup_.has_value() && active_normal_ui_setup_.value() == setup_id)
+    ui_presentation_state().active_ui_setups.erase(setup_id);
+    if (ui_presentation_state().active_normal_ui_setup.has_value() &&
+        ui_presentation_state().active_normal_ui_setup.value() == setup_id)
     {
-        active_normal_ui_setup_.reset();
+        ui_presentation_state().active_normal_ui_setup.reset();
     }
 }
 
@@ -1480,7 +1147,7 @@ void GamePresentationCoordinator::queue_ui_panel_begin_message(
     {
         queue_ui_surface_visibility_message(GS1_UI_SURFACE_REGIONAL_SELECTION_PANEL, true);
     }
-    active_ui_panels_.insert(panel_id);
+    ui_presentation_state().active_ui_panels.insert(panel_id);
 }
 
 void GamePresentationCoordinator::queue_ui_panel_close_message(Gs1UiPanelId panel_id)
@@ -1496,7 +1163,7 @@ void GamePresentationCoordinator::queue_ui_panel_close_message(Gs1UiPanelId pane
     {
         queue_ui_surface_visibility_message(GS1_UI_SURFACE_REGIONAL_SELECTION_PANEL, false);
     }
-    active_ui_panels_.erase(panel_id);
+    ui_presentation_state().active_ui_panels.erase(panel_id);
 }
 
 void GamePresentationCoordinator::queue_ui_surface_visibility_message(Gs1UiSurfaceId surface_id, bool visible)
@@ -1528,6 +1195,7 @@ void GamePresentationCoordinator::queue_progression_view_begin_message(
     engine_messages().push_back(message);
     if (view_id == GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE)
     {
+        ui_presentation_state().regional_map_tech_tree_view_open = true;
         queue_ui_surface_visibility_message(GS1_UI_SURFACE_REGIONAL_TECH_TREE_OVERLAY, true);
     }
 }
@@ -1540,14 +1208,15 @@ void GamePresentationCoordinator::queue_progression_view_close_message(Gs1Progre
     engine_messages().push_back(message);
     if (view_id == GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE)
     {
+        ui_presentation_state().regional_map_tech_tree_view_open = false;
         queue_ui_surface_visibility_message(GS1_UI_SURFACE_REGIONAL_TECH_TREE_OVERLAY, false);
     }
 }
 
 void GamePresentationCoordinator::queue_close_ui_setup_if_open(Gs1UiSetupId setup_id)
 {
-    const auto it = active_ui_setups_.find(setup_id);
-    if (it == active_ui_setups_.end())
+    const auto it = ui_presentation_state().active_ui_setups.find(setup_id);
+    if (it == ui_presentation_state().active_ui_setups.end())
     {
         return;
     }
@@ -1557,7 +1226,7 @@ void GamePresentationCoordinator::queue_close_ui_setup_if_open(Gs1UiSetupId setu
 
 void GamePresentationCoordinator::queue_close_ui_panel_if_open(Gs1UiPanelId panel_id)
 {
-    if (!active_ui_panels_.contains(panel_id))
+    if (!ui_presentation_state().active_ui_panels.contains(panel_id))
     {
         return;
     }
@@ -1567,17 +1236,23 @@ void GamePresentationCoordinator::queue_close_ui_panel_if_open(Gs1UiPanelId pane
 
 void GamePresentationCoordinator::queue_close_progression_view_if_open(Gs1ProgressionViewId view_id)
 {
+    if (view_id == GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE &&
+        !ui_presentation_state().regional_map_tech_tree_view_open)
+    {
+        return;
+    }
+
     queue_progression_view_close_message(view_id);
 }
 
 void GamePresentationCoordinator::queue_close_active_normal_ui_if_open()
 {
-    if (!active_normal_ui_setup_.has_value())
+    if (!ui_presentation_state().active_normal_ui_setup.has_value())
     {
         return;
     }
 
-    queue_close_ui_setup_if_open(active_normal_ui_setup_.value());
+    queue_close_ui_setup_if_open(ui_presentation_state().active_normal_ui_setup.value());
 }
 
 void GamePresentationCoordinator::queue_ui_element_message(
@@ -1842,14 +1517,14 @@ void GamePresentationCoordinator::queue_regional_map_selection_ui_messages()
 {
     if (!campaign().has_value() || !campaign()->regional_map_state.selected_site_id.has_value())
     {
-        if (active_ui_panels_.contains(GS1_UI_PANEL_REGIONAL_MAP_SELECTION))
+        if (ui_presentation_state().active_ui_panels.contains(GS1_UI_PANEL_REGIONAL_MAP_SELECTION))
         {
             auto close = make_engine_message(GS1_ENGINE_MESSAGE_CLOSE_REGIONAL_SELECTION_UI_PANEL);
             auto& close_payload = close.emplace_payload<Gs1EngineMessageCloseUiPanelData>();
             close_payload.panel_id = GS1_UI_PANEL_REGIONAL_MAP_SELECTION;
             engine_messages().push_back(close);
             queue_ui_surface_visibility_message(GS1_UI_SURFACE_REGIONAL_SELECTION_PANEL, false);
-            active_ui_panels_.erase(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
+            ui_presentation_state().active_ui_panels.erase(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
         }
         return;
     }
@@ -1873,7 +1548,7 @@ void GamePresentationCoordinator::queue_regional_map_selection_ui_messages()
     begin_payload.list_action_count = 0U;
     engine_messages().push_back(begin);
     queue_ui_surface_visibility_message(GS1_UI_SURFACE_REGIONAL_SELECTION_PANEL, true);
-    active_ui_panels_.insert(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
+    ui_presentation_state().active_ui_panels.insert(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
 
     const auto queue_selection_text_message = [this](
                                                 std::uint16_t line_id,
@@ -3471,7 +3146,7 @@ void GamePresentationCoordinator::queue_all_site_phone_listing_upsert_messages(
         current_listing_ids.push_back(listing.listing_id);
     }
 
-    for (const auto previous_listing_id : last_emitted_phone_listing_ids_)
+    for (const auto previous_listing_id : presentation_runtime_state().last_emitted_phone_listing_ids)
     {
         if (std::find(current_listing_ids.begin(), current_listing_ids.end(), previous_listing_id) ==
             current_listing_ids.end())
@@ -3485,7 +3160,7 @@ void GamePresentationCoordinator::queue_all_site_phone_listing_upsert_messages(
         queue_site_phone_listing_upsert_message(index, upsert_message_type);
     }
 
-    last_emitted_phone_listing_ids_ = std::move(current_listing_ids);
+    presentation_runtime_state().last_emitted_phone_listing_ids = std::move(current_listing_ids);
 }
 
 void GamePresentationCoordinator::queue_site_bootstrap_messages()
@@ -3900,7 +3575,7 @@ void GamePresentationCoordinator::sync_campaign_unlock_presentations()
 {
     if (!campaign().has_value())
     {
-        last_campaign_unlock_snapshot_ = {};
+        presentation_runtime_state().campaign_unlock_snapshot = {};
         return;
     }
 
@@ -3911,7 +3586,9 @@ void GamePresentationCoordinator::sync_campaign_unlock_presentations()
 
     for (const auto unlock_id : unlocked_reputation_unlock_ids)
     {
-        if (!sorted_contains(last_campaign_unlock_snapshot_.unlocked_reputation_unlock_ids, unlock_id))
+        if (!sorted_contains(
+                presentation_runtime_state().campaign_unlock_snapshot.unlocked_reputation_unlock_ids,
+                unlock_id))
         {
             queue_campaign_unlock_cue_message(
                 unlock_id,
@@ -3922,7 +3599,9 @@ void GamePresentationCoordinator::sync_campaign_unlock_presentations()
 
     for (const auto tech_node_id : unlocked_technology_node_ids)
     {
-        if (!sorted_contains(last_campaign_unlock_snapshot_.unlocked_technology_node_ids, tech_node_id))
+        if (!sorted_contains(
+                presentation_runtime_state().campaign_unlock_snapshot.unlocked_technology_node_ids,
+                tech_node_id))
         {
             queue_campaign_unlock_cue_message(
                 tech_node_id,
@@ -3931,86 +3610,21 @@ void GamePresentationCoordinator::sync_campaign_unlock_presentations()
         }
     }
 
-    last_campaign_unlock_snapshot_.unlocked_reputation_unlock_ids =
+    presentation_runtime_state().campaign_unlock_snapshot.unlocked_reputation_unlock_ids =
         std::move(unlocked_reputation_unlock_ids);
-    last_campaign_unlock_snapshot_.unlocked_technology_node_ids =
+    presentation_runtime_state().campaign_unlock_snapshot.unlocked_technology_node_ids =
         std::move(unlocked_technology_node_ids);
 }
 
-void GamePresentationCoordinator::activate_loaded_site_scene(GamePresentationRuntimeContext& context)
-{
-    active_context_ = &context;
-    if (!active_site_run().has_value() || app_state() != GS1_APP_STATE_SITE_LOADING)
-    {
-        return;
-    }
-
-    app_state() = GS1_APP_STATE_SITE_ACTIVE;
-    if (campaign().has_value())
-    {
-        campaign()->app_state = app_state();
-    }
-
-    queue_app_state_message(app_state());
-    queue_site_ready_bootstrap_messages();
-}
-
-
 void GamePresentationCoordinator::mark_site_projection_update_dirty(GamePresentationRuntimeContext& context, std::uint64_t dirty_flags) noexcept
 {
-    active_context_ = &context;
-    if (!active_site_run().has_value())
-    {
-        return;
-    }
-
-    if ((dirty_flags & SITE_PROJECTION_UPDATE_TILES) != 0U)
-    {
-        active_site_run()->pending_full_tile_projection_update = true;
-    }
-    if ((dirty_flags & SITE_PROJECTION_UPDATE_INVENTORY) != 0U)
-    {
-        active_site_run()->pending_full_inventory_projection_update = true;
-        active_site_run()->pending_inventory_storage_descriptor_projection_update = true;
-        if (active_site_run()->inventory.opened_device_storage_id != 0U)
-        {
-            active_site_run()->pending_opened_inventory_storage_full_projection_update = true;
-        }
-    }
-
-    active_site_run()->pending_projection_update_flags |= dirty_flags;
+    site_presentation_mark_projection_dirty(*this, context, dirty_flags);
 }
 
 
 void GamePresentationCoordinator::mark_site_tile_projection_dirty(GamePresentationRuntimeContext& context, TileCoord coord) noexcept
 {
-    active_context_ = &context;
-    if (!active_site_run().has_value())
-    {
-        return;
-    }
-
-    auto& site_run = active_site_run().value();
-    if (!site_world_access::tile_coord_in_bounds(site_run, coord))
-    {
-        return;
-    }
-
-    const auto tile_count = site_world_access::tile_count(site_run);
-    if (site_run.pending_tile_projection_update_mask.size() != tile_count)
-    {
-        site_run.pending_tile_projection_update_mask.assign(tile_count, 0U);
-        site_run.pending_tile_projection_updates.clear();
-    }
-
-    const auto index = site_world_access::tile_index(site_run, coord);
-    if (site_run.pending_tile_projection_update_mask[index] == 0U)
-    {
-        site_run.pending_tile_projection_update_mask[index] = 1U;
-        site_run.pending_tile_projection_updates.push_back(coord);
-    }
-
-    site_run.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_TILES;
+    site_presentation_mark_tile_dirty(*this, context, coord);
 }
 
 
@@ -4076,51 +3690,7 @@ void GamePresentationCoordinator::clear_pending_site_inventory_projection_update
 
 void GamePresentationCoordinator::flush_site_presentation_if_dirty(GamePresentationRuntimeContext& context)
 {
-    active_context_ = &context;
-    if (!active_site_run().has_value())
-    {
-        return;
-    }
-
-    const auto dirty_flags = active_site_run()->pending_projection_update_flags;
-    if (dirty_flags == 0U)
-    {
-        return;
-    }
-
-    if ((dirty_flags & (SITE_PROJECTION_UPDATE_PHONE |
-            SITE_PROJECTION_UPDATE_TASKS |
-            SITE_PROJECTION_UPDATE_INVENTORY)) != 0U)
-    {
-        RuntimeInvocation invocation {
-            app_state(),
-            campaign(),
-            active_site_run(),
-            engine_messages(),
-            message_queue(),
-            fixed_step_seconds()};
-        PhonePanelSystem system {};
-        system.run(invocation);
-    }
-
-    const auto projected_dirty_flags = active_site_run()->pending_projection_update_flags;
-    if (projected_dirty_flags == 0U)
-    {
-        return;
-    }
-
-    queue_site_delta_messages(projected_dirty_flags);
-
-    if ((projected_dirty_flags & (SITE_PROJECTION_UPDATE_HUD |
-            SITE_PROJECTION_UPDATE_WORKER |
-            SITE_PROJECTION_UPDATE_WEATHER)) != 0U)
-    {
-        queue_hud_state_message();
-    }
-
-    active_site_run()->pending_projection_update_flags = 0U;
-    clear_pending_site_tile_projection_updates();
-    clear_pending_site_inventory_projection_updates();
+    site_presentation_flush_if_dirty(*this, context);
 }
 
 }  // namespace gs1

@@ -114,8 +114,10 @@ set(GS1_CONTENT_RUNTIME_SOURCES
     src/content/prototype_content.cpp)
 
 set(GS1_GAMEPLAY_CORE_SOURCES
+    src/app/campaign_presentation_ops.cpp
     src/app/game_presentation_coordinator.cpp
     src/app/campaign_factory.cpp
+    src/app/site_presentation_ops.cpp
     src/app/site_run_factory.cpp
     src/campaign/systems/campaign_flow_system.cpp
     src/campaign/systems/campaign_time_system.cpp
@@ -131,6 +133,7 @@ set(GS1_GAMEPLAY_CORE_SOURCES
     src/site/systems/ecology_system.cpp
     src/site/systems/economy_phone_system.cpp
     src/site/systems/failure_recovery_system.cpp
+    src/site/systems/host_ui_action_router_system.cpp
     src/site/systems/inventory_system.cpp
     src/site/systems/craft_system.cpp
     src/site/systems/local_weather_resolve_system.cpp
