@@ -9,7 +9,7 @@ Campaign-level systems that react to gameplay messages and mutate only campaign-
 
 ## Contents
 - `campaign_flow_system.h`: Campaign flow system interface for high-level progression transitions and direct `RuntimeInvocation`-based campaign/app-state handling plus host/game message subscriptions.
-- `campaign_flow_system.cpp`: Campaign flow system implementation for campaign state transitions, authoritative runtime app-state handoff, tech-tree open/close and faction-tab flow from both the regional map and active site sessions, site-completion reward emission through `RuntimeInvocation`, and adjacent-site availability promotion without duplicating already-visible prototype site markers in the revealed-site cache.
+- `campaign_flow_system.cpp`: Campaign flow system implementation for campaign state transitions, authoritative runtime app-state handoff, tech-tree open/close and faction-tab flow from both the regional map and active site sessions, direct host-UI handling for campaign-flow intents without first bouncing through synthetic gameplay request messages, site-completion reward emission through `RuntimeInvocation`, and adjacent-site availability promotion without duplicating already-visible prototype site markers in the revealed-site cache.
 - `campaign_time_system.h`: Campaign time system interface for fixed-step-derived campaign clock advancement through the shared `RuntimeInvocation` system interface.
 - `campaign_time_system.cpp`: Campaign time system implementation that owns campaign clock/day progression via runtime state access tags.
 - `campaign_system_context.h`: Shared read/write access bundle passed into campaign systems.

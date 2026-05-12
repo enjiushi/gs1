@@ -74,7 +74,8 @@ std::optional<std::uint32_t> SiteProtectionPresentationSystem::fixed_step_order(
 
 bool SiteProtectionPresentationSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
 {
-    return type == GS1_HOST_EVENT_UI_ACTION;
+    return type == GS1_HOST_EVENT_UI_ACTION ||
+        type == GS1_HOST_EVENT_SITE_STORAGE_VIEW;
 }
 
 bool SiteProtectionPresentationSystem::subscribes_to(GameMessageType type) noexcept
@@ -100,34 +101,88 @@ Gs1Status SiteProtectionPresentationSystem::process_host_message(
     const Gs1HostMessage& message)
 {
     auto access = make_game_state_access<SiteProtectionPresentationSystem>(invocation);
-    (void)access;
+    auto& app_state = access.template read<RuntimeAppStateTag>();
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& active_site_run = access.template read<RuntimeActiveSiteRunTag>();
+    auto& protection = access.template write<RuntimeSiteProtectionPresentationTag>();
+
+    if (message.type == GS1_HOST_EVENT_SITE_STORAGE_VIEW)
+    {
+        if (message.payload.site_storage_view.event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT)
+        {
+            if (protection.selector_open || protection.overlay_mode != GS1_SITE_PROTECTION_OVERLAY_NONE)
+            {
+                clear_protection_ui_state(protection);
+            }
+            if (campaign.has_value() &&
+                app_state_supports_technology_tree(app_state) &&
+                campaign->regional_map_state.tech_tree_open)
+            {
+                queue_close_regional_map_tech_tree(invocation);
+            }
+        }
+        return GS1_STATUS_OK;
+    }
+
     if (message.type != GS1_HOST_EVENT_UI_ACTION)
     {
         return GS1_STATUS_OK;
     }
 
     const auto& action = message.payload.ui_action.action;
-    GameMessage translated {};
     switch (action.type)
     {
+    case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
+        if (protection.selector_open || protection.overlay_mode != GS1_SITE_PROTECTION_OVERLAY_NONE)
+        {
+            clear_protection_ui_state(protection);
+        }
+        if (campaign.has_value() &&
+            app_state_supports_technology_tree(app_state) &&
+            campaign->regional_map_state.tech_tree_open)
+        {
+            queue_close_regional_map_tech_tree(invocation);
+        }
+        return GS1_STATUS_OK;
+
+    case GS1_UI_ACTION_START_SITE_ATTEMPT:
+    case GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP:
+        clear_protection_ui_state(protection);
+        return GS1_STATUS_OK;
+
     case GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR:
-        translated.type = GameMessageType::OpenSiteProtectionSelector;
-        translated.set_payload(OpenSiteProtectionSelectorMessage {});
-        invocation.push_game_message(translated);
+        if (!active_site_run.has_value() || app_state != GS1_APP_STATE_SITE_ACTIVE)
+        {
+            return GS1_STATUS_OK;
+        }
+        if (campaign.has_value() &&
+            app_state_supports_technology_tree(app_state) &&
+            campaign->regional_map_state.tech_tree_open)
+        {
+            queue_close_regional_map_tech_tree(invocation);
+        }
+        protection.selector_open = true;
+        protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI:
-        translated.type = GameMessageType::CloseSiteProtectionUi;
-        translated.set_payload(CloseSiteProtectionUiMessage {});
-        invocation.push_game_message(translated);
+        if (protection.selector_open)
+        {
+            protection.selector_open = false;
+        }
+        else if (protection.overlay_mode != GS1_SITE_PROTECTION_OVERLAY_NONE)
+        {
+            protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
+        }
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
-        translated.type = GameMessageType::SetSiteProtectionOverlayMode;
-        translated.set_payload(SetSiteProtectionOverlayModeMessage {
-            static_cast<Gs1SiteProtectionOverlayMode>(action.arg0),
-            {0U, 0U, 0U}});
-        invocation.push_game_message(translated);
+        if (!active_site_run.has_value() || app_state != GS1_APP_STATE_SITE_ACTIVE)
+        {
+            return GS1_STATUS_OK;
+        }
+        protection.selector_open = false;
+        protection.overlay_mode = static_cast<Gs1SiteProtectionOverlayMode>(action.arg0);
         return GS1_STATUS_OK;
 
     default:

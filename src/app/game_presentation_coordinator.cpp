@@ -1050,17 +1050,187 @@ Gs1PhonePanelSection to_phone_panel_section(PhonePanelSection section) noexcept
 
 bool GamePresentationCoordinator::subscribes_to_host_message(Gs1HostMessageType type) noexcept
 {
-    return type == GS1_HOST_EVENT_SITE_SCENE_READY;
+    return type == GS1_HOST_EVENT_SITE_SCENE_READY ||
+        type == GS1_HOST_EVENT_UI_ACTION ||
+        type == GS1_HOST_EVENT_SITE_STORAGE_VIEW;
 }
 
 Gs1Status GamePresentationCoordinator::process_host_message(
     GamePresentationRuntimeContext& context,
     const Gs1HostMessage& message)
 {
+    active_context_ = &context;
     if (message.type == GS1_HOST_EVENT_SITE_SCENE_READY)
     {
         activate_loaded_site_scene(context);
         return GS1_STATUS_OK;
+    }
+
+    if (message.type == GS1_HOST_EVENT_SITE_STORAGE_VIEW)
+    {
+        if (message.payload.site_storage_view.event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT)
+        {
+            queue_site_protection_overlay_state_message();
+            queue_close_site_phone_panel_if_open();
+            if (campaign().has_value() &&
+                app_state_supports_technology_tree(app_state()) &&
+                campaign()->regional_map_state.tech_tree_open)
+            {
+                GameMessage close_tech_tree {};
+                close_tech_tree.type = GameMessageType::CloseRegionalMapTechTree;
+                close_tech_tree.set_payload(CloseRegionalMapTechTreeMessage {});
+                message_queue().push_back(close_tech_tree);
+            }
+        }
+        return GS1_STATUS_OK;
+    }
+
+    if (message.type == GS1_HOST_EVENT_UI_ACTION)
+    {
+        const auto& action = message.payload.ui_action.action;
+        switch (action.type)
+        {
+        case GS1_UI_ACTION_START_NEW_CAMPAIGN:
+            queue_clear_ui_panel_messages(GS1_UI_PANEL_MAIN_MENU);
+            queue_app_state_message(app_state());
+            queue_campaign_resources_message();
+            queue_regional_map_snapshot_messages();
+            queue_regional_map_menu_ui_messages();
+            queue_regional_map_selection_ui_messages();
+            queue_log_message("Started new GS1 campaign.");
+            return GS1_STATUS_OK;
+
+        case GS1_UI_ACTION_SELECT_DEPLOYMENT_SITE:
+            queue_regional_map_snapshot_messages();
+            queue_regional_map_menu_ui_messages();
+            queue_regional_map_selection_ui_messages();
+            queue_log_message("Selected deployment site.");
+            return GS1_STATUS_OK;
+
+        case GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
+            queue_regional_map_snapshot_messages();
+            queue_regional_map_menu_ui_messages();
+            queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
+            queue_log_message("Cleared deployment site selection.");
+            return GS1_STATUS_OK;
+
+        case GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
+            if (site_protection_selector_open())
+            {
+                queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
+            }
+            if (site_protection_overlay_mode() != GS1_SITE_PROTECTION_OVERLAY_NONE)
+            {
+                queue_site_protection_overlay_state_message();
+            }
+            queue_close_site_inventory_panels_if_open();
+            queue_close_site_phone_panel_if_open();
+            queue_regional_map_menu_ui_messages();
+            queue_regional_map_tech_tree_ui_messages();
+            return GS1_STATUS_OK;
+
+        case GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
+            queue_regional_map_menu_ui_messages();
+            queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
+            queue_close_progression_view_if_open(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
+            return GS1_STATUS_OK;
+
+        case GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB:
+            queue_regional_map_menu_ui_messages();
+            queue_regional_map_tech_tree_ui_messages();
+            return GS1_STATUS_OK;
+
+        case GS1_UI_ACTION_START_SITE_ATTEMPT:
+            close_site_protection_ui();
+            queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
+            queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP_SELECTION);
+            queue_clear_ui_panel_messages(GS1_UI_PANEL_REGIONAL_MAP);
+            queue_close_ui_setup_if_open(GS1_UI_SETUP_REGIONAL_MAP_TECH_TREE);
+            queue_close_progression_view_if_open(GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE);
+            queue_app_state_message(app_state());
+            return GS1_STATUS_OK;
+
+        case GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP:
+            close_site_protection_ui();
+            queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
+            queue_app_state_message(app_state());
+            queue_campaign_resources_message();
+            queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_RESULT);
+            queue_regional_map_snapshot_messages();
+            queue_regional_map_menu_ui_messages();
+            queue_regional_map_selection_ui_messages();
+            return GS1_STATUS_OK;
+
+        case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
+            if (active_ui_setups_.contains(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR))
+            {
+                queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
+            }
+            queue_site_protection_overlay_state_message();
+            queue_close_site_inventory_panels_if_open();
+            if (campaign().has_value() &&
+                app_state_supports_technology_tree(app_state()) &&
+                campaign()->regional_map_state.tech_tree_open)
+            {
+                GameMessage close_tech_tree {};
+                close_tech_tree.type = GameMessageType::CloseRegionalMapTechTree;
+                close_tech_tree.set_payload(CloseRegionalMapTechTreeMessage {});
+                message_queue().push_back(close_tech_tree);
+            }
+            return GS1_STATUS_OK;
+
+        case GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR:
+            if (!active_site_run().has_value() ||
+                app_state() != GS1_APP_STATE_SITE_ACTIVE)
+            {
+                return GS1_STATUS_OK;
+            }
+            queue_close_site_inventory_panels_if_open();
+            queue_close_site_phone_panel_if_open();
+            if (campaign().has_value() &&
+                app_state_supports_technology_tree(app_state()) &&
+                campaign()->regional_map_state.tech_tree_open)
+            {
+                GameMessage close_tech_tree {};
+                close_tech_tree.type = GameMessageType::CloseRegionalMapTechTree;
+                close_tech_tree.set_payload(CloseRegionalMapTechTreeMessage {});
+                message_queue().push_back(close_tech_tree);
+            }
+            queue_site_protection_selector_ui_messages();
+            return GS1_STATUS_OK;
+
+        case GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI:
+            if (active_ui_setups_.contains(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR))
+            {
+                queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
+            }
+            else if (site_protection_overlay_mode() != GS1_SITE_PROTECTION_OVERLAY_NONE)
+            {
+                queue_site_protection_overlay_state_message();
+            }
+            return GS1_STATUS_OK;
+
+        case GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
+            if (!active_site_run().has_value() ||
+                app_state() != GS1_APP_STATE_SITE_ACTIVE)
+            {
+                return GS1_STATUS_OK;
+            }
+            queue_close_ui_setup_if_open(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
+            queue_site_protection_overlay_state_message();
+            return GS1_STATUS_OK;
+
+        case GS1_UI_ACTION_CHECKOUT_PHONE_CART:
+        case GS1_UI_ACTION_BUY_PHONE_LISTING:
+        case GS1_UI_ACTION_SELL_PHONE_LISTING:
+        case GS1_UI_ACTION_HIRE_CONTRACTOR:
+        case GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE:
+            queue_campaign_resources_message();
+            return GS1_STATUS_OK;
+
+        default:
+            return GS1_STATUS_OK;
+        }
     }
 
     return GS1_STATUS_OK;

@@ -2566,6 +2566,18 @@ Gs1Status process_game_message_impl(
     ActionExecutionContext& context,
     const GameMessage& message);
 
+Gs1Status handle_start_site_action(
+    ActionExecutionContext& context,
+    const StartSiteActionMessage& payload);
+
+Gs1Status handle_cancel_site_action(
+    ActionExecutionContext& context,
+    const CancelSiteActionMessage& payload);
+
+Gs1Status handle_placement_mode_cursor_moved(
+    ActionExecutionContext& context,
+    const PlacementModeCursorMovedMessage& payload);
+
 bool ActionExecutionSystem::subscribes_to_host_message(Gs1HostMessageType type) noexcept
 {
     return type == GS1_HOST_EVENT_SITE_ACTION_REQUEST ||
@@ -2577,7 +2589,6 @@ Gs1Status process_host_message_impl(
     ActionExecutionContext& context,
     const Gs1HostMessage& message)
 {
-    GameMessage translated {};
     switch (message.type)
     {
     case GS1_HOST_EVENT_SITE_ACTION_REQUEST:
@@ -2585,8 +2596,9 @@ Gs1Status process_host_message_impl(
         {
             return GS1_STATUS_INVALID_ARGUMENT;
         }
-        translated.type = GameMessageType::StartSiteAction;
-        translated.set_payload(StartSiteActionMessage {
+        return handle_start_site_action(
+            context,
+            StartSiteActionMessage {
             message.payload.site_action_request.action_kind,
             message.payload.site_action_request.flags,
             message.payload.site_action_request.quantity == 0U ? 1U : message.payload.site_action_request.quantity,
@@ -2595,7 +2607,6 @@ Gs1Status process_host_message_impl(
             message.payload.site_action_request.primary_subject_id,
             message.payload.site_action_request.secondary_subject_id,
             message.payload.site_action_request.item_id});
-        return process_game_message_impl(context, translated);
 
     case GS1_HOST_EVENT_SITE_ACTION_CANCEL:
         if (message.payload.site_action_cancel.action_id == 0U &&
@@ -2605,23 +2616,23 @@ Gs1Status process_host_message_impl(
         {
             return GS1_STATUS_INVALID_ARGUMENT;
         }
-        translated.type = GameMessageType::CancelSiteAction;
-        translated.set_payload(CancelSiteActionMessage {
+        return handle_cancel_site_action(
+            context,
+            CancelSiteActionMessage {
             message.payload.site_action_cancel.action_id,
             message.payload.site_action_cancel.flags});
-        return process_game_message_impl(context, translated);
 
     case GS1_HOST_EVENT_SITE_CONTEXT_REQUEST:
         if (!context.site_run.site_action.placement_mode.active)
         {
             return GS1_STATUS_OK;
         }
-        translated.type = GameMessageType::PlacementModeCursorMoved;
-        translated.set_payload(PlacementModeCursorMovedMessage {
+        return handle_placement_mode_cursor_moved(
+            context,
+            PlacementModeCursorMovedMessage {
             message.payload.site_context_request.tile_x,
             message.payload.site_context_request.tile_y,
             message.payload.site_context_request.flags});
-        return process_game_message_impl(context, translated);
 
     default:
         return GS1_STATUS_OK;
@@ -2652,82 +2663,100 @@ Gs1Status process_game_message_impl(
     switch (payload_type)
     {
     case GameMessageType::StartSiteAction:
+        return handle_start_site_action(
+            context,
+            message.payload_as<StartSiteActionMessage>());
+
+    case GameMessageType::CancelSiteAction:
+        return handle_cancel_site_action(
+            context,
+            message.payload_as<CancelSiteActionMessage>());
+
+    case GameMessageType::PlacementModeCursorMoved:
+        return handle_placement_mode_cursor_moved(
+            context,
+            message.payload_as<PlacementModeCursorMovedMessage>());
+
+    case GameMessageType::PlacementReservationAccepted:
     {
-        const auto& payload = message.payload_as<StartSiteActionMessage>();
-        const ActionKind action_kind = to_action_kind(payload.action_kind);
-        const bool deferred_target_selection =
-            (payload.flags & GS1_SITE_ACTION_REQUEST_FLAG_DEFERRED_TARGET_SELECTION) != 0U;
-        const std::uint8_t request_flags = static_cast<std::uint8_t>(
-            payload.flags & ~GS1_SITE_ACTION_REQUEST_FLAG_DEFERRED_TARGET_SELECTION);
-        const std::uint16_t requested_quantity = payload.quantity == 0U ? 1U : payload.quantity;
-        TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
-        std::uint32_t primary_subject_id = payload.primary_subject_id;
-        std::uint32_t secondary_subject_id = payload.secondary_subject_id;
-        std::uint32_t item_id = payload.item_id;
-        bool reactivate_plant_placement_mode_on_completion = false;
-
-        if (has_active_placement_mode(action_state))
+        if (!is_action_waiting_for_placement(action_state))
         {
-            if (deferred_target_selection)
-            {
-                emit_site_action_failed(
-                    context.message_queue,
-                    0U,
-                    action_kind,
-                    SiteActionFailureReason::Busy,
-                    request_flags,
-                    target_tile,
-                    primary_subject_id,
-                    secondary_subject_id);
-                return GS1_STATUS_OK;
-            }
-
-            if (!placement_mode_matches_request(
-                    action_state.placement_mode,
-                    action_kind,
-                    requested_quantity,
-                    primary_subject_id,
-                    secondary_subject_id,
-                    item_id))
-            {
-                emit_site_action_failed(
-                    context.message_queue,
-                    0U,
-                    action_kind,
-                    SiteActionFailureReason::Busy,
-                    request_flags,
-                    target_tile,
-                    primary_subject_id,
-                    secondary_subject_id);
-                return GS1_STATUS_OK;
-            }
-
-            if (!placement_mode_can_commit_to_tile(
-                    context,
-                    action_state.placement_mode,
-                    target_tile))
-            {
-                emit_placement_mode_commit_rejected(
-                    context.message_queue,
-                    action_state.placement_mode,
-                    target_tile);
-                context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW);
-                return GS1_STATUS_OK;
-            }
-
-            const auto placement_mode = action_state.placement_mode;
-            reactivate_plant_placement_mode_on_completion =
-                placement_mode.action_kind == ActionKind::Plant &&
-                placement_mode.item_id != 0U;
-            clear_placement_mode(action_state.placement_mode);
-            context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW);
-
-            target_tile = placement_mode.target_tile.value_or(target_tile);
-            primary_subject_id = placement_mode.primary_subject_id;
-            secondary_subject_id = placement_mode.secondary_subject_id;
-            item_id = placement_mode.item_id;
+            return GS1_STATUS_OK;
         }
-        else if (has_active_action(action_state))
+
+        const auto& payload = message.payload_as<PlacementReservationAcceptedMessage>();
+        if (payload.action_id != action_id_value(action_state))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        action_state.awaiting_placement_reservation = false;
+        action_state.placement_reservation_token = payload.reservation_token;
+        if (!action_requires_worker_approach(action_state.action_kind) ||
+            worker_is_at_action_approach_tile(context, action_state))
+        {
+            begin_action_execution(context, action_state);
+        }
+        else
+        {
+            context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
+        }
+        return GS1_STATUS_OK;
+    }
+
+    case GameMessageType::PlacementReservationRejected:
+    {
+        if (!is_action_waiting_for_placement(action_state))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        const auto& payload = message.payload_as<PlacementReservationRejectedMessage>();
+        if (payload.action_id != action_id_value(action_state))
+        {
+            return GS1_STATUS_OK;
+        }
+
+        emit_site_action_failed(
+            context.message_queue,
+            action_id_value(action_state),
+            action_state.action_kind,
+            SiteActionFailureReason::InvalidTarget,
+            action_state.request_flags,
+            action_target_tile(action_state),
+            action_state.primary_subject_id,
+            action_state.secondary_subject_id);
+        clear_action_state(action_state);
+        context.world.mark_projection_dirty(
+            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
+        return GS1_STATUS_OK;
+    }
+
+    default:
+        return GS1_STATUS_OK;
+    }
+}
+
+Gs1Status handle_start_site_action(
+    ActionExecutionContext& context,
+    const StartSiteActionMessage& payload)
+{
+    auto& action_state = context.world.own_action();
+    const ActionKind action_kind = to_action_kind(payload.action_kind);
+    const bool deferred_target_selection =
+        (payload.flags & GS1_SITE_ACTION_REQUEST_FLAG_DEFERRED_TARGET_SELECTION) != 0U;
+    const std::uint8_t request_flags = static_cast<std::uint8_t>(
+        payload.flags & ~GS1_SITE_ACTION_REQUEST_FLAG_DEFERRED_TARGET_SELECTION);
+    const std::uint16_t requested_quantity = payload.quantity == 0U ? 1U : payload.quantity;
+    TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
+    std::uint32_t primary_subject_id = payload.primary_subject_id;
+    std::uint32_t secondary_subject_id = payload.secondary_subject_id;
+    std::uint32_t item_id = payload.item_id;
+    bool reactivate_plant_placement_mode_on_completion = false;
+
+    if (has_active_placement_mode(action_state))
+    {
+        if (deferred_target_selection)
         {
             emit_site_action_failed(
                 context.message_queue,
@@ -2740,6 +2769,65 @@ Gs1Status process_game_message_impl(
                 secondary_subject_id);
             return GS1_STATUS_OK;
         }
+
+        if (!placement_mode_matches_request(
+                action_state.placement_mode,
+                action_kind,
+                requested_quantity,
+                primary_subject_id,
+                secondary_subject_id,
+                item_id))
+        {
+            emit_site_action_failed(
+                context.message_queue,
+                0U,
+                action_kind,
+                SiteActionFailureReason::Busy,
+                request_flags,
+                target_tile,
+                primary_subject_id,
+                secondary_subject_id);
+            return GS1_STATUS_OK;
+        }
+
+        if (!placement_mode_can_commit_to_tile(
+                context,
+                action_state.placement_mode,
+                target_tile))
+        {
+            emit_placement_mode_commit_rejected(
+                context.message_queue,
+                action_state.placement_mode,
+                target_tile);
+            context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW);
+            return GS1_STATUS_OK;
+        }
+
+        const auto placement_mode = action_state.placement_mode;
+        reactivate_plant_placement_mode_on_completion =
+            placement_mode.action_kind == ActionKind::Plant &&
+            placement_mode.item_id != 0U;
+        clear_placement_mode(action_state.placement_mode);
+        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW);
+
+        target_tile = placement_mode.target_tile.value_or(target_tile);
+        primary_subject_id = placement_mode.primary_subject_id;
+        secondary_subject_id = placement_mode.secondary_subject_id;
+        item_id = placement_mode.item_id;
+    }
+    else if (has_active_action(action_state))
+    {
+        emit_site_action_failed(
+            context.message_queue,
+            0U,
+            action_kind,
+            SiteActionFailureReason::Busy,
+            request_flags,
+            target_tile,
+            primary_subject_id,
+            secondary_subject_id);
+        return GS1_STATUS_OK;
+    }
 
         if (action_kind == ActionKind::None)
         {
@@ -3109,9 +3197,11 @@ Gs1Status process_game_message_impl(
         return GS1_STATUS_OK;
     }
 
-    case GameMessageType::CancelSiteAction:
-    {
-        const auto& payload = message.payload_as<CancelSiteActionMessage>();
+Gs1Status handle_cancel_site_action(
+    ActionExecutionContext& context,
+    const CancelSiteActionMessage& payload)
+{
+    auto& action_state = context.world.own_action();
         const bool cancels_current =
             (payload.flags & GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION) != 0U;
         const bool cancels_placement_mode =
@@ -3154,14 +3244,16 @@ Gs1Status process_game_message_impl(
         return GS1_STATUS_OK;
     }
 
-    case GameMessageType::PlacementModeCursorMoved:
-    {
+Gs1Status handle_placement_mode_cursor_moved(
+    ActionExecutionContext& context,
+    const PlacementModeCursorMovedMessage& payload)
+{
+    auto& action_state = context.world.own_action();
         if (!has_active_placement_mode(action_state))
         {
             return GS1_STATUS_OK;
         }
 
-        const auto& payload = message.payload_as<PlacementModeCursorMovedMessage>();
         const TileCoord target_tile {payload.tile_x, payload.tile_y};
         update_placement_mode_preview(
             context,
@@ -3169,66 +3261,6 @@ Gs1Status process_game_message_impl(
             target_tile);
         context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW);
         return GS1_STATUS_OK;
-    }
-
-    case GameMessageType::PlacementReservationAccepted:
-    {
-        if (!is_action_waiting_for_placement(action_state))
-        {
-            return GS1_STATUS_OK;
-        }
-
-        const auto& payload = message.payload_as<PlacementReservationAcceptedMessage>();
-        if (payload.action_id != action_id_value(action_state))
-        {
-            return GS1_STATUS_OK;
-        }
-
-        action_state.awaiting_placement_reservation = false;
-        action_state.placement_reservation_token = payload.reservation_token;
-        if (!action_requires_worker_approach(action_state.action_kind) ||
-            worker_is_at_action_approach_tile(context, action_state))
-        {
-            begin_action_execution(context, action_state);
-        }
-        else
-        {
-            context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
-        }
-        return GS1_STATUS_OK;
-    }
-
-    case GameMessageType::PlacementReservationRejected:
-    {
-        if (!is_action_waiting_for_placement(action_state))
-        {
-            return GS1_STATUS_OK;
-        }
-
-        const auto& payload = message.payload_as<PlacementReservationRejectedMessage>();
-        if (payload.action_id != action_id_value(action_state))
-        {
-            return GS1_STATUS_OK;
-        }
-
-        emit_site_action_failed(
-            context.message_queue,
-            action_id_value(action_state),
-            action_state.action_kind,
-            SiteActionFailureReason::InvalidTarget,
-            action_state.request_flags,
-            action_target_tile(action_state),
-            action_state.primary_subject_id,
-            action_state.secondary_subject_id);
-        clear_action_state(action_state);
-        context.world.mark_projection_dirty(
-            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
-        return GS1_STATUS_OK;
-    }
-
-    default:
-        return GS1_STATUS_OK;
-    }
 }
 
 void run_impl(ActionExecutionContext& context)
