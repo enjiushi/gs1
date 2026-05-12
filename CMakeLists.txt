@@ -122,7 +122,6 @@ set(GS1_GAMEPLAY_CORE_SOURCES
     src/campaign/systems/faction_reputation_system.cpp
     src/campaign/systems/loadout_planner_system.cpp
     src/campaign/systems/technology_system.cpp
-    src/messages/message_dispatcher.cpp
     ${GS1_CONTENT_RUNTIME_SOURCES}
     src/site/systems/action_execution_system.cpp
     src/site/systems/camp_durability_system.cpp

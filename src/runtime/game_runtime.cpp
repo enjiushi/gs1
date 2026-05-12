@@ -7,7 +7,6 @@
 #include "campaign/systems/loadout_planner_system.h"
 #include "campaign/systems/technology_system.h"
 #include "content/content_loader.h"
-#include "messages/message_dispatcher.h"
 #include "site/systems/action_execution_system.h"
 #include "site/systems/camp_durability_system.h"
 #include "site/systems/craft_system.h"
@@ -651,6 +650,33 @@ Gs1Status GameRuntime::handle_message(const GameMessage& message)
     return dispatch_queued_messages();
 }
 
+Gs1Status GameRuntime::dispatch_queued_messages()
+{
+    while (!state_.message_queue.empty())
+    {
+        const auto message = state_.message_queue.front();
+        state_.message_queue.pop_front();
+
+        const auto status = dispatch_subscribed_message(message);
+        if (status != GS1_STATUS_OK)
+        {
+            return status;
+        }
+
+        GamePresentationRuntimeContext context {
+            state_.app_state,
+            state_.campaign,
+            state_.active_site_run,
+            state_.site_protection_presentation,
+            state_.message_queue,
+            state_.runtime_messages,
+            state_.fixed_step_seconds};
+        presentation_.on_message_processed(context, message);
+    }
+
+    return GS1_STATUS_OK;
+}
+
 Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
 {
     if (!is_valid_message_type(message.type) || message.type == GameMessageType::Count)
@@ -768,11 +794,6 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
     }
 
     return GS1_STATUS_OK;
-}
-
-Gs1Status GameRuntime::dispatch_queued_messages()
-{
-    return MessageDispatcher::dispatch_all(*this);
 }
 
 void GameRuntime::run_fixed_step()

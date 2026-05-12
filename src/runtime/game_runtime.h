@@ -52,7 +52,6 @@ public:
     [[nodiscard]] Gs1Status handle_message(const GameMessage& message);
 
     friend struct GameRuntimeProjectionTestAccess;
-    friend class MessageDispatcher;
     friend class RuntimeInvocation;
 
 private:
