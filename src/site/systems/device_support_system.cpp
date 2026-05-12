@@ -19,37 +19,39 @@ namespace
 constexpr float k_device_efficiency_epsilon = 0.0005f;
 constexpr float k_device_water_epsilon = 0.0005f;
 
-struct DeviceSupportContext final
-{
-    gs1::SiteRunState& site_run;
-    gs1::SiteWorldAccess<gs1::DeviceSupportSystem> world;
-    double fixed_step_seconds {0.0};
-};
-
 Gs1Status process_message(
-    DeviceSupportContext& context,
+    gs1::RuntimeInvocation& invocation,
     const gs1::GameMessage& message)
 {
-    (void)context;
+    (void)invocation;
     (void)message;
     return GS1_STATUS_OK;
 }
 
-void run_context(DeviceSupportContext& context)
+void run_system(gs1::RuntimeInvocation& invocation)
 {
-    if (!context.world.has_world())
+    auto access = gs1::make_game_state_access<gs1::DeviceSupportSystem>(invocation);
+    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
     {
         return;
     }
 
-    const float step_seconds = static_cast<float>(context.fixed_step_seconds);
+    gs1::SiteWorldAccess<gs1::DeviceSupportSystem> world {*site_run};
+    if (!world.has_world())
+    {
+        return;
+    }
+
+    const float step_seconds = static_cast<float>(
+        access.template read<gs1::RuntimeFixedStepSecondsTag>());
     if (step_seconds <= 0.0f)
     {
         return;
     }
 
     const auto& tuning = gs1::gameplay_tuning_def().device_support;
-    auto& ecs_world = context.site_run.site_world->ecs_world();
+    auto& ecs_world = site_run->site_world->ecs_world();
     auto device_query =
         ecs_world.query_builder<
             const gs1::site_ecs::TileCoordComponent,
@@ -83,7 +85,7 @@ void run_context(DeviceSupportContext& context)
             }
 
             const auto tile_entity_id =
-                context.site_run.site_world->tile_entity_id(coord_component.value);
+                site_run->site_world->tile_entity_id(coord_component.value);
             const float tile_heat = tile_entity_id == 0U
                 ? 0.0f
                 : ecs_world.entity(tile_entity_id).get<gs1::site_ecs::TileHeat>().value;
@@ -145,17 +147,12 @@ Gs1Status DeviceSupportSystem::process_game_message(
 {
     auto access = make_game_state_access<DeviceSupportSystem>(invocation);
     auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
     if (!site_run.has_value())
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
-    DeviceSupportContext context {
-        *site_run,
-        SiteWorldAccess<DeviceSupportSystem> {*site_run},
-        fixed_step_seconds};
-    return process_message(context, message);
+    return process_message(invocation, message);
 }
 
 Gs1Status DeviceSupportSystem::process_host_message(
@@ -169,19 +166,7 @@ Gs1Status DeviceSupportSystem::process_host_message(
 
 void DeviceSupportSystem::run(RuntimeInvocation& invocation)
 {
-    auto access = make_game_state_access<DeviceSupportSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    if (!site_run.has_value())
-    {
-        return;
-    }
-
-    DeviceSupportContext context {
-        *site_run,
-        SiteWorldAccess<DeviceSupportSystem> {*site_run},
-        fixed_step_seconds};
-    run_context(context);
+    run_system(invocation);
 }
 }  // namespace gs1
 

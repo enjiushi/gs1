@@ -12,12 +12,6 @@ namespace gs1
 {
 namespace
 {
-struct PlacementValidationContext final
-{
-    SiteWorldAccess<PlacementValidationSystem> world;
-    GameMessageQueue& message_queue;
-};
-
 struct PlacementReservationRecord final
 {
     SiteRunId site_run_id {};
@@ -150,23 +144,39 @@ PlacementReservationRejectionReason validate_request(
     return rejection_reason;
 }
 
-void handle_site_run_started(PlacementValidationContext& context) noexcept
+void handle_site_run_started(RuntimeInvocation& invocation) noexcept
 {
-    prune_reservations_for_run(context.world.site_run_id());
+    auto access = make_game_state_access<PlacementValidationSystem>(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return;
+    }
+
+    prune_reservations_for_run(SiteWorldAccess<PlacementValidationSystem> {*site_run}.site_run_id());
 }
 
 void handle_reservation_requested(
-    PlacementValidationContext& context,
+    RuntimeInvocation& invocation,
     const PlacementReservationRequestedMessage& payload)
 {
+    auto access = make_game_state_access<PlacementValidationSystem>(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return;
+    }
+
+    SiteWorldAccess<PlacementValidationSystem> world {*site_run};
+    auto& message_queue = invocation.game_message_queue();
     const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
     const TileFootprint footprint = resolve_placement_reservation_footprint(
         payload.occupancy_layer,
         payload.subject_kind,
         payload.subject_id);
     const auto rejection_reason = validate_request(
-        context.world.site_run_id(),
-        context.world,
+        world.site_run_id(),
+        world,
         target_tile,
         payload.occupancy_layer,
         payload.action_id,
@@ -174,7 +184,7 @@ void handle_reservation_requested(
     if (rejection_reason != PlacementReservationRejectionReason::None)
     {
         enqueue_message(
-            context.message_queue,
+            message_queue,
             GameMessageType::PlacementReservationRejected,
             PlacementReservationRejectedMessage {
                 payload.action_id,
@@ -191,7 +201,7 @@ void handle_reservation_requested(
         footprint,
         [&](TileCoord coord) {
             g_reservations.push_back(PlacementReservationRecord {
-                context.world.site_run_id(),
+                world.site_run_id(),
                 payload.action_id,
                 reservation_token,
                 coord,
@@ -200,7 +210,7 @@ void handle_reservation_requested(
         });
 
     enqueue_message(
-        context.message_queue,
+        message_queue,
         GameMessageType::PlacementReservationAccepted,
         PlacementReservationAcceptedMessage {
             payload.action_id,
@@ -278,18 +288,15 @@ Gs1Status PlacementValidationSystem::process_game_message(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    PlacementValidationContext context {
-        SiteWorldAccess<PlacementValidationSystem> {*site_run},
-        invocation.game_message_queue()};
     switch (message.type)
     {
     case GameMessageType::SiteRunStarted:
-        handle_site_run_started(context);
+        handle_site_run_started(invocation);
         break;
 
     case GameMessageType::PlacementReservationRequested:
         handle_reservation_requested(
-            context,
+            invocation,
             message.payload_as<PlacementReservationRequestedMessage>());
         break;
 
@@ -315,17 +322,7 @@ Gs1Status PlacementValidationSystem::process_host_message(
 
 void PlacementValidationSystem::run(RuntimeInvocation& invocation)
 {
-    auto access = make_game_state_access<PlacementValidationSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return;
-    }
-
-    PlacementValidationContext context {
-        SiteWorldAccess<PlacementValidationSystem> {*site_run},
-        invocation.game_message_queue()};
-    (void)context;
+    (void)invocation;
 }
 }  // namespace gs1
 

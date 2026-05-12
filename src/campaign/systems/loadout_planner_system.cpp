@@ -1,7 +1,6 @@
 #include "campaign/systems/loadout_planner_system.h"
 
 #include "campaign/campaign_state.h"
-#include "campaign/systems/campaign_system_context.h"
 #include "content/defs/item_defs.h"
 #include "content/prototype_content.h"
 #include "runtime/game_runtime.h"
@@ -123,7 +122,7 @@ void rebuild_selected_loadout(CampaignState& campaign)
 }  // namespace
 
 Gs1Status process_loadout_planner_message(
-    CampaignSystemContext& context,
+    RuntimeInvocation& invocation,
     const GameMessage& message);
 
 template <>
@@ -192,8 +191,7 @@ Gs1Status LoadoutPlannerSystem::process_game_message(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    CampaignSystemContext context {*campaign};
-    return process_loadout_planner_message(context, message);
+    return process_loadout_planner_message(invocation, message);
 }
 
 Gs1Status LoadoutPlannerSystem::process_host_message(
@@ -211,12 +209,19 @@ void LoadoutPlannerSystem::run(RuntimeInvocation& invocation)
 }
 
 Gs1Status process_loadout_planner_message(
-    CampaignSystemContext& context,
+    RuntimeInvocation& invocation,
     const GameMessage& message)
 {
     if (!LoadoutPlannerSystem::subscribes_to(message.type))
     {
         return GS1_STATUS_OK;
+    }
+
+    auto access = make_game_state_access<LoadoutPlannerSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    if (!campaign.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
     }
 
     std::uint32_t selected_site_id = 0U;
@@ -240,14 +245,14 @@ Gs1Status process_loadout_planner_message(
 
     if (selected_site_id == 0U)
     {
-        context.campaign.loadout_planner_state.selected_target_site_id.reset();
+        campaign->loadout_planner_state.selected_target_site_id.reset();
     }
     else
     {
-        context.campaign.loadout_planner_state.selected_target_site_id = SiteId {selected_site_id};
+        campaign->loadout_planner_state.selected_target_site_id = SiteId {selected_site_id};
     }
 
-    rebuild_selected_loadout(context.campaign);
+    rebuild_selected_loadout(*campaign);
     return GS1_STATUS_OK;
 }
 }  // namespace gs1

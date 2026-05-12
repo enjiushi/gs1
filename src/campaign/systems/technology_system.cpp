@@ -1,6 +1,5 @@
 #include "campaign/systems/technology_system.h"
 
-#include "campaign/systems/campaign_system_context.h"
 #include "runtime/game_runtime.h"
 #include "support/currency.h"
 
@@ -128,7 +127,7 @@ const FactionProgressState* find_faction_progress(
 }  // namespace
 
 Gs1Status process_technology_message(
-    CampaignSystemContext& context,
+    RuntimeInvocation& invocation,
     const GameMessage& message);
 
 template <>
@@ -181,8 +180,7 @@ Gs1Status TechnologySystem::process_game_message(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    CampaignSystemContext context {*campaign};
-    return process_technology_message(context, message);
+    return process_technology_message(invocation, message);
 }
 
 Gs1Status TechnologySystem::process_host_message(
@@ -432,20 +430,27 @@ bool TechnologySystem::node_claimable(
 }
 
 Gs1Status process_technology_message(
-    CampaignSystemContext& context,
+    RuntimeInvocation& invocation,
     const GameMessage& message)
 {
     switch (message.type)
     {
     case GameMessageType::CampaignReputationAwardRequested:
     {
+        auto access = make_game_state_access<TechnologySystem>(invocation);
+        auto& campaign = access.template read<RuntimeCampaignTag>();
+        if (!campaign.has_value())
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
         const auto& payload = message.payload_as<CampaignReputationAwardRequestedMessage>();
         if (payload.delta <= 0)
         {
             return GS1_STATUS_OK;
         }
 
-        context.campaign.technology_state.total_reputation += payload.delta;
+        campaign->technology_state.total_reputation += payload.delta;
         return GS1_STATUS_OK;
     }
 

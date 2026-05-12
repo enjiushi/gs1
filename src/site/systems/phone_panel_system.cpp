@@ -24,19 +24,36 @@ struct system_state_tags<PhonePanelSystem>
 
 namespace
 {
-struct PhonePanelContext final
-{
-    SiteRunState& site_run;
-    SiteWorldAccess<PhonePanelSystem> world;
-};
-
 constexpr std::uint32_t k_sell_listing_id_base = 1000U;
 constexpr std::uint64_t k_phone_signature_offset = 14695981039346656037ULL;
 constexpr std::uint64_t k_phone_signature_prime = 1099511628211ULL;
 
-void mark_phone_dirty(PhonePanelContext& context) noexcept
+[[nodiscard]] auto phone_panel_access(RuntimeInvocation& invocation)
+    -> GameStateAccess<PhonePanelSystem>
 {
-    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PHONE);
+    return make_game_state_access<PhonePanelSystem>(invocation);
+}
+
+[[nodiscard]] SiteRunState& phone_panel_site_run(RuntimeInvocation& invocation)
+{
+    auto access = phone_panel_access(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    return *site_run;
+}
+
+[[nodiscard]] SiteWorldAccess<PhonePanelSystem> phone_panel_world(RuntimeInvocation& invocation)
+{
+    return SiteWorldAccess<PhonePanelSystem> {phone_panel_site_run(invocation)};
+}
+
+[[nodiscard]] GameMessageQueue& phone_panel_message_queue(RuntimeInvocation& invocation)
+{
+    return invocation.game_message_queue();
+}
+
+void mark_phone_dirty(RuntimeInvocation& invocation) noexcept
+{
+    phone_panel_world(invocation).mark_projection_dirty(SITE_PROJECTION_UPDATE_PHONE);
 }
 
 std::uint64_t mix_phone_signature(std::uint64_t signature, std::uint64_t value) noexcept
@@ -116,30 +133,30 @@ void clamp_cart_quantity(PhoneListingState& listing) noexcept
     }
 }
 
-std::vector<std::uint64_t> phone_item_instance_ids(PhonePanelContext& context)
+std::vector<std::uint64_t> phone_item_instance_ids(RuntimeInvocation& invocation)
 {
-    const auto& craft = context.world.read_craft();
-    const auto& inventory = context.world.read_inventory();
+    const auto& craft = phone_panel_world(invocation).read_craft();
+    const auto& inventory = phone_panel_world(invocation).read_inventory();
     if (craft.phone_cache.source_membership_revision == inventory.item_membership_revision)
     {
         return craft.phone_cache.item_instance_ids;
     }
 
     return inventory_storage::collect_item_instance_ids_in_containers(
-        context.site_run,
-        inventory_storage::collect_all_storage_containers(context.site_run, true));
+        phone_panel_site_run(invocation),
+        inventory_storage::collect_all_storage_containers(phone_panel_site_run(invocation), true));
 }
 
 std::uint32_t available_global_item_quantity(
-    PhonePanelContext& context,
+    RuntimeInvocation& invocation,
     ItemId item_id)
 {
     const auto available_quantity = craft_logic::available_cached_item_quantity(
-        context.site_run,
-        phone_item_instance_ids(context),
+        phone_panel_site_run(invocation),
+        phone_item_instance_ids(invocation),
         item_id);
     std::uint32_t reserved_quantity = 0U;
-    for (const auto& reserved_stack : context.world.read_action().reserved_input_item_stacks)
+    for (const auto& reserved_stack : phone_panel_world(invocation).read_action().reserved_input_item_stacks)
     {
         if (reserved_stack.item_id == item_id)
         {
@@ -241,11 +258,11 @@ PhoneListingState make_sell_listing(ItemId item_id, std::uint32_t quantity) noex
 }
 
 void build_projected_listings(
-    PhonePanelContext& context,
+    RuntimeInvocation& invocation,
     std::vector<PhoneListingState>& out_listings)
 {
     out_listings.clear();
-    const auto& economy = context.world.read_economy();
+    const auto& economy = phone_panel_world(invocation).read_economy();
     out_listings.reserve(economy.available_phone_listings.size());
 
     for (const auto& listing : economy.available_phone_listings)
@@ -269,7 +286,7 @@ void build_projected_listings(
             continue;
         }
 
-        const auto available_quantity = available_global_item_quantity(context, item_def.item_id);
+        const auto available_quantity = available_global_item_quantity(invocation, item_def.item_id);
         if (available_quantity == 0U)
         {
             continue;
@@ -348,20 +365,20 @@ void count_projected_listings(
 }
 
 void sync_phone_panel_projection(
-    PhonePanelContext& context,
+    RuntimeInvocation& invocation,
     bool force_dirty = false)
 {
-    auto& phone_panel = context.world.own_phone_panel();
+    auto& phone_panel = phone_panel_world(invocation).own_phone_panel();
 
     std::vector<PhoneListingState> projected_listings {};
-    build_projected_listings(context, projected_listings);
+    build_projected_listings(invocation, projected_listings);
 
     std::uint32_t visible_task_count = 0U;
     std::uint32_t accepted_task_count = 0U;
     std::uint32_t completed_task_count = 0U;
     std::uint32_t claimed_task_count = 0U;
     count_projected_tasks(
-        context.world.read_task_board(),
+        phone_panel_world(invocation).read_task_board(),
         visible_task_count,
         accepted_task_count,
         completed_task_count,
@@ -378,7 +395,7 @@ void sync_phone_panel_projection(
         service_listing_count,
         cart_item_count);
 
-    const auto next_task_signature = task_snapshot_signature(context.world.read_task_board());
+    const auto next_task_signature = task_snapshot_signature(phone_panel_world(invocation).read_task_board());
     const auto next_buy_signature =
         listing_snapshot_signature(projected_listings, PhoneListingKind::BuyItem);
     const auto next_sell_signature =
@@ -447,7 +464,7 @@ void sync_phone_panel_projection(
 
     if (changed || force_dirty)
     {
-        mark_phone_dirty(context);
+        mark_phone_dirty(invocation);
     }
 }
 }  // namespace
@@ -508,22 +525,18 @@ Gs1Status PhonePanelSystem::process_game_message(
     {
         return GS1_STATUS_INVALID_STATE;
     }
-
-    PhonePanelContext context {
-        *site_run,
-        SiteWorldAccess<PhonePanelSystem> {*site_run}};
     switch (message.type)
     {
     case GameMessageType::SiteRunStarted:
-        context.world.own_phone_panel() = PhonePanelState {};
-        sync_phone_panel_projection(context, true);
+        phone_panel_world(invocation).own_phone_panel() = PhonePanelState {};
+        sync_phone_panel_projection(invocation, true);
         return GS1_STATUS_OK;
 
     case GameMessageType::PhonePanelSectionRequested:
     {
         const auto requested_section =
             message.payload_as<PhonePanelSectionRequestedMessage>().section;
-        auto& phone_panel = context.world.own_phone_panel();
+        auto& phone_panel = phone_panel_world(invocation).own_phone_panel();
         PhonePanelSection section = PhonePanelSection::Home;
         if (!try_map_phone_panel_section(requested_section, section))
         {
@@ -551,14 +564,14 @@ Gs1Status PhonePanelSystem::process_game_message(
         }
         if (dirty)
         {
-            mark_phone_dirty(context);
+            mark_phone_dirty(invocation);
         }
         return GS1_STATUS_OK;
     }
 
     case GameMessageType::ClosePhonePanel:
     {
-        auto& phone_panel = context.world.own_phone_panel();
+        auto& phone_panel = phone_panel_world(invocation).own_phone_panel();
         bool dirty = false;
         const auto updated_badge_flags =
             phone_panel.badge_flags & ~GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE;
@@ -574,7 +587,7 @@ Gs1Status PhonePanelSystem::process_game_message(
         }
         if (dirty)
         {
-            mark_phone_dirty(context);
+            mark_phone_dirty(invocation);
         }
         return GS1_STATUS_OK;
     }
@@ -588,21 +601,16 @@ Gs1Status PhonePanelSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
+    auto access = make_game_state_access<PhonePanelSystem>(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
     if (message.type != GS1_HOST_EVENT_UI_ACTION)
     {
         return GS1_STATUS_OK;
     }
-
-    auto access = make_game_state_access<PhonePanelSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
     if (!site_run.has_value())
     {
         return GS1_STATUS_INVALID_STATE;
     }
-
-    PhonePanelContext context {
-        *site_run,
-        SiteWorldAccess<PhonePanelSystem> {*site_run}};
     const auto& action = message.payload.ui_action.action;
     switch (action.type)
     {
@@ -619,7 +627,7 @@ Gs1Status PhonePanelSystem::process_host_message(
             return GS1_STATUS_INVALID_ARGUMENT;
         }
 
-        auto& phone_panel = context.world.own_phone_panel();
+        auto& phone_panel = phone_panel_world(invocation).own_phone_panel();
         bool dirty = false;
         const auto updated_badge_flags =
             (phone_panel.badge_flags & ~GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) &
@@ -641,14 +649,14 @@ Gs1Status PhonePanelSystem::process_host_message(
         }
         if (dirty)
         {
-            mark_phone_dirty(context);
+            mark_phone_dirty(invocation);
         }
         return GS1_STATUS_OK;
     }
 
     case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
     {
-        auto& phone_panel = context.world.own_phone_panel();
+        auto& phone_panel = phone_panel_world(invocation).own_phone_panel();
         bool dirty = false;
         const auto updated_badge_flags =
             phone_panel.badge_flags & ~GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE;
@@ -664,7 +672,7 @@ Gs1Status PhonePanelSystem::process_host_message(
         }
         if (dirty)
         {
-            mark_phone_dirty(context);
+            mark_phone_dirty(invocation);
         }
         return GS1_STATUS_OK;
     }
@@ -682,11 +690,8 @@ void PhonePanelSystem::run(RuntimeInvocation& invocation)
     {
         return;
     }
-
-    PhonePanelContext context {
-        *site_run,
-        SiteWorldAccess<PhonePanelSystem> {*site_run}};
-    sync_phone_panel_projection(context);
+    sync_phone_panel_projection(invocation);
 }
 }  // namespace gs1
+
 

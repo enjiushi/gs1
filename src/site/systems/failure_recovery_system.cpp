@@ -7,13 +7,6 @@ namespace gs1
 {
 namespace
 {
-struct FailureRecoveryContext final
-{
-    SiteRunState& site_run;
-    SiteWorldAccess<FailureRecoverySystem> world;
-    GameMessageQueue& message_queue;
-};
-
 bool has_pending_site_transition_message(
     const GameMessageQueue& message_queue,
     std::uint32_t site_id)
@@ -83,21 +76,19 @@ void FailureRecoverySystem::run(RuntimeInvocation& invocation)
         return;
     }
 
-    FailureRecoveryContext context {
-        *site_run,
-        SiteWorldAccess<FailureRecoverySystem> {*site_run},
-        invocation.game_message_queue()};
-    if (!context.world.has_world())
+    SiteWorldAccess<FailureRecoverySystem> world {*site_run};
+    auto& message_queue = invocation.game_message_queue();
+    if (!world.has_world())
     {
         return;
     }
 
-    const auto worker = context.world.read_worker();
+    const auto worker = world.read_worker();
     const float worker_health = worker.conditions.health;
-    const auto& site_run_state = context.site_run;
+    const auto& site_run_state = *site_run;
     if (site_run_state.run_status != SiteRunStatus::Active ||
         worker_health > 0.0f ||
-        has_pending_site_transition_message(context.message_queue, site_run_state.site_id.value))
+        has_pending_site_transition_message(message_queue, site_run_state.site_id.value))
     {
         return;
     }
@@ -105,9 +96,9 @@ void FailureRecoverySystem::run(RuntimeInvocation& invocation)
     GameMessage message {};
     message.type = GameMessageType::SiteAttemptEnded;
     message.set_payload(SiteAttemptEndedMessage {
-        context.world.site_id_value(),
+        world.site_id_value(),
         GS1_SITE_ATTEMPT_RESULT_FAILED});
-    context.message_queue.push_back(message);
+    message_queue.push_back(message);
 }
 }  // namespace gs1
 

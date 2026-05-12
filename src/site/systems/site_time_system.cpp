@@ -12,14 +12,6 @@ namespace gs1
 {
 namespace
 {
-struct SiteTimeContext final
-{
-    SiteRunState& site_run;
-    SiteWorldAccess<SiteTimeSystem> world;
-    GameMessageQueue& message_queue;
-    double fixed_step_seconds {0.0};
-};
-
 DayPhase resolve_day_phase(double world_time_minutes)
 {
     const double minute_in_day = std::fmod(world_time_minutes, k_runtime_minutes_per_day);
@@ -92,14 +84,12 @@ void SiteTimeSystem::run(RuntimeInvocation& invocation)
         return;
     }
 
-    SiteTimeContext context {
-        *site_run,
-        SiteWorldAccess<SiteTimeSystem> {*site_run},
-        invocation.game_message_queue(),
-        access.template read<RuntimeFixedStepSecondsTag>()};
-    auto& clock = context.world.own_time();
+    SiteWorldAccess<SiteTimeSystem> world {*site_run};
+    auto& message_queue = invocation.game_message_queue();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    auto& clock = world.own_time();
     const double step_minutes =
-        runtime_minutes_from_real_seconds(context.fixed_step_seconds);
+        runtime_minutes_from_real_seconds(fixed_step_seconds);
     clock.world_time_minutes += step_minutes;
     clock.day_index =
         static_cast<std::uint32_t>(clock.world_time_minutes / k_runtime_minutes_per_day);
@@ -121,7 +111,7 @@ void SiteTimeSystem::run(RuntimeInvocation& invocation)
         refresh_message.type = GameMessageType::SiteRefreshTick;
         refresh_message.set_payload(SiteRefreshTickMessage {
             SITE_REFRESH_TICK_TASK_BOARD | SITE_REFRESH_TICK_PHONE_BUY_STOCK});
-        context.message_queue.push_back(refresh_message);
+        message_queue.push_back(refresh_message);
     }
 }
 }  // namespace gs1

@@ -16,15 +16,6 @@ namespace gs1
 {
 namespace
 {
-struct WorkerConditionContext final
-{
-    const CampaignState& campaign;
-    SiteRunState& site_run;
-    SiteWorldAccess<WorkerConditionSystem> world;
-    GameMessageQueue& message_queue;
-    double fixed_step_seconds {0.0};
-};
-
 struct WorkerMeterSnapshot final
 {
     float health {0.0f};
@@ -280,27 +271,30 @@ std::uint32_t compute_change_mask(
     return mask;
 }
 
-void ensure_memory_for_run(WorkerConditionContext& context) noexcept
+void ensure_memory_for_run(
+    const SiteWorldAccess<WorkerConditionSystem>& world) noexcept
 {
     auto& memory = g_worker_memory;
     if (!memory.site_run_id.has_value() ||
-        memory.site_run_id->value != context.world.site_run_id().value)
+        memory.site_run_id->value != world.site_run_id().value)
     {
-        memory.site_run_id = context.world.site_run_id();
+        memory.site_run_id = world.site_run_id();
         memory.last_reported_snapshot.reset();
     }
 }
 
-void emit_worker_meters_changed_if_needed(WorkerConditionContext& context) noexcept
+void emit_worker_meters_changed_if_needed(
+    SiteWorldAccess<WorkerConditionSystem>& world,
+    GameMessageQueue& message_queue) noexcept
 {
-    ensure_memory_for_run(context);
-    if (!context.world.has_world())
+    ensure_memory_for_run(world);
+    if (!world.has_world())
     {
         return;
     }
 
     auto& memory = g_worker_memory;
-    const auto snapshot = make_snapshot(context.world.read_worker().conditions);
+    const auto snapshot = make_snapshot(world.read_worker().conditions);
     const auto previous_snapshot = memory.last_reported_snapshot.value_or(snapshot);
     const auto mask = compute_change_mask(previous_snapshot, snapshot);
     const auto is_initial = !memory.last_reported_snapshot.has_value();
@@ -319,8 +313,8 @@ void emit_worker_meters_changed_if_needed(WorkerConditionContext& context) noexc
             snapshot.energy,
             snapshot.morale,
             snapshot.work_efficiency});
-        context.message_queue.push_back(message);
-        context.world.mark_projection_dirty(
+        message_queue.push_back(message);
+        world.mark_projection_dirty(
             SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
         memory.last_reported_snapshot = snapshot;
     }
@@ -679,15 +673,11 @@ Gs1Status WorkerConditionSystem::process_game_message(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    WorkerConditionContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<WorkerConditionSystem> {*site_run},
-        invocation.game_message_queue(),
-        access.template read<RuntimeFixedStepSecondsTag>()};
+    SiteWorldAccess<WorkerConditionSystem> world {*site_run};
+    auto& message_queue = invocation.game_message_queue();
     if (message.type == GameMessageType::SiteRunStarted)
     {
-        emit_worker_meters_changed_if_needed(context);
+        emit_worker_meters_changed_if_needed(world, message_queue);
         return GS1_STATUS_OK;
     }
 
@@ -697,12 +687,12 @@ Gs1Status WorkerConditionSystem::process_game_message(
         return GS1_STATUS_OK;
     }
 
-    if (!context.world.has_world())
+    if (!world.has_world())
     {
         return GS1_STATUS_OK;
     }
 
-    auto worker = context.world.read_worker();
+    auto worker = world.read_worker();
     const auto previous = worker.conditions;
     const auto deltas =
         message.type == GameMessageType::WorkerMeterDeltaRequested
@@ -712,14 +702,14 @@ Gs1Status WorkerConditionSystem::process_game_message(
     worker.conditions = resolve_worker_conditions(
         previous,
         deltas,
-        context.world.read_modifier().resolved_channel_totals,
+        world.read_modifier().resolved_channel_totals,
         0.0f,
         0.0f);
     const bool modified = worker_conditions_changed(previous, worker.conditions);
     if (modified)
     {
-        context.world.write_worker(worker);
-        emit_worker_meters_changed_if_needed(context);
+        world.write_worker(worker);
+        emit_worker_meters_changed_if_needed(world, message_queue);
     }
     return GS1_STATUS_OK;
 }
@@ -743,44 +733,41 @@ void WorkerConditionSystem::run(RuntimeInvocation& invocation)
         return;
     }
 
-    WorkerConditionContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<WorkerConditionSystem> {*site_run},
-        invocation.game_message_queue(),
-        access.template read<RuntimeFixedStepSecondsTag>()};
-    if (!context.world.has_world())
+    SiteWorldAccess<WorkerConditionSystem> world {*site_run};
+    auto& message_queue = invocation.game_message_queue();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    if (!world.has_world())
     {
         return;
     }
 
-    auto worker = context.world.read_worker();
+    auto worker = world.read_worker();
     const auto previous = worker.conditions;
     WorkerMeterDeltas deltas {};
     const float step_real_seconds =
-        static_cast<float>(std::max(0.0, context.fixed_step_seconds));
+        static_cast<float>(std::max(0.0, fixed_step_seconds));
     accumulate_passive_deltas(
         deltas,
         previous,
-        context.world.read_tile_local_weather(worker.position.tile_coord),
-        context.world.read_modifier(),
-        static_cast<float>(runtime_minutes_from_real_seconds(context.fixed_step_seconds)),
+        world.read_tile_local_weather(worker.position.tile_coord),
+        world.read_modifier(),
+        static_cast<float>(runtime_minutes_from_real_seconds(fixed_step_seconds)),
         step_real_seconds);
     const float passive_energy_step_real_seconds =
-        action_is_executing(context.world.read_action()) ? 0.0f : step_real_seconds;
+        action_is_executing(world.read_action()) ? 0.0f : step_real_seconds;
     const float passive_energy_bonus =
-        special_energy_recovery_bonus(context.world.read_modifier());
+        special_energy_recovery_bonus(world.read_modifier());
     worker.conditions = resolve_worker_conditions(
         previous,
         deltas,
-        context.world.read_modifier().resolved_channel_totals,
+        world.read_modifier().resolved_channel_totals,
         passive_energy_step_real_seconds,
         passive_energy_bonus);
     const bool modified = worker_conditions_changed(previous, worker.conditions);
     if (modified)
     {
-        context.world.write_worker(worker);
-        emit_worker_meters_changed_if_needed(context);
+        world.write_worker(worker);
+        emit_worker_meters_changed_if_needed(world, message_queue);
     }
 }
 }  // namespace gs1

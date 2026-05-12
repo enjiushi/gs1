@@ -17,12 +17,6 @@
 
 namespace
 {
-struct DeviceWeatherContributionContext final
-{
-    gs1::SiteRunState& site_run;
-    gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem> world;
-};
-
 [[nodiscard]] bool device_tile_is_support_anchor(
     gs1::TileCoord coord,
     gs1::StructureId structure_id) noexcept
@@ -91,11 +85,11 @@ void clear_dirty_tiles(gs1::DeviceWeatherContributionState& state) noexcept
 }
 
 void mark_tiles_affected_by_source(
-    DeviceWeatherContributionContext& context,
+    gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem>& world,
     gs1::DeviceWeatherContributionState& state,
     gs1::TileCoord source_coord)
 {
-    if (!context.world.tile_coord_in_bounds(source_coord))
+    if (!world.tile_coord_in_bounds(source_coord))
     {
         return;
     }
@@ -103,32 +97,33 @@ void mark_tiles_affected_by_source(
     for (const auto sample : gs1::k_weather_contribution_samples)
     {
         const gs1::TileCoord target_coord {source_coord.x + sample.dx, source_coord.y + sample.dy};
-        if (!context.world.tile_coord_in_bounds(target_coord))
+        if (!world.tile_coord_in_bounds(target_coord))
         {
             continue;
         }
 
-        mark_tile_dirty(state, context.world.tile_index(target_coord));
+        mark_tile_dirty(state, world.tile_index(target_coord));
     }
 }
 
 gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
-    DeviceWeatherContributionContext& context,
+    gs1::SiteRunState& site_run,
+    gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem>& world,
     const gs1::WeatherDirectionStep& wind_direction,
     gs1::TileCoord target_coord)
 {
-    auto& ecs_world = context.site_run.site_world->ecs_world();
+    auto& ecs_world = site_run.site_world->ecs_world();
     gs1::SiteWorld::TileWeatherContributionData total = gs1::zero_weather_contribution();
 
     for (const auto sample : gs1::k_weather_contribution_samples)
     {
         const gs1::TileCoord source_coord {target_coord.x - sample.dx, target_coord.y - sample.dy};
-        if (!context.world.tile_coord_in_bounds(source_coord))
+        if (!world.tile_coord_in_bounds(source_coord))
         {
             continue;
         }
 
-        const auto source_entity_id = context.site_run.site_world->device_entity_id(source_coord);
+        const auto source_entity_id = site_run.site_world->device_entity_id(source_coord);
         if (source_entity_id == 0U)
         {
             continue;
@@ -204,22 +199,23 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
 }
 
 void write_tile_contribution(
-    DeviceWeatherContributionContext& context,
+    gs1::SiteRunState& site_run,
+    gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem>& world,
     std::uint32_t tile_index,
     const gs1::SiteWorld::TileWeatherContributionData& contribution)
 {
-    if (tile_index >= context.world.tile_count())
+    if (tile_index >= world.tile_count())
     {
         return;
     }
 
-    const auto entity_id = context.site_run.site_world->tile_entity_id(context.world.tile_coord(tile_index));
+    const auto entity_id = site_run.site_world->tile_entity_id(world.tile_coord(tile_index));
     if (entity_id == 0U)
     {
         return;
     }
 
-    context.site_run.site_world->ecs_world().entity(entity_id).set<gs1::site_ecs::TileDeviceWeatherContribution>({
+    site_run.site_world->ecs_world().entity(entity_id).set<gs1::site_ecs::TileDeviceWeatherContribution>({
         contribution.heat_protection,
         contribution.wind_protection,
         contribution.dust_protection,
@@ -229,16 +225,24 @@ void write_tile_contribution(
 }
 
 Gs1Status process_message(
-    DeviceWeatherContributionContext& context,
+    gs1::RuntimeInvocation& invocation,
     const gs1::GameMessage& message)
 {
-    if (!context.world.has_world())
+    auto access = gs1::make_game_state_access<gs1::DeviceWeatherContributionSystem>(invocation);
+    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem> world {*site_run};
+    if (!world.has_world())
     {
         return GS1_STATUS_OK;
     }
 
-    auto& runtime = context.world.own_device_weather_runtime();
-    ensure_runtime_buffers(runtime, context.world.tile_count());
+    auto& runtime = world.own_device_weather_runtime();
+    ensure_runtime_buffers(runtime, world.tile_count());
 
     switch (message.type)
     {
@@ -250,7 +254,7 @@ Gs1Status process_message(
     {
         const auto& payload = message.payload_as<gs1::SiteDevicePlacedMessage>();
         mark_tiles_affected_by_source(
-            context,
+            world,
             runtime,
             gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
         return GS1_STATUS_OK;
@@ -260,7 +264,7 @@ Gs1Status process_message(
     {
         const auto& payload = message.payload_as<gs1::SiteDeviceBrokenMessage>();
         mark_tiles_affected_by_source(
-            context,
+            world,
             runtime,
             gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
         return GS1_STATUS_OK;
@@ -270,7 +274,7 @@ Gs1Status process_message(
     {
         const auto& payload = message.payload_as<gs1::SiteDeviceRepairedMessage>();
         mark_tiles_affected_by_source(
-            context,
+            world,
             runtime,
             gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
         return GS1_STATUS_OK;
@@ -280,7 +284,7 @@ Gs1Status process_message(
     {
         const auto& payload = message.payload_as<gs1::SiteDeviceConditionChangedMessage>();
         mark_tiles_affected_by_source(
-            context,
+            world,
             runtime,
             gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
         return GS1_STATUS_OK;
@@ -291,18 +295,26 @@ Gs1Status process_message(
     }
 }
 
-void run_context(DeviceWeatherContributionContext& context)
+void run_system(gs1::RuntimeInvocation& invocation)
 {
-    if (!context.world.has_world())
+    auto access = gs1::make_game_state_access<gs1::DeviceWeatherContributionSystem>(invocation);
+    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
     {
         return;
     }
 
-    auto& runtime = context.world.own_device_weather_runtime();
-    ensure_runtime_buffers(runtime, context.world.tile_count());
+    gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem> world {*site_run};
+    if (!world.has_world())
+    {
+        return;
+    }
+
+    auto& runtime = world.own_device_weather_runtime();
+    ensure_runtime_buffers(runtime, world.tile_count());
 
     const std::uint8_t wind_sector = gs1::quantize_wind_direction_sector(
-        context.world.read_weather().weather_wind_direction_degrees);
+        world.read_weather().weather_wind_direction_degrees);
     if (runtime.last_wind_direction_sector != wind_sector)
     {
         runtime.last_wind_direction_sector = wind_sector;
@@ -311,7 +323,7 @@ void run_context(DeviceWeatherContributionContext& context)
 
     if (runtime.full_rebuild_pending)
     {
-        mark_all_tiles_dirty(runtime, context.world.tile_count());
+        mark_all_tiles_dirty(runtime, world.tile_count());
     }
 
     if (runtime.dirty_tile_indices.empty())
@@ -320,14 +332,15 @@ void run_context(DeviceWeatherContributionContext& context)
     }
 
     const gs1::WeatherDirectionStep wind_direction =
-        gs1::resolve_wind_direction_step(context.world.read_weather().weather_wind_direction_degrees);
+        gs1::resolve_wind_direction_step(world.read_weather().weather_wind_direction_degrees);
     for (const std::uint32_t tile_index : runtime.dirty_tile_indices)
     {
-        const gs1::TileCoord target_coord = context.world.tile_coord(tile_index);
+        const gs1::TileCoord target_coord = world.tile_coord(tile_index);
         write_tile_contribution(
-            context,
+            *site_run,
+            world,
             tile_index,
-            recompute_tile_contribution(context, wind_direction, target_coord));
+            recompute_tile_contribution(*site_run, world, wind_direction, target_coord));
     }
 
     clear_dirty_tiles(runtime);
@@ -384,10 +397,7 @@ Gs1Status DeviceWeatherContributionSystem::process_game_message(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    DeviceWeatherContributionContext context {
-        *site_run,
-        SiteWorldAccess<DeviceWeatherContributionSystem> {*site_run}};
-    return process_message(context, message);
+    return process_message(invocation, message);
 }
 
 Gs1Status DeviceWeatherContributionSystem::process_host_message(
@@ -408,10 +418,7 @@ void DeviceWeatherContributionSystem::run(RuntimeInvocation& invocation)
         return;
     }
 
-    DeviceWeatherContributionContext context {
-        *site_run,
-        SiteWorldAccess<DeviceWeatherContributionSystem> {*site_run}};
-    run_context(context);
+    run_system(invocation);
 }
 }  // namespace gs1
 

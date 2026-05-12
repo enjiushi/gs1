@@ -22,14 +22,6 @@ namespace
 constexpr float k_integrity_epsilon = 0.0001f;
 constexpr float k_weather_meter_max = 100.0f;
 
-struct DeviceMaintenanceContext final
-{
-    gs1::SiteRunState& site_run;
-    gs1::SiteWorldAccess<gs1::DeviceMaintenanceSystem> world;
-    gs1::GameMessageQueue& message_queue;
-    double fixed_step_seconds {0.0};
-};
-
 struct BrokenDeviceEntry final
 {
     gs1::TileCoord coord {};
@@ -72,18 +64,22 @@ void emit_device_condition_changed_message(
 }
 
 Gs1Status process_message(
-    DeviceMaintenanceContext& context,
+    gs1::RuntimeInvocation& invocation,
     const gs1::GameMessage& message)
 {
+    auto access = gs1::make_game_state_access<gs1::DeviceMaintenanceSystem>(invocation);
+    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
+    gs1::SiteWorldAccess<gs1::DeviceMaintenanceSystem> world {*site_run};
+    auto& message_queue = invocation.game_message_queue();
     if (message.type == gs1::GameMessageType::SiteRunStarted)
     {
-        if (!context.world.has_world() || context.site_run.site_world == nullptr)
+        if (!world.has_world() || site_run->site_world == nullptr)
         {
             return GS1_STATUS_OK;
         }
 
         auto source_query =
-            context.site_run.site_world->ecs_world()
+            site_run->site_world->ecs_world()
                 .query_builder<
                     const gs1::site_ecs::TileCoordComponent,
                     const gs1::site_ecs::DeviceStructureId,
@@ -102,7 +98,7 @@ Gs1Status process_message(
                 }
 
                 emit_device_condition_changed_message(
-                    context.message_queue,
+                    message_queue,
                     coord_component.value,
                     structure_component.structure_id,
                     integrity_component.value);
@@ -114,12 +110,12 @@ Gs1Status process_message(
     {
         const auto& payload = message.payload_as<gs1::SiteDeviceRepairedMessage>();
         const gs1::TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
-        if (!context.world.tile_coord_in_bounds(target_tile) || context.site_run.site_world == nullptr)
+        if (!world.tile_coord_in_bounds(target_tile) || site_run->site_world == nullptr)
         {
             return GS1_STATUS_INVALID_ARGUMENT;
         }
 
-        const auto anchor_device = context.site_run.site_world->tile_device(target_tile);
+        const auto anchor_device = site_run->site_world->tile_device(target_tile);
         if (anchor_device.structure_id.value == 0U)
         {
             return GS1_STATUS_OK;
@@ -129,21 +125,21 @@ Gs1Status process_message(
             target_tile,
             gs1::resolve_structure_tile_footprint(anchor_device.structure_id),
             [&](gs1::TileCoord footprint_coord) {
-                if (!context.world.tile_coord_in_bounds(footprint_coord))
+                if (!world.tile_coord_in_bounds(footprint_coord))
                 {
                     return;
                 }
 
-                auto device = context.site_run.site_world->tile_device(footprint_coord);
+                auto device = site_run->site_world->tile_device(footprint_coord);
                 if (device.structure_id != anchor_device.structure_id)
                 {
                     return;
                 }
 
                 device.device_integrity = 1.0f;
-                context.site_run.site_world->set_tile_device(footprint_coord, device);
+                site_run->site_world->set_tile_device(footprint_coord, device);
                 emit_device_condition_changed_message(
-                    context.message_queue,
+                    message_queue,
                     footprint_coord,
                     device.structure_id,
                     device.device_integrity);
@@ -158,7 +154,7 @@ Gs1Status process_message(
 
     const auto& payload = message.payload_as<gs1::SiteDevicePlacedMessage>();
     const gs1::TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
-    if (!context.world.tile_coord_in_bounds(target_tile) || context.site_run.site_world == nullptr)
+    if (!world.tile_coord_in_bounds(target_tile) || site_run->site_world == nullptr)
     {
             return GS1_STATUS_INVALID_ARGUMENT;
     }
@@ -167,12 +163,12 @@ Gs1Status process_message(
         target_tile,
         gs1::resolve_structure_tile_footprint(gs1::StructureId {payload.structure_id}),
         [&](gs1::TileCoord footprint_coord) {
-            if (!context.world.tile_coord_in_bounds(footprint_coord))
+            if (!world.tile_coord_in_bounds(footprint_coord))
             {
                 return;
             }
 
-            context.site_run.site_world->set_tile_device(
+            site_run->site_world->set_tile_device(
                 footprint_coord,
                 gs1::SiteWorld::TileDeviceData {
                     gs1::StructureId {payload.structure_id},
@@ -180,9 +176,9 @@ Gs1Status process_message(
                     1.0f,
                     0.0f,
                     false});
-            context.world.mark_tile_projection_dirty(footprint_coord);
+            world.mark_tile_projection_dirty(footprint_coord);
             emit_device_condition_changed_message(
-                context.message_queue,
+                message_queue,
                 footprint_coord,
                 gs1::StructureId {payload.structure_id},
                 1.0f);
@@ -190,30 +186,35 @@ Gs1Status process_message(
     return GS1_STATUS_OK;
 }
 
-void run_context(DeviceMaintenanceContext& context)
+void run_system(gs1::RuntimeInvocation& invocation)
 {
-    if (!context.world.has_world())
+    auto access = gs1::make_game_state_access<gs1::DeviceMaintenanceSystem>(invocation);
+    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
+    gs1::SiteWorldAccess<gs1::DeviceMaintenanceSystem> world {*site_run};
+    auto& message_queue = invocation.game_message_queue();
+    if (!world.has_world())
     {
         return;
     }
 
-    const float step_seconds = static_cast<float>(context.fixed_step_seconds);
+    const float step_seconds = static_cast<float>(
+        access.template read<gs1::RuntimeFixedStepSecondsTag>());
     if (step_seconds <= 0.0f)
     {
         return;
     }
 
     const float max_weather_meter = std::max({
-        std::fabs(context.world.read_weather().weather_heat),
-        std::fabs(context.world.read_weather().weather_wind),
-        std::fabs(context.world.read_weather().weather_dust)});
+        std::fabs(world.read_weather().weather_heat),
+        std::fabs(world.read_weather().weather_wind),
+        std::fabs(world.read_weather().weather_dust)});
     const float weather_factor = std::clamp(max_weather_meter / k_weather_meter_max, 0.0f, 1.0f);
-    if (context.site_run.site_world == nullptr)
+    if (site_run->site_world == nullptr)
     {
         return;
     }
 
-    auto& ecs_world = context.site_run.site_world->ecs_world();
+    auto& ecs_world = site_run->site_world->ecs_world();
     auto device_query =
         ecs_world.query_builder<
             const gs1::site_ecs::TileCoordComponent,
@@ -271,7 +272,7 @@ void run_context(DeviceMaintenanceContext& context)
 
             entity.set<gs1::site_ecs::DeviceIntegrity>({next_integrity});
             emit_device_condition_changed_message(
-                context.message_queue,
+                message_queue,
                 coord,
                 structure_id,
                 next_integrity);
@@ -279,19 +280,19 @@ void run_context(DeviceMaintenanceContext& context)
 
     for (const BrokenDeviceEntry& broken : broken_devices)
     {
-        context.site_run.site_world->set_tile_device(
+        site_run->site_world->set_tile_device(
             broken.coord,
             gs1::SiteWorld::TileDeviceData {});
-        context.world.mark_tile_projection_dirty(broken.coord);
+        world.mark_tile_projection_dirty(broken.coord);
         emit_device_condition_changed_message(
-            context.message_queue,
+            message_queue,
             broken.coord,
             gs1::StructureId {},
             0.0f);
         if (broken.device_entity_id != 0U)
         {
             emit_device_broken_message(
-                context.message_queue,
+                message_queue,
                 broken.device_entity_id,
                 broken.coord,
                 broken.structure_id);
@@ -344,18 +345,12 @@ Gs1Status DeviceMaintenanceSystem::process_game_message(
 {
     auto access = make_game_state_access<DeviceMaintenanceSystem>(invocation);
     auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
     if (!site_run.has_value())
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
-    DeviceMaintenanceContext context {
-        *site_run,
-        SiteWorldAccess<DeviceMaintenanceSystem> {*site_run},
-        invocation.game_message_queue(),
-        fixed_step_seconds};
-    return process_message(context, message);
+    return process_message(invocation, message);
 }
 
 Gs1Status DeviceMaintenanceSystem::process_host_message(
@@ -371,18 +366,12 @@ void DeviceMaintenanceSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<DeviceMaintenanceSystem>(invocation);
     auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
     if (!site_run.has_value())
     {
         return;
     }
 
-    DeviceMaintenanceContext context {
-        *site_run,
-        SiteWorldAccess<DeviceMaintenanceSystem> {*site_run},
-        invocation.game_message_queue(),
-        fixed_step_seconds};
-    run_context(context);
+    run_system(invocation);
 }
 }  // namespace gs1
 

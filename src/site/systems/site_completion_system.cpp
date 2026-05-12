@@ -13,12 +13,6 @@ namespace gs1
 {
 namespace
 {
-struct SiteCompletionContext final
-{
-    SiteWorldAccess<SiteCompletionSystem> world;
-    GameMessageQueue& message_queue;
-};
-
 constexpr float k_objective_progress_epsilon = 0.0001f;
 
 bool has_pending_site_transition_message(
@@ -54,11 +48,11 @@ bool tile_has_objective_occupant(const SiteWorld::TileData& tile) noexcept
 }
 
 void update_objective_progress(
-    SiteCompletionContext& context,
+    SiteWorldAccess<SiteCompletionSystem>& world,
     float normalized_progress) noexcept
 {
     const float clamped_progress = std::clamp(normalized_progress, 0.0f, 1.0f);
-    auto& counters = context.world.own_counters();
+    auto& counters = world.own_counters();
     if (std::fabs(counters.objective_progress_normalized - clamped_progress) <=
         k_objective_progress_epsilon)
     {
@@ -66,14 +60,14 @@ void update_objective_progress(
     }
 
     counters.objective_progress_normalized = clamped_progress;
-    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
+    world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
 }
 
 float average_target_sand_level(
-    SiteCompletionContext& context,
+    const SiteWorldAccess<SiteCompletionSystem>& world,
     bool use_highway_cover) noexcept
 {
-    const auto& objective = context.world.read_objective();
+    const auto& objective = world.read_objective();
     if (objective.target_tile_indices.empty())
     {
         return 0.0f;
@@ -81,7 +75,7 @@ float average_target_sand_level(
 
     float total = 0.0f;
     std::uint32_t count = 0U;
-    const auto tile_count = context.world.tile_count();
+    const auto tile_count = world.tile_count();
     for (const auto tile_index : objective.target_tile_indices)
     {
         if (tile_index >= tile_count)
@@ -89,7 +83,7 @@ float average_target_sand_level(
             continue;
         }
 
-        const auto tile = context.world.read_tile_at_index(tile_index);
+        const auto tile = world.read_tile_at_index(tile_index);
         total += use_highway_cover ? tile.ecology.soil_fertility : tile.ecology.sand_burial;
         ++count;
     }
@@ -97,10 +91,10 @@ float average_target_sand_level(
     return count == 0U ? 0.0f : (total / static_cast<float>(count));
 }
 
-bool green_wall_regions_connected(SiteCompletionContext& context)
+bool green_wall_regions_connected(const SiteWorldAccess<SiteCompletionSystem>& world)
 {
-    const auto& objective = context.world.read_objective();
-    const auto tile_count = context.world.tile_count();
+    const auto& objective = world.read_objective();
+    const auto tile_count = world.tile_count();
     if (objective.connection_start_tile_indices.empty() ||
         objective.connection_goal_tile_indices.empty() ||
         objective.connection_start_tile_mask.size() != tile_count ||
@@ -117,7 +111,7 @@ bool green_wall_regions_connected(SiteCompletionContext& context)
     {
         if (tile_index >= tile_count ||
             visited[tile_index] != 0U ||
-            !tile_has_objective_occupant(context.world.read_tile_at_index(tile_index)))
+            !tile_has_objective_occupant(world.read_tile_at_index(tile_index)))
         {
             continue;
         }
@@ -134,7 +128,7 @@ bool green_wall_regions_connected(SiteCompletionContext& context)
             return true;
         }
 
-        const auto coord = context.world.tile_coord(tile_index);
+        const auto coord = world.tile_coord(tile_index);
         const TileCoord neighbors[] = {
             TileCoord {coord.x, coord.y - 1},
             TileCoord {coord.x + 1, coord.y},
@@ -144,14 +138,14 @@ bool green_wall_regions_connected(SiteCompletionContext& context)
 
         for (const auto neighbor : neighbors)
         {
-            if (!context.world.tile_coord_in_bounds(neighbor))
+            if (!world.tile_coord_in_bounds(neighbor))
             {
                 continue;
             }
 
-            const auto neighbor_index = static_cast<std::uint32_t>(context.world.tile_index(neighbor));
+            const auto neighbor_index = static_cast<std::uint32_t>(world.tile_index(neighbor));
             if (visited[neighbor_index] != 0U ||
-                !tile_has_objective_occupant(context.world.read_tile(neighbor)))
+                !tile_has_objective_occupant(world.read_tile(neighbor)))
             {
                 continue;
             }
@@ -181,22 +175,23 @@ float normalized_cash_target_progress(
 }
 
 void run_green_wall_connection(
-    SiteCompletionContext& context,
+    SiteWorldAccess<SiteCompletionSystem>& world,
+    GameMessageQueue& message_queue,
     const SiteClockState& clock)
 {
-    auto& objective = context.world.own_objective();
+    auto& objective = world.own_objective();
     const double delta_minutes = std::max(
         0.0,
         clock.world_time_minutes - objective.last_evaluated_world_time_minutes);
     objective.last_evaluated_world_time_minutes = clock.world_time_minutes;
 
-    const bool connected = green_wall_regions_connected(context);
-    const float average_sand_level = average_target_sand_level(context, false);
+    const bool connected = green_wall_regions_connected(world);
+    const float average_sand_level = average_target_sand_level(world, false);
     if (!connected)
     {
         objective.completion_hold_progress_minutes = 0.0;
         objective.has_hold_baseline = false;
-        update_objective_progress(context, 0.0f);
+        update_objective_progress(world, 0.0f);
     }
     else
     {
@@ -228,15 +223,15 @@ void run_green_wall_connection(
                       objective.completion_hold_progress_minutes / objective.completion_hold_minutes,
                       0.0,
                       1.0));
-        update_objective_progress(context, 0.5f + hold_progress * 0.5f);
+        update_objective_progress(world, 0.5f + hold_progress * 0.5f);
 
         if (objective.completion_hold_minutes <= 0.0 ||
             objective.completion_hold_progress_minutes + k_objective_progress_epsilon >=
                 objective.completion_hold_minutes)
         {
             enqueue_site_attempt_result(
-                context.message_queue,
-                context.world.site_id_value(),
+                message_queue,
+                world.site_id_value(),
                 GS1_SITE_ATTEMPT_RESULT_COMPLETED);
             return;
         }
@@ -255,8 +250,8 @@ void run_green_wall_connection(
     }
 
     enqueue_site_attempt_result(
-        context.message_queue,
-        context.world.site_id_value(),
+        message_queue,
+        world.site_id_value(),
         GS1_SITE_ATTEMPT_RESULT_FAILED);
 }
 }  // namespace
@@ -313,16 +308,15 @@ void SiteCompletionSystem::run(RuntimeInvocation& invocation)
         return;
     }
 
-    SiteCompletionContext context {
-        SiteWorldAccess<SiteCompletionSystem> {*site_run},
-        invocation.game_message_queue()};
-    const auto& counters = context.world.read_counters();
-    const auto& objective = context.world.read_objective();
-    const auto& clock = context.world.read_time();
-    if (context.world.run_status() != SiteRunStatus::Active ||
+    SiteWorldAccess<SiteCompletionSystem> world {*site_run};
+    auto& message_queue = invocation.game_message_queue();
+    const auto& counters = world.read_counters();
+    const auto& objective = world.read_objective();
+    const auto& clock = world.read_time();
+    if (world.run_status() != SiteRunStatus::Active ||
         has_pending_site_transition_message(
-            context.message_queue,
-            context.world.site_id_value()))
+            message_queue,
+            world.site_id_value()))
     {
         return;
     }
@@ -337,8 +331,8 @@ void SiteCompletionSystem::run(RuntimeInvocation& invocation)
         }
 
         enqueue_site_attempt_result(
-            context.message_queue,
-            context.world.site_id_value(),
+            message_queue,
+            world.site_id_value(),
             GS1_SITE_ATTEMPT_RESULT_COMPLETED);
         return;
 
@@ -359,8 +353,8 @@ void SiteCompletionSystem::run(RuntimeInvocation& invocation)
         if (counters.highway_average_sand_cover >= cover_threshold)
         {
             enqueue_site_attempt_result(
-                context.message_queue,
-                context.world.site_id_value(),
+                message_queue,
+                world.site_id_value(),
                 GS1_SITE_ATTEMPT_RESULT_FAILED);
             return;
         }
@@ -371,14 +365,14 @@ void SiteCompletionSystem::run(RuntimeInvocation& invocation)
         }
 
         enqueue_site_attempt_result(
-            context.message_queue,
-            context.world.site_id_value(),
+            message_queue,
+            world.site_id_value(),
             GS1_SITE_ATTEMPT_RESULT_COMPLETED);
         return;
     }
 
     case SiteObjectiveType::GreenWallConnection:
-        run_green_wall_connection(context, clock);
+        run_green_wall_connection(world, message_queue, clock);
         return;
 
     case SiteObjectiveType::PureSurvival:
@@ -388,7 +382,7 @@ void SiteCompletionSystem::run(RuntimeInvocation& invocation)
         }
 
         update_objective_progress(
-            context,
+            world,
             static_cast<float>(std::clamp(
                 clock.world_time_minutes / objective.time_limit_minutes,
                 0.0,
@@ -399,16 +393,16 @@ void SiteCompletionSystem::run(RuntimeInvocation& invocation)
         }
 
         enqueue_site_attempt_result(
-            context.message_queue,
-            context.world.site_id_value(),
+            message_queue,
+            world.site_id_value(),
             GS1_SITE_ATTEMPT_RESULT_COMPLETED);
         return;
 
     case SiteObjectiveType::CashTargetSurvival:
     {
-        const auto& economy = context.world.read_economy();
+        const auto& economy = world.read_economy();
         update_objective_progress(
-            context,
+            world,
             normalized_cash_target_progress(objective, economy));
         if (objective.target_cash_points <= 0 ||
             economy.current_cash < objective.target_cash_points)
@@ -417,8 +411,8 @@ void SiteCompletionSystem::run(RuntimeInvocation& invocation)
         }
 
         enqueue_site_attempt_result(
-            context.message_queue,
-            context.world.site_id_value(),
+            message_queue,
+            world.site_id_value(),
             GS1_SITE_ATTEMPT_RESULT_COMPLETED);
         return;
     }

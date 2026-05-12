@@ -11,15 +11,6 @@ namespace gs1
 {
 namespace
 {
-struct SiteFlowContext final
-{
-    SiteRunState& site_run;
-    SiteWorldAccess<SiteFlowSystem> world;
-    GameMessageQueue& message_queue;
-    SiteMoveDirectionInput move_direction {};
-    double fixed_step_seconds {0.0};
-};
-
 constexpr float k_worker_move_speed_tiles_per_second = 3.5f;
 constexpr float k_radians_to_degrees = 57.2957795f;
 constexpr float k_worker_position_epsilon = 0.0001f;
@@ -129,29 +120,26 @@ void SiteFlowSystem::run(RuntimeInvocation& invocation)
         return;
     }
 
+    SiteWorldAccess<SiteFlowSystem> world {*site_run};
     const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
-    SiteFlowContext context {
-        *site_run,
-        SiteWorldAccess<SiteFlowSystem> {*site_run},
-        invocation.game_message_queue(),
-        SiteMoveDirectionInput {
-            move_direction.world_move_x,
-            move_direction.world_move_y,
-            move_direction.world_move_z,
-            move_direction.present},
-        access.template read<RuntimeFixedStepSecondsTag>()};
-    const std::uint32_t width = context.world.tile_width();
-    const std::uint32_t height = context.world.tile_height();
+    const SiteMoveDirectionInput move_direction_input {
+        move_direction.world_move_x,
+        move_direction.world_move_y,
+        move_direction.world_move_z,
+        move_direction.present};
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    const std::uint32_t width = world.tile_width();
+    const std::uint32_t height = world.tile_height();
     if (width == 0U || height == 0U)
     {
         return;
     }
 
-    auto worker = context.world.read_worker();
-    const auto& action_state = context.world.read_action();
-    const auto& inventory = context.world.read_inventory();
+    auto worker = world.read_worker();
+    const auto& action_state = world.read_action();
+    const auto& inventory = world.read_inventory();
     const float movement_step =
-        k_worker_move_speed_tiles_per_second * static_cast<float>(context.fixed_step_seconds);
+        k_worker_move_speed_tiles_per_second * static_cast<float>(fixed_step_seconds);
 
     std::optional<TileCoord> move_goal_tile {};
     if (action_waits_for_worker_approach(action_state))
@@ -170,8 +158,8 @@ void SiteFlowSystem::run(RuntimeInvocation& invocation)
             if (std::fabs(next_facing - worker.position.facing_degrees) > k_worker_position_epsilon)
             {
                 worker.position.facing_degrees = next_facing;
-                context.world.write_worker(worker);
-                context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
+                world.write_worker(worker);
+                world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
             }
         }
         return;
@@ -188,8 +176,8 @@ void SiteFlowSystem::run(RuntimeInvocation& invocation)
 
     if (move_goal_tile.has_value())
     {
-        if (!context.world.tile_coord_in_bounds(*move_goal_tile) ||
-            !context.world.read_tile(*move_goal_tile).static_data.traversable)
+        if (!world.tile_coord_in_bounds(*move_goal_tile) ||
+            !world.read_tile(*move_goal_tile).static_data.traversable)
         {
             return;
         }
@@ -216,13 +204,13 @@ void SiteFlowSystem::run(RuntimeInvocation& invocation)
     }
     else
     {
-        if (!context.move_direction.present)
+        if (!move_direction_input.present)
         {
             return;
         }
 
-        const float move_x = context.move_direction.world_move_x;
-        const float move_y = context.move_direction.world_move_y;
+        const float move_x = move_direction_input.world_move_x;
+        const float move_y = move_direction_input.world_move_y;
         const float move_length_squared = move_x * move_x + move_y * move_y;
         if (move_length_squared <= 0.0001f)
         {
@@ -243,8 +231,8 @@ void SiteFlowSystem::run(RuntimeInvocation& invocation)
     const TileCoord target_tile {
         static_cast<std::int32_t>(std::lround(target_x)),
         static_cast<std::int32_t>(std::lround(target_y))};
-    if (!context.world.tile_coord_in_bounds(target_tile) ||
-        !context.world.read_tile(target_tile).static_data.traversable)
+    if (!world.tile_coord_in_bounds(target_tile) ||
+        !world.read_tile(target_tile).static_data.traversable)
     {
         return;
     }
@@ -270,8 +258,8 @@ void SiteFlowSystem::run(RuntimeInvocation& invocation)
     {
         worker.position.facing_degrees = next_facing;
     }
-    context.world.write_worker(worker);
-    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
+    world.write_worker(worker);
+    world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
 }
 }  // namespace gs1
 

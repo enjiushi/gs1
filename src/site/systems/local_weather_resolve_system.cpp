@@ -22,13 +22,6 @@ constexpr std::uint32_t k_site_tile_state_changed_local_weather = 1U << 0U;
 constexpr std::uint32_t k_site_tile_state_changed_support = 1U << 1U;
 constexpr double k_site_one_probe_window_minutes = 0.25;
 
-struct LocalWeatherResolveContext final
-{
-    gs1::SiteRunState& site_run;
-    gs1::SiteWorldAccess<gs1::LocalWeatherResolveSystem> world;
-    gs1::GameMessageQueue& message_queue;
-};
-
 struct BaseLocalWeather final
 {
     float heat {0.0f};
@@ -43,15 +36,16 @@ bool is_site_one_probe_tile(gs1::TileCoord coord) noexcept
 }
 
 void emit_site_one_local_weather_probe_log(
-    LocalWeatherResolveContext& context,
+    const gs1::SiteWorldAccess<gs1::LocalWeatherResolveSystem>& world,
+    gs1::GameMessageQueue& message_queue,
     gs1::TileCoord coord,
     const BaseLocalWeather& base_weather,
     const gs1::SiteWorld::TileLocalWeatherData& resolved_weather,
     const gs1::SiteWorld::TileWeatherContributionData& total_contribution,
     float plant_density)
 {
-    if (!context.world.has_world() ||
-        context.world.site_id_value() != 1U ||
+    if (!world.has_world() ||
+        world.site_id_value() != 1U ||
         !is_site_one_probe_tile(coord))
     {
         return;
@@ -75,7 +69,7 @@ void emit_site_one_local_weather_probe_log(
         plant_density);
     message.type = gs1::GameMessageType::PresentLog;
     message.set_payload(payload);
-    context.message_queue.push_back(message);
+    message_queue.push_back(message);
 
     payload.level = GS1_LOG_LEVEL_DEBUG;
     std::snprintf(
@@ -88,7 +82,7 @@ void emit_site_one_local_weather_probe_log(
         total_contribution.heat_protection,
         total_contribution.dust_protection);
     message.set_payload(payload);
-    context.message_queue.push_back(message);
+    message_queue.push_back(message);
 }
 
 void ensure_local_weather_runtime_buffers(
@@ -125,7 +119,7 @@ gs1::SiteWorld::TileWeatherContributionData weather_contribution_from_component(
 }
 
 void emit_site_tile_state_changed(
-    LocalWeatherResolveContext& context,
+    gs1::GameMessageQueue& message_queue,
     gs1::TileCoord coord,
     gs1::PlantId plant_id,
     float plant_density,
@@ -163,7 +157,7 @@ void emit_site_tile_state_changed(
         total_contribution.wind_protection,
         total_contribution.heat_protection,
         total_contribution.dust_protection});
-    context.message_queue.push_back(message);
+    message_queue.push_back(message);
 }
 
 gs1::SiteWorld::TileLocalWeatherData resolve_local_weather(
@@ -177,10 +171,10 @@ gs1::SiteWorld::TileLocalWeatherData resolve_local_weather(
 }
 
 BaseLocalWeather compute_base_local_weather(
-    LocalWeatherResolveContext& context)
+    const gs1::SiteWorldAccess<gs1::LocalWeatherResolveSystem>& world)
 {
-    const auto& weather = context.world.read_weather();
-    const auto& modifiers = context.world.read_modifier().resolved_channel_totals;
+    const auto& weather = world.read_weather();
+    const auto& modifiers = world.read_modifier().resolved_channel_totals;
     return BaseLocalWeather {
         std::clamp(weather.weather_heat * (1.0f + modifiers.heat), 0.0f, 100.0f),
         std::clamp(weather.weather_wind * (1.0f + modifiers.wind), 0.0f, 100.0f),
@@ -188,37 +182,54 @@ BaseLocalWeather compute_base_local_weather(
 }
 
 Gs1Status process_message(
-    LocalWeatherResolveContext& context,
+    gs1::RuntimeInvocation& invocation,
     const gs1::GameMessage& message)
 {
-    if (!context.world.has_world())
+    auto access = gs1::make_game_state_access<gs1::LocalWeatherResolveSystem>(invocation);
+    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    gs1::SiteWorldAccess<gs1::LocalWeatherResolveSystem> world {*site_run};
+    if (!world.has_world())
     {
         return GS1_STATUS_OK;
     }
 
     if (message.type == gs1::GameMessageType::SiteRunStarted)
     {
-        context.world.own_local_weather_runtime().emit_full_snapshot_on_next_run = true;
+        world.own_local_weather_runtime().emit_full_snapshot_on_next_run = true;
     }
 
     return GS1_STATUS_OK;
 }
 
-void run_context(LocalWeatherResolveContext& context)
+void run_system(gs1::RuntimeInvocation& invocation)
 {
-    if (!context.world.has_world())
+    auto access = gs1::make_game_state_access<gs1::LocalWeatherResolveSystem>(invocation);
+    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
     {
         return;
     }
 
-    auto& runtime = context.world.own_local_weather_runtime();
-    ensure_local_weather_runtime_buffers(runtime, context.world.tile_count());
+    gs1::SiteWorldAccess<gs1::LocalWeatherResolveSystem> world {*site_run};
+    if (!world.has_world())
+    {
+        return;
+    }
+
+    auto& runtime = world.own_local_weather_runtime();
+    ensure_local_weather_runtime_buffers(runtime, world.tile_count());
 
     const bool emit_full_snapshot = runtime.emit_full_snapshot_on_next_run;
     runtime.emit_full_snapshot_on_next_run = false;
 
-    const auto base_weather = compute_base_local_weather(context);
-    auto& ecs_world = context.site_run.site_world->ecs_world();
+    const auto base_weather = compute_base_local_weather(world);
+    auto& ecs_world = site_run->site_world->ecs_world();
+    auto& message_queue = invocation.game_message_queue();
     auto tile_query =
         ecs_world.query_builder<
             const gs1::site_ecs::TileIndex,
@@ -291,7 +302,7 @@ void run_context(LocalWeatherResolveContext& context)
                     : previous_local_weather;
 
                 emit_site_tile_state_changed(
-                    context,
+                    message_queue,
                     coord_component.value,
                     plant_slot.plant_id,
                     density_component.value,
@@ -303,10 +314,11 @@ void run_context(LocalWeatherResolveContext& context)
             }
 
             if ((emit_full_snapshot || local_weather_changed || support_changed) &&
-                context.world.read_time().world_time_minutes <= k_site_one_probe_window_minutes)
+                world.read_time().world_time_minutes <= k_site_one_probe_window_minutes)
             {
                 emit_site_one_local_weather_probe_log(
-                    context,
+                    world,
+                    message_queue,
                     coord_component.value,
                     base_weather,
                     resolved_weather,
@@ -318,7 +330,7 @@ void run_context(LocalWeatherResolveContext& context)
                     ecology_has_projected_plant_visual(plant_slot.plant_id, density_component.value)) ||
                 support_changed)
             {
-                context.world.mark_tile_projection_dirty(coord_component.value);
+                world.mark_tile_projection_dirty(coord_component.value);
             }
 
             runtime.last_total_weather_contributions[index] = total_contribution;
@@ -372,11 +384,7 @@ Gs1Status LocalWeatherResolveSystem::process_game_message(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    LocalWeatherResolveContext context {
-        *site_run,
-        SiteWorldAccess<LocalWeatherResolveSystem> {*site_run},
-        invocation.game_message_queue()};
-    return process_message(context, message);
+    return process_message(invocation, message);
 }
 
 Gs1Status LocalWeatherResolveSystem::process_host_message(
@@ -397,11 +405,7 @@ void LocalWeatherResolveSystem::run(RuntimeInvocation& invocation)
         return;
     }
 
-    LocalWeatherResolveContext context {
-        *site_run,
-        SiteWorldAccess<LocalWeatherResolveSystem> {*site_run},
-        invocation.game_message_queue()};
-    run_context(context);
+    run_system(invocation);
 }
 }  // namespace gs1
 

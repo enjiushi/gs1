@@ -1,7 +1,6 @@
 #include "campaign/systems/faction_reputation_system.h"
 
 #include "campaign/campaign_state.h"
-#include "campaign/systems/campaign_system_context.h"
 #include "content/defs/faction_defs.h"
 #include "runtime/game_runtime.h"
 
@@ -29,7 +28,7 @@ FactionProgressState* find_faction_progress_mut(
 }  // namespace
 
 Gs1Status process_faction_reputation_message(
-    CampaignSystemContext& context,
+    RuntimeInvocation& invocation,
     const GameMessage& message);
 
 template <>
@@ -82,8 +81,7 @@ Gs1Status FactionReputationSystem::process_game_message(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    CampaignSystemContext context {*campaign};
-    return process_faction_reputation_message(context, message);
+    return process_faction_reputation_message(invocation, message);
 }
 
 Gs1Status FactionReputationSystem::process_host_message(
@@ -101,7 +99,7 @@ void FactionReputationSystem::run(RuntimeInvocation& invocation)
 }
 
 Gs1Status process_faction_reputation_message(
-    CampaignSystemContext& context,
+    RuntimeInvocation& invocation,
     const GameMessage& message)
 {
     if (message.type != GameMessageType::FactionReputationAwardRequested)
@@ -109,8 +107,15 @@ Gs1Status process_faction_reputation_message(
         return GS1_STATUS_OK;
     }
 
+    auto access = make_game_state_access<FactionReputationSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    if (!campaign.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
     const auto& payload = message.payload_as<FactionReputationAwardRequestedMessage>();
-    auto* faction_progress = find_faction_progress_mut(context.campaign, FactionId {payload.faction_id});
+    auto* faction_progress = find_faction_progress_mut(*campaign, FactionId {payload.faction_id});
     if (faction_progress == nullptr)
     {
         return GS1_STATUS_NOT_FOUND;

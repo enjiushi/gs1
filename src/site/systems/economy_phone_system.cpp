@@ -30,17 +30,37 @@ struct system_state_tags<EconomyPhoneSystem>
 
 namespace
 {
-struct EconomyPhoneContext final
-{
-    const CampaignState& campaign;
-    SiteRunState& site_run;
-    SiteWorldAccess<EconomyPhoneSystem> world;
-    GameMessageQueue& message_queue;
-    double fixed_step_seconds {0.0};
-    SiteMoveDirectionInput move_direction {};
-};
-
 constexpr std::uint32_t k_sell_listing_id_base = 1000U;
+
+[[nodiscard]] auto economy_phone_access(RuntimeInvocation& invocation)
+    -> GameStateAccess<EconomyPhoneSystem>
+{
+    return make_game_state_access<EconomyPhoneSystem>(invocation);
+}
+
+[[nodiscard]] const CampaignState& economy_phone_campaign(RuntimeInvocation& invocation)
+{
+    auto access = economy_phone_access(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    return *campaign;
+}
+
+[[nodiscard]] SiteRunState& economy_phone_site_run(RuntimeInvocation& invocation)
+{
+    auto access = economy_phone_access(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    return *site_run;
+}
+
+[[nodiscard]] SiteWorldAccess<EconomyPhoneSystem> economy_phone_world(RuntimeInvocation& invocation)
+{
+    return SiteWorldAccess<EconomyPhoneSystem> {economy_phone_site_run(invocation)};
+}
+
+[[nodiscard]] GameMessageQueue& economy_phone_message_queue(RuntimeInvocation& invocation)
+{
+    return invocation.game_message_queue();
+}
 
 std::uint32_t normalize_quantity(std::uint16_t value) noexcept
 {
@@ -54,10 +74,14 @@ bool money_delta_fits(std::int64_t amount) noexcept
 }
 
 bool can_apply_site_cash_delta(
-    const EconomyPhoneContext& context,
+    const RuntimeInvocation& invocation,
     std::int32_t delta) noexcept
 {
-    const auto updated = static_cast<std::int64_t>(context.world.read_economy().current_cash) + delta;
+    auto& mutable_invocation = const_cast<RuntimeInvocation&>(invocation);
+    auto access = make_game_state_access<EconomyPhoneSystem>(mutable_invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    auto world = SiteWorldAccess<EconomyPhoneSystem> {*site_run};
+    const auto updated = static_cast<std::int64_t>(world.read_economy().current_cash) + delta;
     if (updated < 0 || updated > std::numeric_limits<std::int32_t>::max())
     {
         return false;
@@ -66,27 +90,27 @@ bool can_apply_site_cash_delta(
     return true;
 }
 
-void mark_phone_dirty(EconomyPhoneContext& context) noexcept
+void mark_phone_dirty(RuntimeInvocation& invocation) noexcept
 {
-    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PHONE);
+    economy_phone_world(invocation).mark_projection_dirty(SITE_PROJECTION_UPDATE_PHONE);
 }
 
-void mark_phone_and_hud_dirty(EconomyPhoneContext& context) noexcept
+void mark_phone_and_hud_dirty(RuntimeInvocation& invocation) noexcept
 {
-    context.world.mark_projection_dirty(
+    economy_phone_world(invocation).mark_projection_dirty(
         SITE_PROJECTION_UPDATE_PHONE | SITE_PROJECTION_UPDATE_HUD);
 }
 
 bool apply_site_cash_delta(
-    EconomyPhoneContext& context,
+    RuntimeInvocation& invocation,
     std::int32_t delta) noexcept
 {
-    if (!can_apply_site_cash_delta(context, delta))
+    if (!can_apply_site_cash_delta(invocation, delta))
     {
         return false;
     }
 
-    auto& economy = context.world.own_economy();
+    auto& economy = economy_phone_world(invocation).own_economy();
     economy.current_cash = static_cast<std::int32_t>(
         static_cast<std::int64_t>(economy.current_cash) + delta);
     return true;
@@ -198,9 +222,13 @@ std::uint64_t mix_seed(
     return value;
 }
 
-bool onboarding_chain_effective(const EconomyPhoneContext& context) noexcept
+bool onboarding_chain_effective(const RuntimeInvocation& invocation) noexcept
 {
-    for (const auto& task : context.world.read_task_board().visible_tasks)
+    auto& mutable_invocation = const_cast<RuntimeInvocation&>(invocation);
+    auto access = make_game_state_access<EconomyPhoneSystem>(mutable_invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    auto world = SiteWorldAccess<EconomyPhoneSystem> {*site_run};
+    for (const auto& task : world.read_task_board().visible_tasks)
     {
         if (task.runtime_list_kind == TaskRuntimeListKind::Claimed)
         {
@@ -209,7 +237,7 @@ bool onboarding_chain_effective(const EconomyPhoneContext& context) noexcept
 
         for (const auto& seed_def : all_site_onboarding_task_seed_defs())
         {
-            if (seed_def.site_id == context.site_run.site_id &&
+            if (seed_def.site_id == site_run->site_id &&
                 seed_def.task_template_id == task.task_template_id)
             {
                 return true;
@@ -221,9 +249,12 @@ bool onboarding_chain_effective(const EconomyPhoneContext& context) noexcept
 }
 
 bool phone_buy_stock_item_available(
-    const EconomyPhoneContext& context,
+    const RuntimeInvocation& invocation,
     ItemId item_id) noexcept
 {
+    auto& mutable_invocation = const_cast<RuntimeInvocation&>(invocation);
+    auto access = make_game_state_access<EconomyPhoneSystem>(mutable_invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
     const auto* item_def = find_item_def(item_id);
     if (item_def == nullptr)
     {
@@ -232,7 +263,7 @@ bool phone_buy_stock_item_available(
 
     if (item_def->linked_plant_id.value != 0U)
     {
-        return TechnologySystem::plant_unlocked(context.campaign, item_def->linked_plant_id);
+        return TechnologySystem::plant_unlocked(*campaign, item_def->linked_plant_id);
     }
 
     return item_buy_price_cash_points(item_id) > 0U;
@@ -254,30 +285,30 @@ PhoneListingState* find_generated_stock_listing(
 }
 
 std::vector<std::uint64_t> phone_item_instance_ids(
-    EconomyPhoneContext& context)
+    RuntimeInvocation& invocation)
 {
-    const auto& craft = context.world.read_craft();
-    const auto& inventory = context.world.read_inventory();
+    const auto& craft = economy_phone_world(invocation).read_craft();
+    const auto& inventory = economy_phone_world(invocation).read_inventory();
     if (craft.phone_cache.source_membership_revision == inventory.item_membership_revision)
     {
         return craft.phone_cache.item_instance_ids;
     }
 
     return inventory_storage::collect_item_instance_ids_in_containers(
-        context.site_run,
-        inventory_storage::collect_all_storage_containers(context.site_run, true));
+        economy_phone_site_run(invocation),
+        inventory_storage::collect_all_storage_containers(economy_phone_site_run(invocation), true));
 }
 
 std::uint32_t available_global_item_quantity(
-    EconomyPhoneContext& context,
+    RuntimeInvocation& invocation,
     ItemId item_id)
 {
     const auto available_quantity = craft_logic::available_cached_item_quantity(
-        context.site_run,
-        phone_item_instance_ids(context),
+        economy_phone_site_run(invocation),
+        phone_item_instance_ids(invocation),
         item_id);
     std::uint32_t reserved_quantity = 0U;
-    for (const auto& reserved_stack : context.world.read_action().reserved_input_item_stacks)
+    for (const auto& reserved_stack : economy_phone_world(invocation).read_action().reserved_input_item_stacks)
     {
         if (reserved_stack.item_id == item_id)
         {
@@ -350,7 +381,7 @@ std::uint32_t cart_item_quantity(const EconomyState& economy) noexcept
 }
 
 bool queue_delivery_batch_message(
-    EconomyPhoneContext& context,
+    RuntimeInvocation& invocation,
     const InventoryDeliveryBatchEntry* entries,
     std::uint8_t entry_count) noexcept
 {
@@ -362,7 +393,7 @@ bool queue_delivery_batch_message(
     GameMessage delivery_message {};
     delivery_message.type = GameMessageType::InventoryDeliveryBatchRequested;
     auto& payload = delivery_message.emplace_payload<InventoryDeliveryBatchRequestedMessage>();
-    payload.minutes_until_arrival = context.world.read_economy().phone_delivery_minutes;
+    payload.minutes_until_arrival = economy_phone_world(invocation).read_economy().phone_delivery_minutes;
     payload.entry_count = entry_count;
     payload.reserved0 = 0U;
     for (std::size_t index = 0; index < k_inventory_delivery_batch_entry_count; ++index)
@@ -373,12 +404,12 @@ bool queue_delivery_batch_message(
     {
         payload.entries[index] = entries[index];
     }
-    context.message_queue.push_back(delivery_message);
+    economy_phone_message_queue(invocation).push_back(delivery_message);
     return true;
 }
 
 bool queue_single_delivery_message(
-    EconomyPhoneContext& context,
+    RuntimeInvocation& invocation,
     ItemId item_id,
     std::uint32_t quantity) noexcept
 {
@@ -392,11 +423,11 @@ bool queue_single_delivery_message(
     InventoryDeliveryBatchEntry entry {};
     entry.item_id = static_cast<std::uint16_t>(item_id.value);
     entry.quantity = static_cast<std::uint16_t>(quantity);
-    return queue_delivery_batch_message(context, &entry, 1U);
+    return queue_delivery_batch_message(invocation, &entry, 1U);
 }
 
 void queue_purchase_completed_message(
-    EconomyPhoneContext& context,
+    RuntimeInvocation& invocation,
     const PhoneListingState& listing,
     std::uint32_t quantity) noexcept
 {
@@ -412,11 +443,11 @@ void queue_purchase_completed_message(
         listing.item_id.value,
         static_cast<std::uint16_t>(std::min<std::uint32_t>(quantity, 65535U)),
         0U});
-    context.message_queue.push_back(message);
+    economy_phone_message_queue(invocation).push_back(message);
 }
 
 void queue_sale_completed_message(
-    EconomyPhoneContext& context,
+    RuntimeInvocation& invocation,
     const PhoneListingState& listing,
     std::uint32_t quantity) noexcept
 {
@@ -432,18 +463,22 @@ void queue_sale_completed_message(
         listing.item_id.value,
         static_cast<std::uint16_t>(std::min<std::uint32_t>(quantity, 65535U)),
         0U});
-    context.message_queue.push_back(message);
+    economy_phone_message_queue(invocation).push_back(message);
 }
 
 std::uint32_t resolved_stock_cash_points(
-    const EconomyPhoneContext& context,
+    const RuntimeInvocation& invocation,
     const PrototypePhoneBuyStockContent& stock_entry,
     std::uint32_t refresh_generation) noexcept
 {
+    auto& mutable_invocation = const_cast<RuntimeInvocation&>(invocation);
+    auto access = make_game_state_access<EconomyPhoneSystem>(mutable_invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    auto world = SiteWorldAccess<EconomyPhoneSystem> {*site_run};
     const auto span = stock_entry.stock_cash_points_variance * 2U + 1U;
     const auto roll = static_cast<std::uint32_t>(
         mix_seed(
-            context.world.site_attempt_seed(),
+            world.site_attempt_seed(),
             refresh_generation ^ stock_entry.listing_id,
             stock_entry.item_id.value) %
         std::max<std::uint32_t>(span, 1U));
@@ -454,7 +489,7 @@ std::uint32_t resolved_stock_cash_points(
 }
 
 std::uint32_t resolved_stock_quantity(
-    const EconomyPhoneContext& context,
+    const RuntimeInvocation& invocation,
     const PrototypePhoneBuyStockContent& stock_entry,
     std::uint32_t refresh_generation) noexcept
 {
@@ -465,7 +500,7 @@ std::uint32_t resolved_stock_quantity(
     }
 
     const auto stock_cash_points =
-        resolved_stock_cash_points(context, stock_entry, refresh_generation);
+        resolved_stock_cash_points(invocation, stock_entry, refresh_generation);
     if (stock_cash_points == 0U)
     {
         return 1U;
@@ -475,11 +510,11 @@ std::uint32_t resolved_stock_quantity(
 }
 
 void refresh_generated_buy_stock_listings(
-    EconomyPhoneContext& context,
+    RuntimeInvocation& invocation,
     bool force_dirty = false)
 {
-    auto& economy = context.world.own_economy();
-    const auto* site_content = find_prototype_site_content(context.site_run.site_id);
+    auto& economy = economy_phone_world(invocation).own_economy();
+    const auto* site_content = find_prototype_site_content(economy_phone_site_run(invocation).site_id);
     const auto next_generation = economy.phone_buy_stock_refresh_generation + 1U;
 
     std::vector<PhoneListingState> refreshed {};
@@ -499,13 +534,13 @@ void refresh_generated_buy_stock_listings(
         {
             const auto* item_def = find_item_def(stock_entry.item_id);
             if (item_def == nullptr ||
-                !phone_buy_stock_item_available(context, stock_entry.item_id))
+                !phone_buy_stock_item_available(invocation, stock_entry.item_id))
             {
                 continue;
             }
 
             const auto quantity =
-                resolved_stock_quantity(context, stock_entry, next_generation);
+                resolved_stock_quantity(invocation, stock_entry, next_generation);
             if (quantity == 0U)
             {
                 continue;
@@ -534,17 +569,17 @@ void refresh_generated_buy_stock_listings(
     economy.phone_buy_stock_refresh_generation = next_generation;
     if (changed || force_dirty)
     {
-        mark_phone_dirty(context);
+        mark_phone_dirty(invocation);
     }
 }
 
 void refresh_dynamic_sell_listings(
-    EconomyPhoneContext& context,
+    RuntimeInvocation& invocation,
     bool force_dirty = false)
 {
-    auto& economy = context.world.own_economy();
-    const auto& inventory = context.world.read_inventory();
-    const auto reservation_signature = action_reservation_signature(context.world.read_action());
+    auto& economy = economy_phone_world(invocation).own_economy();
+    const auto& inventory = economy_phone_world(invocation).read_inventory();
+    const auto reservation_signature = action_reservation_signature(economy_phone_world(invocation).read_action());
     const bool revisions_unchanged =
         !force_dirty &&
         economy.phone_listing_source_membership_revision == inventory.item_membership_revision &&
@@ -563,7 +598,7 @@ void refresh_dynamic_sell_listings(
             continue;
         }
 
-        const auto available_quantity = available_global_item_quantity(context, item_def.item_id);
+        const auto available_quantity = available_global_item_quantity(invocation, item_def.item_id);
         if (available_quantity == 0U)
         {
             continue;
@@ -600,12 +635,12 @@ void refresh_dynamic_sell_listings(
     economy.phone_listing_source_action_reservation_signature = reservation_signature;
     if (changed || force_dirty)
     {
-        mark_phone_dirty(context);
+        mark_phone_dirty(invocation);
     }
 }
 
 Gs1Status process_buy_listing(
-    EconomyPhoneContext& context,
+    RuntimeInvocation& invocation,
     PhoneListingState& listing,
     std::uint32_t quantity)
 {
@@ -623,13 +658,13 @@ Gs1Status process_buy_listing(
 
     const auto total_cost =
         static_cast<std::int64_t>(listing.price) * quantity +
-        static_cast<std::int64_t>(context.world.read_economy().phone_delivery_fee);
+        static_cast<std::int64_t>(economy_phone_world(invocation).read_economy().phone_delivery_fee);
     if (total_cost < 0 || !money_delta_fits(-total_cost))
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
-    if (!apply_site_cash_delta(context, static_cast<std::int32_t>(-total_cost)))
+    if (!apply_site_cash_delta(invocation, static_cast<std::int32_t>(-total_cost)))
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -641,19 +676,19 @@ Gs1Status process_buy_listing(
     clamp_cart_quantity(listing);
 
     if (listing.item_id.value != 0U &&
-        !queue_single_delivery_message(context, listing.item_id, quantity))
+        !queue_single_delivery_message(invocation, listing.item_id, quantity))
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
-    queue_purchase_completed_message(context, listing, quantity);
+    queue_purchase_completed_message(invocation, listing, quantity);
 
-    mark_phone_and_hud_dirty(context);
+    mark_phone_and_hud_dirty(invocation);
     return GS1_STATUS_OK;
 }
 
 Gs1Status process_cart_add(
-    EconomyPhoneContext& context,
+    RuntimeInvocation& invocation,
     PhoneListingState& listing,
     std::uint32_t quantity)
 {
@@ -678,12 +713,12 @@ Gs1Status process_cart_add(
     }
 
     listing.cart_quantity += quantity_to_add;
-    mark_phone_dirty(context);
+    mark_phone_dirty(invocation);
     return GS1_STATUS_OK;
 }
 
 Gs1Status process_cart_remove(
-    EconomyPhoneContext& context,
+    RuntimeInvocation& invocation,
     PhoneListingState& listing,
     std::uint32_t quantity)
 {
@@ -699,13 +734,13 @@ Gs1Status process_cart_remove(
 
     listing.cart_quantity =
         listing.cart_quantity > quantity ? (listing.cart_quantity - quantity) : 0U;
-    mark_phone_dirty(context);
+    mark_phone_dirty(invocation);
     return GS1_STATUS_OK;
 }
 
-Gs1Status process_cart_checkout(EconomyPhoneContext& context)
+Gs1Status process_cart_checkout(RuntimeInvocation& invocation)
 {
-    auto& economy = context.world.own_economy();
+    auto& economy = economy_phone_world(invocation).own_economy();
     if (cart_item_quantity(economy) == 0U)
     {
         return GS1_STATUS_INVALID_STATE;
@@ -744,13 +779,13 @@ Gs1Status process_cart_checkout(EconomyPhoneContext& context)
     }
 
     const auto total_cost =
-        subtotal + static_cast<std::int64_t>(context.world.read_economy().phone_delivery_fee);
+        subtotal + static_cast<std::int64_t>(economy_phone_world(invocation).read_economy().phone_delivery_fee);
     if (subtotal <= 0 || total_cost < 0 || !money_delta_fits(-total_cost))
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
-    if (!apply_site_cash_delta(context, static_cast<std::int32_t>(-total_cost)))
+    if (!apply_site_cash_delta(invocation, static_cast<std::int32_t>(-total_cost)))
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -769,7 +804,7 @@ Gs1Status process_cart_checkout(EconomyPhoneContext& context)
         listing.cart_quantity = 0U;
     }
 
-        if (entry_count > 0U && !queue_delivery_batch_message(context, entries, entry_count))
+        if (entry_count > 0U && !queue_delivery_batch_message(invocation, entries, entry_count))
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -793,15 +828,15 @@ Gs1Status process_cart_checkout(EconomyPhoneContext& context)
                 break;
             }
         }
-        queue_purchase_completed_message(context, synthetic_listing, entry.quantity);
+        queue_purchase_completed_message(invocation, synthetic_listing, entry.quantity);
     }
 
-    mark_phone_and_hud_dirty(context);
+    mark_phone_and_hud_dirty(invocation);
     return GS1_STATUS_OK;
 }
 
 Gs1Status process_sell_listing(
-    EconomyPhoneContext& context,
+    RuntimeInvocation& invocation,
     PhoneListingState& listing,
     std::uint32_t quantity)
 {
@@ -810,12 +845,12 @@ Gs1Status process_sell_listing(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    const auto inventory_available = available_global_item_quantity(context, listing.item_id);
+    const auto inventory_available = available_global_item_quantity(invocation, listing.item_id);
     const auto effective_available = std::min(listing.quantity, inventory_available);
     const auto quantity_to_sell = std::min(quantity, effective_available);
     if (quantity_to_sell == 0U)
     {
-        refresh_dynamic_sell_listings(context, true);
+        refresh_dynamic_sell_listings(invocation, true);
         return GS1_STATUS_OK;
     }
 
@@ -825,7 +860,7 @@ Gs1Status process_sell_listing(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    if (!apply_site_cash_delta(context, static_cast<std::int32_t>(total_gain)))
+    if (!apply_site_cash_delta(invocation, static_cast<std::int32_t>(total_gain)))
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -838,18 +873,18 @@ Gs1Status process_sell_listing(
         listing.item_id.value,
         static_cast<std::uint16_t>(quantity_to_sell),
         0U});
-    context.message_queue.push_back(consume_message);
-    queue_sale_completed_message(context, listing, quantity_to_sell);
+    economy_phone_message_queue(invocation).push_back(consume_message);
+    queue_sale_completed_message(invocation, listing, quantity_to_sell);
 
-    mark_phone_and_hud_dirty(context);
+    mark_phone_and_hud_dirty(invocation);
     return GS1_STATUS_OK;
 }
 
 Gs1Status process_contractor_hire(
-    EconomyPhoneContext& context,
+    RuntimeInvocation& invocation,
     const ContractorHireRequestedMessage& payload)
 {
-    auto* listing = find_listing(context.world.own_economy(), payload.listing_or_offer_id);
+    auto* listing = find_listing(economy_phone_world(invocation).own_economy(), payload.listing_or_offer_id);
     if (listing == nullptr)
     {
         return GS1_STATUS_NOT_FOUND;
@@ -873,7 +908,7 @@ Gs1Status process_contractor_hire(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    if (!apply_site_cash_delta(context, static_cast<std::int32_t>(-total_cost)))
+    if (!apply_site_cash_delta(invocation, static_cast<std::int32_t>(-total_cost)))
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -883,16 +918,16 @@ Gs1Status process_contractor_hire(
         listing->quantity = available - work_units;
     }
 
-    mark_phone_and_hud_dirty(context);
+    mark_phone_and_hud_dirty(invocation);
     return GS1_STATUS_OK;
 }
 
 Gs1Status process_unlockable_purchase(
-    EconomyPhoneContext& context,
+    RuntimeInvocation& invocation,
     std::uint32_t unlockable_id,
     std::int32_t price)
 {
-    auto& economy = context.world.own_economy();
+    auto& economy = economy_phone_world(invocation).own_economy();
     if (price < 0 || !money_delta_fits(-static_cast<std::int64_t>(price)))
     {
         return GS1_STATUS_INVALID_STATE;
@@ -903,7 +938,7 @@ Gs1Status process_unlockable_purchase(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    if (!apply_site_cash_delta(context, static_cast<std::int32_t>(-price)))
+    if (!apply_site_cash_delta(invocation, static_cast<std::int32_t>(-price)))
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -914,12 +949,12 @@ Gs1Status process_unlockable_purchase(
         economy.revealed_site_unlockable_ids.push_back(unlockable_id);
     }
 
-    mark_phone_and_hud_dirty(context);
+    mark_phone_and_hud_dirty(invocation);
     return GS1_STATUS_OK;
 }
 
 void reveal_unlockable_for_site(
-    EconomyPhoneContext& context,
+    RuntimeInvocation& invocation,
     std::uint32_t unlockable_id)
 {
     if (unlockable_id == 0U)
@@ -927,17 +962,17 @@ void reveal_unlockable_for_site(
         return;
     }
 
-    auto& economy = context.world.own_economy();
+    auto& economy = economy_phone_world(invocation).own_economy();
     if (!contains_unlockable(economy.revealed_site_unlockable_ids, unlockable_id))
     {
         economy.revealed_site_unlockable_ids.push_back(unlockable_id);
     }
 
-    mark_phone_and_hud_dirty(context);
+    mark_phone_and_hud_dirty(invocation);
 }
 
 void append_seed_phone_listing(
-    EconomyPhoneContext& context,
+    RuntimeInvocation& invocation,
     const PrototypePhoneListingContent& listing_content)
 {
     switch (listing_content.kind)
@@ -951,12 +986,12 @@ void append_seed_phone_listing(
             return;
         }
 
-        if (!phone_buy_stock_item_available(context, item_id))
+        if (!phone_buy_stock_item_available(invocation, item_id))
         {
             return;
         }
 
-        context.world.own_economy().available_phone_listings.push_back(make_item_listing(
+        economy_phone_world(invocation).own_economy().available_phone_listings.push_back(make_item_listing(
             PhoneListingKind::BuyItem,
             listing_content.listing_id,
             item_id,
@@ -966,7 +1001,7 @@ void append_seed_phone_listing(
 
     case PhoneListingKind::HireContractor:
     case PhoneListingKind::PurchaseUnlockable:
-        context.world.own_economy().available_phone_listings.push_back(PhoneListingState {
+        economy_phone_world(invocation).own_economy().available_phone_listings.push_back(PhoneListingState {
             listing_content.kind,
             ItemId {listing_content.item_or_unlockable_id},
             listing_content.listing_id,
@@ -986,9 +1021,9 @@ void append_seed_phone_listing(
     }
 }
 
-void seed_site_economy(EconomyPhoneContext& context, std::uint32_t site_id)
+void seed_site_economy(RuntimeInvocation& invocation, std::uint32_t site_id)
 {
-    auto& economy = context.world.own_economy();
+    auto& economy = economy_phone_world(invocation).own_economy();
     const auto* site_content = find_prototype_site_content(SiteId {site_id});
     economy.phone_listing_source_membership_revision = 0U;
     economy.phone_listing_source_quantity_revision = 0U;
@@ -1002,7 +1037,7 @@ void seed_site_economy(EconomyPhoneContext& context, std::uint32_t site_id)
     economy.direct_purchase_unlockable_ids.clear();
     if (site_content == nullptr)
     {
-        mark_phone_and_hud_dirty(context);
+        mark_phone_and_hud_dirty(invocation);
         return;
     }
 
@@ -1010,12 +1045,12 @@ void seed_site_economy(EconomyPhoneContext& context, std::uint32_t site_id)
     economy.direct_purchase_unlockable_ids = site_content->initial_direct_purchase_unlockable_ids;
     for (const auto& listing_content : site_content->seeded_phone_listings)
     {
-        append_seed_phone_listing(context, listing_content);
+        append_seed_phone_listing(invocation, listing_content);
     }
 
-    refresh_generated_buy_stock_listings(context, true);
-    refresh_dynamic_sell_listings(context, true);
-    mark_phone_and_hud_dirty(context);
+    refresh_generated_buy_stock_listings(invocation, true);
+    refresh_dynamic_sell_listings(invocation, true);
+    mark_phone_and_hud_dirty(invocation);
 }
 }  // namespace
 
@@ -1080,39 +1115,25 @@ Gs1Status EconomyPhoneSystem::process_game_message(
     auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
     auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
     if (!campaign.has_value() || !site_run.has_value())
     {
         return GS1_STATUS_INVALID_STATE;
     }
-
-    EconomyPhoneContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<EconomyPhoneSystem> {*site_run},
-        invocation.game_message_queue(),
-        fixed_step_seconds,
-        SiteMoveDirectionInput {
-            move_direction.world_move_x,
-            move_direction.world_move_y,
-            move_direction.world_move_z,
-            move_direction.present}};
     switch (message.type)
     {
     case GameMessageType::SiteRunStarted:
     {
         const auto& payload = message.payload_as<SiteRunStartedMessage>();
-        seed_site_economy(context, payload.site_id);
+        seed_site_economy(invocation, payload.site_id);
         return GS1_STATUS_OK;
     }
 
     case GameMessageType::SiteRefreshTick:
         if ((message.payload_as<SiteRefreshTickMessage>().refresh_mask &
                 SITE_REFRESH_TICK_PHONE_BUY_STOCK) != 0U &&
-            !onboarding_chain_effective(context))
+            !onboarding_chain_effective(invocation))
         {
-            refresh_generated_buy_stock_listings(context, true);
+            refresh_generated_buy_stock_listings(invocation, true);
         }
         return GS1_STATUS_OK;
 
@@ -1124,19 +1145,19 @@ Gs1Status EconomyPhoneSystem::process_game_message(
             return GS1_STATUS_OK;
         }
 
-        if (!apply_site_cash_delta(context, payload.delta))
+        if (!apply_site_cash_delta(invocation, payload.delta))
         {
             return GS1_STATUS_INVALID_STATE;
         }
 
-        mark_phone_and_hud_dirty(context);
+        mark_phone_and_hud_dirty(invocation);
         return GS1_STATUS_OK;
     }
 
     case GameMessageType::PhoneListingPurchaseRequested:
     {
         const auto& payload = message.payload_as<PhoneListingPurchaseRequestedMessage>();
-        auto* listing = find_listing(context.world.own_economy(), payload.listing_id);
+        auto* listing = find_listing(economy_phone_world(invocation).own_economy(), payload.listing_id);
         if (listing == nullptr)
         {
             return GS1_STATUS_NOT_FOUND;
@@ -1146,9 +1167,9 @@ Gs1Status EconomyPhoneSystem::process_game_message(
         switch (listing->kind)
         {
         case PhoneListingKind::BuyItem:
-            return process_buy_listing(context, *listing, quantity);
+            return process_buy_listing(invocation, *listing, quantity);
         case PhoneListingKind::PurchaseUnlockable:
-            return process_unlockable_purchase(context, listing->item_id.value, listing->price);
+            return process_unlockable_purchase(invocation, listing->item_id.value, listing->price);
         default:
             return GS1_STATUS_INVALID_STATE;
         }
@@ -1157,69 +1178,69 @@ Gs1Status EconomyPhoneSystem::process_game_message(
     case GameMessageType::PhoneListingSaleRequested:
     {
         const auto& payload = message.payload_as<PhoneListingSaleRequestedMessage>();
-        auto* listing = find_listing(context.world.own_economy(), payload.listing_id_or_item_id);
+        auto* listing = find_listing(economy_phone_world(invocation).own_economy(), payload.listing_id_or_item_id);
         if (listing == nullptr)
         {
             listing = find_sell_listing_for_item(
-                context.world.own_economy(),
+                economy_phone_world(invocation).own_economy(),
                 payload.listing_id_or_item_id);
             if (listing == nullptr)
             {
-                refresh_dynamic_sell_listings(context, true);
+                refresh_dynamic_sell_listings(invocation, true);
                 return GS1_STATUS_OK;
             }
         }
 
         const std::uint32_t quantity = normalize_quantity(payload.quantity);
-        return process_sell_listing(context, *listing, quantity);
+        return process_sell_listing(invocation, *listing, quantity);
     }
 
     case GameMessageType::PhoneListingCartAddRequested:
     {
         const auto& payload = message.payload_as<PhoneListingCartAddRequestedMessage>();
-        auto* listing = find_listing(context.world.own_economy(), payload.listing_id);
+        auto* listing = find_listing(economy_phone_world(invocation).own_economy(), payload.listing_id);
         if (listing == nullptr)
         {
             return GS1_STATUS_NOT_FOUND;
         }
 
-        return process_cart_add(context, *listing, normalize_quantity(payload.quantity));
+        return process_cart_add(invocation, *listing, normalize_quantity(payload.quantity));
     }
 
     case GameMessageType::PhoneListingCartRemoveRequested:
     {
         const auto& payload = message.payload_as<PhoneListingCartRemoveRequestedMessage>();
-        auto* listing = find_listing(context.world.own_economy(), payload.listing_id);
+        auto* listing = find_listing(economy_phone_world(invocation).own_economy(), payload.listing_id);
         if (listing == nullptr)
         {
             return GS1_STATUS_NOT_FOUND;
         }
 
-        return process_cart_remove(context, *listing, normalize_quantity(payload.quantity));
+        return process_cart_remove(invocation, *listing, normalize_quantity(payload.quantity));
     }
 
     case GameMessageType::PhoneCartCheckoutRequested:
-        return process_cart_checkout(context);
+        return process_cart_checkout(invocation);
 
     case GameMessageType::ContractorHireRequested:
-        return process_contractor_hire(context, message.payload_as<ContractorHireRequestedMessage>());
+        return process_contractor_hire(invocation, message.payload_as<ContractorHireRequestedMessage>());
 
     case GameMessageType::SiteUnlockablePurchaseRequested:
     {
         const auto& payload = message.payload_as<SiteUnlockablePurchaseRequestedMessage>();
-        const auto* listing = find_unlockable_listing(context.world.own_economy(), payload.unlockable_id);
+        const auto* listing = find_unlockable_listing(economy_phone_world(invocation).own_economy(), payload.unlockable_id);
         if (listing == nullptr)
         {
             return GS1_STATUS_NOT_FOUND;
         }
 
-        return process_unlockable_purchase(context, payload.unlockable_id, listing->price);
+        return process_unlockable_purchase(invocation, payload.unlockable_id, listing->price);
     }
 
     case GameMessageType::SiteUnlockableRevealRequested:
     {
         const auto& payload = message.payload_as<SiteUnlockableRevealRequestedMessage>();
-        reveal_unlockable_for_site(context, payload.unlockable_id);
+        reveal_unlockable_for_site(invocation, payload.unlockable_id);
         return GS1_STATUS_OK;
     }
 
@@ -1235,24 +1256,10 @@ Gs1Status EconomyPhoneSystem::process_host_message(
     auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
     auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
     if (!campaign.has_value() || !site_run.has_value())
     {
         return GS1_STATUS_INVALID_STATE;
     }
-
-    EconomyPhoneContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<EconomyPhoneSystem> {*site_run},
-        invocation.game_message_queue(),
-        fixed_step_seconds,
-        SiteMoveDirectionInput {
-            move_direction.world_move_x,
-            move_direction.world_move_y,
-            move_direction.world_move_z,
-            move_direction.present}};
     if (message.type != GS1_HOST_EVENT_UI_ACTION)
     {
         return GS1_STATUS_OK;
@@ -1267,13 +1274,13 @@ Gs1Status EconomyPhoneSystem::process_host_message(
         {
             return GS1_STATUS_INVALID_ARGUMENT;
         }
-        auto* listing = find_listing(context.world.own_economy(), action.target_id);
+        auto* listing = find_listing(economy_phone_world(invocation).own_economy(), action.target_id);
         if (listing == nullptr)
         {
             return GS1_STATUS_NOT_FOUND;
         }
         return process_buy_listing(
-            context,
+            invocation,
             *listing,
             normalize_quantity(static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0)));
     }
@@ -1284,13 +1291,13 @@ Gs1Status EconomyPhoneSystem::process_host_message(
         {
             return GS1_STATUS_INVALID_ARGUMENT;
         }
-        auto* listing = find_listing(context.world.own_economy(), action.target_id);
+        auto* listing = find_listing(economy_phone_world(invocation).own_economy(), action.target_id);
         if (listing == nullptr)
         {
             return GS1_STATUS_NOT_FOUND;
         }
         return process_cart_add(
-            context,
+            invocation,
             *listing,
             normalize_quantity(static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0)));
     }
@@ -1301,19 +1308,19 @@ Gs1Status EconomyPhoneSystem::process_host_message(
         {
             return GS1_STATUS_INVALID_ARGUMENT;
         }
-        auto* listing = find_listing(context.world.own_economy(), action.target_id);
+        auto* listing = find_listing(economy_phone_world(invocation).own_economy(), action.target_id);
         if (listing == nullptr)
         {
             return GS1_STATUS_NOT_FOUND;
         }
         return process_cart_remove(
-            context,
+            invocation,
             *listing,
             normalize_quantity(static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0)));
     }
 
     case GS1_UI_ACTION_CHECKOUT_PHONE_CART:
-        return process_cart_checkout(context);
+        return process_cart_checkout(invocation);
 
     case GS1_UI_ACTION_SELL_PHONE_LISTING:
     {
@@ -1321,20 +1328,20 @@ Gs1Status EconomyPhoneSystem::process_host_message(
         {
             return GS1_STATUS_INVALID_ARGUMENT;
         }
-        auto* listing = find_listing(context.world.own_economy(), action.target_id);
+        auto* listing = find_listing(economy_phone_world(invocation).own_economy(), action.target_id);
         if (listing == nullptr)
         {
             listing = find_sell_listing_for_item(
-                context.world.own_economy(),
+                economy_phone_world(invocation).own_economy(),
                 action.target_id);
             if (listing == nullptr)
             {
-                refresh_dynamic_sell_listings(context, true);
+                refresh_dynamic_sell_listings(invocation, true);
                 return GS1_STATUS_OK;
             }
         }
         return process_sell_listing(
-            context,
+            invocation,
             *listing,
             normalize_quantity(static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0)));
     }
@@ -1345,7 +1352,7 @@ Gs1Status EconomyPhoneSystem::process_host_message(
             return GS1_STATUS_INVALID_ARGUMENT;
         }
         return process_contractor_hire(
-            context,
+            invocation,
             ContractorHireRequestedMessage {
                 action.target_id,
                 static_cast<std::uint32_t>(action.arg0)});
@@ -1356,12 +1363,12 @@ Gs1Status EconomyPhoneSystem::process_host_message(
             return GS1_STATUS_INVALID_ARGUMENT;
         }
         {
-            const auto* listing = find_unlockable_listing(context.world.own_economy(), action.target_id);
+            const auto* listing = find_unlockable_listing(economy_phone_world(invocation).own_economy(), action.target_id);
             if (listing == nullptr)
             {
                 return GS1_STATUS_NOT_FOUND;
             }
-            return process_unlockable_purchase(context, action.target_id, listing->price);
+            return process_unlockable_purchase(invocation, action.target_id, listing->price);
         }
 
     default:
@@ -1374,25 +1381,12 @@ void EconomyPhoneSystem::run(RuntimeInvocation& invocation)
     auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
     auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
     if (!campaign.has_value() || !site_run.has_value())
     {
         return;
     }
-
-    EconomyPhoneContext context {
-        *campaign,
-        *site_run,
-        SiteWorldAccess<EconomyPhoneSystem> {*site_run},
-        invocation.game_message_queue(),
-        fixed_step_seconds,
-        SiteMoveDirectionInput {
-            move_direction.world_move_x,
-            move_direction.world_move_y,
-            move_direction.world_move_z,
-            move_direction.present}};
-    refresh_dynamic_sell_listings(context);
+    refresh_dynamic_sell_listings(invocation);
 }
 }  // namespace gs1
+
 

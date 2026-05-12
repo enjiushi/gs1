@@ -15,13 +15,6 @@ namespace gs1
 {
 namespace
 {
-struct WeatherEventContext final
-{
-    SiteWorldAccess<WeatherEventSystem> world;
-    GameMessageQueue& message_queue;
-    double fixed_step_seconds {0.0};
-};
-
 constexpr float k_mild_weather_heat = 15.0f;
 constexpr float k_mild_weather_wind = 10.0f;
 constexpr float k_mild_weather_dust = 5.0f;
@@ -51,14 +44,15 @@ bool has_pending_site_transition_message(
 }
 
 void emit_site_one_weather_probe_log(
-    WeatherEventContext& context,
+    const SiteWorldAccess<WeatherEventSystem>& world,
+    GameMessageQueue& message_queue,
     const char* label,
     float heat,
     float wind,
     float dust,
     float wind_direction_degrees)
 {
-    if (!context.world.has_world() || context.world.site_id_value() != 1U)
+    if (!world.has_world() || world.site_id_value() != 1U)
     {
         return;
     }
@@ -77,7 +71,7 @@ void emit_site_one_weather_probe_log(
         wind_direction_degrees);
     message.type = GameMessageType::PresentLog;
     message.set_payload(payload);
-    context.message_queue.push_back(message);
+    message_queue.push_back(message);
 }
 
 struct SiteBaselineWeather final
@@ -105,13 +99,13 @@ struct SiteBaselineWeather final
 }
 
 void apply_site_weather(
-    WeatherEventContext& context,
+    SiteWorldAccess<WeatherEventSystem>& world,
     float heat,
     float wind,
     float dust,
     float wind_direction_degrees)
 {
-    auto& weather = context.world.own_weather();
+    auto& weather = world.own_weather();
     const bool changed =
         std::fabs(weather.weather_heat - heat) > k_weather_epsilon ||
         std::fabs(weather.weather_wind - wind) > k_weather_epsilon ||
@@ -126,7 +120,7 @@ void apply_site_weather(
     weather.weather_wind = wind;
     weather.weather_dust = dust;
     weather.weather_wind_direction_degrees = wind_direction_degrees;
-    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
+    world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
 }
 
 float resolve_weather_lerp_factor(double fixed_step_seconds) noexcept
@@ -171,16 +165,17 @@ float smooth_wind_direction_degrees(float current, float target, float lerp_fact
 }
 
 void smooth_site_weather_toward(
-    WeatherEventContext& context,
+    SiteWorldAccess<WeatherEventSystem>& world,
+    double fixed_step_seconds,
     float target_heat,
     float target_wind,
     float target_dust,
     float target_wind_direction_degrees)
 {
-    const auto& current_weather = context.world.read_weather();
-    const float lerp_factor = resolve_weather_lerp_factor(context.fixed_step_seconds);
+    const auto& current_weather = world.read_weather();
+    const float lerp_factor = resolve_weather_lerp_factor(fixed_step_seconds);
     apply_site_weather(
-        context,
+        world,
         smooth_weather_channel(current_weather.weather_heat, target_heat, lerp_factor),
         smooth_weather_channel(current_weather.weather_wind, target_wind, lerp_factor),
         smooth_weather_channel(current_weather.weather_dust, target_dust, lerp_factor),
@@ -334,17 +329,17 @@ float resolve_event_pressure_scale(
 }
 
 float resolve_event_wind_direction(
-    const WeatherEventContext& context) noexcept
+    const SiteWorldAccess<WeatherEventSystem>& world) noexcept
 {
-    const auto& objective = context.world.read_objective();
+    const auto& objective = world.read_objective();
     if (objective_uses_repeating_weather_waves(objective))
     {
-        const auto& event = context.world.read_event();
+        const auto& event = world.read_event();
         const float edge_base = resolve_edge_base_wind_direction(objective.target_edge);
         const auto wave_index = std::max(event.wave_sequence_index, 1U);
         const float random_offset =
             (normalized_hash(
-                 context.world.site_attempt_seed() +
+                 world.site_attempt_seed() +
                  static_cast<std::uint64_t>(wave_index) * 97ULL) *
                 70.0f) -
             35.0f;
@@ -355,12 +350,12 @@ float resolve_event_wind_direction(
 }
 
 double resolve_next_wave_delay_minutes(
-    const WeatherEventContext& context,
+    const SiteWorldAccess<WeatherEventSystem>& world,
     std::uint32_t wave_sequence_index) noexcept
 {
     const float sample =
         normalized_hash(
-            context.world.site_attempt_seed() +
+            world.site_attempt_seed() +
             static_cast<std::uint64_t>(wave_sequence_index + 1U) * 131ULL);
     return k_min_wave_delay_minutes +
         (k_max_wave_delay_minutes - k_min_wave_delay_minutes) * static_cast<double>(sample);
@@ -378,10 +373,11 @@ void clear_event_timeline(EventState& event) noexcept
     event.event_dust_pressure = 0.0f;
 }
 
-void start_next_wave(WeatherEventContext& context)
+void start_next_wave(
+    SiteWorldAccess<WeatherEventSystem>& world)
 {
-    auto& event = context.world.own_event();
-    const double world_time_minutes = context.world.read_time().world_time_minutes;
+    auto& event = world.own_event();
+    const double world_time_minutes = world.read_time().world_time_minutes;
     event.active_event_template_id = EventTemplateId {1U};
     event.start_time_minutes = world_time_minutes;
     event.peak_time_minutes = world_time_minutes + k_event_ramp_up_minutes;
@@ -390,7 +386,7 @@ void start_next_wave(WeatherEventContext& context)
         event.peak_time_minutes + event.peak_duration_minutes + k_event_ramp_down_minutes;
     event.minutes_until_next_wave = 0.0;
     event.wave_sequence_index += 1U;
-    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
+    world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
 }
 }  // namespace
 
@@ -435,15 +431,13 @@ Gs1Status WeatherEventSystem::process_game_message(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    WeatherEventContext context {
-        SiteWorldAccess<WeatherEventSystem> {*site_run},
-        invocation.game_message_queue(),
-        access.template read<RuntimeFixedStepSecondsTag>()};
-    auto& weather = context.world.own_weather();
-    auto& event = context.world.own_event();
-    const auto& objective = context.world.read_objective();
+    SiteWorldAccess<WeatherEventSystem> world {*site_run};
+    auto& message_queue = invocation.game_message_queue();
+    auto& weather = world.own_weather();
+    auto& event = world.own_event();
+    const auto& objective = world.read_objective();
     const auto baseline_weather =
-        resolve_site_baseline_weather(context.world.site_id_value());
+        resolve_site_baseline_weather(world.site_id_value());
     if (has_active_event(event))
     {
         return GS1_STATUS_OK;
@@ -454,15 +448,16 @@ Gs1Status WeatherEventSystem::process_game_message(
         weather.forecast_profile_state.forecast_profile_id = 2U;
         weather.site_weather_bias = 0.0f;
         event.minutes_until_next_wave =
-            resolve_next_wave_delay_minutes(context, event.wave_sequence_index);
+            resolve_next_wave_delay_minutes(world, event.wave_sequence_index);
         apply_site_weather(
-            context,
+            world,
             baseline_weather.heat,
             baseline_weather.wind,
             baseline_weather.dust,
             baseline_weather.wind_direction_degrees);
         emit_site_one_weather_probe_log(
-            context,
+            world,
+            message_queue,
             "start",
             baseline_weather.heat,
             baseline_weather.wind,
@@ -471,20 +466,21 @@ Gs1Status WeatherEventSystem::process_game_message(
         return GS1_STATUS_OK;
     }
 
-    if (context.world.site_id_value() == 1U)
+    if (world.site_id_value() == 1U)
     {
         weather.forecast_profile_state.forecast_profile_id = 1U;
     }
 
     weather.site_weather_bias = 0.0f;
     apply_site_weather(
-        context,
+        world,
         baseline_weather.heat,
         baseline_weather.wind,
         baseline_weather.dust,
         baseline_weather.wind_direction_degrees);
     emit_site_one_weather_probe_log(
-        context,
+        world,
+        message_queue,
         "start",
         baseline_weather.heat,
         baseline_weather.wind,
@@ -512,24 +508,24 @@ void WeatherEventSystem::run(RuntimeInvocation& invocation)
         return;
     }
 
-    WeatherEventContext context {
-        SiteWorldAccess<WeatherEventSystem> {*site_run},
-        invocation.game_message_queue(),
-        access.template read<RuntimeFixedStepSecondsTag>()};
+    SiteWorldAccess<WeatherEventSystem> world {*site_run};
+    auto& message_queue = invocation.game_message_queue();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
     const double step_minutes =
-        runtime_minutes_from_real_seconds(context.fixed_step_seconds);
-    auto& event = context.world.own_event();
-    const auto& objective = context.world.read_objective();
-    const auto& board = context.world.read_task_board();
+        runtime_minutes_from_real_seconds(fixed_step_seconds);
+    auto& event = world.own_event();
+    const auto& objective = world.read_objective();
+    const auto& board = world.read_task_board();
     const auto baseline_weather =
-        resolve_site_baseline_weather(context.world.site_id_value());
-    const double world_time_minutes = context.world.read_time().world_time_minutes;
-    if (onboarding_chain_weather_locked(context.world.site_id(), board))
+        resolve_site_baseline_weather(world.site_id_value());
+    const double world_time_minutes = world.read_time().world_time_minutes;
+    if (onboarding_chain_weather_locked(world.site_id(), board))
     {
         clear_event_timeline(event);
         event.minutes_until_next_wave = 0.0;
         smooth_site_weather_toward(
-            context,
+            world,
+            fixed_step_seconds,
             baseline_weather.heat,
             baseline_weather.wind,
             baseline_weather.dust,
@@ -542,19 +538,20 @@ void WeatherEventSystem::run(RuntimeInvocation& invocation)
         clear_event_timeline(event);
         if (objective_wave_window_is_active(objective, world_time_minutes) &&
             !has_pending_site_transition_message(
-                context.message_queue,
-                context.world.site_id_value()))
+                message_queue,
+                world.site_id_value()))
         {
             event.minutes_until_next_wave =
                 std::max(0.0, event.minutes_until_next_wave - step_minutes);
             if (event.minutes_until_next_wave <= 0.0)
             {
-                start_next_wave(context);
+                start_next_wave(world);
             }
         }
 
         smooth_site_weather_toward(
-            context,
+            world,
+            fixed_step_seconds,
             baseline_weather.heat,
             baseline_weather.wind,
             baseline_weather.dust,
@@ -569,15 +566,16 @@ void WeatherEventSystem::run(RuntimeInvocation& invocation)
         clear_event_timeline(event);
         if (objective_wave_window_is_active(objective, world_time_minutes) &&
             !has_pending_site_transition_message(
-                context.message_queue,
-                context.world.site_id_value()))
+                message_queue,
+                world.site_id_value()))
         {
             event.minutes_until_next_wave =
-                resolve_next_wave_delay_minutes(context, event.wave_sequence_index);
+                resolve_next_wave_delay_minutes(world, event.wave_sequence_index);
         }
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
+        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
         smooth_site_weather_toward(
-            context,
+            world,
+            fixed_step_seconds,
             baseline_weather.heat,
             baseline_weather.wind,
             baseline_weather.dust,
@@ -592,10 +590,11 @@ void WeatherEventSystem::run(RuntimeInvocation& invocation)
     event.event_dust_pressure = k_mild_weather_dust * pressure_scale;
     if (event.active_event_template_id != previous_template_id)
     {
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
+        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
     }
     smooth_site_weather_toward(
-        context,
+        world,
+        fixed_step_seconds,
         std::clamp(
             baseline_weather.heat + event.event_heat_pressure,
             0.0f,
@@ -608,7 +607,7 @@ void WeatherEventSystem::run(RuntimeInvocation& invocation)
             baseline_weather.dust + event.event_dust_pressure,
             0.0f,
             k_weather_meter_max),
-        resolve_event_wind_direction(context));
+        resolve_event_wind_direction(world));
 }
 }  // namespace gs1
 

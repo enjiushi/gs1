@@ -62,13 +62,6 @@ constexpr TechNodeId k_bureau_t20 {base_technology_node_id(k_bureau_faction, 20U
 constexpr TechNodeId k_bureau_t25 {base_technology_node_id(k_bureau_faction, 25U)};
 constexpr TechNodeId k_bureau_t30 {base_technology_node_id(k_bureau_faction, 30U)};
 
-struct ModifierContext final
-{
-    const CampaignState& campaign;
-    SiteWorldAccess<ModifierSystem> world;
-    double fixed_step_seconds {0.0};
-};
-
 const ModifierSystemTuning& modifier_system_tuning() noexcept
 {
     return gameplay_tuning_def().modifier_system;
@@ -922,18 +915,26 @@ ResolvedModifierOutputs resolve_owned_modifiers(
     return resolved;
 }
 
-void resolve_modifier_totals(ModifierContext& context)
+void resolve_modifier_totals(RuntimeInvocation& invocation)
 {
+    auto access = make_game_state_access<ModifierSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return;
+    }
+
+    SiteWorldAccess<ModifierSystem> world {*site_run};
     const auto next_outputs =
-        resolve_owned_modifiers(context.campaign, context.world.read_modifier(), context.world.read_camp());
-    auto& current_totals = context.world.own_modifier().resolved_channel_totals;
+        resolve_owned_modifiers(*campaign, world.read_modifier(), world.read_camp());
+    auto& current_totals = world.own_modifier().resolved_channel_totals;
     const auto next_terrain_factors = resolve_terrain_factor_modifiers(next_outputs.totals);
-    auto& current_terrain_factors = context.world.own_modifier().resolved_terrain_factor_modifiers;
-    auto& current_action_cost_modifiers = context.world.own_modifier().resolved_action_cost_modifiers;
-    auto& current_harvest_output_modifiers =
-        context.world.own_modifier().resolved_harvest_output_modifiers;
-    auto& current_village_effects = context.world.own_modifier().resolved_village_technology_effects;
-    auto& current_bureau_effects = context.world.own_modifier().resolved_bureau_technology_effects;
+    auto& current_terrain_factors = world.own_modifier().resolved_terrain_factor_modifiers;
+    auto& current_action_cost_modifiers = world.own_modifier().resolved_action_cost_modifiers;
+    auto& current_harvest_output_modifiers = world.own_modifier().resolved_harvest_output_modifiers;
+    auto& current_village_effects = world.own_modifier().resolved_village_technology_effects;
+    auto& current_bureau_effects = world.own_modifier().resolved_bureau_technology_effects;
 
     if (!totals_match(current_totals, next_outputs.totals) ||
         !terrain_factors_match(current_terrain_factors, next_terrain_factors) ||
@@ -956,15 +957,24 @@ void resolve_modifier_totals(ModifierContext& context)
         current_harvest_output_modifiers = next_outputs.harvest_output_modifiers;
         current_village_effects = next_outputs.village_technology_effects;
         current_bureau_effects = next_outputs.bureau_technology_effects;
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
+        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
     }
 }
 
 void handle_site_run_started(
-    ModifierContext& context,
+    RuntimeInvocation& invocation,
     const SiteRunStartedMessage& /*payload*/) noexcept
 {
-    auto& modifier_state = context.world.own_modifier();
+    auto access = make_game_state_access<ModifierSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return;
+    }
+
+    SiteWorldAccess<ModifierSystem> world {*site_run};
+    auto& modifier_state = world.own_modifier();
     modifier_state.active_nearby_aura_modifier_ids.clear();
     modifier_state.active_site_modifiers.clear();
     modifier_state.resolved_channel_totals = {};
@@ -974,21 +984,30 @@ void handle_site_run_started(
     modifier_state.resolved_village_technology_effects = {};
     modifier_state.resolved_bureau_technology_effects = {};
 
-    const auto& aura_ids = context.campaign.loadout_planner_state.active_nearby_aura_modifier_ids;
+    const auto& aura_ids = campaign->loadout_planner_state.active_nearby_aura_modifier_ids;
     modifier_state.active_nearby_aura_modifier_ids.insert(
         modifier_state.active_nearby_aura_modifier_ids.end(),
         aura_ids.begin(),
         aura_ids.end());
-    import_campaign_run_modifiers(context.campaign, modifier_state);
+    import_campaign_run_modifiers(*campaign, modifier_state);
 
-    context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
-    resolve_modifier_totals(context);
+    world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
+    resolve_modifier_totals(invocation);
 }
 
 void handle_inventory_item_use_completed(
-    ModifierContext& context,
+    RuntimeInvocation& invocation,
     const InventoryItemUseCompletedMessage& payload) noexcept
 {
+    auto access = make_game_state_access<ModifierSystem>(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!campaign.has_value() || !site_run.has_value())
+    {
+        return;
+    }
+
+    SiteWorldAccess<ModifierSystem> world {*site_run};
     const ItemId item_id {payload.item_id};
     const auto* item_def = find_item_def(item_id);
     if (item_def == nullptr)
@@ -1000,7 +1019,7 @@ void handle_inventory_item_use_completed(
         item_def->modifier_id.value != 0U
         ? item_def->modifier_id
         : custom_consumable_modifier_id(
-            resolve_village_technology_effects(context.campaign),
+            resolve_village_technology_effects(*campaign),
             item_id);
     if (resolved_modifier_id.value == 0U)
     {
@@ -1017,23 +1036,31 @@ void handle_inventory_item_use_completed(
     const float effect_scale =
         modifier_def->duration_eight_hour_blocks == 0U
         ? 1.0f
-        : resolve_village_technology_effects(context.campaign).timed_buff_effect_multiplier;
+        : resolve_village_technology_effects(*campaign).timed_buff_effect_multiplier;
 
     if (apply_modifier(
-            context.world.own_modifier(),
+            world.own_modifier(),
             *modifier_def,
             item_def->item_id,
             effect_scale))
     {
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
-        resolve_modifier_totals(context);
+        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
+        resolve_modifier_totals(invocation);
     }
 }
 
 void handle_run_modifier_award_requested(
-    ModifierContext& context,
+    RuntimeInvocation& invocation,
     const RunModifierAwardRequestedMessage& payload) noexcept
 {
+    auto access = make_game_state_access<ModifierSystem>(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return;
+    }
+
+    SiteWorldAccess<ModifierSystem> world {*site_run};
     if (payload.modifier_id == 0U)
     {
         return;
@@ -1047,30 +1074,38 @@ void handle_run_modifier_award_requested(
     }
 
     if (apply_modifier(
-            context.world.own_modifier(),
+            world.own_modifier(),
             *modifier_def,
             ItemId {}))
     {
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
-        resolve_modifier_totals(context);
+        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
+        resolve_modifier_totals(invocation);
     }
 }
 
 void handle_site_modifier_end_requested(
-    ModifierContext& context,
+    RuntimeInvocation& invocation,
     const SiteModifierEndRequestedMessage& payload) noexcept
 {
+    auto access = make_game_state_access<ModifierSystem>(invocation);
+    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    if (!site_run.has_value())
+    {
+        return;
+    }
+
+    SiteWorldAccess<ModifierSystem> world {*site_run};
     if (payload.modifier_id == 0U)
     {
         return;
     }
 
     if (end_timed_modifier(
-            context.world.own_modifier(),
+            world.own_modifier(),
             ModifierId {payload.modifier_id}))
     {
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
-        resolve_modifier_totals(context);
+        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
+        resolve_modifier_totals(invocation);
     }
 }
 }  // namespace
@@ -1118,36 +1153,31 @@ Gs1Status ModifierSystem::process_game_message(
     auto access = make_game_state_access<ModifierSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
     auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
     if (!campaign.has_value() || !site_run.has_value())
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
-    ModifierContext context {
-        *campaign,
-        SiteWorldAccess<ModifierSystem> {*site_run},
-        fixed_step_seconds};
     if (message.type == GameMessageType::SiteRunStarted)
     {
-        handle_site_run_started(context, message.payload_as<SiteRunStartedMessage>());
+        handle_site_run_started(invocation, message.payload_as<SiteRunStartedMessage>());
     }
     else if (message.type == GameMessageType::RunModifierAwardRequested)
     {
         handle_run_modifier_award_requested(
-            context,
+            invocation,
             message.payload_as<RunModifierAwardRequestedMessage>());
     }
     else if (message.type == GameMessageType::InventoryItemUseCompleted)
     {
         handle_inventory_item_use_completed(
-            context,
+            invocation,
             message.payload_as<InventoryItemUseCompletedMessage>());
     }
     else if (message.type == GameMessageType::SiteModifierEndRequested)
     {
         handle_site_modifier_end_requested(
-            context,
+            invocation,
             message.payload_as<SiteModifierEndRequestedMessage>());
     }
 
@@ -1161,16 +1191,11 @@ Gs1Status ModifierSystem::process_host_message(
     auto access = make_game_state_access<ModifierSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
     auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
     if (!campaign.has_value() || !site_run.has_value())
     {
         return GS1_STATUS_OK;
     }
 
-    ModifierContext context {
-        *campaign,
-        SiteWorldAccess<ModifierSystem> {*site_run},
-        fixed_step_seconds};
     if (message.type != GS1_HOST_EVENT_UI_ACTION)
     {
         return GS1_STATUS_OK;
@@ -1188,7 +1213,7 @@ Gs1Status ModifierSystem::process_host_message(
     }
 
     handle_site_modifier_end_requested(
-        context,
+        invocation,
         SiteModifierEndRequestedMessage {action.target_id});
     return GS1_STATUS_OK;
 }
@@ -1212,24 +1237,21 @@ void ModifierSystem::run(RuntimeInvocation& invocation)
         return;
     }
 
-    ModifierContext context {
-        *campaign,
-        SiteWorldAccess<ModifierSystem> {*site_run},
-        fixed_step_seconds};
+    SiteWorldAccess<ModifierSystem> world {*site_run};
     const auto tick_result = tick_timed_modifiers(
-        context.world.own_modifier(),
-        runtime_minutes_from_real_seconds(context.fixed_step_seconds));
+        world.own_modifier(),
+        runtime_minutes_from_real_seconds(fixed_step_seconds));
     if (tick_result.projection_changed)
     {
-        context.world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
+        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
     }
     if (tick_result.modifier_set_changed)
     {
-        resolve_modifier_totals(context);
+        resolve_modifier_totals(invocation);
         return;
     }
 
-    resolve_modifier_totals(context);
+    resolve_modifier_totals(invocation);
 }
 }  // namespace gs1
 
