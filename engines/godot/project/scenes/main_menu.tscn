@@ -11,10 +11,6 @@ grow_horizontal = 2
 grow_vertical = 2
 theme = ExtResource("2_theme")
 
-[node name="ActionPanelController" type="Gs1GodotActionPanelController" parent="."]
-layout_mode = 1
-mouse_filter = 2
-
 [node name="BackdropViewport" type="SubViewportContainer" parent="." unique_id=27601693]
 layout_mode = 1
 anchors_preset = 15
@@ -69,25 +65,16 @@ theme_override_constants/separation = 14
 custom_minimum_size = Vector2(0, 54)
 layout_mode = 2
 size_flags_horizontal = 3
-metadata/gs1_panel_id = 1
-metadata/gs1_slot_id = 1
 text = "Start New Campaign"
-groups = ["gs1_slot_button"]
 
 [node name="MenuSettingsButton" type="Button" parent="HudMargin/RootVBox/MenuWrap/MenuPanel/MenuVBox" unique_id=732670092]
 custom_minimum_size = Vector2(0, 54)
 layout_mode = 2
 size_flags_horizontal = 3
-metadata/gs1_panel_id = 1
-metadata/gs1_slot_id = 2
 text = "Settings"
-groups = ["gs1_slot_button"]
 
 [node name="QuitButton" type="Button" parent="HudMargin/RootVBox/MenuWrap/MenuPanel/MenuVBox" unique_id=1390229338]
 custom_minimum_size = Vector2(0, 54)
 layout_mode = 2
 size_flags_horizontal = 3
-metadata/gs1_panel_id = 1
-metadata/gs1_slot_id = 3
 text = "Quit"
-groups = ["gs1_slot_button"]

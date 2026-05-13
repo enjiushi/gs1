@@ -43,5 +43,3 @@ custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Research & Unlocks"
-metadata/gs1_panel_id = 2
-metadata/gs1_slot_id = 1

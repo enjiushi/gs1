@@ -252,6 +252,7 @@ void rebuild_site_view(
     cache.task_reward_draft_options.clear();
     cache.active_modifiers.clear();
     cache.phone_listings.clear();
+    cache.craft_context_options.clear();
 
     for (const auto& storage : site_run.inventory.storage_containers)
     {
@@ -379,6 +380,18 @@ void rebuild_site_view(
             0U});
     }
 
+    const auto& craft_context = site_run.craft.context_presentation;
+    if (craft_context.occupied)
+    {
+        cache.craft_context_options.reserve(craft_context.options.size());
+        for (const auto& option : craft_context.options)
+        {
+            cache.craft_context_options.push_back(Gs1CraftContextOptionView {
+                option.recipe_id,
+                option.output_item_id});
+        }
+    }
+
     const SiteWorld::WorkerData worker =
         site_run.site_world != nullptr ? site_run.site_world->worker() : SiteWorld::WorkerData {};
     const auto event_template_id = site_run.event.active_event_template_id.has_value()
@@ -387,6 +400,7 @@ void rebuild_site_view(
     const auto current_action_id = site_run.site_action.current_action_id.has_value()
         ? id_value(site_run.site_action.current_action_id.value())
         : 0U;
+    const auto& placement_mode = site_run.site_action.placement_mode;
 
     cache.site = Gs1SiteStateView {
         id_value(site_run.site_run_id),
@@ -468,6 +482,27 @@ void rebuild_site_view(
             site_run.site_action.started_at_world_minute.value_or(0.0),
             site_run.site_action.started_at_world_minute.has_value() ? 1U : 0U,
             {0U, 0U, 0U, 0U, 0U, 0U, 0U}},
+        Gs1PlacementModeView {
+            static_cast<Gs1SiteActionKind>(placement_mode.action_kind),
+            placement_mode.active ? 1U : 0U,
+            placement_mode.quantity,
+            placement_mode.target_tile.has_value() ? placement_mode.target_tile->x : 0,
+            placement_mode.target_tile.has_value() ? placement_mode.target_tile->y : 0,
+            placement_mode.target_tile.has_value() ? 1U : 0U,
+            placement_mode.request_flags,
+            placement_mode.footprint_width,
+            placement_mode.footprint_height,
+            placement_mode.primary_subject_id,
+            placement_mode.secondary_subject_id,
+            placement_mode.item_id,
+            placement_mode.blocked_mask},
+        Gs1CraftContextView {
+            craft_context.tile_coord.x,
+            craft_context.tile_coord.y,
+            craft_context.occupied ? 1U : 0U,
+            {0U, 0U, 0U},
+            cache.craft_context_options.empty() ? nullptr : cache.craft_context_options.data(),
+            static_cast<std::uint32_t>(cache.craft_context_options.size())},
         Gs1SiteObjectiveView {
             static_cast<std::uint8_t>(site_run.objective.type),
             static_cast<std::uint8_t>(site_run.objective.target_edge),

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gs1_godot_adapter_service.h"
-#include "gs1_godot_projection_types.h"
+#include "gs1/state_view.h"
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/control.hpp>
@@ -16,6 +16,7 @@
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 class Gs1GodotCraftPanelController final
     : public godot::Control
@@ -48,9 +49,31 @@ private:
         godot::ObjectID object_id {};
     };
 
+    struct CraftOptionState final
+    {
+        std::uint32_t recipe_id {0U};
+        std::uint32_t output_item_id {0U};
+    };
+
+    struct CraftContextState final
+    {
+        std::int32_t tile_x {0};
+        std::int32_t tile_y {0};
+        std::vector<CraftOptionState> options {};
+    };
+
+    struct PlacementPreviewState final
+    {
+        std::int32_t tile_x {0};
+        std::int32_t tile_y {0};
+        std::uint64_t blocked_mask {0ULL};
+        std::uint32_t item_id {0U};
+    };
+
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
     void submit_craft_option(int tile_x, int tile_y, int output_item_id);
+    void refresh_from_game_state_view();
     void apply_panel_visibility();
     void update_craft_summary();
     void reconcile_craft_option_buttons();
@@ -71,9 +94,9 @@ private:
     godot::VBoxContainer* craft_options_ {nullptr};
     godot::Control* owner_control_ {nullptr};
     Gs1GodotAdapterService* adapter_service_ {nullptr};
-    std::optional<Gs1RuntimePlacementPreviewProjection> placement_preview_ {};
-    std::optional<Gs1RuntimePlacementFailureProjection> placement_failure_ {};
-    std::optional<Gs1RuntimeCraftContextProjection> craft_context_ {};
+    std::optional<PlacementPreviewState> placement_preview_ {};
+    std::optional<Gs1EngineMessagePlacementFailureData> placement_failure_ {};
+    std::optional<CraftContextState> craft_context_ {};
     SubmitCraftOptionFn submit_craft_option_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> craft_option_buttons_ {};
 };

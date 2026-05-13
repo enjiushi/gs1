@@ -1,4 +1,3 @@
-#include "gs1_godot_action_panel_controller.h"
 #include "gs1_godot_craft_panel_controller.h"
 #include "gs1_godot_director_control.h"
 #include "gs1_godot_inventory_panel_controller.h"
@@ -34,7 +33,6 @@ void initialize_gs1_godot_adapter(ModuleInitializationLevel level)
         return;
     }
 
-    GDREGISTER_CLASS(Gs1GodotActionPanelController);
     GDREGISTER_CLASS(Gs1GodotCraftPanelController);
     GDREGISTER_CLASS(Gs1GodotInventoryPanelController);
     GDREGISTER_CLASS(Gs1GodotMainMenuUiController);

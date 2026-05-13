@@ -83,6 +83,10 @@ void Gs1GodotCraftPanelController::_ready()
     {
         cache_ui_references(*owner);
     }
+    refresh_from_game_state_view();
+    apply_panel_visibility();
+    update_craft_summary();
+    reconcile_craft_option_buttons();
 }
 
 void Gs1GodotCraftPanelController::_exit_tree()
@@ -167,10 +171,8 @@ bool Gs1GodotCraftPanelController::handles_engine_message(Gs1EngineMessageType t
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_BEGIN:
-    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_OPTION_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_END:
-    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW:
+    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
+    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
     case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_FAILURE:
         return true;
     default:
@@ -182,35 +184,10 @@ void Gs1GodotCraftPanelController::handle_engine_message(const Gs1EngineMessage&
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_BEGIN:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessageCraftContextData>();
-        craft_context_ = Gs1RuntimeCraftContextProjection {};
-        craft_context_->tile_x = payload.tile_x;
-        craft_context_->tile_y = payload.tile_y;
-        craft_context_->flags = payload.flags;
-        craft_context_->options.clear();
-        craft_context_->options.reserve(payload.option_count);
+    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
+    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
+        refresh_from_game_state_view();
         break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_OPTION_UPSERT:
-        if (craft_context_.has_value()) craft_context_->options.push_back(message.payload_as<Gs1EngineMessageCraftContextOptionData>());
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_END:
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessagePlacementPreviewData>();
-        if ((payload.flags & 1U) == 0U)
-        {
-            placement_preview_.reset();
-        }
-        else
-        {
-            placement_preview_ = payload;
-        }
-        break;
-    }
     case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_FAILURE:
         placement_failure_ = message.payload_as<Gs1EngineMessagePlacementFailureData>();
         break;
@@ -230,6 +207,53 @@ void Gs1GodotCraftPanelController::handle_runtime_message_reset()
     craft_context_.reset();
     prune_button_registry(craft_option_buttons_, {});
     apply_panel_visibility();
+}
+
+void Gs1GodotCraftPanelController::refresh_from_game_state_view()
+{
+    placement_preview_.reset();
+    craft_context_.reset();
+
+    if (adapter_service_ == nullptr)
+    {
+        placement_failure_.reset();
+        return;
+    }
+
+    Gs1GameStateView view {};
+    if (!adapter_service_->get_game_state_view(view) ||
+        view.has_active_site == 0U ||
+        view.active_site == nullptr)
+    {
+        placement_failure_.reset();
+        return;
+    }
+
+    const Gs1SiteStateView& site = *view.active_site;
+    if (site.placement_mode.active != 0U)
+    {
+        placement_preview_ = PlacementPreviewState {
+            site.placement_mode.target_tile_x,
+            site.placement_mode.target_tile_y,
+            site.placement_mode.blocked_mask,
+            site.placement_mode.item_id};
+    }
+
+    if (site.craft_context.occupied != 0U)
+    {
+        CraftContextState context {};
+        context.tile_x = site.craft_context.tile_x;
+        context.tile_y = site.craft_context.tile_y;
+        context.options.reserve(site.craft_context.option_count);
+        for (std::uint32_t index = 0; index < site.craft_context.option_count; ++index)
+        {
+            const Gs1CraftContextOptionView& option = site.craft_context.options[index];
+            context.options.push_back(CraftOptionState {
+                option.recipe_id,
+                option.output_item_id});
+        }
+        craft_context_ = std::move(context);
+    }
 }
 
 void Gs1GodotCraftPanelController::apply_panel_visibility()
@@ -318,7 +342,7 @@ void Gs1GodotCraftPanelController::reconcile_craft_option_buttons()
                 "[ITM] Craft %s",
                 recipe_output_name_for(
                     static_cast<int>(option.recipe_id),
-                    static_cast<int>(option.output_item_id))));
+                    output_item_id)));
             button->set_tooltip_text(String());
             button->set_meta("tile_x", context_x);
             button->set_meta("tile_y", context_y);

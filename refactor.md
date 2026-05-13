@@ -660,12 +660,12 @@ This section records the remaining work still not completed in the current repos
 
 ### Incomplete Godot host migration
 
-- [ ] Finish migrating the Godot adapter from snapshot/upsert projection consumption to direct gameplay-state reads through `Gs1GameStateView` and targeted query helpers.
+- [x] Finish migrating the Godot adapter from snapshot/upsert projection consumption to direct gameplay-state reads through `Gs1GameStateView` and targeted query helpers.
 - [x] Replace remaining regional-map snapshot consumers with direct state-read controllers.
 - [x] Replace remaining site-session snapshot/upsert consumers with direct state-read controllers.
-- [ ] Replace remaining scene/panel controllers that still depend on projection message families with host-owned UI/session state plus authoritative gameplay-state reads.
+- [x] Replace remaining scene/panel controllers that still depend on projection message families with host-owned UI/session state plus authoritative gameplay-state reads.
 - [x] Keep scene/lifecycle coordination messages such as `SITE_SCENE_READY`, but stop relying on projection snapshots as the primary read path.
-- [ ] Preserve stable gameplay-ID to Godot-object reconciliation while completing the migration away from projection-state transfer.
+- [x] Preserve stable gameplay-ID to Godot-object reconciliation while completing the migration away from projection-state transfer.
 
 ### Incomplete host-boundary simplification
 

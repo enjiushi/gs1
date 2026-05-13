@@ -34,6 +34,7 @@ struct RuntimeGameStateViewCache final
     std::vector<Gs1TaskRewardDraftOptionView> task_reward_draft_options {};
     std::vector<Gs1SiteModifierView> active_modifiers {};
     std::vector<Gs1PhoneListingView> phone_listings {};
+    std::vector<Gs1CraftContextOptionView> craft_context_options {};
 
     std::uint32_t revision {0};
 };

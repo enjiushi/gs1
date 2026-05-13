@@ -197,6 +197,39 @@ struct Gs1PhoneListingView
     std::uint8_t reserved0;
 };
 
+struct Gs1CraftContextOptionView
+{
+    std::uint32_t recipe_id;
+    std::uint32_t output_item_id;
+};
+
+struct Gs1CraftContextView
+{
+    std::int32_t tile_x;
+    std::int32_t tile_y;
+    std::uint8_t occupied;
+    std::uint8_t reserved0[3];
+    const Gs1CraftContextOptionView* options;
+    std::uint32_t option_count;
+};
+
+struct Gs1PlacementModeView
+{
+    Gs1SiteActionKind action_kind;
+    std::uint8_t active;
+    std::uint16_t quantity;
+    std::int32_t target_tile_x;
+    std::int32_t target_tile_y;
+    std::uint8_t has_target_tile;
+    std::uint8_t request_flags;
+    std::uint8_t footprint_width;
+    std::uint8_t footprint_height;
+    std::uint32_t primary_subject_id;
+    std::uint32_t secondary_subject_id;
+    std::uint32_t item_id;
+    std::uint64_t blocked_mask;
+};
+
 struct Gs1WorkerStateView
 {
     std::uint64_t worker_entity_id;
@@ -333,6 +366,8 @@ struct Gs1SiteStateView
     Gs1WeatherStateView weather;
     Gs1SiteEventView event;
     Gs1SiteActionView action;
+    Gs1PlacementModeView placement_mode;
+    Gs1CraftContextView craft_context;
     Gs1SiteObjectiveView objective;
     Gs1WorkerStateView worker;
     std::int32_t current_cash_points;
@@ -413,3 +448,9 @@ static_assert(std::is_standard_layout_v<Gs1GameStateView>);
 static_assert(std::is_trivially_copyable_v<Gs1GameStateView>);
 static_assert(std::is_standard_layout_v<Gs1SiteTileView>);
 static_assert(std::is_trivially_copyable_v<Gs1SiteTileView>);
+static_assert(std::is_standard_layout_v<Gs1CraftContextOptionView>);
+static_assert(std::is_trivially_copyable_v<Gs1CraftContextOptionView>);
+static_assert(std::is_standard_layout_v<Gs1CraftContextView>);
+static_assert(std::is_trivially_copyable_v<Gs1CraftContextView>);
+static_assert(std::is_standard_layout_v<Gs1PlacementModeView>);
+static_assert(std::is_trivially_copyable_v<Gs1PlacementModeView>);
