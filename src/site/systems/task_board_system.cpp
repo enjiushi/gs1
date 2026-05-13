@@ -11,7 +11,6 @@
 #include "runtime/game_runtime.h"
 #include "runtime/runtime_clock.h"
 #include "site/defs/site_action_defs.h"
-#include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 
 #include <algorithm>
@@ -1230,8 +1229,7 @@ bool remove_task_id(std::vector<TaskInstanceId>& list, TaskInstanceId id) noexce
 
 void mark_task_projection_dirty(RuntimeInvocation& invocation) noexcept
 {
-    task_board_world(invocation).mark_projection_dirty(
-        SITE_PROJECTION_UPDATE_TASKS | SITE_PROJECTION_UPDATE_PHONE | SITE_PROJECTION_UPDATE_HUD);
+    (void)invocation;
 }
 
 bool queue_reward_message(
@@ -2219,13 +2217,6 @@ void handle_task_reward_claim_requested(
         mark_task_projection_dirty(invocation);
     }
 
-    GameMessage resolved_message {};
-    resolved_message.type = GameMessageType::TaskRewardClaimResolved;
-    resolved_message.set_payload(TaskRewardClaimResolvedMessage {
-        claimed_task_instance_id,
-        claimed_task_template_id,
-        reward_candidate_count});
-    task_board_message_queue(invocation).push_back(resolved_message);
 }
 
 void handle_restoration_progress(

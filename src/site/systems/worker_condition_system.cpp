@@ -4,7 +4,6 @@
 #include "content/defs/gameplay_tuning_defs.h"
 #include "runtime/game_runtime.h"
 #include "runtime/runtime_clock.h"
-#include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 
 #include <algorithm>
@@ -314,8 +313,6 @@ void emit_worker_meters_changed_if_needed(
             snapshot.morale,
             snapshot.work_efficiency});
         message_queue.push_back(message);
-        world.mark_projection_dirty(
-            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
         memory.last_reported_snapshot = snapshot;
     }
 }

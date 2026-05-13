@@ -8,10 +8,8 @@
 #include "runtime/game_runtime.h"
 #include "site/craft_logic.h"
 #include "site/defs/site_action_defs.h"
-#include "site/device_interaction_logic.h"
 #include "site/inventory_state.h"
 #include "site/inventory_storage.h"
-#include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 #include "site/site_world_components.h"
 
@@ -37,8 +35,7 @@ struct system_state_tags<InventorySystem>
     using type = type_list<
         RuntimeCampaignTag,
         RuntimeActiveSiteRunTag,
-        RuntimeFixedStepSecondsTag,
-        RuntimeMoveDirectionTag>;
+        RuntimeFixedStepSecondsTag>;
 };
 
 namespace
@@ -157,104 +154,6 @@ bool storage_is_retrieval_only(const StorageContainerState& storage_state) noexc
     return (storage_state.flags & inventory_storage::k_inventory_storage_flag_retrieval_only) != 0U;
 }
 
-void clear_pending_device_storage_open(InventoryState& inventory) noexcept
-{
-    inventory.pending_device_storage_open = {};
-}
-
-bool has_pending_device_storage_open(const InventoryState& inventory) noexcept
-{
-    return inventory.pending_device_storage_open.active &&
-        inventory.pending_device_storage_open.storage_id != 0U;
-}
-
-bool clear_pending_device_storage_open_for_storage(
-    InventoryState& inventory,
-    std::uint32_t storage_id) noexcept
-{
-    if (!has_pending_device_storage_open(inventory) ||
-        inventory.pending_device_storage_open.storage_id != storage_id)
-    {
-        return false;
-    }
-
-    clear_pending_device_storage_open(inventory);
-    return true;
-}
-
-bool open_device_storage_now(
-    RuntimeInvocation& invocation,
-    std::uint32_t storage_id) noexcept
-{
-    auto& inventory = inventory_world(invocation).own_inventory();
-    clear_pending_device_storage_open(inventory);
-    inventory.opened_device_storage_id = storage_id;
-    inventory_world(invocation).mark_inventory_view_state_projection_dirty();
-    inventory_world(invocation).mark_opened_inventory_storage_full_projection_dirty();
-    return true;
-}
-
-void close_opened_device_storage_if_out_of_range(
-    RuntimeInvocation& invocation) noexcept
-{
-    auto& inventory = inventory_world(invocation).own_inventory();
-    if (inventory.opened_device_storage_id == 0U)
-    {
-        return;
-    }
-
-    const auto* storage_state =
-        inventory_storage::storage_container_state_for_storage_id(
-            inventory_site_run(invocation),
-            inventory.opened_device_storage_id);
-    if (storage_state == nullptr ||
-        storage_state->container_kind != GS1_INVENTORY_CONTAINER_DEVICE_STORAGE ||
-        !device_interaction_logic::worker_is_in_interaction_range(
-            inventory_site_run(invocation),
-            inventory_world(invocation).read_worker(),
-            storage_state->tile_coord))
-    {
-        inventory.opened_device_storage_id = 0U;
-        inventory_world(invocation).mark_inventory_view_state_projection_dirty();
-    }
-}
-
-void progress_pending_device_storage_open(RuntimeInvocation& invocation) noexcept
-{
-    auto& inventory = inventory_world(invocation).own_inventory();
-    if (!has_pending_device_storage_open(inventory))
-    {
-        return;
-    }
-
-    const auto storage_id = inventory.pending_device_storage_open.storage_id;
-    const auto* storage_state =
-        inventory_storage::storage_container_state_for_storage_id(inventory_site_run(invocation), storage_id);
-    if (storage_state == nullptr ||
-        storage_state->container_kind != GS1_INVENTORY_CONTAINER_DEVICE_STORAGE)
-    {
-        clear_pending_device_storage_open(inventory);
-        return;
-    }
-
-    if (!device_interaction_logic::tile_is_traversable(
-            inventory_site_run(invocation),
-            inventory.pending_device_storage_open.approach_tile))
-    {
-        clear_pending_device_storage_open(inventory);
-        return;
-    }
-
-    if (!device_interaction_logic::worker_is_at_tile(
-            inventory_world(invocation).read_worker(),
-            inventory.pending_device_storage_open.approach_tile))
-    {
-        return;
-    }
-
-    (void)open_device_storage_now(invocation, storage_id);
-}
-
 bool ensure_inventory_storage_initialized(RuntimeInvocation& invocation) noexcept
 {
     auto& inventory = inventory_world(invocation).own_inventory();
@@ -319,7 +218,7 @@ bool ensure_device_storage_containers(RuntimeInvocation& invocation) noexcept
 
     if (created_any)
     {
-        inventory_world(invocation).mark_inventory_storage_descriptors_projection_dirty();
+        // Storage membership is reflected through the exported state view.
     }
 
     return created_any;
@@ -361,16 +260,10 @@ flecs::entity resolve_delivery_box_container(RuntimeInvocation& invocation) noex
 
 void mark_changed_slot_views(
     RuntimeInvocation& invocation,
-    const std::vector<InventorySlot>& before_worker,
-    std::uint32_t before_opened_storage_id,
-    const std::vector<InventorySlot>& before_opened_storage) noexcept
+    const std::vector<InventorySlot>& before_worker) noexcept
 {
     const auto& inventory = inventory_world(invocation).read_inventory();
-    if (before_worker.size() != inventory.worker_pack_slots.size())
-    {
-        inventory_world(invocation).mark_inventory_storage_descriptors_projection_dirty();
-    }
-    else
+    if (before_worker.size() == inventory.worker_pack_slots.size())
     {
         for (std::size_t index = 0; index < before_worker.size(); ++index)
         {
@@ -383,51 +276,8 @@ void mark_changed_slot_views(
                 lhs.item_freshness != rhs.item_freshness ||
                 lhs.occupied != rhs.occupied)
             {
-                inventory_world(invocation).mark_inventory_slot_projection_dirty(
-                    GS1_INVENTORY_CONTAINER_WORKER_PACK,
-                    static_cast<std::uint32_t>(index));
+                break;
             }
-        }
-    }
-
-    const auto after_opened_storage_id = inventory.opened_device_storage_id;
-    if (before_opened_storage_id != after_opened_storage_id)
-    {
-        inventory_world(invocation).mark_inventory_view_state_projection_dirty();
-        if (after_opened_storage_id != 0U)
-        {
-            inventory_world(invocation).mark_opened_inventory_storage_full_projection_dirty();
-        }
-        return;
-    }
-
-    if (after_opened_storage_id == 0U)
-    {
-        return;
-    }
-
-    const auto after_opened_storage =
-        capture_storage_projection_slots(inventory_site_run(invocation), after_opened_storage_id);
-    if (before_opened_storage.size() != after_opened_storage.size())
-    {
-        inventory_world(invocation).mark_opened_inventory_storage_full_projection_dirty();
-        return;
-    }
-
-    for (std::size_t index = 0; index < before_opened_storage.size(); ++index)
-    {
-        const auto& lhs = before_opened_storage[index];
-        const auto& rhs = after_opened_storage[index];
-        if (lhs.item_instance_id != rhs.item_instance_id ||
-            lhs.item_id != rhs.item_id ||
-            lhs.item_quantity != rhs.item_quantity ||
-            lhs.item_condition != rhs.item_condition ||
-            lhs.item_freshness != rhs.item_freshness ||
-            lhs.occupied != rhs.occupied)
-        {
-            inventory_world(invocation).mark_inventory_slot_projection_dirty_by_storage(
-                after_opened_storage_id,
-                static_cast<std::uint32_t>(index));
         }
     }
 }
@@ -439,24 +289,14 @@ Gs1Status mutate_inventory_storage(
 {
     const bool storage_changed = ensure_inventory_storage_initialized(invocation);
     const auto before_worker = inventory_world(invocation).read_inventory().worker_pack_slots;
-    const auto before_opened_storage_id = inventory_world(invocation).read_inventory().opened_device_storage_id;
-    const auto before_opened_storage =
-        capture_storage_projection_slots(inventory_site_run(invocation), before_opened_storage_id);
     const auto status = func();
     if (status != GS1_STATUS_OK)
     {
         return status;
     }
 
-    if (storage_changed)
-    {
-        inventory_world(invocation).mark_inventory_storage_descriptors_projection_dirty();
-    }
-    mark_changed_slot_views(
-        invocation,
-        before_worker,
-        before_opened_storage_id,
-        before_opened_storage);
+    (void)storage_changed;
+    mark_changed_slot_views(invocation, before_worker);
     return GS1_STATUS_OK;
 }
 
@@ -765,7 +605,6 @@ Gs1Status resolve_inventory_item_use(
     }
 
     emit_item_use_completed(invocation, stack->item_id, requested_quantity);
-    inventory_world(invocation).mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
     return GS1_STATUS_OK;
 }
 
@@ -811,7 +650,6 @@ Gs1Status handle_inventory_item_consume(
         if (item_def != nullptr && item_is_directly_usable(*item_def))
         {
             emit_item_use_completed(invocation, item_id, quantity);
-            inventory_world(invocation).mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
         }
         return GS1_STATUS_OK;
     });
@@ -988,15 +826,7 @@ Gs1Status handle_site_device_broken(
 
         const auto storage_id =
             inventory_storage::storage_id_for_container(inventory_site_run(invocation), container);
-        if (inventory_world(invocation).own_inventory().opened_device_storage_id == storage_id)
-        {
-            inventory_world(invocation).own_inventory().opened_device_storage_id = 0U;
-        }
-
-        if (inventory_storage::destroy_storage_container(inventory_site_run(invocation), container))
-        {
-            inventory_world(invocation).mark_inventory_storage_descriptors_projection_dirty();
-        }
+        (void)inventory_storage::destroy_storage_container(inventory_site_run(invocation), container);
         return GS1_STATUS_OK;
     });
 }
@@ -1261,21 +1091,20 @@ Gs1Status handle_inventory_slot_tapped(
             return GS1_STATUS_OK;
         }
 
-        const auto opened_storage_id = inventory_world(invocation).read_inventory().opened_device_storage_id;
-        if (opened_storage_id != 0U &&
-            opened_storage_id != payload.storage_id)
+        if (payload.companion_storage_id != 0U &&
+            payload.companion_storage_id != payload.storage_id)
         {
             const auto* destination_storage =
                 inventory_storage::storage_container_state_for_storage_id(
                     inventory_site_run(invocation),
-                    opened_storage_id);
+                    payload.companion_storage_id);
             if (destination_storage != nullptr &&
                 destination_storage->container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE &&
                 !storage_is_retrieval_only(*destination_storage))
             {
                 InventoryTransferRequestedMessage transfer {};
                 transfer.source_storage_id = payload.storage_id;
-                transfer.destination_storage_id = opened_storage_id;
+                transfer.destination_storage_id = payload.companion_storage_id;
                 transfer.source_slot_index = payload.slot_index;
                 transfer.quantity = static_cast<std::uint16_t>(
                     std::min<std::uint32_t>(source_stack->quantity, 65535U));
@@ -1365,87 +1194,6 @@ Gs1Status handle_inventory_item_submit(
         inventory_message_queue(invocation).push_back(completed_message);
         return GS1_STATUS_OK;
     });
-}
-
-Gs1Status handle_inventory_storage_view_request(
-    RuntimeInvocation& invocation,
-    const InventoryStorageViewRequestMessage& payload) noexcept
-{
-    ensure_inventory_storage_initialized(invocation);
-
-    if (payload.event_kind == GS1_INVENTORY_VIEW_EVENT_CLOSE)
-    {
-        auto& inventory = inventory_world(invocation).own_inventory();
-        if (payload.storage_id == inventory.worker_pack_storage_id)
-        {
-            if (inventory.worker_pack_panel_open)
-            {
-                inventory.worker_pack_panel_open = false;
-                inventory_world(invocation).mark_inventory_view_state_projection_dirty();
-            }
-            return GS1_STATUS_OK;
-        }
-
-        const bool cleared_pending =
-            clear_pending_device_storage_open_for_storage(inventory, payload.storage_id);
-        if (inventory.opened_device_storage_id == payload.storage_id)
-        {
-            inventory.opened_device_storage_id = 0U;
-            inventory_world(invocation).mark_inventory_view_state_projection_dirty();
-        }
-        else if (cleared_pending)
-        {
-            return GS1_STATUS_OK;
-        }
-        return GS1_STATUS_OK;
-    }
-
-    if (payload.event_kind != GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT)
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    if (payload.storage_id == inventory_world(invocation).read_inventory().worker_pack_storage_id)
-    {
-        auto& inventory = inventory_world(invocation).own_inventory();
-        if (!inventory.worker_pack_panel_open)
-        {
-            inventory.worker_pack_panel_open = true;
-            inventory_world(invocation).mark_inventory_view_state_projection_dirty();
-        }
-        return GS1_STATUS_OK;
-    }
-
-    const auto* storage_state =
-        inventory_storage::storage_container_state_for_storage_id(inventory_site_run(invocation), payload.storage_id);
-    if (storage_state == nullptr ||
-        storage_state->container_kind != GS1_INVENTORY_CONTAINER_DEVICE_STORAGE)
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    const auto worker = inventory_world(invocation).read_worker();
-    const auto approach_tile =
-        device_interaction_logic::resolve_interaction_range_approach_tile(
-            inventory_site_run(invocation),
-            worker,
-            storage_state->tile_coord);
-    if (!approach_tile.has_value())
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    if (device_interaction_logic::worker_is_at_tile(worker, *approach_tile))
-    {
-        (void)open_device_storage_now(invocation, payload.storage_id);
-        return GS1_STATUS_OK;
-    }
-
-    auto& inventory = inventory_world(invocation).own_inventory();
-    inventory.pending_device_storage_open.storage_id = payload.storage_id;
-    inventory.pending_device_storage_open.approach_tile = *approach_tile;
-    inventory.pending_device_storage_open.active = true;
-    return GS1_STATUS_OK;
 }
 
 Gs1Status handle_inventory_delivery_requested(
@@ -1561,10 +1309,6 @@ void progress_pending_deliveries(RuntimeInvocation& invocation) noexcept
     }
 
     const auto before_worker = inventory.worker_pack_slots;
-    const auto before_opened_storage_id = inventory.opened_device_storage_id;
-    const auto before_opened_storage =
-        capture_storage_projection_slots(inventory_site_run(invocation), before_opened_storage_id);
-
     for (auto& delivery : inventory.pending_delivery_queue)
     {
         try_add_delivery_to_crate(invocation, delivery);
@@ -1579,11 +1323,7 @@ void progress_pending_deliveries(RuntimeInvocation& invocation) noexcept
             }),
         inventory.pending_delivery_queue.end());
 
-    mark_changed_slot_views(
-        invocation,
-        before_worker,
-        before_opened_storage_id,
-        before_opened_storage);
+    mark_changed_slot_views(invocation, before_worker);
 }
 
 }  // namespace
@@ -1608,7 +1348,6 @@ GameMessageSubscriptionSpan InventorySystem::subscribed_game_messages() const no
         GameMessageType::InventoryGlobalItemConsumeRequested,
         GameMessageType::InventoryTransferRequested,
         GameMessageType::InventoryItemSubmitRequested,
-        GameMessageType::InventoryStorageViewRequest,
         GameMessageType::InventorySlotTapped,
         GameMessageType::InventoryCraftCommitRequested,
     };
@@ -1618,8 +1357,6 @@ GameMessageSubscriptionSpan InventorySystem::subscribed_game_messages() const no
 HostMessageSubscriptionSpan InventorySystem::subscribed_host_messages() const noexcept
 {
     static constexpr Gs1HostMessageType subscriptions[] = {
-        GS1_HOST_EVENT_SITE_MOVE_DIRECTION,
-        GS1_HOST_EVENT_SITE_STORAGE_VIEW,
         GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP,
     };
     return subscriptions;
@@ -1649,14 +1386,6 @@ Gs1Status InventorySystem::process_game_message(
 
     switch (message.type)
     {
-    case GameMessageType::StartSiteAction:
-        if (gs1_action_impacts_worker_movement(
-                message.payload_as<StartSiteActionMessage>().action_kind))
-        {
-            clear_pending_device_storage_open(inventory_world(invocation).own_inventory());
-        }
-        return GS1_STATUS_OK;
-
     case GameMessageType::SiteRunStarted:
         seed_inventory_from_loadout(invocation);
         return GS1_STATUS_OK;
@@ -1711,11 +1440,6 @@ Gs1Status InventorySystem::process_game_message(
             invocation,
             message.payload_as<InventoryItemSubmitRequestedMessage>());
 
-    case GameMessageType::InventoryStorageViewRequest:
-        return handle_inventory_storage_view_request(
-            invocation,
-            message.payload_as<InventoryStorageViewRequestMessage>());
-
     case GameMessageType::InventorySlotTapped:
         return handle_inventory_slot_tapped(
             invocation,
@@ -1745,28 +1469,6 @@ Gs1Status InventorySystem::process_host_message(
 
     switch (message.type)
     {
-    case GS1_HOST_EVENT_SITE_MOVE_DIRECTION:
-    {
-        const auto& payload = message.payload.site_move_direction;
-        const float move_length_squared =
-            payload.world_move_x * payload.world_move_x +
-            payload.world_move_y * payload.world_move_y +
-            payload.world_move_z * payload.world_move_z;
-        if (move_length_squared > 0.0001f)
-        {
-            clear_pending_device_storage_open(inventory_world(invocation).own_inventory());
-        }
-        return GS1_STATUS_OK;
-    }
-
-    case GS1_HOST_EVENT_SITE_STORAGE_VIEW:
-        return handle_inventory_storage_view_request(
-            invocation,
-            InventoryStorageViewRequestMessage {
-                message.payload.site_storage_view.storage_id,
-                message.payload.site_storage_view.event_kind,
-                {0U, 0U, 0U}});
-
     case GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP:
         return handle_inventory_slot_tapped(
             invocation,
@@ -1775,7 +1477,8 @@ Gs1Status InventorySystem::process_host_message(
                 message.payload.site_inventory_slot_tap.item_instance_id,
                 message.payload.site_inventory_slot_tap.slot_index,
                 message.payload.site_inventory_slot_tap.container_kind,
-                0U});
+                0U,
+                message.payload.site_inventory_slot_tap.companion_storage_id});
 
     default:
         return GS1_STATUS_OK;
@@ -1794,10 +1497,8 @@ void InventorySystem::run(RuntimeInvocation& invocation)
 
     if (ensure_inventory_storage_initialized(invocation))
     {
-        inventory_world(invocation).mark_inventory_storage_descriptors_projection_dirty();
+        return;
     }
-    close_opened_device_storage_if_out_of_range(invocation);
-    progress_pending_device_storage_open(invocation);
     progress_pending_deliveries(invocation);
 }
 }  // namespace gs1

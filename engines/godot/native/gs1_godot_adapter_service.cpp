@@ -225,6 +225,7 @@ void Gs1GodotAdapterService::sync_ui_session_from_view(const Gs1GameStateView& v
     if (view.has_active_site == 0U || view.active_site == nullptr)
     {
         ui_session_state_.inventory.worker_pack_open = false;
+        ui_session_state_.inventory.opened_storage_id = 0U;
         return;
     }
 }
@@ -739,25 +740,20 @@ bool Gs1GodotAdapterService::submit_site_action_cancel(std::int64_t action_id, s
 
 bool Gs1GodotAdapterService::submit_site_storage_view(std::int64_t storage_id, std::int64_t event_kind)
 {
-    if (storage_id > 0 &&
-        handle_local_storage_view(
-            static_cast<std::uint32_t>(storage_id),
-            static_cast<Gs1InventoryViewEventKind>(event_kind)))
+    if (storage_id > 0 ||
+        static_cast<Gs1InventoryViewEventKind>(event_kind) == GS1_INVENTORY_VIEW_EVENT_CLOSE)
     {
-        last_error_.clear();
-        return true;
+        if (handle_local_storage_view(
+                static_cast<std::uint32_t>(storage_id),
+                static_cast<Gs1InventoryViewEventKind>(event_kind)))
+        {
+            last_error_.clear();
+            return true;
+        }
     }
 
-    Gs1HostEvent event {};
-    event.type = GS1_HOST_EVENT_SITE_STORAGE_VIEW;
-    event.payload.site_storage_view.storage_id = static_cast<std::uint32_t>(storage_id);
-    event.payload.site_storage_view.event_kind = static_cast<Gs1InventoryViewEventKind>(event_kind);
-    if (!runtime_session_.submit_host_events(&event, 1U))
-    {
-        last_error_ = runtime_session_.last_error();
-        return false;
-    }
-    return true;
+    last_error_ = "Unsupported local inventory storage view request.";
+    return false;
 }
 
 bool Gs1GodotAdapterService::submit_site_inventory_slot_tap(
@@ -772,6 +768,7 @@ bool Gs1GodotAdapterService::submit_site_inventory_slot_tap(
     event.payload.site_inventory_slot_tap.container_kind = static_cast<Gs1InventoryContainerKind>(container_kind);
     event.payload.site_inventory_slot_tap.slot_index = static_cast<std::uint16_t>(slot_index);
     event.payload.site_inventory_slot_tap.item_instance_id = static_cast<std::uint32_t>(item_instance_id);
+    event.payload.site_inventory_slot_tap.companion_storage_id = ui_session_state_.inventory.opened_storage_id;
     if (!runtime_session_.submit_host_events(&event, 1U))
     {
         last_error_ = runtime_session_.last_error();
@@ -805,11 +802,34 @@ bool Gs1GodotAdapterService::handle_local_storage_view(
     }
 
     const Gs1SiteStateView& site = *view.active_site;
+    auto& inventory = ui_session_state_.inventory;
+
+    if (event_kind == GS1_INVENTORY_VIEW_EVENT_CLOSE)
+    {
+        bool changed = false;
+        if (storage_id == 0U || storage_id == site.worker_pack_storage_id)
+        {
+            changed = inventory.worker_pack_open;
+            inventory.worker_pack_open = false;
+        }
+        if (storage_id == 0U || storage_id == inventory.opened_storage_id)
+        {
+            changed = changed || (inventory.opened_storage_id != 0U);
+            inventory.opened_storage_id = 0U;
+        }
+        if (changed)
+        {
+            bump_ui_session_revision(GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD);
+        }
+        return changed;
+    }
+
     if (storage_id == site.worker_pack_storage_id)
     {
         if (event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT)
         {
-            ui_session_state_.inventory.worker_pack_open = true;
+            inventory.worker_pack_open = true;
+            inventory.opened_storage_id = 0U;
             ui_session_state_.phone.open = false;
             ui_session_state_.regional_tech.open = false;
             ui_session_state_.protection.selector_open = false;
@@ -817,13 +837,30 @@ bool Gs1GodotAdapterService::handle_local_storage_view(
             bump_ui_session_revision(GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD);
             return true;
         }
+    }
 
-        if (event_kind == GS1_INVENTORY_VIEW_EVENT_CLOSE)
+    if (event_kind != GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT)
+    {
+        return false;
+    }
+
+    for (std::uint32_t index = 0; index < site.storage_count; ++index)
+    {
+        const Gs1InventoryStorageView& storage = site.storages[index];
+        if (storage.storage_id != storage_id ||
+            storage.container_kind != GS1_INVENTORY_CONTAINER_DEVICE_STORAGE)
         {
-            ui_session_state_.inventory.worker_pack_open = false;
-            bump_ui_session_revision(GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD);
-            return true;
+            continue;
         }
+
+        inventory.worker_pack_open = false;
+        inventory.opened_storage_id = storage_id;
+        ui_session_state_.phone.open = false;
+        ui_session_state_.regional_tech.open = false;
+        ui_session_state_.protection.selector_open = false;
+        ui_session_state_.protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
+        bump_ui_session_revision(GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD);
+        return true;
     }
 
     return false;
@@ -863,6 +900,7 @@ bool Gs1GodotAdapterService::handle_local_ui_action(const Gs1UiAction& action)
         phone.active_section = requested_section;
         phone.badge_flags &= ~(GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE | clear_badge_mask);
         ui_session_state_.inventory.worker_pack_open = false;
+        ui_session_state_.inventory.opened_storage_id = 0U;
         ui_session_state_.protection.selector_open = false;
         ui_session_state_.protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
         ui_session_state_.regional_tech.open = false;
@@ -883,6 +921,7 @@ bool Gs1GodotAdapterService::handle_local_ui_action(const Gs1UiAction& action)
         ui_session_state_.regional_tech.open = true;
         ui_session_state_.phone.open = false;
         ui_session_state_.inventory.worker_pack_open = false;
+        ui_session_state_.inventory.opened_storage_id = 0U;
         ui_session_state_.protection.selector_open = false;
         ui_session_state_.protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
         bump_ui_session_revision(GS1_PRESENTATION_DIRTY_REGIONAL_MAP | GS1_PRESENTATION_DIRTY_SITE);
@@ -908,6 +947,7 @@ bool Gs1GodotAdapterService::handle_local_ui_action(const Gs1UiAction& action)
         ui_session_state_.protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
         ui_session_state_.phone.open = false;
         ui_session_state_.inventory.worker_pack_open = false;
+        ui_session_state_.inventory.opened_storage_id = 0U;
         ui_session_state_.regional_tech.open = false;
         bump_ui_session_revision(GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD);
         return true;

@@ -74,7 +74,6 @@ enum class GameMessageType : std::uint8_t
     SiteRefreshTick,
     TaskAcceptRequested,
     TaskRewardClaimRequested,
-    TaskRewardClaimResolved,
     PhoneListingPurchased,
     PhoneListingSold,
     InventoryTransferCompleted,
@@ -87,14 +86,6 @@ enum class GameMessageType : std::uint8_t
     SiteModifierEndRequested,
     PhoneListingPurchaseRequested,
     PhoneListingSaleRequested,
-    PhoneListingCartAddRequested,
-    PhoneListingCartRemoveRequested,
-    PhoneCartCheckoutRequested,
-    PhonePanelSectionRequested,
-    ClosePhonePanel,
-    OpenSiteProtectionSelector,
-    CloseSiteProtectionUi,
-    SetSiteProtectionOverlayMode,
     InventoryDeliveryRequested,
     InventoryDeliveryBatchRequested,
     InventoryWorkerPackInsertRequested,
@@ -103,7 +94,6 @@ enum class GameMessageType : std::uint8_t
     InventoryGlobalItemConsumeRequested,
     InventoryTransferRequested,
     InventoryItemSubmitRequested,
-    InventoryStorageViewRequest,
     InventorySlotTapped,
     InventoryCraftContextRequested,
     PlacementModeCursorMoved,
@@ -560,13 +550,6 @@ struct TaskRewardClaimRequestedMessage final
     std::uint32_t reward_candidate_id;
 };
 
-struct TaskRewardClaimResolvedMessage final
-{
-    std::uint32_t task_instance_id;
-    std::uint32_t task_template_id;
-    std::uint32_t reward_candidate_count;
-};
-
 struct PhoneListingPurchasedMessage final
 {
     std::uint32_t listing_id;
@@ -649,48 +632,6 @@ struct PhoneListingSaleRequestedMessage final
     std::uint16_t flags;
 };
 
-struct PhoneListingCartAddRequestedMessage final
-{
-    std::uint32_t listing_id;
-    std::uint16_t quantity;
-    std::uint16_t flags;
-};
-
-struct PhoneListingCartRemoveRequestedMessage final
-{
-    std::uint32_t listing_id;
-    std::uint16_t quantity;
-    std::uint16_t flags;
-};
-
-struct PhoneCartCheckoutRequestedMessage final
-{
-};
-
-struct PhonePanelSectionRequestedMessage final
-{
-    Gs1PhonePanelSection section;
-    std::uint8_t reserved0[3];
-};
-
-struct ClosePhonePanelMessage final
-{
-};
-
-struct OpenSiteProtectionSelectorMessage final
-{
-};
-
-struct CloseSiteProtectionUiMessage final
-{
-};
-
-struct SetSiteProtectionOverlayModeMessage final
-{
-    Gs1SiteProtectionOverlayMode mode;
-    std::uint8_t reserved0[3];
-};
-
 struct InventoryDeliveryRequestedMessage final
 {
     std::uint32_t item_id;
@@ -766,13 +707,6 @@ struct InventoryItemSubmitRequestedMessage final
     std::uint16_t quantity;
 };
 
-struct InventoryStorageViewRequestMessage final
-{
-    std::uint32_t storage_id;
-    Gs1InventoryViewEventKind event_kind;
-    std::uint8_t reserved0[3];
-};
-
 struct InventorySlotTappedMessage final
 {
     std::uint32_t storage_id;
@@ -780,6 +714,7 @@ struct InventorySlotTappedMessage final
     std::uint16_t slot_index;
     Gs1InventoryContainerKind container_kind;
     std::uint8_t reserved0;
+    std::uint32_t companion_storage_id;
 };
 
 struct CraftContextRequestedMessage final
@@ -872,7 +807,6 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(RestorationProgressChangedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteRefreshTickMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskAcceptRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskRewardClaimRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskRewardClaimResolvedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingPurchasedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingSoldMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryTransferCompletedMessage, 16U);
@@ -885,14 +819,6 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(RunModifierAwardRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteModifierEndRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingPurchaseRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingSaleRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingCartAddRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingCartRemoveRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneCartCheckoutRequestedMessage, 1U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhonePanelSectionRequestedMessage, 4U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ClosePhonePanelMessage, 1U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(OpenSiteProtectionSelectorMessage, 1U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CloseSiteProtectionUiMessage, 1U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SetSiteProtectionOverlayModeMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryBatchEntry, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryBatchRequestedMessage, 44U);
@@ -902,8 +828,7 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemConsumeRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryGlobalItemConsumeRequestedMessage, 8U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryTransferRequestedMessage, 16U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemSubmitRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryStorageViewRequestMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventorySlotTappedMessage, 12U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventorySlotTappedMessage, 16U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CraftContextRequestedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PlacementModeCursorMovedMessage, 12U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PlacementModeCommitRejectedMessage, 24U);

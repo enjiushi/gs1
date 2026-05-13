@@ -1,7 +1,6 @@
 #include "site/systems/site_completion_system.h"
 
 #include "runtime/game_runtime.h"
-#include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 
 #include <algorithm>
@@ -60,7 +59,6 @@ void update_objective_progress(
     }
 
     counters.objective_progress_normalized = clamped_progress;
-    world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
 }
 
 float average_target_sand_level(

@@ -599,7 +599,8 @@ struct Gs1HostEventSiteInventorySlotTapData
     std::uint16_t slot_index;
     Gs1InventoryContainerKind container_kind;
     std::uint8_t reserved0;
-    std::uint64_t reserved1;
+    std::uint32_t companion_storage_id;
+    std::uint32_t reserved1;
 };
 
 struct Gs1HostEventSiteSceneReadyData
@@ -1247,7 +1248,7 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteActionRequestData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteActionCancelData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteStorageViewData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteContextRequestData, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteInventorySlotTapData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteInventorySlotTapData, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteSceneReadyData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventEmptyData, 16U);
 static_assert(std::is_standard_layout_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain standard layout.");

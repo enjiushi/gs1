@@ -2,7 +2,6 @@
 
 #include "runtime/game_runtime.h"
 #include "site/defs/site_action_defs.h"
-#include "site/site_projection_update_flags.h"
 
 #include <algorithm>
 #include <cmath>
@@ -33,12 +32,6 @@ bool action_blocks_worker_movement(const ActionState& action_state) noexcept
 {
     return has_active_action(action_state) &&
         action_impacts_worker_movement(action_state.action_kind);
-}
-
-bool has_pending_device_storage_open(const InventoryState& inventory) noexcept
-{
-    return inventory.pending_device_storage_open.active &&
-        inventory.pending_device_storage_open.storage_id != 0U;
 }
 
 float facing_degrees_for_direction(float direction_x, float direction_y) noexcept
@@ -137,7 +130,6 @@ void SiteFlowSystem::run(RuntimeInvocation& invocation)
 
     auto worker = world.read_worker();
     const auto& action_state = world.read_action();
-    const auto& inventory = world.read_inventory();
     const float movement_step =
         k_worker_move_speed_tiles_per_second * static_cast<float>(fixed_step_seconds);
 
@@ -159,14 +151,9 @@ void SiteFlowSystem::run(RuntimeInvocation& invocation)
             {
                 worker.position.facing_degrees = next_facing;
                 world.write_worker(worker);
-                world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
             }
         }
         return;
-    }
-    else if (has_pending_device_storage_open(inventory))
-    {
-        move_goal_tile = inventory.pending_device_storage_open.approach_tile;
     }
 
     float direction_x = 0.0f;
@@ -259,7 +246,6 @@ void SiteFlowSystem::run(RuntimeInvocation& invocation)
         worker.position.facing_degrees = next_facing;
     }
     world.write_worker(worker);
-    world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
 }
 }  // namespace gs1
 

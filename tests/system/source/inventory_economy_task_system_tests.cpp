@@ -3433,16 +3433,9 @@ void task_board_reward_claim_queues_resolved_message_after_reward_effects(
                     task.task_instance_id.value,
                     0U})) == GS1_STATUS_OK);
 
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 3U);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 2U);
     GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::EconomyMoneyAwardRequested);
     GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::InventoryDeliveryRequested);
-    GS1_SYSTEM_TEST_CHECK(context, queue[2].type == GameMessageType::TaskRewardClaimResolved);
-    {
-        const auto& payload = queue[2].payload_as<gs1::TaskRewardClaimResolvedMessage>();
-        GS1_SYSTEM_TEST_CHECK(context, payload.task_instance_id == 1U);
-        GS1_SYSTEM_TEST_CHECK(context, payload.task_template_id == gs1::k_task_template_site1_buy_water);
-        GS1_SYSTEM_TEST_CHECK(context, payload.reward_candidate_count == 2U);
-    }
 }
 
 void task_board_reward_claim_uses_first_draft_option_when_candidate_is_unspecified(
@@ -3486,9 +3479,6 @@ void task_board_reward_claim_uses_first_draft_option_when_candidate_is_unspecifi
     GS1_SYSTEM_TEST_CHECK(
         context,
         count_queued_messages(queue, GameMessageType::InventoryDeliveryRequested) == 1U);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        count_queued_messages(queue, GameMessageType::TaskRewardClaimResolved) == 1U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.visible_tasks.front().reward_draft_options[0].selected);
     GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.visible_tasks.front().reward_draft_options[1].selected);
 }

@@ -176,7 +176,6 @@ Gs1Status process_message(
                     1.0f,
                     0.0f,
                     false});
-            world.mark_tile_projection_dirty(footprint_coord);
             emit_device_condition_changed_message(
                 message_queue,
                 footprint_coord,
@@ -283,7 +282,6 @@ void run_system(gs1::RuntimeInvocation& invocation)
         site_run->site_world->set_tile_device(
             broken.coord,
             gs1::SiteWorld::TileDeviceData {});
-        world.mark_tile_projection_dirty(broken.coord);
         emit_device_condition_changed_message(
             message_queue,
             broken.coord,

@@ -8,7 +8,6 @@
 #include "content/defs/technology_defs.h"
 #include "runtime/game_runtime.h"
 #include "runtime/runtime_clock.h"
-#include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 
 #include <algorithm>
@@ -957,7 +956,6 @@ void resolve_modifier_totals(RuntimeInvocation& invocation)
         current_harvest_output_modifiers = next_outputs.harvest_output_modifiers;
         current_village_effects = next_outputs.village_technology_effects;
         current_bureau_effects = next_outputs.bureau_technology_effects;
-        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
     }
 }
 
@@ -991,7 +989,6 @@ void handle_site_run_started(
         aura_ids.end());
     import_campaign_run_modifiers(*campaign, modifier_state);
 
-    world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
     resolve_modifier_totals(invocation);
 }
 
@@ -1044,7 +1041,6 @@ void handle_inventory_item_use_completed(
             item_def->item_id,
             effect_scale))
     {
-        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
         resolve_modifier_totals(invocation);
     }
 }
@@ -1078,7 +1074,6 @@ void handle_run_modifier_award_requested(
             *modifier_def,
             ItemId {}))
     {
-        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
         resolve_modifier_totals(invocation);
     }
 }
@@ -1104,7 +1099,6 @@ void handle_site_modifier_end_requested(
             world.own_modifier(),
             ModifierId {payload.modifier_id}))
     {
-        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
         resolve_modifier_totals(invocation);
     }
 }
@@ -1204,10 +1198,6 @@ void ModifierSystem::run(RuntimeInvocation& invocation)
     const auto tick_result = tick_timed_modifiers(
         world.own_modifier(),
         runtime_minutes_from_real_seconds(fixed_step_seconds));
-    if (tick_result.projection_changed)
-    {
-        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_MODIFIERS);
-    }
     if (tick_result.modifier_set_changed)
     {
         resolve_modifier_totals(invocation);

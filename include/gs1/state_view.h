@@ -189,7 +189,6 @@ struct Gs1PhoneListingView
     std::uint32_t item_or_unlockable_id;
     std::int32_t price_cash_points;
     std::uint32_t quantity;
-    std::uint32_t cart_quantity;
     std::uint32_t stock_refresh_generation;
     std::uint8_t listing_kind;
     std::uint8_t occupied;
@@ -375,7 +374,6 @@ struct Gs1SiteStateView
     std::uint16_t phone_delivery_minutes;
     std::uint16_t reserved0;
     std::uint32_t worker_pack_storage_id;
-    std::uint32_t opened_device_storage_id;
     std::uint32_t next_storage_id;
     std::uint32_t storage_count;
     const Gs1InventoryStorageView* storages;

@@ -326,13 +326,6 @@ void run_system(gs1::RuntimeInvocation& invocation)
                     density_component.value);
             }
 
-            if ((wind_changed &&
-                    ecology_has_projected_plant_visual(plant_slot.plant_id, density_component.value)) ||
-                support_changed)
-            {
-                world.mark_tile_projection_dirty(coord_component.value);
-            }
-
             runtime.last_total_weather_contributions[index] = total_contribution;
         });
 }

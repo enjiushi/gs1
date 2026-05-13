@@ -261,7 +261,6 @@ void Gs1GodotPhonePanelController::refresh_from_game_state_view()
         listing.price = gs1::cash_value_from_cash_points(listing_view.price_cash_points);
         listing.related_site_id = site.site_id;
         listing.quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(listing_view.quantity, 65535U));
-        listing.cart_quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(listing_view.cart_quantity, 65535U));
         listing.listing_kind = static_cast<Gs1PhoneListingPresentationKind>(listing_view.listing_kind);
         listing.flags = listing_view.occupied != 0U ? 1U : 0U;
         phone_listings_state_.push_back(listing);
@@ -297,14 +296,12 @@ void Gs1GodotPhonePanelController::update_phone_state_label()
         std::uint32_t buy_count = 0U;
         std::uint32_t sell_count = 0U;
         std::uint32_t service_count = 0U;
-        std::uint32_t cart_count = 0U;
         for (const auto& listing : phone_listings_state_)
         {
             switch (listing.listing_kind)
             {
             case GS1_PHONE_LISTING_PRESENTATION_BUY_ITEM:
                 buy_count += 1U;
-                cart_count += listing.cart_quantity;
                 break;
             case GS1_PHONE_LISTING_PRESENTATION_SELL_ITEM:
                 sell_count += 1U;
@@ -318,16 +315,15 @@ void Gs1GodotPhonePanelController::update_phone_state_label()
             }
         }
         phone_state_label_->set_text(vformat(
-            "Phone Section: %d  Buy %d  Sell %d  Services %d  Cart %d",
+            "Phone Section: %d  Buy %d  Sell %d  Services %d",
             static_cast<int>(phone_state.active_section),
             static_cast<int>(buy_count),
             static_cast<int>(sell_count),
-            static_cast<int>(service_count),
-            static_cast<int>(cart_count)));
+            static_cast<int>(service_count)));
     }
     else
     {
-        phone_state_label_->set_text("Phone Section: 0  Listings: buy 0 sell 0");
+        phone_state_label_->set_text("Phone Section: 0  Buy 0  Sell 0  Services 0");
     }
 }
 

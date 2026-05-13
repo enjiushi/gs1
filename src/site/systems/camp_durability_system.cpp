@@ -1,4 +1,3 @@
-#include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 #include "site/systems/camp_durability_system.h"
 #include "content/defs/gameplay_tuning_defs.h"
@@ -110,7 +109,6 @@ void apply_projection_if_needed(
         return;
     }
 
-    world.mark_projection_dirty(SITE_PROJECTION_UPDATE_CAMP);
     memory.last_reported_durability = durability;
     memory.last_protection_resolved = protection_resolved;
     memory.last_delivery_operational = delivery_operational;

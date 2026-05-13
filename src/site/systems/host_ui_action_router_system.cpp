@@ -170,54 +170,10 @@ Gs1Status HostUiActionRouterSystem::process_host_message(
         queue_game_message(invocation, gameplay_message);
         return GS1_STATUS_OK;
 
-    case GS1_UI_ACTION_ADD_PHONE_LISTING_TO_CART:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        gameplay_message.type = GameMessageType::PhoneListingCartAddRequested;
-        gameplay_message.set_payload(PhoneListingCartAddRequestedMessage {
-            action.target_id,
-            static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
-            0U});
-        queue_game_message(invocation, gameplay_message);
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_REMOVE_PHONE_LISTING_FROM_CART:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        gameplay_message.type = GameMessageType::PhoneListingCartRemoveRequested;
-        gameplay_message.set_payload(PhoneListingCartRemoveRequestedMessage {
-            action.target_id,
-            static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
-            0U});
-        queue_game_message(invocation, gameplay_message);
-        return GS1_STATUS_OK;
-
-    case GS1_UI_ACTION_CHECKOUT_PHONE_CART:
-        gameplay_message.type = GameMessageType::PhoneCartCheckoutRequested;
-        gameplay_message.set_payload(PhoneCartCheckoutRequestedMessage {});
-        queue_game_message(invocation, gameplay_message);
-        return GS1_STATUS_OK;
-
     case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
-        if (action.arg0 > static_cast<std::uint64_t>(GS1_PHONE_PANEL_SECTION_CART))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        gameplay_message.type = GameMessageType::PhonePanelSectionRequested;
-        gameplay_message.set_payload(PhonePanelSectionRequestedMessage {
-            static_cast<Gs1PhonePanelSection>(action.arg0),
-            {0U, 0U, 0U}});
-        queue_game_message(invocation, gameplay_message);
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
-        gameplay_message.type = GameMessageType::ClosePhonePanel;
-        gameplay_message.set_payload(ClosePhonePanelMessage {});
-        queue_game_message(invocation, gameplay_message);
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_HIRE_CONTRACTOR:
@@ -243,23 +199,12 @@ Gs1Status HostUiActionRouterSystem::process_host_message(
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR:
-        gameplay_message.type = GameMessageType::OpenSiteProtectionSelector;
-        gameplay_message.set_payload(OpenSiteProtectionSelectorMessage {});
-        queue_game_message(invocation, gameplay_message);
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI:
-        gameplay_message.type = GameMessageType::CloseSiteProtectionUi;
-        gameplay_message.set_payload(CloseSiteProtectionUiMessage {});
-        queue_game_message(invocation, gameplay_message);
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
-        gameplay_message.type = GameMessageType::SetSiteProtectionOverlayMode;
-        gameplay_message.set_payload(SetSiteProtectionOverlayModeMessage {
-            static_cast<Gs1SiteProtectionOverlayMode>(action.arg0),
-            {0U, 0U, 0U}});
-        queue_game_message(invocation, gameplay_message);
         return GS1_STATUS_OK;
 
     case GS1_UI_ACTION_END_SITE_MODIFIER:

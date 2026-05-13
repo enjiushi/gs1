@@ -6,7 +6,6 @@
 #include "runtime/game_runtime.h"
 #include "site/craft_logic.h"
 #include "site/inventory_storage.h"
-#include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 #include "site/systems/economy_phone_system.h"
 #include "support/currency.h"
@@ -90,17 +89,6 @@ bool can_apply_site_cash_delta(
     return true;
 }
 
-void mark_phone_dirty(RuntimeInvocation& invocation) noexcept
-{
-    economy_phone_world(invocation).mark_projection_dirty(SITE_PROJECTION_UPDATE_PHONE);
-}
-
-void mark_phone_and_hud_dirty(RuntimeInvocation& invocation) noexcept
-{
-    economy_phone_world(invocation).mark_projection_dirty(
-        SITE_PROJECTION_UPDATE_PHONE | SITE_PROJECTION_UPDATE_HUD);
-}
-
 bool apply_site_cash_delta(
     RuntimeInvocation& invocation,
     std::int32_t delta) noexcept
@@ -134,7 +122,6 @@ PhoneListingState make_item_listing(
         item_def == nullptr ? 0 : static_cast<std::int32_t>(item_price_cash_points),
         quantity,
         0U,
-        0U,
         true,
         false};
 }
@@ -142,20 +129,6 @@ PhoneListingState make_item_listing(
 std::uint32_t make_sell_listing_id(ItemId item_id) noexcept
 {
     return k_sell_listing_id_base + item_id.value;
-}
-
-void clamp_cart_quantity(PhoneListingState& listing) noexcept
-{
-    if (listing.kind != PhoneListingKind::BuyItem)
-    {
-        listing.cart_quantity = 0U;
-        return;
-    }
-
-    if (listing.quantity != 0U)
-    {
-        listing.cart_quantity = std::min(listing.cart_quantity, listing.quantity);
-    }
 }
 
 PhoneListingState* find_listing(EconomyState& economy, std::uint32_t listing_id) noexcept
@@ -354,7 +327,6 @@ bool same_listing_vector(
             left.listing_id != right.listing_id ||
             left.price != right.price ||
             left.quantity != right.quantity ||
-            left.cart_quantity != right.cart_quantity ||
             left.stock_refresh_generation != right.stock_refresh_generation ||
             left.occupied != right.occupied ||
             left.generated_from_stock != right.generated_from_stock)
@@ -364,20 +336,6 @@ bool same_listing_vector(
     }
 
     return true;
-}
-
-std::uint32_t cart_item_quantity(const EconomyState& economy) noexcept
-{
-    std::uint32_t total = 0U;
-    for (const auto& listing : economy.available_phone_listings)
-    {
-        if (listing.kind == PhoneListingKind::BuyItem)
-        {
-            total += listing.cart_quantity;
-        }
-    }
-
-    return total;
 }
 
 bool queue_delivery_batch_message(
@@ -553,13 +511,6 @@ void refresh_generated_buy_stock_listings(
                 quantity);
             generated_listing.stock_refresh_generation = next_generation;
             generated_listing.generated_from_stock = true;
-            if (auto* previous_listing =
-                    find_generated_stock_listing(economy, stock_entry.listing_id);
-                previous_listing != nullptr)
-            {
-                generated_listing.cart_quantity = previous_listing->cart_quantity;
-                clamp_cart_quantity(generated_listing);
-            }
             refreshed.push_back(generated_listing);
         }
     }
@@ -567,10 +518,8 @@ void refresh_generated_buy_stock_listings(
     const bool changed = !same_listing_vector(refreshed, economy.available_phone_listings);
     economy.available_phone_listings = std::move(refreshed);
     economy.phone_buy_stock_refresh_generation = next_generation;
-    if (changed || force_dirty)
-    {
-        mark_phone_dirty(invocation);
-    }
+    (void)changed;
+    (void)force_dirty;
 }
 
 void refresh_dynamic_sell_listings(
@@ -621,9 +570,7 @@ void refresh_dynamic_sell_listings(
     {
         if (listing.kind != PhoneListingKind::SellItem)
         {
-            auto preserved_listing = listing;
-            clamp_cart_quantity(preserved_listing);
-            refreshed.push_back(preserved_listing);
+            refreshed.push_back(listing);
         }
     }
     refreshed.insert(refreshed.end(), sell_listings.begin(), sell_listings.end());
@@ -633,10 +580,8 @@ void refresh_dynamic_sell_listings(
     economy.phone_listing_source_membership_revision = inventory.item_membership_revision;
     economy.phone_listing_source_quantity_revision = inventory.item_quantity_revision;
     economy.phone_listing_source_action_reservation_signature = reservation_signature;
-    if (changed || force_dirty)
-    {
-        mark_phone_dirty(invocation);
-    }
+    (void)changed;
+    (void)force_dirty;
 }
 
 Gs1Status process_buy_listing(
@@ -673,7 +618,6 @@ Gs1Status process_buy_listing(
     {
         listing.quantity = available - quantity;
     }
-    clamp_cart_quantity(listing);
 
     if (listing.item_id.value != 0U &&
         !queue_single_delivery_message(invocation, listing.item_id, quantity))
@@ -683,155 +627,6 @@ Gs1Status process_buy_listing(
 
     queue_purchase_completed_message(invocation, listing, quantity);
 
-    mark_phone_and_hud_dirty(invocation);
-    return GS1_STATUS_OK;
-}
-
-Gs1Status process_cart_add(
-    RuntimeInvocation& invocation,
-    PhoneListingState& listing,
-    std::uint32_t quantity)
-{
-    if (listing.kind != PhoneListingKind::BuyItem)
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    if (listing.quantity != 0U && listing.cart_quantity >= listing.quantity)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    const auto remaining_capacity =
-        listing.quantity == 0U
-            ? quantity
-            : (listing.quantity > listing.cart_quantity ? (listing.quantity - listing.cart_quantity) : 0U);
-    const auto quantity_to_add = listing.quantity == 0U ? quantity : std::min(quantity, remaining_capacity);
-    if (quantity_to_add == 0U)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    listing.cart_quantity += quantity_to_add;
-    mark_phone_dirty(invocation);
-    return GS1_STATUS_OK;
-}
-
-Gs1Status process_cart_remove(
-    RuntimeInvocation& invocation,
-    PhoneListingState& listing,
-    std::uint32_t quantity)
-{
-    if (listing.kind != PhoneListingKind::BuyItem)
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    if (listing.cart_quantity == 0U)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    listing.cart_quantity =
-        listing.cart_quantity > quantity ? (listing.cart_quantity - quantity) : 0U;
-    mark_phone_dirty(invocation);
-    return GS1_STATUS_OK;
-}
-
-Gs1Status process_cart_checkout(RuntimeInvocation& invocation)
-{
-    auto& economy = economy_phone_world(invocation).own_economy();
-    if (cart_item_quantity(economy) == 0U)
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    InventoryDeliveryBatchEntry entries[k_inventory_delivery_batch_entry_count] {};
-    std::uint8_t entry_count = 0U;
-    std::int64_t subtotal = 0;
-    for (auto& listing : economy.available_phone_listings)
-    {
-        clamp_cart_quantity(listing);
-        if (listing.kind != PhoneListingKind::BuyItem || listing.cart_quantity == 0U)
-        {
-            continue;
-        }
-
-        if (listing.quantity != 0U && listing.quantity < listing.cart_quantity)
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        subtotal += static_cast<std::int64_t>(listing.price) * listing.cart_quantity;
-        if (listing.item_id.value != 0U)
-        {
-            if (entry_count >= k_inventory_delivery_batch_entry_count ||
-                listing.item_id.value > static_cast<std::uint32_t>(std::numeric_limits<std::uint16_t>::max()) ||
-                listing.cart_quantity > static_cast<std::uint32_t>(std::numeric_limits<std::uint16_t>::max()))
-            {
-                return GS1_STATUS_INVALID_STATE;
-            }
-
-            entries[entry_count].item_id = static_cast<std::uint16_t>(listing.item_id.value);
-            entries[entry_count].quantity = static_cast<std::uint16_t>(listing.cart_quantity);
-            entry_count += 1U;
-        }
-    }
-
-    const auto total_cost =
-        subtotal + static_cast<std::int64_t>(economy_phone_world(invocation).read_economy().phone_delivery_fee);
-    if (subtotal <= 0 || total_cost < 0 || !money_delta_fits(-total_cost))
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    if (!apply_site_cash_delta(invocation, static_cast<std::int32_t>(-total_cost)))
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    for (auto& listing : economy.available_phone_listings)
-    {
-        if (listing.kind != PhoneListingKind::BuyItem || listing.cart_quantity == 0U)
-        {
-            continue;
-        }
-
-        if (listing.quantity != 0U)
-        {
-            listing.quantity -= listing.cart_quantity;
-        }
-        listing.cart_quantity = 0U;
-    }
-
-        if (entry_count > 0U && !queue_delivery_batch_message(invocation, entries, entry_count))
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    for (const auto& entry : entries)
-    {
-        if (entry.item_id == 0U || entry.quantity == 0U)
-        {
-            continue;
-        }
-
-        PhoneListingState synthetic_listing {};
-        synthetic_listing.listing_id = 0U;
-        synthetic_listing.item_id = ItemId {entry.item_id};
-        for (const auto& listing : economy.available_phone_listings)
-        {
-            if (listing.kind == PhoneListingKind::BuyItem &&
-                listing.item_id.value == entry.item_id)
-            {
-                synthetic_listing.listing_id = listing.listing_id;
-                break;
-            }
-        }
-        queue_purchase_completed_message(invocation, synthetic_listing, entry.quantity);
-    }
-
-    mark_phone_and_hud_dirty(invocation);
     return GS1_STATUS_OK;
 }
 
@@ -876,7 +671,6 @@ Gs1Status process_sell_listing(
     economy_phone_message_queue(invocation).push_back(consume_message);
     queue_sale_completed_message(invocation, listing, quantity_to_sell);
 
-    mark_phone_and_hud_dirty(invocation);
     return GS1_STATUS_OK;
 }
 
@@ -918,7 +712,6 @@ Gs1Status process_contractor_hire(
         listing->quantity = available - work_units;
     }
 
-    mark_phone_and_hud_dirty(invocation);
     return GS1_STATUS_OK;
 }
 
@@ -948,8 +741,6 @@ Gs1Status process_unlockable_purchase(
     {
         economy.revealed_site_unlockable_ids.push_back(unlockable_id);
     }
-
-    mark_phone_and_hud_dirty(invocation);
     return GS1_STATUS_OK;
 }
 
@@ -967,8 +758,6 @@ void reveal_unlockable_for_site(
     {
         economy.revealed_site_unlockable_ids.push_back(unlockable_id);
     }
-
-    mark_phone_and_hud_dirty(invocation);
 }
 
 void append_seed_phone_listing(
@@ -1010,7 +799,6 @@ void append_seed_phone_listing(
                 : listing_content.price,
             listing_content.quantity,
             0U,
-            0U,
             true,
             false});
         return;
@@ -1037,7 +825,6 @@ void seed_site_economy(RuntimeInvocation& invocation, std::uint32_t site_id)
     economy.direct_purchase_unlockable_ids.clear();
     if (site_content == nullptr)
     {
-        mark_phone_and_hud_dirty(invocation);
         return;
     }
 
@@ -1050,7 +837,6 @@ void seed_site_economy(RuntimeInvocation& invocation, std::uint32_t site_id)
 
     refresh_generated_buy_stock_listings(invocation, true);
     refresh_dynamic_sell_listings(invocation, true);
-    mark_phone_and_hud_dirty(invocation);
 }
 }  // namespace
 
@@ -1067,9 +853,6 @@ GameMessageSubscriptionSpan EconomyPhoneSystem::subscribed_game_messages() const
         GameMessageType::EconomyMoneyAwardRequested,
         GameMessageType::PhoneListingPurchaseRequested,
         GameMessageType::PhoneListingSaleRequested,
-        GameMessageType::PhoneListingCartAddRequested,
-        GameMessageType::PhoneListingCartRemoveRequested,
-        GameMessageType::PhoneCartCheckoutRequested,
         GameMessageType::ContractorHireRequested,
         GameMessageType::SiteUnlockableRevealRequested,
         GameMessageType::SiteUnlockablePurchaseRequested,
@@ -1079,8 +862,7 @@ GameMessageSubscriptionSpan EconomyPhoneSystem::subscribed_game_messages() const
 
 HostMessageSubscriptionSpan EconomyPhoneSystem::subscribed_host_messages() const noexcept
 {
-    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_UI_ACTION};
-    return subscriptions;
+    return {};
 }
 
 std::optional<Gs1RuntimeProfileSystemId> EconomyPhoneSystem::profile_system_id() const noexcept
@@ -1135,7 +917,6 @@ Gs1Status EconomyPhoneSystem::process_game_message(
             return GS1_STATUS_INVALID_STATE;
         }
 
-        mark_phone_and_hud_dirty(invocation);
         return GS1_STATUS_OK;
     }
 
@@ -1179,33 +960,6 @@ Gs1Status EconomyPhoneSystem::process_game_message(
         const std::uint32_t quantity = normalize_quantity(payload.quantity);
         return process_sell_listing(invocation, *listing, quantity);
     }
-
-    case GameMessageType::PhoneListingCartAddRequested:
-    {
-        const auto& payload = message.payload_as<PhoneListingCartAddRequestedMessage>();
-        auto* listing = find_listing(economy_phone_world(invocation).own_economy(), payload.listing_id);
-        if (listing == nullptr)
-        {
-            return GS1_STATUS_NOT_FOUND;
-        }
-
-        return process_cart_add(invocation, *listing, normalize_quantity(payload.quantity));
-    }
-
-    case GameMessageType::PhoneListingCartRemoveRequested:
-    {
-        const auto& payload = message.payload_as<PhoneListingCartRemoveRequestedMessage>();
-        auto* listing = find_listing(economy_phone_world(invocation).own_economy(), payload.listing_id);
-        if (listing == nullptr)
-        {
-            return GS1_STATUS_NOT_FOUND;
-        }
-
-        return process_cart_remove(invocation, *listing, normalize_quantity(payload.quantity));
-    }
-
-    case GameMessageType::PhoneCartCheckoutRequested:
-        return process_cart_checkout(invocation);
 
     case GameMessageType::ContractorHireRequested:
         return process_contractor_hire(invocation, message.payload_as<ContractorHireRequestedMessage>());

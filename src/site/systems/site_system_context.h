@@ -2,7 +2,6 @@
 
 #include "messages/game_message.h"
 #include "site/inventory_storage.h"
-#include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 #include "site/site_world_access.h"
 
@@ -692,61 +691,6 @@ public:
 
     [[nodiscard]] const SiteObjectiveState& read_objective() const noexcept { return site_run_.objective; }
     [[nodiscard]] SiteObjectiveState& own_objective() noexcept { return site_run_.objective; }
-
-    void mark_projection_dirty(std::uint64_t dirty_flags) noexcept
-    {
-        // Compatibility shim while site systems are migrated off gameplay-owned projection dirties.
-        (void)dirty_flags;
-    }
-
-    void mark_tile_projection_dirty(TileCoord coord) noexcept
-    {
-        (void)coord;
-    }
-
-    void mark_inventory_slot_projection_dirty(
-        Gs1InventoryContainerKind container_kind,
-        std::uint32_t slot_index) noexcept
-    {
-        switch (container_kind)
-        {
-        case GS1_INVENTORY_CONTAINER_WORKER_PACK:
-            mark_inventory_slot_projection_dirty_by_storage(
-                site_run_.inventory.worker_pack_storage_id,
-                slot_index);
-            break;
-        case GS1_INVENTORY_CONTAINER_DEVICE_STORAGE:
-            if (site_run_.inventory.opened_device_storage_id != 0U)
-            {
-                mark_inventory_slot_projection_dirty_by_storage(
-                    site_run_.inventory.opened_device_storage_id,
-                    slot_index);
-            }
-            break;
-        default:
-            return;
-        }
-    }
-
-    void mark_inventory_storage_descriptors_projection_dirty() noexcept
-    {
-    }
-
-    void mark_inventory_view_state_projection_dirty() noexcept
-    {
-    }
-
-    void mark_opened_inventory_storage_full_projection_dirty() noexcept
-    {
-    }
-
-    void mark_inventory_slot_projection_dirty_by_storage(
-        std::uint32_t storage_id,
-        std::uint32_t slot_index) noexcept
-    {
-        (void)storage_id;
-        (void)slot_index;
-    }
 
 private:
     [[nodiscard]] const SiteWorld* site_world_ptr() const noexcept

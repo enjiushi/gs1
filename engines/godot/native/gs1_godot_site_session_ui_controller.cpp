@@ -593,10 +593,21 @@ void Gs1GodotSiteSessionUiController::on_open_nearest_storage_pressed()
 
 void Gs1GodotSiteSessionUiController::on_close_storage_pressed()
 {
-    const Gs1SiteStateView* site_state = active_site();
-    if (site_state != nullptr && site_state->opened_device_storage_id != 0U)
+    if (adapter_service_ != nullptr)
     {
-        submit_storage_view(static_cast<int>(site_state->opened_device_storage_id), INVENTORY_VIEW_EVENT_CLOSE);
+        const auto opened_storage_id =
+            static_cast<int>(adapter_service_->ui_session_state().inventory.opened_storage_id);
+        if (opened_storage_id != 0)
+        {
+            submit_storage_view(opened_storage_id, INVENTORY_VIEW_EVENT_CLOSE);
+            return;
+        }
+
+        const int worker_pack_storage_id = find_worker_pack_storage_id();
+        if (worker_pack_storage_id != 0)
+        {
+            submit_storage_view(worker_pack_storage_id, INVENTORY_VIEW_EVENT_CLOSE);
+        }
     }
 }
 

@@ -235,7 +235,8 @@ void Gs1GodotInventoryPanelController::refresh_from_game_state_view()
     }
 
     const Gs1SiteStateView& site = *view.active_site;
-    worker_pack_open_ = adapter_service_->ui_session_state().inventory.worker_pack_open;
+    const auto& inventory_session = adapter_service_->ui_session_state().inventory;
+    worker_pack_open_ = inventory_session.worker_pack_open;
     inventory_storages_.clear();
     inventory_storages_.reserve(site.storage_count);
     worker_pack_slots_.clear();
@@ -272,14 +273,14 @@ void Gs1GodotInventoryPanelController::refresh_from_game_state_view()
         }
     }
 
-    if (site.opened_device_storage_id == 0U)
+    if (inventory_session.opened_storage_id == 0U)
     {
         opened_storage_.reset();
     }
-    else if (!opened_storage_.has_value() || opened_storage_->storage_id != site.opened_device_storage_id)
+    else if (!opened_storage_.has_value() || opened_storage_->storage_id != inventory_session.opened_storage_id)
     {
         opened_storage_ = Gs1RuntimeInventoryViewProjection {};
-        opened_storage_->storage_id = site.opened_device_storage_id;
+        opened_storage_->storage_id = inventory_session.opened_storage_id;
     }
 
     if (opened_storage_.has_value())

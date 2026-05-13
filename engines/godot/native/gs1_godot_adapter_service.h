@@ -49,6 +49,7 @@ struct Gs1GodotProtectionUiSessionState final
 struct Gs1GodotInventoryUiSessionState final
 {
     bool worker_pack_open {false};
+    std::uint32_t opened_storage_id {0U};
 };
 
 struct Gs1GodotUiSessionState final

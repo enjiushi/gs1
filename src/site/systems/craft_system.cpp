@@ -113,29 +113,26 @@ Gs1Status handle_craft_context_requested(
     }
 
     SiteWorldAccess<CraftSystem> world {*site_run};
-    auto& presentation = world.own_craft().context_presentation;
-    presentation = CraftContextPresentationState {};
+    auto& context = world.own_craft().context;
+    context = CraftContextState {};
 
     if (!world.has_world() || site_run->site_world == nullptr)
     {
-        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_CRAFT_CONTEXT);
         return GS1_STATUS_OK;
     }
 
     const TileCoord target_tile {payload.tile_x, payload.tile_y};
     if (!world.tile_coord_in_bounds(target_tile))
     {
-        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_CRAFT_CONTEXT);
         return GS1_STATUS_OK;
     }
 
     const auto tile = world.read_tile(target_tile);
     const auto recipes = craft_logic::recipes_for_station(*campaign, tile.device.structure_id);
-    presentation.occupied = true;
-    presentation.tile_coord = target_tile;
+    context.occupied = true;
+    context.tile_coord = target_tile;
     if (recipes.empty())
     {
-        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_CRAFT_CONTEXT);
         return GS1_STATUS_OK;
     }
 
@@ -144,7 +141,6 @@ Gs1Status handle_craft_context_requested(
         inventory_storage::find_device_storage_container(*site_run, device_entity_id);
     if (device_entity_id == 0U || !output_container.is_valid())
     {
-        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_CRAFT_CONTEXT);
         return GS1_STATUS_OK;
     }
 
@@ -176,12 +172,11 @@ Gs1Status handle_craft_context_requested(
             continue;
         }
 
-        presentation.options.push_back(CraftContextOptionState {
+        context.options.push_back(CraftContextOptionState {
             recipe_def->recipe_id.value,
             recipe_def->output_item_id.value});
     }
 
-    world.mark_projection_dirty(SITE_PROJECTION_UPDATE_CRAFT_CONTEXT);
     return GS1_STATUS_OK;
 }
 }  // namespace

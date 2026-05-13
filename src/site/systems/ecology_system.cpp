@@ -6,7 +6,6 @@
 #include "content/prototype_content.h"
 #include "runtime/game_runtime.h"
 #include "runtime/runtime_clock.h"
-#include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 #include "site/site_world_components.h"
 #include "site/tile_footprint.h"
@@ -645,10 +644,6 @@ void mark_dirty_tile_ecology(
     entity.set<site_ecs::DirtyEcologyMask>({existing_mask | changed_mask});
     entity.add<site_ecs::DirtyEcologyTag>();
 
-    if (ecology_change_affects_visible_projection(changed_mask))
-    {
-        world.mark_tile_projection_dirty(coord);
-    }
 }
 
 std::vector<ActiveEcologyCoord> collect_active_ecology_coords(
@@ -1150,7 +1145,6 @@ void update_restoration_progress(
         counters.site_completion_tile_threshold,
         normalized_progress});
     message_queue.push_back(progress_message);
-    world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
 }
 
 float compute_highway_sand_cover_delta(
@@ -1193,7 +1187,6 @@ void update_highway_protection_progress(
 
     counters.highway_average_sand_cover = clamped_average;
     counters.objective_progress_normalized = normalized_progress;
-    world.mark_projection_dirty(SITE_PROJECTION_UPDATE_HUD);
 }
 
 void update_living_plant_stability(
@@ -1632,10 +1625,6 @@ void EcologySystem::run(RuntimeInvocation& invocation)
                 {
                     report_component.last_reported_density = ecology.plant_density;
                     report_component.valid = 1U;
-                }
-                if (ecology_change_affects_visible_projection(changed_mask))
-                {
-                    world.mark_tile_projection_dirty(coord);
                 }
                 append_tile_ecology_batch_entry(
                     message_queue,

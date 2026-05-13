@@ -27,7 +27,7 @@ struct CraftContextOptionState final
     std::uint32_t output_item_id {0U};
 };
 
-struct CraftContextPresentationState final
+struct CraftContextState final
 {
     bool occupied {false};
     TileCoord tile_coord {};
@@ -38,7 +38,7 @@ struct CraftState final
 {
     std::vector<CraftDeviceCacheState> device_caches {};
     PhoneInventoryCacheState phone_cache {};
-    CraftContextPresentationState context_presentation {};
+    CraftContextState context {};
     std::uint64_t device_cache_source_membership_revision {0U};
     TileCoord device_cache_worker_tile {};
     bool device_caches_dirty {true};

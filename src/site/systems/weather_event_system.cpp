@@ -4,7 +4,6 @@
 #include "content/prototype_content.h"
 #include "runtime/game_runtime.h"
 #include "runtime/runtime_clock.h"
-#include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 
 #include <algorithm>
@@ -120,7 +119,6 @@ void apply_site_weather(
     weather.weather_wind = wind;
     weather.weather_dust = dust;
     weather.weather_wind_direction_degrees = wind_direction_degrees;
-    world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
 }
 
 float resolve_weather_lerp_factor(double fixed_step_seconds) noexcept
@@ -386,7 +384,6 @@ void start_next_wave(
         event.peak_time_minutes + event.peak_duration_minutes + k_event_ramp_down_minutes;
     event.minutes_until_next_wave = 0.0;
     event.wave_sequence_index += 1U;
-    world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
 }
 }  // namespace
 
@@ -572,7 +569,6 @@ void WeatherEventSystem::run(RuntimeInvocation& invocation)
             event.minutes_until_next_wave =
                 resolve_next_wave_delay_minutes(world, event.wave_sequence_index);
         }
-        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
         smooth_site_weather_toward(
             world,
             fixed_step_seconds,
@@ -588,10 +584,6 @@ void WeatherEventSystem::run(RuntimeInvocation& invocation)
     event.event_heat_pressure = k_mild_weather_heat * pressure_scale;
     event.event_wind_pressure = k_mild_weather_wind * pressure_scale;
     event.event_dust_pressure = k_mild_weather_dust * pressure_scale;
-    if (event.active_event_template_id != previous_template_id)
-    {
-        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WEATHER);
-    }
     smooth_site_weather_toward(
         world,
         fixed_step_seconds,

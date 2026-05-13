@@ -14,7 +14,6 @@
 #include "site/defs/site_action_defs.h"
 #include "site/inventory_storage.h"
 #include "site/placement_preview.h"
-#include "site/site_projection_update_flags.h"
 #include "site/site_run_state.h"
 #include "support/id_types.h"
 
@@ -2095,8 +2094,6 @@ void begin_action_execution(
         action_state.quantity,
         action_state.primary_subject_id,
         craft_recipe);
-    world.mark_projection_dirty(
-        SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
 }
 
 void emit_placement_reservation_requested(
@@ -2700,7 +2697,6 @@ Gs1Status handle_start_site_action(
                 invocation.game_message_queue(),
                 action_state.placement_mode,
                 target_tile);
-            world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW);
             return GS1_STATUS_OK;
         }
 
@@ -2709,8 +2705,6 @@ Gs1Status handle_start_site_action(
             placement_mode.action_kind == ActionKind::Plant &&
             placement_mode.item_id != 0U;
         clear_placement_mode(action_state.placement_mode);
-        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW);
-
         target_tile = placement_mode.target_tile.value_or(target_tile);
         primary_subject_id = placement_mode.primary_subject_id;
         secondary_subject_id = placement_mode.secondary_subject_id;
@@ -2812,7 +2806,6 @@ Gs1Status handle_start_site_action(
                 invocation,
                 placement_mode,
                 resolve_initial_placement_mode_tile(invocation, target_tile));
-            world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW);
             return GS1_STATUS_OK;
         }
 
@@ -3093,8 +3086,6 @@ Gs1Status handle_start_site_action(
             begin_action_execution(invocation, action_state);
         }
 
-        world.mark_projection_dirty(
-            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
         return GS1_STATUS_OK;
     }
 
@@ -3117,7 +3108,6 @@ Gs1Status handle_cancel_site_action(
                 (cancels_current || cancels_placement_mode))
             {
                 clear_placement_mode(action_state.placement_mode);
-                world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW);
             }
             return GS1_STATUS_OK;
         }
@@ -3143,8 +3133,6 @@ Gs1Status handle_cancel_site_action(
             0U);
 
         clear_action_state(action_state);
-        world.mark_projection_dirty(
-            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
         return GS1_STATUS_OK;
     }
 
@@ -3166,7 +3154,6 @@ Gs1Status handle_placement_mode_cursor_moved(
             invocation,
             action_state.placement_mode,
             target_tile);
-        world.mark_projection_dirty(SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW);
         return GS1_STATUS_OK;
 }
 
@@ -3255,7 +3242,6 @@ Gs1Status ActionExecutionSystem::process_game_message(
         }
         else
         {
-            world.mark_projection_dirty(SITE_PROJECTION_UPDATE_WORKER);
         }
         return GS1_STATUS_OK;
     }
@@ -3283,8 +3269,6 @@ Gs1Status ActionExecutionSystem::process_game_message(
             action_state.primary_subject_id,
             action_state.secondary_subject_id);
         clear_action_state(action_state);
-        world.mark_projection_dirty(
-            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
         return GS1_STATUS_OK;
     }
 
@@ -3407,8 +3391,6 @@ void ActionExecutionSystem::run(RuntimeInvocation& invocation)
                 action_state.secondary_subject_id);
             emit_placement_reservation_released(invocation.game_message_queue(), action_state);
             clear_action_state(action_state);
-            world.mark_projection_dirty(
-                SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
             return;
         }
     }
@@ -3428,8 +3410,6 @@ void ActionExecutionSystem::run(RuntimeInvocation& invocation)
                 action_state.secondary_subject_id);
             emit_placement_reservation_released(invocation.game_message_queue(), action_state);
             clear_action_state(action_state);
-            world.mark_projection_dirty(
-                SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
             return;
         }
     }
@@ -3449,8 +3429,6 @@ void ActionExecutionSystem::run(RuntimeInvocation& invocation)
                 action_state.secondary_subject_id);
             emit_placement_reservation_released(invocation.game_message_queue(), action_state);
             clear_action_state(action_state);
-            world.mark_projection_dirty(
-                SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
             return;
         }
 
@@ -3476,8 +3454,6 @@ void ActionExecutionSystem::run(RuntimeInvocation& invocation)
                 action_state.secondary_subject_id);
             emit_placement_reservation_released(invocation.game_message_queue(), action_state);
             clear_action_state(action_state);
-            world.mark_projection_dirty(
-                SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
             return;
         }
     }
@@ -3496,8 +3472,6 @@ void ActionExecutionSystem::run(RuntimeInvocation& invocation)
             action_state.secondary_subject_id);
         emit_placement_reservation_released(invocation.game_message_queue(), action_state);
         clear_action_state(action_state);
-        world.mark_projection_dirty(
-            SITE_PROJECTION_UPDATE_WORKER | SITE_PROJECTION_UPDATE_HUD);
         return;
     }
 
@@ -3516,18 +3490,9 @@ void ActionExecutionSystem::run(RuntimeInvocation& invocation)
         reactivate_plant_placement_mode_from_completed_action(action_state);
     }
     clear_action_state(action_state);
-    std::uint32_t dirty_flags =
-        SITE_PROJECTION_UPDATE_WORKER |
-        SITE_PROJECTION_UPDATE_HUD;
-    if (completed_action_kind == ActionKind::Excavate && completed_target_tile.has_value())
-    {
-        world.mark_tile_projection_dirty(*completed_target_tile);
-    }
-    if (reactivated_placement_mode)
-    {
-        dirty_flags |= SITE_PROJECTION_UPDATE_PLACEMENT_PREVIEW;
-    }
-    world.mark_projection_dirty(dirty_flags);
+    (void)completed_action_kind;
+    (void)completed_target_tile;
+    (void)reactivated_placement_mode;
 }
 }  // namespace gs1
 

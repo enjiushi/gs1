@@ -372,7 +372,6 @@ void rebuild_site_view(
             id_value(listing.item_id),
             listing.price,
             listing.quantity,
-            listing.cart_quantity,
             listing.stock_refresh_generation,
             static_cast<std::uint8_t>(listing.kind),
             listing.occupied ? 1U : 0U,
@@ -380,7 +379,7 @@ void rebuild_site_view(
             0U});
     }
 
-    const auto& craft_context = site_run.craft.context_presentation;
+    const auto& craft_context = site_run.craft.context;
     if (craft_context.occupied)
     {
         cache.craft_context_options.reserve(craft_context.options.size());
@@ -537,7 +536,6 @@ void rebuild_site_view(
         site_run.economy.phone_delivery_minutes,
         0U,
         site_run.inventory.worker_pack_storage_id,
-        site_run.inventory.opened_device_storage_id,
         site_run.inventory.next_storage_id,
         static_cast<std::uint32_t>(cache.inventory_storages.size()),
         cache.inventory_storages.empty() ? nullptr : cache.inventory_storages.data(),
