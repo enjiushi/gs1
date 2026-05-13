@@ -14,9 +14,9 @@ using namespace godot;
 
 namespace
 {
-constexpr std::int64_t k_ui_action_return_to_regional_map = 4;
-constexpr std::int64_t k_ui_action_close_site_protection_ui = 25;
-constexpr std::int64_t k_ui_action_set_site_protection_overlay_mode = 26;
+constexpr std::int64_t k_gameplay_action_return_to_regional_map = 4;
+constexpr std::int64_t k_gameplay_action_close_site_protection_ui = 25;
+constexpr std::int64_t k_gameplay_action_set_site_protection_overlay_mode = 26;
 
 constexpr std::uint64_t k_site_result_return_button_key = 1U;
 
@@ -74,8 +74,8 @@ void Gs1GodotOverlayPanelController::_bind_methods()
 
 void Gs1GodotOverlayPanelController::_ready()
 {
-    set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
-        submit_ui_action(action_type, target_id, arg0, arg1);
+    set_submit_gameplay_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
+        submit_gameplay_action(action_type, target_id, arg0, arg1);
     });
     cache_adapter_service();
     if (Control* owner = resolve_owner_control())
@@ -147,11 +147,11 @@ void Gs1GodotOverlayPanelController::cache_ui_references(Control& owner)
         const char* name;
         std::int64_t mode;
     } bindings[] {
-        {"OverlayWindButton", GS1_SITE_PROTECTION_OVERLAY_WIND},
-        {"OverlayHeatButton", GS1_SITE_PROTECTION_OVERLAY_HEAT},
-        {"OverlayDustButton", GS1_SITE_PROTECTION_OVERLAY_DUST},
-        {"OverlayConditionButton", GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION},
-        {"OverlayClearButton", GS1_SITE_PROTECTION_OVERLAY_NONE},
+        {"OverlayWindButton", static_cast<std::int64_t>(Gs1GodotProtectionOverlayMode::Wind)},
+        {"OverlayHeatButton", static_cast<std::int64_t>(Gs1GodotProtectionOverlayMode::Heat)},
+        {"OverlayDustButton", static_cast<std::int64_t>(Gs1GodotProtectionOverlayMode::Dust)},
+        {"OverlayConditionButton", static_cast<std::int64_t>(Gs1GodotProtectionOverlayMode::OccupantCondition)},
+        {"OverlayClearButton", static_cast<std::int64_t>(Gs1GodotProtectionOverlayMode::None)},
     };
     for (const ButtonBinding& binding : bindings)
     {
@@ -170,9 +170,9 @@ void Gs1GodotOverlayPanelController::cache_ui_references(Control& owner)
     update_site_result();
 }
 
-void Gs1GodotOverlayPanelController::set_submit_ui_action_callback(SubmitUiActionFn callback)
+void Gs1GodotOverlayPanelController::set_submit_gameplay_action_callback(SubmitGameplayActionFn callback)
 {
-    submit_ui_action_ = std::move(callback);
+    submit_gameplay_action_ = std::move(callback);
 }
 
 void Gs1GodotOverlayPanelController::cache_adapter_service()
@@ -203,7 +203,7 @@ Control* Gs1GodotOverlayPanelController::resolve_owner_control()
     return owner_control_;
 }
 
-void Gs1GodotOverlayPanelController::submit_ui_action(
+void Gs1GodotOverlayPanelController::submit_gameplay_action(
     std::int64_t action_type,
     std::int64_t target_id,
     std::int64_t arg0,
@@ -211,19 +211,19 @@ void Gs1GodotOverlayPanelController::submit_ui_action(
 {
     if (adapter_service_ != nullptr)
     {
-        adapter_service_->submit_ui_action(action_type, target_id, arg0, arg1);
+        adapter_service_->submit_gameplay_action(action_type, target_id, arg0, arg1);
     }
 }
 
 void Gs1GodotOverlayPanelController::handle_overlay_mode_pressed(std::int64_t mode)
 {
-    if (!submit_ui_action_)
+    if (!submit_gameplay_action_)
     {
         return;
     }
 
-    submit_ui_action_(
-        k_ui_action_set_site_protection_overlay_mode,
+    submit_gameplay_action_(
+        k_gameplay_action_set_site_protection_overlay_mode,
         0,
         mode,
         0);
@@ -243,12 +243,12 @@ void Gs1GodotOverlayPanelController::handle_projected_button_pressed(std::int64_
     {
         button = resolve_object<Button>(found->second.object_id);
     }
-    if (button == nullptr || !submit_ui_action_)
+    if (button == nullptr || !submit_gameplay_action_)
     {
         return;
     }
 
-    submit_ui_action_(
+    submit_gameplay_action_(
         as_int(button->get_meta("action_type", 0), 0),
         as_int(button->get_meta("target_id", 0), 0),
         as_int(button->get_meta("arg0", 0), 0),
@@ -316,7 +316,7 @@ void Gs1GodotOverlayPanelController::update_overlay_state_label()
     const auto mode =
         adapter_service_ != nullptr
             ? adapter_service_->ui_session_state().protection.overlay_mode
-            : GS1_SITE_PROTECTION_OVERLAY_NONE;
+            : Gs1GodotProtectionOverlayMode::None;
     overlay_state_label_->set_text(vformat("Overlay Mode: %s", protection_mode_label(mode)));
 }
 
@@ -347,14 +347,14 @@ void Gs1GodotOverlayPanelController::update_protection_selector()
     const struct SelectorButtonSpec final
     {
         std::uint32_t element_id;
-        Gs1SiteProtectionOverlayMode mode;
+        Gs1GodotProtectionOverlayMode mode;
         std::int64_t action_type;
     } button_defs[] {
-        {1U, GS1_SITE_PROTECTION_OVERLAY_WIND, k_ui_action_set_site_protection_overlay_mode},
-        {2U, GS1_SITE_PROTECTION_OVERLAY_HEAT, k_ui_action_set_site_protection_overlay_mode},
-        {3U, GS1_SITE_PROTECTION_OVERLAY_DUST, k_ui_action_set_site_protection_overlay_mode},
-        {4U, GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION, k_ui_action_set_site_protection_overlay_mode},
-        {5U, GS1_SITE_PROTECTION_OVERLAY_NONE, k_ui_action_close_site_protection_ui},
+        {1U, Gs1GodotProtectionOverlayMode::Wind, k_gameplay_action_set_site_protection_overlay_mode},
+        {2U, Gs1GodotProtectionOverlayMode::Heat, k_gameplay_action_set_site_protection_overlay_mode},
+        {3U, Gs1GodotProtectionOverlayMode::Dust, k_gameplay_action_set_site_protection_overlay_mode},
+        {4U, Gs1GodotProtectionOverlayMode::OccupantCondition, k_gameplay_action_set_site_protection_overlay_mode},
+        {5U, Gs1GodotProtectionOverlayMode::None, k_gameplay_action_close_site_protection_ui},
     };
     for (const SelectorButtonSpec& button_def : button_defs)
     {
@@ -362,7 +362,7 @@ void Gs1GodotOverlayPanelController::update_protection_selector()
         action["type"] = static_cast<int>(button_def.action_type);
         action["target_id"] = 0;
         action["arg0"] = static_cast<int64_t>(
-            button_def.action_type == k_ui_action_set_site_protection_overlay_mode
+            button_def.action_type == k_gameplay_action_set_site_protection_overlay_mode
                 ? button_def.mode
                 : 0);
         action["arg1"] = 0;
@@ -370,7 +370,7 @@ void Gs1GodotOverlayPanelController::update_protection_selector()
         Dictionary spec;
         spec["setup_id"] = static_cast<int>(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
         spec["element_id"] = static_cast<int>(button_def.element_id);
-        spec["text"] = button_def.action_type == k_ui_action_close_site_protection_ui
+        spec["text"] = button_def.action_type == k_gameplay_action_close_site_protection_ui
             ? String("Close")
             : protection_mode_label(button_def.mode);
         spec["flags"] = 0;
@@ -407,7 +407,7 @@ void Gs1GodotOverlayPanelController::update_site_result()
     }
 
     Dictionary action;
-    action["type"] = static_cast<int>(k_ui_action_return_to_regional_map);
+    action["type"] = static_cast<int>(k_gameplay_action_return_to_regional_map);
     action["target_id"] = 0;
     action["arg0"] = 0;
     action["arg1"] = 0;
@@ -524,19 +524,19 @@ void Gs1GodotOverlayPanelController::prune_button_registry(
     }
 }
 
-String Gs1GodotOverlayPanelController::protection_mode_label(Gs1SiteProtectionOverlayMode mode) const
+String Gs1GodotOverlayPanelController::protection_mode_label(Gs1GodotProtectionOverlayMode mode) const
 {
     switch (mode)
     {
-    case GS1_SITE_PROTECTION_OVERLAY_WIND:
+    case Gs1GodotProtectionOverlayMode::Wind:
         return "Wind";
-    case GS1_SITE_PROTECTION_OVERLAY_HEAT:
+    case Gs1GodotProtectionOverlayMode::Heat:
         return "Heat";
-    case GS1_SITE_PROTECTION_OVERLAY_DUST:
+    case Gs1GodotProtectionOverlayMode::Dust:
         return "Dust";
-    case GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION:
+    case Gs1GodotProtectionOverlayMode::OccupantCondition:
         return "Condition";
-    case GS1_SITE_PROTECTION_OVERLAY_NONE:
+    case Gs1GodotProtectionOverlayMode::None:
     default:
         return "Off";
     }

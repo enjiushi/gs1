@@ -9,7 +9,7 @@ using namespace godot;
 
 namespace
 {
-constexpr std::int64_t k_ui_action_start_new_campaign = 1;
+constexpr std::int64_t k_gameplay_action_start_new_campaign = 1;
 }
 
 void Gs1GodotMainMenuUiController::_bind_methods()
@@ -67,17 +67,17 @@ void Gs1GodotMainMenuUiController::bind_button(BaseButton* button, const Callabl
     button->connect("pressed", callback);
 }
 
-void Gs1GodotMainMenuUiController::submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)
+void Gs1GodotMainMenuUiController::submit_gameplay_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)
 {
     if (adapter_service_ != nullptr)
     {
-        (void)adapter_service_->submit_ui_action(action_type, target_id, arg0, arg1);
+        (void)adapter_service_->submit_gameplay_action(action_type, target_id, arg0, arg1);
     }
 }
 
 void Gs1GodotMainMenuUiController::on_start_campaign_pressed()
 {
-    submit_ui_action(k_ui_action_start_new_campaign, 0, 0, 0);
+    submit_gameplay_action(k_gameplay_action_start_new_campaign, 0, 0, 0);
 }
 
 void Gs1GodotMainMenuUiController::on_menu_settings_pressed()

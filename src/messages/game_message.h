@@ -31,9 +31,6 @@ enum class GameMessageType : std::uint8_t
     StartNewCampaign,
     SelectDeploymentSite,
     ClearDeploymentSiteSelection,
-    OpenRegionalMapTechTree,
-    CloseRegionalMapTechTree,
-    SelectRegionalMapTechTreeFaction,
     DeploymentSiteSelectionChanged,
     CampaignCashDeltaRequested,
     CampaignReputationAwardRequested,
@@ -191,19 +188,6 @@ struct SelectDeploymentSiteMessage final
 
 struct ClearDeploymentSiteSelectionMessage final
 {
-};
-
-struct OpenRegionalMapTechTreeMessage final
-{
-};
-
-struct CloseRegionalMapTechTreeMessage final
-{
-};
-
-struct SelectRegionalMapTechTreeFactionMessage final
-{
-    std::uint32_t faction_id;
 };
 
 struct DeploymentSiteSelectionChangedMessage final
@@ -763,9 +747,6 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(OpenMainMenuMessage, 1U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(StartNewCampaignMessage, 16U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SelectDeploymentSiteMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ClearDeploymentSiteSelectionMessage, 1U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(OpenRegionalMapTechTreeMessage, 1U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CloseRegionalMapTechTreeMessage, 1U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SelectRegionalMapTechTreeFactionMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(DeploymentSiteSelectionChangedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CampaignCashDeltaRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CampaignReputationAwardRequestedMessage, 4U);

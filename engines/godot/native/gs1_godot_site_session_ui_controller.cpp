@@ -485,13 +485,13 @@ String Gs1GodotSiteSessionUiController::structure_name_for(int structure_id) con
     return structure_name_cache_.emplace(structure_id, display_name).first->second;
 }
 
-void Gs1GodotSiteSessionUiController::submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)
+void Gs1GodotSiteSessionUiController::submit_gameplay_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)
 {
     if (adapter_service_ == nullptr)
     {
         return;
     }
-    const bool ok = adapter_service_->submit_ui_action(action_type, target_id, arg0, arg1);
+    const bool ok = adapter_service_->submit_gameplay_action(action_type, target_id, arg0, arg1);
     (void)ok;
 }
 
@@ -563,7 +563,7 @@ void Gs1GodotSiteSessionUiController::submit_storage_view(int storage_id, int ev
 
 void Gs1GodotSiteSessionUiController::on_return_to_map_pressed()
 {
-    submit_ui_action(UI_ACTION_RETURN_TO_REGIONAL_MAP, 0, 0, 0);
+    submit_gameplay_action(GAMEPLAY_ACTION_RETURN_TO_REGIONAL_MAP, 0, 0, 0);
 }
 
 void Gs1GodotSiteSessionUiController::on_submit_move_pressed(double x, double y, double z)

@@ -51,7 +51,7 @@ enum Gs1SiteState : std::uint8_t
 enum Gs1HostEventType : std::uint8_t
 {
     GS1_HOST_EVENT_NONE = 0,
-    GS1_HOST_EVENT_UI_ACTION = 1,
+    GS1_HOST_EVENT_GAMEPLAY_ACTION = 1,
     GS1_HOST_EVENT_SITE_MOVE_DIRECTION = 2,
     GS1_HOST_EVENT_SITE_ACTION_REQUEST = 3,
     GS1_HOST_EVENT_SITE_ACTION_CANCEL = 4,
@@ -94,12 +94,6 @@ enum Gs1UiSetupPresentationType : std::uint8_t
     GS1_UI_SETUP_PRESENTATION_OVERLAY = 2
 };
 
-enum Gs1ProgressionViewId : std::uint8_t
-{
-    GS1_PROGRESSION_VIEW_NONE = 0,
-    GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE = 1
-};
-
 enum Gs1ProgressionEntryKind : std::uint8_t
 {
     GS1_PROGRESSION_ENTRY_NONE = 0,
@@ -116,90 +110,34 @@ enum Gs1ProgressionEntryFlags : std::uint8_t
     GS1_PROGRESSION_ENTRY_FLAG_SELECTED = 1u << 3
 };
 
-enum Gs1UiSurfaceId : std::uint16_t
+enum Gs1GameplayActionType : std::uint8_t
 {
-    GS1_UI_SURFACE_NONE = 0,
-    GS1_UI_SURFACE_REGIONAL_SELECTION_PANEL = 1,
-    GS1_UI_SURFACE_REGIONAL_TECH_TREE_OVERLAY = 2,
-    GS1_UI_SURFACE_SITE_INVENTORY_PANEL = 3,
-    GS1_UI_SURFACE_SITE_PHONE_PANEL = 4,
-    GS1_UI_SURFACE_SITE_OVERLAY_PANEL = 5,
-    GS1_UI_SURFACE_SITE_TASK_PANEL = 6,
-    GS1_UI_SURFACE_SITE_CRAFT_PANEL = 7
-};
-
-enum Gs1UiPanelId : std::uint8_t
-{
-    GS1_UI_PANEL_NONE = 0,
-    GS1_UI_PANEL_MAIN_MENU = 1,
-    GS1_UI_PANEL_REGIONAL_MAP = 2,
-    GS1_UI_PANEL_REGIONAL_MAP_SELECTION = 3
-};
-
-enum Gs1UiPanelSlotId : std::uint8_t
-{
-    GS1_UI_PANEL_SLOT_NONE = 0,
-    GS1_UI_PANEL_SLOT_PRIMARY = 1,
-    GS1_UI_PANEL_SLOT_SECONDARY = 2,
-    GS1_UI_PANEL_SLOT_TERTIARY = 3
-};
-
-enum Gs1UiPanelListId : std::uint8_t
-{
-    GS1_UI_PANEL_LIST_NONE = 0,
-    GS1_UI_PANEL_LIST_REGIONAL_SITES = 1,
-    GS1_UI_PANEL_LIST_REGIONAL_LOADOUT = 2
-};
-
-enum Gs1UiPanelSlotFlags : std::uint8_t
-{
-    GS1_UI_PANEL_SLOT_FLAG_NONE = 0,
-    GS1_UI_PANEL_SLOT_FLAG_PRIMARY = 1u << 0,
-    GS1_UI_PANEL_SLOT_FLAG_DISABLED = 1u << 1
-};
-
-enum Gs1UiPanelListItemFlags : std::uint8_t
-{
-    GS1_UI_PANEL_LIST_ITEM_FLAG_NONE = 0,
-    GS1_UI_PANEL_LIST_ITEM_FLAG_SELECTED = 1u << 0,
-    GS1_UI_PANEL_LIST_ITEM_FLAG_DISABLED = 1u << 1
-};
-
-enum Gs1UiPanelListActionRole : std::uint8_t
-{
-    GS1_UI_PANEL_LIST_ACTION_ROLE_NONE = 0,
-    GS1_UI_PANEL_LIST_ACTION_ROLE_PRIMARY = 1,
-    GS1_UI_PANEL_LIST_ACTION_ROLE_SECONDARY = 2
-};
-
-enum Gs1UiActionType : std::uint8_t
-{
-    GS1_UI_ACTION_NONE = 0,
-    GS1_UI_ACTION_START_NEW_CAMPAIGN = 1,
-    GS1_UI_ACTION_SELECT_DEPLOYMENT_SITE = 2,
-    GS1_UI_ACTION_START_SITE_ATTEMPT = 3,
-    GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP = 4,
-    GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION = 5,
-    GS1_UI_ACTION_ACCEPT_TASK = 6,
-    GS1_UI_ACTION_CLAIM_TASK_REWARD = 7,
-    GS1_UI_ACTION_BUY_PHONE_LISTING = 8,
-    GS1_UI_ACTION_SELL_PHONE_LISTING = 9,
-    GS1_UI_ACTION_HIRE_CONTRACTOR = 12,
-    GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE = 13,
-    GS1_UI_ACTION_ADD_PHONE_LISTING_TO_CART = 14,
-    GS1_UI_ACTION_REMOVE_PHONE_LISTING_FROM_CART = 15,
-    GS1_UI_ACTION_CHECKOUT_PHONE_CART = 16,
-    GS1_UI_ACTION_SET_PHONE_PANEL_SECTION = 17,
-    GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE = 18,
-    GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE = 19,
-    GS1_UI_ACTION_CLAIM_TECHNOLOGY_NODE = 20,
-    GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB = 21,
-    GS1_UI_ACTION_CLOSE_PHONE_PANEL = 22,
-    GS1_UI_ACTION_REFUND_TECHNOLOGY_NODE = 23,
-    GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR = 24,
-    GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI = 25,
-    GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE = 26,
-    GS1_UI_ACTION_END_SITE_MODIFIER = 27
+    GS1_GAMEPLAY_ACTION_NONE = 0,
+    GS1_GAMEPLAY_ACTION_START_NEW_CAMPAIGN = 1,
+    GS1_GAMEPLAY_ACTION_SELECT_DEPLOYMENT_SITE = 2,
+    GS1_GAMEPLAY_ACTION_START_SITE_ATTEMPT = 3,
+    GS1_GAMEPLAY_ACTION_RETURN_TO_REGIONAL_MAP = 4,
+    GS1_GAMEPLAY_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION = 5,
+    GS1_GAMEPLAY_ACTION_ACCEPT_TASK = 6,
+    GS1_GAMEPLAY_ACTION_CLAIM_TASK_REWARD = 7,
+    GS1_GAMEPLAY_ACTION_BUY_PHONE_LISTING = 8,
+    GS1_GAMEPLAY_ACTION_SELL_PHONE_LISTING = 9,
+    GS1_GAMEPLAY_ACTION_HIRE_CONTRACTOR = 12,
+    GS1_GAMEPLAY_ACTION_PURCHASE_SITE_UNLOCKABLE = 13,
+    GS1_GAMEPLAY_ACTION_ADD_PHONE_LISTING_TO_CART = 14,
+    GS1_GAMEPLAY_ACTION_REMOVE_PHONE_LISTING_FROM_CART = 15,
+    GS1_GAMEPLAY_ACTION_CHECKOUT_PHONE_CART = 16,
+    GS1_GAMEPLAY_ACTION_SET_PHONE_PANEL_SECTION = 17,
+    GS1_GAMEPLAY_ACTION_OPEN_REGIONAL_MAP_TECH_TREE = 18,
+    GS1_GAMEPLAY_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE = 19,
+    GS1_GAMEPLAY_ACTION_CLAIM_TECHNOLOGY_NODE = 20,
+    GS1_GAMEPLAY_ACTION_SELECT_TECH_TREE_FACTION_TAB = 21,
+    GS1_GAMEPLAY_ACTION_CLOSE_PHONE_PANEL = 22,
+    GS1_GAMEPLAY_ACTION_REFUND_TECHNOLOGY_NODE = 23,
+    GS1_GAMEPLAY_ACTION_OPEN_SITE_PROTECTION_SELECTOR = 24,
+    GS1_GAMEPLAY_ACTION_CLOSE_SITE_PROTECTION_UI = 25,
+    GS1_GAMEPLAY_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE = 26,
+    GS1_GAMEPLAY_ACTION_END_SITE_MODIFIER = 27
 };
 
 enum Gs1SiteActionKind : std::uint8_t
@@ -288,16 +226,6 @@ enum Gs1PhoneListingPresentationKind : std::uint8_t
     GS1_PHONE_LISTING_PRESENTATION_PURCHASE_UNLOCKABLE = 3
 };
 
-enum Gs1PhonePanelSection : std::uint8_t
-{
-    GS1_PHONE_PANEL_SECTION_HOME = 0,
-    GS1_PHONE_PANEL_SECTION_TASKS = 1,
-    GS1_PHONE_PANEL_SECTION_BUY = 2,
-    GS1_PHONE_PANEL_SECTION_SELL = 3,
-    GS1_PHONE_PANEL_SECTION_HIRE = 4,
-    GS1_PHONE_PANEL_SECTION_CART = 5
-};
-
 enum Gs1NotificationKind : std::uint8_t
 {
     GS1_NOTIFICATION_KIND_INFO = 0,
@@ -325,15 +253,6 @@ enum Gs1SiteAttemptResult : std::uint8_t
     GS1_SITE_ATTEMPT_RESULT_NONE = 0,
     GS1_SITE_ATTEMPT_RESULT_COMPLETED = 1,
     GS1_SITE_ATTEMPT_RESULT_FAILED = 2
-};
-
-enum Gs1SiteProtectionOverlayMode : std::uint8_t
-{
-    GS1_SITE_PROTECTION_OVERLAY_NONE = 0,
-    GS1_SITE_PROTECTION_OVERLAY_WIND = 1,
-    GS1_SITE_PROTECTION_OVERLAY_HEAT = 2,
-    GS1_SITE_PROTECTION_OVERLAY_DUST = 3,
-    GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION = 4
 };
 
 enum Gs1EngineMessageType : std::uint8_t
@@ -384,19 +303,10 @@ enum Gs1EngineMessageType : std::uint8_t
     GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_UPSERT = 51,
     GS1_ENGINE_MESSAGE_SITE_DEVICE_VISUAL_REMOVE = 52,
 
-    GS1_ENGINE_MESSAGE_BEGIN_UI_PANEL = 53,
-    GS1_ENGINE_MESSAGE_UI_PANEL_TEXT_UPSERT = 54,
-    GS1_ENGINE_MESSAGE_UI_PANEL_SLOT_ACTION_UPSERT = 55,
-    GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ITEM_UPSERT = 56,
-    GS1_ENGINE_MESSAGE_UI_PANEL_LIST_ACTION_UPSERT = 57,
-    GS1_ENGINE_MESSAGE_END_UI_PANEL = 58,
-    GS1_ENGINE_MESSAGE_CLOSE_UI_PANEL = 59,
-
     GS1_ENGINE_MESSAGE_BEGIN_PROGRESSION_VIEW = 60,
     GS1_ENGINE_MESSAGE_PROGRESSION_ENTRY_UPSERT = 61,
     GS1_ENGINE_MESSAGE_END_PROGRESSION_VIEW = 62,
     GS1_ENGINE_MESSAGE_CLOSE_PROGRESSION_VIEW = 63,
-    GS1_ENGINE_MESSAGE_SET_UI_SURFACE_VISIBILITY = 64,
 
     GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_HUD_SNAPSHOT = 65,
     GS1_ENGINE_MESSAGE_REGIONAL_MAP_HUD_SITE_UPSERT = 66,
@@ -452,14 +362,6 @@ enum Gs1EngineMessageType : std::uint8_t
     GS1_ENGINE_MESSAGE_BEGIN_SITE_HUD_SNAPSHOT = 108,
     GS1_ENGINE_MESSAGE_SITE_HUD_STORAGE_UPSERT = 109,
     GS1_ENGINE_MESSAGE_END_SITE_HUD_SNAPSHOT = 110,
-
-    GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_SELECTION_UI_PANEL = 111,
-    GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_UI_PANEL_TEXT_UPSERT = 112,
-    GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_UI_PANEL_SLOT_ACTION_UPSERT = 113,
-    GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_UI_PANEL_LIST_ITEM_UPSERT = 114,
-    GS1_ENGINE_MESSAGE_REGIONAL_SELECTION_UI_PANEL_LIST_ACTION_UPSERT = 115,
-    GS1_ENGINE_MESSAGE_END_REGIONAL_SELECTION_UI_PANEL = 116,
-    GS1_ENGINE_MESSAGE_CLOSE_REGIONAL_SELECTION_UI_PANEL = 117,
 
     GS1_ENGINE_MESSAGE_HUD_STATE = 44,
     GS1_ENGINE_MESSAGE_NOTIFICATION_PUSH = 45,
@@ -534,17 +436,17 @@ struct Gs1RuntimeProfilingSnapshot
     Gs1RuntimeProfileSystemStats systems[GS1_RUNTIME_PROFILE_SYSTEM_COUNT];
 };
 
-struct Gs1UiAction
+struct Gs1GameplayAction
 {
-    Gs1UiActionType type;
+    Gs1GameplayActionType type;
     std::uint32_t target_id;
     std::uint64_t arg0;
     std::uint64_t arg1;
 };
 
-struct Gs1HostEventUiActionData
+struct Gs1HostEventGameplayActionData
 {
-    Gs1UiAction action;
+    Gs1GameplayAction action;
 };
 
 struct Gs1HostEventSiteMoveDirectionData
@@ -618,7 +520,7 @@ struct Gs1HostEventEmptyData
 
 union Gs1HostEventPayload
 {
-    Gs1HostEventUiActionData ui_action;
+    Gs1HostEventGameplayActionData gameplay_action;
     Gs1HostEventSiteMoveDirectionData site_move_direction;
     Gs1HostEventSiteActionRequestData site_action_request;
     Gs1HostEventSiteActionCancelData site_action_cancel;
@@ -630,7 +532,7 @@ union Gs1HostEventPayload
 };
 
 using Gs1HostMessageType = Gs1HostEventType;
-using Gs1HostMessageUiActionData = Gs1HostEventUiActionData;
+using Gs1HostMessageGameplayActionData = Gs1HostEventGameplayActionData;
 using Gs1HostMessageSiteMoveDirectionData = Gs1HostEventSiteMoveDirectionData;
 using Gs1HostMessageSiteActionRequestData = Gs1HostEventSiteActionRequestData;
 using Gs1HostMessageSiteActionCancelData = Gs1HostEventSiteActionCancelData;
@@ -737,75 +639,9 @@ struct Gs1EngineMessageCloseUiSetupData
     Gs1UiSetupPresentationType presentation_type;
 };
 
-struct Gs1EngineMessageUiPanelData
-{
-    std::uint32_t context_id;
-    Gs1UiPanelId panel_id;
-    Gs1ProjectionMode mode;
-    std::uint8_t text_line_count;
-    std::uint8_t slot_action_count;
-    std::uint8_t list_item_count;
-    std::uint8_t list_action_count;
-};
-
-struct Gs1EngineMessageCloseUiPanelData
-{
-    Gs1UiPanelId panel_id;
-    std::uint8_t reserved0[3];
-};
-
-struct Gs1EngineMessageUiPanelTextData
-{
-    std::uint16_t line_id;
-    std::uint8_t flags;
-    std::uint8_t text_kind;
-    std::uint32_t primary_id;
-    std::uint32_t secondary_id;
-    std::uint32_t quantity;
-    std::uint32_t aux_value;
-    std::uint8_t reserved0[40];
-};
-
-struct Gs1EngineMessageUiPanelSlotActionData
-{
-    Gs1UiAction action;
-    Gs1UiPanelSlotId slot_id;
-    std::uint8_t flags;
-    std::uint8_t label_kind;
-    std::uint32_t primary_id;
-    std::uint32_t secondary_id;
-    std::uint32_t quantity;
-    std::uint8_t reserved0[16];
-};
-
-struct Gs1EngineMessageUiPanelListItemData
-{
-    std::uint32_t item_id;
-    Gs1UiPanelListId list_id;
-    std::uint8_t flags;
-    std::uint8_t primary_kind;
-    std::uint8_t secondary_kind;
-    std::uint32_t primary_id;
-    std::uint32_t secondary_id;
-    std::uint32_t quantity;
-    std::int32_t map_x;
-    std::int32_t map_y;
-    std::uint8_t reserved0[32];
-};
-
-struct Gs1EngineMessageUiPanelListActionData
-{
-    Gs1UiAction action;
-    std::uint32_t item_id;
-    Gs1UiPanelListId list_id;
-    Gs1UiPanelListActionRole role;
-    std::uint8_t flags;
-    std::uint8_t reserved0;
-};
-
 struct Gs1EngineMessageUiElementData
 {
-    Gs1UiAction action;
+    Gs1GameplayAction action;
     std::uint32_t element_id;
     Gs1UiElementType element_type;
     std::uint8_t flags;
@@ -816,23 +652,9 @@ struct Gs1EngineMessageUiElementData
     std::uint8_t reserved0[12];
 };
 
-struct Gs1EngineMessageProgressionViewData
-{
-    std::uint32_t context_id;
-    std::uint16_t entry_count;
-    Gs1ProgressionViewId view_id;
-    Gs1ProjectionMode mode;
-};
-
-struct Gs1EngineMessageCloseProgressionViewData
-{
-    Gs1ProgressionViewId view_id;
-    std::uint8_t reserved0;
-};
-
 struct Gs1EngineMessageProgressionEntryData
 {
-    Gs1UiAction action;
+    Gs1GameplayAction action;
     std::uint16_t entry_id;
     std::uint16_t reputation_requirement;
     std::uint16_t content_id;
@@ -1031,41 +853,6 @@ struct Gs1EngineMessagePhoneListingData
     std::uint8_t flags;
 };
 
-struct Gs1EngineMessagePhonePanelData
-{
-    Gs1PhonePanelSection active_section;
-    std::uint8_t reserved0[3];
-    std::uint32_t visible_task_count;
-    std::uint32_t accepted_task_count;
-    std::uint32_t completed_task_count;
-    std::uint32_t claimed_task_count;
-    std::uint32_t buy_listing_count;
-    std::uint32_t sell_listing_count;
-    std::uint32_t service_listing_count;
-    std::uint32_t cart_item_count;
-    std::uint32_t flags;
-};
-
-inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_OPEN = 1U << 0U;
-inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE = 1U << 1U;
-inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_TASKS_BADGE = 1U << 2U;
-inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_BUY_BADGE = 1U << 3U;
-inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_SELL_BADGE = 1U << 4U;
-inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_HIRE_BADGE = 1U << 5U;
-
-struct Gs1EngineMessageSiteProtectionOverlayData
-{
-    Gs1SiteProtectionOverlayMode mode;
-    std::uint8_t reserved0[3];
-};
-
-struct Gs1EngineMessageUiSurfaceVisibilityData
-{
-    Gs1UiSurfaceId surface_id;
-    std::uint8_t visible;
-    std::uint8_t reserved0;
-};
-
 struct Gs1EngineMessageSiteModifierListData
 {
     Gs1ProjectionMode mode;
@@ -1241,8 +1028,8 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1RuntimeCreateDesc, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeTimingStats);
 GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeProfileSystemStats);
 GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeProfilingSnapshot);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1UiAction, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventUiActionData, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1GameplayAction, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventGameplayActionData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteMoveDirectionData, 12U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteActionRequestData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteActionCancelData, 24U);
@@ -1268,15 +1055,7 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageRegionalMapSiteData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageRegionalMapLinkData, 12U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiSetupData, 12U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCloseUiSetupData, 2U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiPanelData, 12U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCloseUiPanelData, 4U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiPanelTextData, 60U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiPanelSlotActionData, 56U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiPanelListItemData, 60U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiPanelListActionData, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiElementData, 56U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageProgressionViewData, 8U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCloseProgressionViewData, 2U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageProgressionEntryData, 40U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteSnapshotData, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteTileData, 60U);
@@ -1292,9 +1071,6 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePlacementPreviewData, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePlacementFailureData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageTaskData, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhoneListingData, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessagePhonePanelData, 40U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteProtectionOverlayData, 4U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageUiSurfaceVisibilityData, 4U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteModifierListData, 4U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteModifierData, 8U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteActionData, 24U);
@@ -1316,15 +1092,7 @@ static_assert(sizeof(Gs1EngineMessageRegionalMapSiteData) <= GS1_MESSAGE_PAYLOAD
 static_assert(sizeof(Gs1EngineMessageRegionalMapLinkData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageUiSetupData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageCloseUiSetupData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineMessageUiPanelData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineMessageCloseUiPanelData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineMessageUiPanelTextData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineMessageUiPanelSlotActionData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineMessageUiPanelListItemData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineMessageUiPanelListActionData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageUiElementData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineMessageProgressionViewData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineMessageCloseProgressionViewData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageProgressionEntryData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteSnapshotData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteTileData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
@@ -1341,9 +1109,6 @@ static_assert(sizeof(Gs1EngineMessagePlacementPreviewTileData) <= GS1_MESSAGE_PA
 static_assert(sizeof(Gs1EngineMessagePlacementFailureData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageTaskData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessagePhoneListingData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineMessagePhonePanelData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineMessageSiteProtectionOverlayData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineMessageUiSurfaceVisibilityData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteModifierListData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteModifierData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageSiteActionData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);

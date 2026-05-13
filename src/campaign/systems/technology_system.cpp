@@ -149,7 +149,8 @@ GameMessageSubscriptionSpan TechnologySystem::subscribed_game_messages() const n
 
 HostMessageSubscriptionSpan TechnologySystem::subscribed_host_messages() const noexcept
 {
-    return {};
+    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_GAMEPLAY_ACTION};
+    return subscriptions;
 }
 
 std::optional<Gs1RuntimeProfileSystemId> TechnologySystem::profile_system_id() const noexcept
@@ -180,9 +181,40 @@ Gs1Status TechnologySystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
+    if (message.type != GS1_HOST_EVENT_GAMEPLAY_ACTION)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    const auto& action = message.payload.gameplay_action.action;
+    GameMessage gameplay_message {};
+    switch (action.type)
+    {
+    case GS1_GAMEPLAY_ACTION_CLAIM_TECHNOLOGY_NODE:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        gameplay_message.type = GameMessageType::TechnologyNodeClaimRequested;
+        gameplay_message.set_payload(TechnologyNodeClaimRequestedMessage {
+            action.target_id,
+            static_cast<std::uint32_t>(action.arg0)});
+        invocation.push_game_message(gameplay_message);
+        return GS1_STATUS_OK;
+
+    case GS1_GAMEPLAY_ACTION_REFUND_TECHNOLOGY_NODE:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        gameplay_message.type = GameMessageType::TechnologyNodeRefundRequested;
+        gameplay_message.set_payload(TechnologyNodeRefundRequestedMessage {action.target_id});
+        invocation.push_game_message(gameplay_message);
+        return GS1_STATUS_OK;
+
+    default:
+        return GS1_STATUS_OK;
+    }
 }
 
 void TechnologySystem::run(RuntimeInvocation& invocation)

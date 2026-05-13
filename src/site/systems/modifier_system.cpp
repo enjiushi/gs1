@@ -1122,7 +1122,7 @@ GameMessageSubscriptionSpan ModifierSystem::subscribed_game_messages() const noe
 
 HostMessageSubscriptionSpan ModifierSystem::subscribed_host_messages() const noexcept
 {
-    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_UI_ACTION};
+    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_GAMEPLAY_ACTION};
     return subscriptions;
 }
 
@@ -1178,8 +1178,26 @@ Gs1Status ModifierSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    (void)invocation;
-    (void)message;
+    if (message.type != GS1_HOST_EVENT_GAMEPLAY_ACTION)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    const auto& action = message.payload.gameplay_action.action;
+    if (action.type != GS1_GAMEPLAY_ACTION_END_SITE_MODIFIER)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    if (action.target_id == 0U)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    GameMessage gameplay_message {};
+    gameplay_message.type = GameMessageType::SiteModifierEndRequested;
+    gameplay_message.set_payload(SiteModifierEndRequestedMessage {action.target_id});
+    invocation.push_game_message(gameplay_message);
     return GS1_STATUS_OK;
 }
 

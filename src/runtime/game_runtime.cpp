@@ -16,7 +16,6 @@
 #include "site/systems/ecology_system.h"
 #include "site/systems/economy_phone_system.h"
 #include "site/systems/failure_recovery_system.h"
-#include "site/systems/host_ui_action_router_system.h"
 #include "site/systems/inventory_system.h"
 #include "site/systems/local_weather_resolve_system.h"
 #include "site/systems/modifier_system.h"
@@ -456,7 +455,6 @@ void GameRuntime::initialize_system_registry()
     systems_.push_back(std::make_unique<LoadoutPlannerSystem>());
     systems_.push_back(std::make_unique<FactionReputationSystem>());
     systems_.push_back(std::make_unique<TechnologySystem>());
-    systems_.push_back(std::make_unique<HostUiActionRouterSystem>());
     systems_.push_back(std::make_unique<ActionExecutionSystem>());
     systems_.push_back(std::make_unique<WeatherEventSystem>());
     systems_.push_back(std::make_unique<WorkerConditionSystem>());

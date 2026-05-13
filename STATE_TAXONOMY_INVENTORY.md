@@ -1,6 +1,6 @@
 # State Taxonomy Inventory
 
-This document records the current gameplay/runtime state inventory for the gameplay-state refactor described in [refactor.md](/d:/testgame/gs1_upstream/refactor.md).
+This document records the current gameplay/runtime state inventory for the completed gameplay-state refactor that moved authoritative reads to `Gs1GameStateView` and removed gameplay-owned UI/presentation state.
 
 The classification buckets used here are:
 

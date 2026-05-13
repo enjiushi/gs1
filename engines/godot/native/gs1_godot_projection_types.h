@@ -11,7 +11,7 @@ struct Gs1RuntimeUiElementProjection final
     std::uint32_t element_id {0};
     Gs1UiElementType element_type {GS1_UI_ELEMENT_NONE};
     std::uint32_t flags {0};
-    Gs1UiAction action {};
+    Gs1GameplayAction action {};
     std::uint32_t content_kind {0};
     std::uint32_t primary_id {0};
     std::uint32_t secondary_id {0};
@@ -37,69 +37,14 @@ struct Gs1RuntimeProgressionEntryProjection final
     std::uint32_t flags {0};
     std::uint8_t content_kind {0};
     std::uint8_t tier_index {0};
-    Gs1UiAction action {};
+    Gs1GameplayAction action {};
 };
 
 struct Gs1RuntimeProgressionViewProjection final
 {
-    Gs1ProgressionViewId view_id {GS1_PROGRESSION_VIEW_NONE};
+    std::uint32_t view_id {0U};
     std::uint32_t context_id {0};
     std::vector<Gs1RuntimeProgressionEntryProjection> entries {};
-};
-
-struct Gs1RuntimeUiPanelTextProjection final
-{
-    std::uint16_t line_id {0};
-    std::uint32_t flags {0};
-    std::uint32_t text_kind {0};
-    std::uint32_t primary_id {0};
-    std::uint32_t secondary_id {0};
-    std::uint32_t quantity {0};
-    std::uint32_t aux_value {0};
-};
-
-struct Gs1RuntimeUiPanelSlotActionProjection final
-{
-    Gs1UiPanelSlotId slot_id {GS1_UI_PANEL_SLOT_NONE};
-    std::uint32_t flags {0};
-    Gs1UiAction action {};
-    std::uint32_t label_kind {0};
-    std::uint32_t primary_id {0};
-    std::uint32_t secondary_id {0};
-    std::uint32_t quantity {0};
-};
-
-struct Gs1RuntimeUiPanelListItemProjection final
-{
-    std::uint32_t item_id {0};
-    Gs1UiPanelListId list_id {GS1_UI_PANEL_LIST_NONE};
-    std::uint32_t flags {0};
-    std::uint32_t primary_kind {0};
-    std::uint32_t secondary_kind {0};
-    std::uint32_t primary_id {0};
-    std::uint32_t secondary_id {0};
-    std::uint32_t quantity {0};
-    std::int32_t map_x {0};
-    std::int32_t map_y {0};
-};
-
-struct Gs1RuntimeUiPanelListActionProjection final
-{
-    std::uint32_t item_id {0};
-    Gs1UiPanelListId list_id {GS1_UI_PANEL_LIST_NONE};
-    Gs1UiPanelListActionRole role {GS1_UI_PANEL_LIST_ACTION_ROLE_NONE};
-    std::uint32_t flags {0};
-    Gs1UiAction action {};
-};
-
-struct Gs1RuntimeUiPanelProjection final
-{
-    Gs1UiPanelId panel_id {GS1_UI_PANEL_NONE};
-    std::uint32_t context_id {0};
-    std::vector<Gs1RuntimeUiPanelTextProjection> text_lines {};
-    std::vector<Gs1RuntimeUiPanelSlotActionProjection> slot_actions {};
-    std::vector<Gs1RuntimeUiPanelListItemProjection> list_items {};
-    std::vector<Gs1RuntimeUiPanelListActionProjection> list_actions {};
 };
 
 using Gs1RuntimeRegionalMapSiteProjection = Gs1EngineMessageRegionalMapSiteData;

@@ -27,7 +27,7 @@ private:
     void cache_adapter_service();
     void wire_static_buttons();
     void bind_button(godot::BaseButton* button, const godot::Callable& callback);
-    void submit_ui_action(std::int64_t action_type, std::int64_t target_id = 0, std::int64_t arg0 = 0, std::int64_t arg1 = 0);
+    void submit_gameplay_action(std::int64_t action_type, std::int64_t target_id = 0, std::int64_t arg0 = 0, std::int64_t arg1 = 0);
     void on_start_campaign_pressed();
     void on_menu_settings_pressed();
     void on_quit_pressed();

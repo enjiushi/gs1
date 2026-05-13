@@ -13,10 +13,10 @@ using namespace godot;
 
 namespace
 {
-constexpr std::int64_t k_ui_action_set_phone_panel_section = 17;
-constexpr std::int64_t k_ui_action_close_phone_panel = 22;
-constexpr std::int64_t k_ui_action_open_regional_map_tech_tree = 18;
-constexpr std::int64_t k_ui_action_open_site_protection_selector = 24;
+constexpr std::int64_t k_gameplay_action_set_phone_panel_section = 17;
+constexpr std::int64_t k_gameplay_action_close_phone_panel = 22;
+constexpr std::int64_t k_gameplay_action_open_regional_map_tech_tree = 18;
+constexpr std::int64_t k_gameplay_action_open_site_protection_selector = 24;
 constexpr int k_inventory_view_event_open_snapshot = 1;
 
 Gs1GodotSiteHudController* resolve_controller(std::int64_t controller_bits)
@@ -97,8 +97,8 @@ void Gs1GodotSiteHudController::_bind_methods()
 
 void Gs1GodotSiteHudController::_ready()
 {
-    set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
-        submit_ui_action(action_type, target_id, arg0, arg1);
+    set_submit_gameplay_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
+        submit_gameplay_action(action_type, target_id, arg0, arg1);
     });
     set_submit_storage_view_callback([this](int storage_id, int event_kind) {
         submit_storage_view(storage_id, event_kind);
@@ -155,9 +155,9 @@ void Gs1GodotSiteHudController::cache_ui_references(Control& owner)
     rebuild_hud();
 }
 
-void Gs1GodotSiteHudController::set_submit_ui_action_callback(SubmitUiActionFn callback)
+void Gs1GodotSiteHudController::set_submit_gameplay_action_callback(SubmitGameplayActionFn callback)
 {
-    submit_ui_action_ = std::move(callback);
+    submit_gameplay_action_ = std::move(callback);
 }
 
 void Gs1GodotSiteHudController::set_submit_storage_view_callback(SubmitStorageViewFn callback)
@@ -208,7 +208,7 @@ Control* Gs1GodotSiteHudController::resolve_owner_control()
     return owner_control_;
 }
 
-void Gs1GodotSiteHudController::submit_ui_action(
+void Gs1GodotSiteHudController::submit_gameplay_action(
     std::int64_t action_type,
     std::int64_t target_id,
     std::int64_t arg0,
@@ -216,7 +216,7 @@ void Gs1GodotSiteHudController::submit_ui_action(
 {
     if (adapter_service_ != nullptr)
     {
-        adapter_service_->submit_ui_action(action_type, target_id, arg0, arg1);
+        adapter_service_->submit_gameplay_action(action_type, target_id, arg0, arg1);
     }
 }
 
@@ -238,14 +238,18 @@ void Gs1GodotSiteHudController::submit_context_request(int tile_x, int tile_y, i
 
 void Gs1GodotSiteHudController::handle_phone_pressed()
 {
-    if (!submit_ui_action_)
+    if (!submit_gameplay_action_)
     {
         return;
     }
     const bool open =
         adapter_service_ != nullptr &&
         adapter_service_->ui_session_state().phone.open;
-    submit_ui_action_(open ? k_ui_action_close_phone_panel : k_ui_action_set_phone_panel_section, 0, open ? 0 : GS1_PHONE_PANEL_SECTION_HOME, 0);
+    submit_gameplay_action_(
+        open ? k_gameplay_action_close_phone_panel : k_gameplay_action_set_phone_panel_section,
+        0,
+        open ? 0 : static_cast<std::int64_t>(Gs1GodotPhoneSection::Home),
+        0);
 }
 
 void Gs1GodotSiteHudController::handle_pack_pressed()
@@ -262,9 +266,13 @@ void Gs1GodotSiteHudController::handle_pack_pressed()
 
 void Gs1GodotSiteHudController::handle_tasks_pressed()
 {
-    if (submit_ui_action_)
+    if (submit_gameplay_action_)
     {
-        submit_ui_action_(k_ui_action_set_phone_panel_section, 0, GS1_PHONE_PANEL_SECTION_TASKS, 0);
+        submit_gameplay_action_(
+            k_gameplay_action_set_phone_panel_section,
+            0,
+            static_cast<std::int64_t>(Gs1GodotPhoneSection::Tasks),
+            0);
     }
 }
 
@@ -278,17 +286,17 @@ void Gs1GodotSiteHudController::handle_craft_pressed()
 
 void Gs1GodotSiteHudController::handle_protection_pressed()
 {
-    if (submit_ui_action_)
+    if (submit_gameplay_action_)
     {
-        submit_ui_action_(k_ui_action_open_site_protection_selector, 0, 0, 0);
+        submit_gameplay_action_(k_gameplay_action_open_site_protection_selector, 0, 0, 0);
     }
 }
 
 void Gs1GodotSiteHudController::handle_tech_pressed()
 {
-    if (submit_ui_action_)
+    if (submit_gameplay_action_)
     {
-        submit_ui_action_(k_ui_action_open_regional_map_tech_tree, 0, 0, 0);
+        submit_gameplay_action_(k_gameplay_action_open_regional_map_tech_tree, 0, 0, 0);
     }
 }
 
@@ -401,12 +409,12 @@ void Gs1GodotSiteHudController::refresh_button_badges()
     }
     if (phone_badge_label_ != nullptr)
     {
-        phone_badge_label_->set_visible((flags & GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) != 0U);
+        phone_badge_label_->set_visible((flags & GS1_GODOT_PHONE_BADGE_LAUNCHER) != 0U);
     }
     if (task_badge_label_ != nullptr)
     {
         const std::uint32_t ready_count = hud_.has_value() ? hud_->active_task_count : 0U;
-        task_badge_label_->set_visible(ready_count > 0U || (flags & GS1_PHONE_PANEL_FLAG_TASKS_BADGE) != 0U);
+        task_badge_label_->set_visible(ready_count > 0U || (flags & GS1_GODOT_PHONE_BADGE_TASKS) != 0U);
         task_badge_label_->set_text(ready_count > 0U ? String::num_int64(ready_count) : String("!"));
     }
     if (pack_button_ != nullptr)
@@ -417,6 +425,6 @@ void Gs1GodotSiteHudController::refresh_button_badges()
     {
         protection_button_->set_pressed(
             ui_session->protection.selector_open ||
-            ui_session->protection.overlay_mode != GS1_SITE_PROTECTION_OVERLAY_NONE);
+            ui_session->protection.overlay_mode != Gs1GodotProtectionOverlayMode::None);
     }
 }

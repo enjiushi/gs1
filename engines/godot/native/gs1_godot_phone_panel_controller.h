@@ -25,7 +25,7 @@ class Gs1GodotPhonePanelController final
     GDCLASS(Gs1GodotPhonePanelController, godot::Control)
 
 public:
-    using SubmitUiActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
+    using SubmitGameplayActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
 
     Gs1GodotPhonePanelController() = default;
     ~Gs1GodotPhonePanelController() override = default;
@@ -34,7 +34,7 @@ public:
     void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
-    void set_submit_ui_action_callback(SubmitUiActionFn callback);
+    void set_submit_gameplay_action_callback(SubmitGameplayActionFn callback);
     void handle_phone_listing_pressed(std::int64_t button_key);
     void handle_phone_section_pressed(std::int64_t section);
     void handle_close_phone_pressed();
@@ -54,7 +54,7 @@ private:
     void refresh_from_game_state_view();
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
-    void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
+    void submit_gameplay_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
     void apply_panel_visibility();
     void update_phone_state_label();
     void reconcile_phone_listing_buttons();
@@ -74,7 +74,7 @@ private:
     godot::Control* panel_ {nullptr};
     godot::Label* phone_state_label_ {nullptr};
     godot::VBoxContainer* phone_listings_ {nullptr};
-    SubmitUiActionFn submit_ui_action_ {};
+    SubmitGameplayActionFn submit_gameplay_action_ {};
     std::vector<Gs1RuntimePhoneListingProjection> phone_listings_state_ {};
     std::unordered_map<std::uint32_t, std::size_t> pending_listing_indices_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> phone_listing_buttons_ {};

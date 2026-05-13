@@ -2727,7 +2727,7 @@ GameMessageSubscriptionSpan TaskBoardSystem::subscribed_game_messages() const no
 
 HostMessageSubscriptionSpan TaskBoardSystem::subscribed_host_messages() const noexcept
 {
-    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_UI_ACTION};
+    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_GAMEPLAY_ACTION};
     return subscriptions;
 }
 
@@ -2856,9 +2856,41 @@ Gs1Status TaskBoardSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
+    if (message.type != GS1_HOST_EVENT_GAMEPLAY_ACTION)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    const auto& action = message.payload.gameplay_action.action;
+    GameMessage gameplay_message {};
+    switch (action.type)
+    {
+    case GS1_GAMEPLAY_ACTION_ACCEPT_TASK:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        gameplay_message.type = GameMessageType::TaskAcceptRequested;
+        gameplay_message.set_payload(TaskAcceptRequestedMessage {action.target_id});
+        invocation.push_game_message(gameplay_message);
+        return GS1_STATUS_OK;
+
+    case GS1_GAMEPLAY_ACTION_CLAIM_TASK_REWARD:
+        if (action.target_id == 0U ||
+            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        gameplay_message.type = GameMessageType::TaskRewardClaimRequested;
+        gameplay_message.set_payload(TaskRewardClaimRequestedMessage {
+            action.target_id,
+            static_cast<std::uint32_t>(action.arg0)});
+        invocation.push_game_message(gameplay_message);
+        return GS1_STATUS_OK;
+
+    default:
+        return GS1_STATUS_OK;
+    }
 }
 
 void TaskBoardSystem::run(RuntimeInvocation& invocation)

@@ -18,12 +18,12 @@ using namespace godot;
 
 namespace
 {
-constexpr std::int64_t k_ui_action_buy_phone_listing = 8;
-constexpr std::int64_t k_ui_action_sell_phone_listing = 9;
-constexpr std::int64_t k_ui_action_hire_contractor = 12;
-constexpr std::int64_t k_ui_action_purchase_site_unlockable = 13;
-constexpr std::int64_t k_ui_action_set_phone_panel_section = 17;
-constexpr std::int64_t k_ui_action_close_phone_panel = 22;
+constexpr std::int64_t k_gameplay_action_buy_phone_listing = 8;
+constexpr std::int64_t k_gameplay_action_sell_phone_listing = 9;
+constexpr std::int64_t k_gameplay_action_hire_contractor = 12;
+constexpr std::int64_t k_gameplay_action_purchase_site_unlockable = 13;
+constexpr std::int64_t k_gameplay_action_set_phone_panel_section = 17;
+constexpr std::int64_t k_gameplay_action_close_phone_panel = 22;
 
 template <typename T>
 T* resolve_object(const ObjectID object_id)
@@ -72,8 +72,8 @@ void Gs1GodotPhonePanelController::_bind_methods()
 
 void Gs1GodotPhonePanelController::_ready()
 {
-    set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
-        submit_ui_action(action_type, target_id, arg0, arg1);
+    set_submit_gameplay_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
+        submit_gameplay_action(action_type, target_id, arg0, arg1);
     });
     cache_adapter_service();
     if (Control* owner = resolve_owner_control())
@@ -112,12 +112,12 @@ void Gs1GodotPhonePanelController::cache_ui_references(Control& owner)
         const char* name;
         std::int64_t section;
     } section_bindings[] {
-        {"OpenPhoneHomeButton", 0},
-        {"OpenPhoneTasksButton", 1},
-        {"OpenPhoneBuyButton", 2},
-        {"OpenPhoneSellButton", 3},
-        {"OpenPhoneHireButton", 4},
-        {"OpenPhoneCartButton", 5},
+        {"OpenPhoneHomeButton", static_cast<std::int64_t>(Gs1GodotPhoneSection::Home)},
+        {"OpenPhoneTasksButton", static_cast<std::int64_t>(Gs1GodotPhoneSection::Tasks)},
+        {"OpenPhoneBuyButton", static_cast<std::int64_t>(Gs1GodotPhoneSection::Buy)},
+        {"OpenPhoneSellButton", static_cast<std::int64_t>(Gs1GodotPhoneSection::Sell)},
+        {"OpenPhoneHireButton", static_cast<std::int64_t>(Gs1GodotPhoneSection::Hire)},
+        {"OpenPhoneCartButton", static_cast<std::int64_t>(Gs1GodotPhoneSection::Cart)},
     };
     for (const ButtonBinding& binding : section_bindings)
     {
@@ -143,9 +143,9 @@ void Gs1GodotPhonePanelController::cache_ui_references(Control& owner)
     reconcile_phone_listing_buttons();
 }
 
-void Gs1GodotPhonePanelController::set_submit_ui_action_callback(SubmitUiActionFn callback)
+void Gs1GodotPhonePanelController::set_submit_gameplay_action_callback(SubmitGameplayActionFn callback)
 {
-    submit_ui_action_ = std::move(callback);
+    submit_gameplay_action_ = std::move(callback);
 }
 
 void Gs1GodotPhonePanelController::cache_adapter_service()
@@ -176,7 +176,7 @@ Control* Gs1GodotPhonePanelController::resolve_owner_control()
     return owner_control_;
 }
 
-void Gs1GodotPhonePanelController::submit_ui_action(
+void Gs1GodotPhonePanelController::submit_gameplay_action(
     std::int64_t action_type,
     std::int64_t target_id,
     std::int64_t arg0,
@@ -184,7 +184,7 @@ void Gs1GodotPhonePanelController::submit_ui_action(
 {
     if (adapter_service_ != nullptr)
     {
-        adapter_service_->submit_ui_action(action_type, target_id, arg0, arg1);
+        adapter_service_->submit_gameplay_action(action_type, target_id, arg0, arg1);
     }
 }
 
@@ -336,13 +336,13 @@ void Gs1GodotPhonePanelController::handle_phone_listing_pressed(std::int64_t but
     }
 
     Button* button = resolve_object<Button>(found->second.object_id);
-    if (button == nullptr || !submit_ui_action_)
+    if (button == nullptr || !submit_gameplay_action_)
     {
         return;
     }
 
-    submit_ui_action_(
-        static_cast<int>(button->get_meta("action_type", k_ui_action_buy_phone_listing)),
+    submit_gameplay_action_(
+        static_cast<int>(button->get_meta("action_type", k_gameplay_action_buy_phone_listing)),
         static_cast<int>(button->get_meta("listing_id", 0)),
         1,
         0);
@@ -350,13 +350,13 @@ void Gs1GodotPhonePanelController::handle_phone_listing_pressed(std::int64_t but
 
 void Gs1GodotPhonePanelController::handle_phone_section_pressed(std::int64_t section)
 {
-    if (!submit_ui_action_)
+    if (!submit_gameplay_action_)
     {
         return;
     }
 
-    submit_ui_action_(
-        k_ui_action_set_phone_panel_section,
+    submit_gameplay_action_(
+        k_gameplay_action_set_phone_panel_section,
         0,
         section,
         0);
@@ -364,13 +364,13 @@ void Gs1GodotPhonePanelController::handle_phone_section_pressed(std::int64_t sec
 
 void Gs1GodotPhonePanelController::handle_close_phone_pressed()
 {
-    if (!submit_ui_action_)
+    if (!submit_gameplay_action_)
     {
         return;
     }
 
-    submit_ui_action_(
-        k_ui_action_close_phone_panel,
+    submit_gameplay_action_(
+        k_gameplay_action_close_phone_panel,
         0,
         0,
         0);
@@ -415,21 +415,21 @@ void Gs1GodotPhonePanelController::reconcile_phone_listing_buttons()
             static_cast<int>(listing.listing_kind),
             static_cast<int>(listing.item_or_unlockable_id)));
         button->set_meta("listing_id", listing_id);
-        std::int64_t action_type = k_ui_action_buy_phone_listing;
+        std::int64_t action_type = k_gameplay_action_buy_phone_listing;
         switch (listing.listing_kind)
         {
         case GS1_PHONE_LISTING_PRESENTATION_SELL_ITEM:
-            action_type = k_ui_action_sell_phone_listing;
+            action_type = k_gameplay_action_sell_phone_listing;
             break;
         case GS1_PHONE_LISTING_PRESENTATION_HIRE_CONTRACTOR:
-            action_type = k_ui_action_hire_contractor;
+            action_type = k_gameplay_action_hire_contractor;
             break;
         case GS1_PHONE_LISTING_PRESENTATION_PURCHASE_UNLOCKABLE:
-            action_type = k_ui_action_purchase_site_unlockable;
+            action_type = k_gameplay_action_purchase_site_unlockable;
             break;
         case GS1_PHONE_LISTING_PRESENTATION_BUY_ITEM:
         default:
-            action_type = k_ui_action_buy_phone_listing;
+            action_type = k_gameplay_action_buy_phone_listing;
             break;
         }
         button->set_meta("action_type", action_type);

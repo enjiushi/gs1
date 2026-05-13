@@ -89,34 +89,34 @@ void assign_error(std::string* out_error, const char* message)
     }
 }
 
-std::optional<Gs1UiActionType> parse_ui_action_name(const std::string& value)
+std::optional<Gs1GameplayActionType> parse_gameplay_action_name(const std::string& value)
 {
-    if (value == "NONE") return GS1_UI_ACTION_NONE;
-    if (value == "START_NEW_CAMPAIGN") return GS1_UI_ACTION_START_NEW_CAMPAIGN;
-    if (value == "SELECT_DEPLOYMENT_SITE") return GS1_UI_ACTION_SELECT_DEPLOYMENT_SITE;
-    if (value == "START_SITE_ATTEMPT") return GS1_UI_ACTION_START_SITE_ATTEMPT;
-    if (value == "RETURN_TO_REGIONAL_MAP") return GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP;
-    if (value == "CLEAR_DEPLOYMENT_SITE_SELECTION") return GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION;
-    if (value == "ACCEPT_TASK") return GS1_UI_ACTION_ACCEPT_TASK;
-    if (value == "CLAIM_TASK_REWARD") return GS1_UI_ACTION_CLAIM_TASK_REWARD;
-    if (value == "BUY_PHONE_LISTING") return GS1_UI_ACTION_BUY_PHONE_LISTING;
-    if (value == "SELL_PHONE_LISTING") return GS1_UI_ACTION_SELL_PHONE_LISTING;
-    if (value == "HIRE_CONTRACTOR") return GS1_UI_ACTION_HIRE_CONTRACTOR;
-    if (value == "PURCHASE_SITE_UNLOCKABLE") return GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE;
-    if (value == "ADD_PHONE_LISTING_TO_CART") return GS1_UI_ACTION_ADD_PHONE_LISTING_TO_CART;
-    if (value == "REMOVE_PHONE_LISTING_FROM_CART") return GS1_UI_ACTION_REMOVE_PHONE_LISTING_FROM_CART;
-    if (value == "CHECKOUT_PHONE_CART") return GS1_UI_ACTION_CHECKOUT_PHONE_CART;
-    if (value == "SET_PHONE_PANEL_SECTION") return GS1_UI_ACTION_SET_PHONE_PANEL_SECTION;
-    if (value == "OPEN_REGIONAL_MAP_TECH_TREE") return GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE;
-    if (value == "CLOSE_REGIONAL_MAP_TECH_TREE") return GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE;
-    if (value == "CLAIM_TECHNOLOGY_NODE") return GS1_UI_ACTION_CLAIM_TECHNOLOGY_NODE;
-    if (value == "SELECT_TECH_TREE_FACTION_TAB") return GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB;
-    if (value == "CLOSE_PHONE_PANEL") return GS1_UI_ACTION_CLOSE_PHONE_PANEL;
-    if (value == "REFUND_TECHNOLOGY_NODE") return GS1_UI_ACTION_REFUND_TECHNOLOGY_NODE;
-    if (value == "OPEN_SITE_PROTECTION_SELECTOR") return GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR;
-    if (value == "CLOSE_SITE_PROTECTION_UI") return GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI;
-    if (value == "SET_SITE_PROTECTION_OVERLAY_MODE") return GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;
-    if (value == "END_SITE_MODIFIER") return GS1_UI_ACTION_END_SITE_MODIFIER;
+    if (value == "NONE") return GS1_GAMEPLAY_ACTION_NONE;
+    if (value == "START_NEW_CAMPAIGN") return GS1_GAMEPLAY_ACTION_START_NEW_CAMPAIGN;
+    if (value == "SELECT_DEPLOYMENT_SITE") return GS1_GAMEPLAY_ACTION_SELECT_DEPLOYMENT_SITE;
+    if (value == "START_SITE_ATTEMPT") return GS1_GAMEPLAY_ACTION_START_SITE_ATTEMPT;
+    if (value == "RETURN_TO_REGIONAL_MAP") return GS1_GAMEPLAY_ACTION_RETURN_TO_REGIONAL_MAP;
+    if (value == "CLEAR_DEPLOYMENT_SITE_SELECTION") return GS1_GAMEPLAY_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION;
+    if (value == "ACCEPT_TASK") return GS1_GAMEPLAY_ACTION_ACCEPT_TASK;
+    if (value == "CLAIM_TASK_REWARD") return GS1_GAMEPLAY_ACTION_CLAIM_TASK_REWARD;
+    if (value == "BUY_PHONE_LISTING") return GS1_GAMEPLAY_ACTION_BUY_PHONE_LISTING;
+    if (value == "SELL_PHONE_LISTING") return GS1_GAMEPLAY_ACTION_SELL_PHONE_LISTING;
+    if (value == "HIRE_CONTRACTOR") return GS1_GAMEPLAY_ACTION_HIRE_CONTRACTOR;
+    if (value == "PURCHASE_SITE_UNLOCKABLE") return GS1_GAMEPLAY_ACTION_PURCHASE_SITE_UNLOCKABLE;
+    if (value == "ADD_PHONE_LISTING_TO_CART") return GS1_GAMEPLAY_ACTION_ADD_PHONE_LISTING_TO_CART;
+    if (value == "REMOVE_PHONE_LISTING_FROM_CART") return GS1_GAMEPLAY_ACTION_REMOVE_PHONE_LISTING_FROM_CART;
+    if (value == "CHECKOUT_PHONE_CART") return GS1_GAMEPLAY_ACTION_CHECKOUT_PHONE_CART;
+    if (value == "SET_PHONE_PANEL_SECTION") return GS1_GAMEPLAY_ACTION_SET_PHONE_PANEL_SECTION;
+    if (value == "OPEN_REGIONAL_MAP_TECH_TREE") return GS1_GAMEPLAY_ACTION_OPEN_REGIONAL_MAP_TECH_TREE;
+    if (value == "CLOSE_REGIONAL_MAP_TECH_TREE") return GS1_GAMEPLAY_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE;
+    if (value == "CLAIM_TECHNOLOGY_NODE") return GS1_GAMEPLAY_ACTION_CLAIM_TECHNOLOGY_NODE;
+    if (value == "SELECT_TECH_TREE_FACTION_TAB") return GS1_GAMEPLAY_ACTION_SELECT_TECH_TREE_FACTION_TAB;
+    if (value == "CLOSE_PHONE_PANEL") return GS1_GAMEPLAY_ACTION_CLOSE_PHONE_PANEL;
+    if (value == "REFUND_TECHNOLOGY_NODE") return GS1_GAMEPLAY_ACTION_REFUND_TECHNOLOGY_NODE;
+    if (value == "OPEN_SITE_PROTECTION_SELECTOR") return GS1_GAMEPLAY_ACTION_OPEN_SITE_PROTECTION_SELECTOR;
+    if (value == "CLOSE_SITE_PROTECTION_UI") return GS1_GAMEPLAY_ACTION_CLOSE_SITE_PROTECTION_UI;
+    if (value == "SET_SITE_PROTECTION_OVERLAY_MODE") return GS1_GAMEPLAY_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;
+    if (value == "END_SITE_MODIFIER") return GS1_GAMEPLAY_ACTION_END_SITE_MODIFIER;
     return std::nullopt;
 }
 
@@ -151,7 +151,7 @@ std::optional<Gs1InventoryContainerKind> parse_inventory_container_name(const st
     return std::nullopt;
 }
 
-std::optional<std::int64_t> parse_ui_action_type(std::string_view body)
+std::optional<std::int64_t> parse_gameplay_action_type(std::string_view body)
 {
     if (const auto numeric_value = extract_number_field<std::int64_t>(body, "actionType"); numeric_value.has_value())
     {
@@ -162,7 +162,7 @@ std::optional<std::int64_t> parse_ui_action_type(std::string_view body)
     {
         return std::nullopt;
     }
-    const auto parsed = parse_ui_action_name(action_name.value());
+    const auto parsed = parse_gameplay_action_name(action_name.value());
     if (!parsed.has_value())
     {
         return std::nullopt;
@@ -236,15 +236,15 @@ bool gs1_parse_godot_debug_http_command(
 {
     Gs1GodotDebugHttpCommand command {};
 
-    if (path == "/ui-action")
+    if (path == "/gameplay-action")
     {
-        const auto action_type = parse_ui_action_type(body);
+        const auto action_type = parse_gameplay_action_type(body);
         if (!action_type.has_value())
         {
-            assign_error(out_error, "Missing or invalid UI action type.");
+            assign_error(out_error, "Missing or invalid gameplay action type.");
             return false;
         }
-        command.kind = Gs1GodotDebugHttpCommandKind::UiAction;
+        command.kind = Gs1GodotDebugHttpCommandKind::GameplayAction;
         command.action_type = action_type.value();
         command.target_id = extract_number_field<std::int64_t>(body, "targetId").value_or(0);
         command.arg0 = extract_number_field<std::int64_t>(body, "arg0").value_or(0);

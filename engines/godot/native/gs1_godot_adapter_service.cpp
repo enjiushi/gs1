@@ -184,29 +184,29 @@ void Gs1GodotAdapterService::sync_phone_badges_from_view(const Gs1GameStateView&
     {
         std::uint32_t new_badge_flags = 0U;
         if (phone.task_snapshot_signature != next_task_signature &&
-            !(phone.open && phone.active_section == GS1_PHONE_PANEL_SECTION_TASKS))
+            !(phone.open && phone.active_section == Gs1GodotPhoneSection::Tasks))
         {
-            new_badge_flags |= GS1_PHONE_PANEL_FLAG_TASKS_BADGE;
+            new_badge_flags |= GS1_GODOT_PHONE_BADGE_TASKS;
         }
         if (phone.buy_snapshot_signature != next_buy_signature &&
-            !(phone.open && phone.active_section == GS1_PHONE_PANEL_SECTION_BUY))
+            !(phone.open && phone.active_section == Gs1GodotPhoneSection::Buy))
         {
-            new_badge_flags |= GS1_PHONE_PANEL_FLAG_BUY_BADGE;
+            new_badge_flags |= GS1_GODOT_PHONE_BADGE_BUY;
         }
         if (phone.sell_snapshot_signature != next_sell_signature &&
-            !(phone.open && phone.active_section == GS1_PHONE_PANEL_SECTION_SELL))
+            !(phone.open && phone.active_section == Gs1GodotPhoneSection::Sell))
         {
-            new_badge_flags |= GS1_PHONE_PANEL_FLAG_SELL_BADGE;
+            new_badge_flags |= GS1_GODOT_PHONE_BADGE_SELL;
         }
         if (phone.service_snapshot_signature != next_service_signature &&
-            !(phone.open && phone.active_section == GS1_PHONE_PANEL_SECTION_HIRE))
+            !(phone.open && phone.active_section == Gs1GodotPhoneSection::Hire))
         {
-            new_badge_flags |= GS1_PHONE_PANEL_FLAG_HIRE_BADGE;
+            new_badge_flags |= GS1_GODOT_PHONE_BADGE_HIRE;
         }
 
         if (new_badge_flags != 0U)
         {
-            phone.badge_flags |= new_badge_flags | GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE;
+            phone.badge_flags |= new_badge_flags | GS1_GODOT_PHONE_BADGE_LAUNCHER;
         }
     }
 
@@ -487,8 +487,8 @@ bool Gs1GodotAdapterService::drain_debug_http_commands()
         bool ok = false;
         switch (command.kind)
         {
-        case Gs1GodotDebugHttpCommandKind::UiAction:
-            ok = submit_ui_action(command.action_type, command.target_id, command.arg0, command.arg1);
+        case Gs1GodotDebugHttpCommandKind::GameplayAction:
+            ok = submit_gameplay_action(command.action_type, command.target_id, command.arg0, command.arg1);
             break;
         case Gs1GodotDebugHttpCommandKind::SiteAction:
             ok = submit_site_action_request(
@@ -636,17 +636,17 @@ void Gs1GodotAdapterService::dispatch_engine_message(Gs1EngineMessage&& message)
     }
 }
 
-bool Gs1GodotAdapterService::submit_ui_action(const Gs1UiAction& action)
+bool Gs1GodotAdapterService::submit_gameplay_action(const Gs1GameplayAction& action)
 {
-    if (handle_local_ui_action(action))
+    if (handle_local_gameplay_action(action))
     {
         last_error_.clear();
         return true;
     }
 
     Gs1HostEvent event {};
-    event.type = GS1_HOST_EVENT_UI_ACTION;
-    event.payload.ui_action.action = action;
+    event.type = GS1_HOST_EVENT_GAMEPLAY_ACTION;
+    event.payload.gameplay_action.action = action;
     if (!runtime_session_.submit_host_events(&event, 1U))
     {
         last_error_ = runtime_session_.last_error();
@@ -655,14 +655,14 @@ bool Gs1GodotAdapterService::submit_ui_action(const Gs1UiAction& action)
     return true;
 }
 
-bool Gs1GodotAdapterService::submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)
+bool Gs1GodotAdapterService::submit_gameplay_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)
 {
-    Gs1UiAction action {};
-    action.type = static_cast<Gs1UiActionType>(action_type);
+    Gs1GameplayAction action {};
+    action.type = static_cast<Gs1GameplayActionType>(action_type);
     action.target_id = static_cast<std::uint32_t>(target_id);
     action.arg0 = static_cast<std::uint64_t>(arg0);
     action.arg1 = static_cast<std::uint64_t>(arg1);
-    return submit_ui_action(action);
+    return submit_gameplay_action(action);
 }
 
 bool Gs1GodotAdapterService::submit_move_direction(double world_move_x, double world_move_y, double world_move_z)
@@ -833,7 +833,7 @@ bool Gs1GodotAdapterService::handle_local_storage_view(
             ui_session_state_.phone.open = false;
             ui_session_state_.regional_tech.open = false;
             ui_session_state_.protection.selector_open = false;
-            ui_session_state_.protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
+            ui_session_state_.protection.overlay_mode = Gs1GodotProtectionOverlayMode::None;
             bump_ui_session_revision(GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD);
             return true;
         }
@@ -858,7 +858,7 @@ bool Gs1GodotAdapterService::handle_local_storage_view(
         ui_session_state_.phone.open = false;
         ui_session_state_.regional_tech.open = false;
         ui_session_state_.protection.selector_open = false;
-        ui_session_state_.protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
+        ui_session_state_.protection.overlay_mode = Gs1GodotProtectionOverlayMode::None;
         bump_ui_session_revision(GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD);
         return true;
     }
@@ -866,31 +866,31 @@ bool Gs1GodotAdapterService::handle_local_storage_view(
     return false;
 }
 
-bool Gs1GodotAdapterService::handle_local_ui_action(const Gs1UiAction& action)
+bool Gs1GodotAdapterService::handle_local_gameplay_action(const Gs1GameplayAction& action)
 {
     switch (action.type)
     {
-    case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
+    case GS1_GAMEPLAY_ACTION_SET_PHONE_PANEL_SECTION:
     {
-        if (action.arg0 > static_cast<std::uint64_t>(GS1_PHONE_PANEL_SECTION_CART))
+        if (action.arg0 > static_cast<std::uint64_t>(Gs1GodotPhoneSection::Cart))
         {
             return false;
         }
 
         auto& phone = ui_session_state_.phone;
-        const auto requested_section = static_cast<Gs1PhonePanelSection>(action.arg0);
+        const auto requested_section = static_cast<Gs1GodotPhoneSection>(action.arg0);
         const std::uint32_t clear_badge_mask = [&]() -> std::uint32_t
         {
             switch (requested_section)
             {
-            case GS1_PHONE_PANEL_SECTION_TASKS:
-                return GS1_PHONE_PANEL_FLAG_TASKS_BADGE;
-            case GS1_PHONE_PANEL_SECTION_BUY:
-                return GS1_PHONE_PANEL_FLAG_BUY_BADGE;
-            case GS1_PHONE_PANEL_SECTION_SELL:
-                return GS1_PHONE_PANEL_FLAG_SELL_BADGE;
-            case GS1_PHONE_PANEL_SECTION_HIRE:
-                return GS1_PHONE_PANEL_FLAG_HIRE_BADGE;
+            case Gs1GodotPhoneSection::Tasks:
+                return GS1_GODOT_PHONE_BADGE_TASKS;
+            case Gs1GodotPhoneSection::Buy:
+                return GS1_GODOT_PHONE_BADGE_BUY;
+            case Gs1GodotPhoneSection::Sell:
+                return GS1_GODOT_PHONE_BADGE_SELL;
+            case Gs1GodotPhoneSection::Hire:
+                return GS1_GODOT_PHONE_BADGE_HIRE;
             default:
                 return 0U;
             }
@@ -898,11 +898,11 @@ bool Gs1GodotAdapterService::handle_local_ui_action(const Gs1UiAction& action)
 
         phone.open = true;
         phone.active_section = requested_section;
-        phone.badge_flags &= ~(GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE | clear_badge_mask);
+        phone.badge_flags &= ~(GS1_GODOT_PHONE_BADGE_LAUNCHER | clear_badge_mask);
         ui_session_state_.inventory.worker_pack_open = false;
         ui_session_state_.inventory.opened_storage_id = 0U;
         ui_session_state_.protection.selector_open = false;
-        ui_session_state_.protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
+        ui_session_state_.protection.overlay_mode = Gs1GodotProtectionOverlayMode::None;
         ui_session_state_.regional_tech.open = false;
         bump_ui_session_revision(
             GS1_PRESENTATION_DIRTY_PHONE |
@@ -911,28 +911,28 @@ bool Gs1GodotAdapterService::handle_local_ui_action(const Gs1UiAction& action)
         return true;
     }
 
-    case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
+    case GS1_GAMEPLAY_ACTION_CLOSE_PHONE_PANEL:
         ui_session_state_.phone.open = false;
-        ui_session_state_.phone.badge_flags &= ~GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE;
+        ui_session_state_.phone.badge_flags &= ~GS1_GODOT_PHONE_BADGE_LAUNCHER;
         bump_ui_session_revision(GS1_PRESENTATION_DIRTY_PHONE | GS1_PRESENTATION_DIRTY_HUD);
         return true;
 
-    case GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
+    case GS1_GAMEPLAY_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
         ui_session_state_.regional_tech.open = true;
         ui_session_state_.phone.open = false;
         ui_session_state_.inventory.worker_pack_open = false;
         ui_session_state_.inventory.opened_storage_id = 0U;
         ui_session_state_.protection.selector_open = false;
-        ui_session_state_.protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
+        ui_session_state_.protection.overlay_mode = Gs1GodotProtectionOverlayMode::None;
         bump_ui_session_revision(GS1_PRESENTATION_DIRTY_REGIONAL_MAP | GS1_PRESENTATION_DIRTY_SITE);
         return true;
 
-    case GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
+    case GS1_GAMEPLAY_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
         ui_session_state_.regional_tech.open = false;
         bump_ui_session_revision(GS1_PRESENTATION_DIRTY_REGIONAL_MAP);
         return true;
 
-    case GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB:
+    case GS1_GAMEPLAY_ACTION_SELECT_TECH_TREE_FACTION_TAB:
         if (action.target_id == 0U)
         {
             return false;
@@ -942,9 +942,9 @@ bool Gs1GodotAdapterService::handle_local_ui_action(const Gs1UiAction& action)
         bump_ui_session_revision(GS1_PRESENTATION_DIRTY_REGIONAL_MAP);
         return true;
 
-    case GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR:
+    case GS1_GAMEPLAY_ACTION_OPEN_SITE_PROTECTION_SELECTOR:
         ui_session_state_.protection.selector_open = true;
-        ui_session_state_.protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
+        ui_session_state_.protection.overlay_mode = Gs1GodotProtectionOverlayMode::None;
         ui_session_state_.phone.open = false;
         ui_session_state_.inventory.worker_pack_open = false;
         ui_session_state_.inventory.opened_storage_id = 0U;
@@ -952,16 +952,16 @@ bool Gs1GodotAdapterService::handle_local_ui_action(const Gs1UiAction& action)
         bump_ui_session_revision(GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD);
         return true;
 
-    case GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI:
+    case GS1_GAMEPLAY_ACTION_CLOSE_SITE_PROTECTION_UI:
         ui_session_state_.protection.selector_open = false;
-        ui_session_state_.protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
+        ui_session_state_.protection.overlay_mode = Gs1GodotProtectionOverlayMode::None;
         bump_ui_session_revision(GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD);
         return true;
 
-    case GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
+    case GS1_GAMEPLAY_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
         ui_session_state_.protection.selector_open = false;
         ui_session_state_.protection.overlay_mode =
-            static_cast<Gs1SiteProtectionOverlayMode>(action.arg0);
+            static_cast<Gs1GodotProtectionOverlayMode>(action.arg0);
         bump_ui_session_revision(GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD);
         return true;
 

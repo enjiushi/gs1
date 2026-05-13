@@ -29,7 +29,7 @@ class Gs1GodotRegionalSelectionPanelController final
     GDCLASS(Gs1GodotRegionalSelectionPanelController, godot::Control)
 
 public:
-    using SubmitUiActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
+    using SubmitGameplayActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
 
     struct RegionalSiteState final
     {
@@ -50,7 +50,7 @@ public:
     void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
-    void set_submit_ui_action_callback(SubmitUiActionFn callback);
+    void set_submit_gameplay_action_callback(SubmitGameplayActionFn callback);
     void handle_action_pressed(std::int64_t button_key);
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
     void handle_engine_message(const Gs1EngineMessage& message) override;
@@ -72,7 +72,7 @@ private:
 
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
-    void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
+    void submit_gameplay_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
     void reset_regional_map_state() noexcept;
     void refresh_from_game_state_view();
     [[nodiscard]] const RegionalSiteState* resolve_selected_site() const;
@@ -118,7 +118,7 @@ private:
     godot::GridContainer* loadout_slots_grid_ {nullptr};
     godot::Label* loadout_empty_label_ {nullptr};
     godot::VBoxContainer* actions_ {nullptr};
-    SubmitUiActionFn submit_ui_action_ {};
+    SubmitGameplayActionFn submit_gameplay_action_ {};
     std::vector<RegionalSiteState> sites_ {};
     std::vector<Gs1LoadoutSlotView> selected_site_loadout_slots_ {};
     int selected_site_id_ {0};

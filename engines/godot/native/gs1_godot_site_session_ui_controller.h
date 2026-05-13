@@ -63,7 +63,7 @@ private:
     void plant_first_seed_on_selected_tile();
     [[nodiscard]] godot::String plant_name_for(int plant_id) const;
     [[nodiscard]] godot::String structure_name_for(int structure_id) const;
-    void submit_ui_action(std::int64_t action_type, std::int64_t target_id = 0, std::int64_t arg0 = 0, std::int64_t arg1 = 0);
+    void submit_gameplay_action(std::int64_t action_type, std::int64_t target_id = 0, std::int64_t arg0 = 0, std::int64_t arg1 = 0);
     void submit_move(double x, double y, double z);
     void submit_site_context_request(int tile_x, int tile_y, int flags);
     void submit_site_action_request(
@@ -92,7 +92,7 @@ private:
     static constexpr int APP_STATE_SITE_PAUSED = 6;
     static constexpr int APP_STATE_SITE_RESULT = 7;
 
-    static constexpr std::int64_t UI_ACTION_RETURN_TO_REGIONAL_MAP = 4;
+    static constexpr std::int64_t GAMEPLAY_ACTION_RETURN_TO_REGIONAL_MAP = 4;
     static constexpr int SITE_ACTION_PLANT = 1;
     static constexpr int SITE_ACTION_CRAFT = 6;
     static constexpr int SITE_ACTION_REQUEST_FLAG_HAS_ITEM = 4;

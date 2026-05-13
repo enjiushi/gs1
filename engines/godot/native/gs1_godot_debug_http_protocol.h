@@ -8,7 +8,7 @@
 
 enum class Gs1GodotDebugHttpCommandKind : std::uint8_t
 {
-    UiAction = 0,
+    GameplayAction = 0,
     SiteAction = 1,
     SiteActionCancel = 2,
     SiteStorageView = 3,
@@ -19,7 +19,7 @@ enum class Gs1GodotDebugHttpCommandKind : std::uint8_t
 
 struct Gs1GodotDebugHttpCommand final
 {
-    Gs1GodotDebugHttpCommandKind kind {Gs1GodotDebugHttpCommandKind::UiAction};
+    Gs1GodotDebugHttpCommandKind kind {Gs1GodotDebugHttpCommandKind::GameplayAction};
     std::int64_t action_type {0};
     std::int64_t target_id {0};
     std::int64_t arg0 {0};

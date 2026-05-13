@@ -22,7 +22,7 @@ using namespace godot;
 
 namespace
 {
-constexpr int k_ui_action_start_site_attempt = 3;
+constexpr int k_gameplay_action_start_site_attempt = 3;
 
 constexpr std::uint64_t pack_u32_pair(std::uint32_t high, std::uint32_t low) noexcept
 {
@@ -106,8 +106,8 @@ void Gs1GodotRegionalSelectionPanelController::_bind_methods()
 
 void Gs1GodotRegionalSelectionPanelController::_ready()
 {
-    set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
-        submit_ui_action(action_type, target_id, arg0, arg1);
+    set_submit_gameplay_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
+        submit_gameplay_action(action_type, target_id, arg0, arg1);
     });
     cache_adapter_service();
     if (Control* owner = resolve_owner_control())
@@ -164,9 +164,9 @@ void Gs1GodotRegionalSelectionPanelController::cache_ui_references(Control& owne
     }
 }
 
-void Gs1GodotRegionalSelectionPanelController::set_submit_ui_action_callback(SubmitUiActionFn callback)
+void Gs1GodotRegionalSelectionPanelController::set_submit_gameplay_action_callback(SubmitGameplayActionFn callback)
 {
-    submit_ui_action_ = std::move(callback);
+    submit_gameplay_action_ = std::move(callback);
 }
 
 void Gs1GodotRegionalSelectionPanelController::cache_adapter_service()
@@ -197,7 +197,7 @@ Control* Gs1GodotRegionalSelectionPanelController::resolve_owner_control()
     return owner_control_;
 }
 
-void Gs1GodotRegionalSelectionPanelController::submit_ui_action(
+void Gs1GodotRegionalSelectionPanelController::submit_gameplay_action(
     std::int64_t action_type,
     std::int64_t target_id,
     std::int64_t arg0,
@@ -205,7 +205,7 @@ void Gs1GodotRegionalSelectionPanelController::submit_ui_action(
 {
     if (adapter_service_ != nullptr)
     {
-        adapter_service_->submit_ui_action(action_type, target_id, arg0, arg1);
+        adapter_service_->submit_gameplay_action(action_type, target_id, arg0, arg1);
     }
 }
 
@@ -351,14 +351,14 @@ void Gs1GodotRegionalSelectionPanelController::refresh_selection_panel_actions_a
     if (selected_site != nullptr)
     {
         Dictionary deploy_action;
-        deploy_action["type"] = k_ui_action_start_site_attempt;
+        deploy_action["type"] = k_gameplay_action_start_site_attempt;
         deploy_action["target_id"] = static_cast<int>(selected_site->site_id);
         deploy_action["arg0"] = 0;
         deploy_action["arg1"] = 0;
 
         Dictionary deploy_spec;
         deploy_spec["setup_id"] = -1;
-        deploy_spec["element_id"] = k_ui_action_start_site_attempt;
+        deploy_spec["element_id"] = k_gameplay_action_start_site_attempt;
         deploy_spec["text"] = vformat("Deploy To Site %d", static_cast<int>(selected_site->site_id));
         deploy_spec["flags"] = selected_site->site_state == GS1_SITE_STATE_AVAILABLE ? 0 : 2;
         deploy_spec["action"] = deploy_action;
@@ -398,12 +398,12 @@ void Gs1GodotRegionalSelectionPanelController::handle_action_pressed(std::int64_
     }
 
     Button* button = resolve_object<Button>(found->second.object_id);
-    if (button == nullptr || !submit_ui_action_)
+    if (button == nullptr || !submit_gameplay_action_)
     {
         return;
     }
 
-    submit_ui_action_(
+    submit_gameplay_action_(
         as_int(button->get_meta("action_type", 0), 0),
         as_int(button->get_meta("target_id", 0), 0),
         as_int(button->get_meta("arg0", 0), 0),

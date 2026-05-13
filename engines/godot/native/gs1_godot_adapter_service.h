@@ -22,11 +22,36 @@ public:
     virtual void handle_runtime_message_reset() = 0;
 };
 
+enum class Gs1GodotPhoneSection : std::uint8_t
+{
+    Home = 0,
+    Tasks = 1,
+    Buy = 2,
+    Sell = 3,
+    Hire = 4,
+    Cart = 5
+};
+
+enum class Gs1GodotProtectionOverlayMode : std::uint8_t
+{
+    None = 0,
+    Wind = 1,
+    Heat = 2,
+    Dust = 3,
+    OccupantCondition = 4
+};
+
+inline constexpr std::uint32_t GS1_GODOT_PHONE_BADGE_LAUNCHER = 1U << 0U;
+inline constexpr std::uint32_t GS1_GODOT_PHONE_BADGE_TASKS = 1U << 1U;
+inline constexpr std::uint32_t GS1_GODOT_PHONE_BADGE_BUY = 1U << 2U;
+inline constexpr std::uint32_t GS1_GODOT_PHONE_BADGE_SELL = 1U << 3U;
+inline constexpr std::uint32_t GS1_GODOT_PHONE_BADGE_HIRE = 1U << 4U;
+
 struct Gs1GodotPhoneUiSessionState final
 {
     bool open {false};
     bool notification_state_initialized {false};
-    Gs1PhonePanelSection active_section {GS1_PHONE_PANEL_SECTION_HOME};
+    Gs1GodotPhoneSection active_section {Gs1GodotPhoneSection::Home};
     std::uint32_t badge_flags {0U};
     std::uint64_t task_snapshot_signature {0U};
     std::uint64_t buy_snapshot_signature {0U};
@@ -43,7 +68,7 @@ struct Gs1GodotRegionalTechUiSessionState final
 struct Gs1GodotProtectionUiSessionState final
 {
     bool selector_open {false};
-    Gs1SiteProtectionOverlayMode overlay_mode {GS1_SITE_PROTECTION_OVERLAY_NONE};
+    Gs1GodotProtectionOverlayMode overlay_mode {Gs1GodotProtectionOverlayMode::None};
 };
 
 struct Gs1GodotInventoryUiSessionState final
@@ -80,7 +105,7 @@ public:
     void unsubscribe_matching_messages(IGs1GodotEngineMessageSubscriber& subscriber);
     void unsubscribe_all(IGs1GodotEngineMessageSubscriber& subscriber);
 
-    [[nodiscard]] bool submit_ui_action(std::int64_t action_type, std::int64_t target_id = 0, std::int64_t arg0 = 0, std::int64_t arg1 = 0);
+    [[nodiscard]] bool submit_gameplay_action(std::int64_t action_type, std::int64_t target_id = 0, std::int64_t arg0 = 0, std::int64_t arg1 = 0);
     [[nodiscard]] bool submit_move_direction(double world_move_x, double world_move_y, double world_move_z);
     [[nodiscard]] bool submit_site_context_request(std::int64_t tile_x, std::int64_t tile_y, std::int64_t flags);
     [[nodiscard]] bool submit_site_action_request(
@@ -122,8 +147,8 @@ private:
     void notify_runtime_message_reset();
     void dispatch_engine_message(Gs1EngineMessage&& message);
     void dispatch_or_buffer_engine_message(Gs1EngineMessage&& message);
-    [[nodiscard]] bool submit_ui_action(const Gs1UiAction& action);
-    [[nodiscard]] bool handle_local_ui_action(const Gs1UiAction& action);
+    [[nodiscard]] bool submit_gameplay_action(const Gs1GameplayAction& action);
+    [[nodiscard]] bool handle_local_gameplay_action(const Gs1GameplayAction& action);
     [[nodiscard]] bool handle_local_storage_view(
         std::uint32_t storage_id,
         Gs1InventoryViewEventKind event_kind);

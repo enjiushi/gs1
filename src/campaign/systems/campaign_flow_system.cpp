@@ -107,23 +107,88 @@ Gs1Status process_campaign_flow_host_message(
     auto& active_site_run = access.template read<RuntimeActiveSiteRunTag>();
     auto& app_state = access.template read<RuntimeAppStateTag>();
 
-    if (message.type != GS1_HOST_EVENT_SITE_SCENE_READY)
+    switch (message.type)
     {
+    case GS1_HOST_EVENT_SITE_SCENE_READY:
+        if (!campaign.has_value() || !active_site_run.has_value() || app_state != GS1_APP_STATE_SITE_LOADING)
+        {
+            return GS1_STATUS_OK;
+        }
+
+        app_state = GS1_APP_STATE_SITE_ACTIVE;
+        campaign->app_state = app_state;
+        {
+            GameMessage site_scene_activated {};
+            site_scene_activated.type = GameMessageType::SiteSceneActivated;
+            site_scene_activated.set_payload(SiteSceneActivatedMessage {});
+            invocation.push_game_message(site_scene_activated);
+        }
         return GS1_STATUS_OK;
+
+    case GS1_HOST_EVENT_GAMEPLAY_ACTION:
+    {
+        const auto& action = message.payload.gameplay_action.action;
+        GameMessage gameplay_message {};
+
+        switch (action.type)
+        {
+        case GS1_GAMEPLAY_ACTION_START_NEW_CAMPAIGN:
+            gameplay_message.type = GameMessageType::StartNewCampaign;
+            gameplay_message.set_payload(StartNewCampaignMessage {
+                action.arg0,
+                static_cast<std::uint32_t>(action.arg1)});
+            invocation.push_game_message(gameplay_message);
+            return GS1_STATUS_OK;
+
+        case GS1_GAMEPLAY_ACTION_SELECT_DEPLOYMENT_SITE:
+            if (action.target_id == 0U)
+            {
+                return GS1_STATUS_INVALID_ARGUMENT;
+            }
+            gameplay_message.type = GameMessageType::SelectDeploymentSite;
+            gameplay_message.set_payload(SelectDeploymentSiteMessage {action.target_id});
+            invocation.push_game_message(gameplay_message);
+            return GS1_STATUS_OK;
+
+        case GS1_GAMEPLAY_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
+            gameplay_message.type = GameMessageType::ClearDeploymentSiteSelection;
+            gameplay_message.set_payload(ClearDeploymentSiteSelectionMessage {});
+            invocation.push_game_message(gameplay_message);
+            return GS1_STATUS_OK;
+
+        case GS1_GAMEPLAY_ACTION_START_SITE_ATTEMPT:
+            if (action.target_id == 0U)
+            {
+                return GS1_STATUS_INVALID_ARGUMENT;
+            }
+            gameplay_message.type = GameMessageType::StartSiteAttempt;
+            gameplay_message.set_payload(StartSiteAttemptMessage {action.target_id});
+            invocation.push_game_message(gameplay_message);
+            return GS1_STATUS_OK;
+
+        case GS1_GAMEPLAY_ACTION_RETURN_TO_REGIONAL_MAP:
+            gameplay_message.type = GameMessageType::ReturnToRegionalMap;
+            gameplay_message.set_payload(ReturnToRegionalMapMessage {});
+            invocation.push_game_message(gameplay_message);
+            return GS1_STATUS_OK;
+
+        case GS1_GAMEPLAY_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
+        case GS1_GAMEPLAY_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
+        case GS1_GAMEPLAY_ACTION_SELECT_TECH_TREE_FACTION_TAB:
+        case GS1_GAMEPLAY_ACTION_SET_PHONE_PANEL_SECTION:
+        case GS1_GAMEPLAY_ACTION_CLOSE_PHONE_PANEL:
+        case GS1_GAMEPLAY_ACTION_OPEN_SITE_PROTECTION_SELECTOR:
+        case GS1_GAMEPLAY_ACTION_CLOSE_SITE_PROTECTION_UI:
+        case GS1_GAMEPLAY_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
+        case GS1_GAMEPLAY_ACTION_NONE:
+        default:
+            return GS1_STATUS_OK;
+        }
     }
 
-    if (!campaign.has_value() || !active_site_run.has_value() || app_state != GS1_APP_STATE_SITE_LOADING)
-    {
+    default:
         return GS1_STATUS_OK;
     }
-
-    app_state = GS1_APP_STATE_SITE_ACTIVE;
-    campaign->app_state = app_state;
-    GameMessage site_scene_activated {};
-    site_scene_activated.type = GameMessageType::SiteSceneActivated;
-    site_scene_activated.set_payload(SiteSceneActivatedMessage {});
-    invocation.push_game_message(site_scene_activated);
-    return GS1_STATUS_OK;
 }
 
 const char* CampaignFlowSystem::name() const noexcept
@@ -147,7 +212,9 @@ GameMessageSubscriptionSpan CampaignFlowSystem::subscribed_game_messages() const
 
 HostMessageSubscriptionSpan CampaignFlowSystem::subscribed_host_messages() const noexcept
 {
-    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_SITE_SCENE_READY};
+    static constexpr Gs1HostMessageType subscriptions[] = {
+        GS1_HOST_EVENT_GAMEPLAY_ACTION,
+        GS1_HOST_EVENT_SITE_SCENE_READY};
     return subscriptions;
 }
 

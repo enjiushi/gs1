@@ -25,7 +25,7 @@ class Gs1GodotOverlayPanelController final
     GDCLASS(Gs1GodotOverlayPanelController, godot::Control)
 
 public:
-    using SubmitUiActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
+    using SubmitGameplayActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
 
     Gs1GodotOverlayPanelController() = default;
     ~Gs1GodotOverlayPanelController() override = default;
@@ -34,7 +34,7 @@ public:
     void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
-    void set_submit_ui_action_callback(SubmitUiActionFn callback);
+    void set_submit_gameplay_action_callback(SubmitGameplayActionFn callback);
     void handle_overlay_mode_pressed(std::int64_t mode);
     void handle_projected_button_pressed(std::int64_t button_key);
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
@@ -52,7 +52,7 @@ private:
 
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
-    void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
+    void submit_gameplay_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
     void update_overlay_state_label();
     void update_protection_selector();
     void update_site_result();
@@ -69,7 +69,7 @@ private:
     void prune_button_registry(
         std::unordered_map<std::uint64_t, ProjectedButtonRecord>& registry,
         const std::unordered_set<std::uint64_t>& desired_keys);
-    [[nodiscard]] godot::String protection_mode_label(Gs1SiteProtectionOverlayMode mode) const;
+    [[nodiscard]] godot::String protection_mode_label(Gs1GodotProtectionOverlayMode mode) const;
     [[nodiscard]] godot::String site_result_text() const;
 
     godot::Control* owner_control_ {nullptr};
@@ -85,7 +85,7 @@ private:
     godot::Label* site_result_title_ {nullptr};
     godot::Label* site_result_summary_ {nullptr};
     godot::VBoxContainer* site_result_actions_ {nullptr};
-    SubmitUiActionFn submit_ui_action_ {};
+    SubmitGameplayActionFn submit_gameplay_action_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> protection_selector_buttons_registry_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> site_result_buttons_registry_ {};
     std::optional<Gs1EngineMessageSiteResultData> site_result_ {};

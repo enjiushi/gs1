@@ -67,7 +67,7 @@ private:
     void cache_adapter_service();
     void cache_scene_references();
     void cache_ui_references();
-    void submit_ui_action(std::int64_t action_type, std::int64_t target_id = 0);
+    void submit_gameplay_action(std::int64_t action_type, std::int64_t target_id = 0);
     void reset_regional_map_state() noexcept;
     void refresh_from_game_state_view();
     void select_regional_site(int site_id);
@@ -93,8 +93,8 @@ private:
     [[nodiscard]] Gs1GodotRegionalMapPickOutcome try_select_regional_site_from_screen(const godot::Vector2& screen_position);
 
 private:
-    static constexpr std::int64_t UI_ACTION_SELECT_DEPLOYMENT_SITE = 2;
-    static constexpr std::int64_t UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION = 5;
+    static constexpr std::int64_t GAMEPLAY_ACTION_SELECT_DEPLOYMENT_SITE = 2;
+    static constexpr std::int64_t GAMEPLAY_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION = 5;
     static constexpr double REGIONAL_TILE_SIZE = 4.5;
     static constexpr int REGIONAL_WORLD_PADDING = 2;
     static constexpr double REGIONAL_PICK_DISTANCE = 400.0;

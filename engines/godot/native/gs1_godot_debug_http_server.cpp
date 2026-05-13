@@ -247,7 +247,7 @@ void Gs1GodotDebugHttpServer::handle_client(std::uintptr_t client_socket_value)
         return;
     }
 
-    if (path != "/ui-action" &&
+    if (path != "/gameplay-action" &&
         path != "/site-action" &&
         path != "/site-action-cancel" &&
         path != "/site-storage-view" &&

@@ -33,7 +33,8 @@ using namespace godot;
 
 namespace
 {
-constexpr std::int64_t k_ui_action_close_regional_map_tech_tree = 19;
+constexpr std::int64_t k_gameplay_action_close_regional_map_tech_tree = 19;
+constexpr std::uint32_t k_regional_map_tech_tree_view_id = 1U;
 
 constexpr std::uint8_t k_unlockable_content_kind_plant = 0U;
 constexpr std::uint8_t k_unlockable_content_kind_item = 1U;
@@ -184,8 +185,8 @@ void Gs1GodotRegionalTechTreePanelController::_bind_methods()
 
 void Gs1GodotRegionalTechTreePanelController::_ready()
 {
-    set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
-        submit_ui_action(action_type, target_id, arg0, arg1);
+    set_submit_gameplay_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
+        submit_gameplay_action(action_type, target_id, arg0, arg1);
     });
     cache_adapter_service();
     if (Control* owner = resolve_owner_control())
@@ -241,9 +242,9 @@ void Gs1GodotRegionalTechTreePanelController::cache_ui_references(Control& owner
     rebuild_tech_tree_cards();
 }
 
-void Gs1GodotRegionalTechTreePanelController::set_submit_ui_action_callback(SubmitUiActionFn callback)
+void Gs1GodotRegionalTechTreePanelController::set_submit_gameplay_action_callback(SubmitGameplayActionFn callback)
 {
-    submit_ui_action_ = std::move(callback);
+    submit_gameplay_action_ = std::move(callback);
 }
 
 void Gs1GodotRegionalTechTreePanelController::cache_adapter_service()
@@ -274,7 +275,7 @@ Control* Gs1GodotRegionalTechTreePanelController::resolve_owner_control()
     return owner_control_;
 }
 
-void Gs1GodotRegionalTechTreePanelController::submit_ui_action(
+void Gs1GodotRegionalTechTreePanelController::submit_gameplay_action(
     std::int64_t action_type,
     std::int64_t target_id,
     std::int64_t arg0,
@@ -282,7 +283,7 @@ void Gs1GodotRegionalTechTreePanelController::submit_ui_action(
 {
     if (adapter_service_ != nullptr)
     {
-        adapter_service_->submit_ui_action(action_type, target_id, arg0, arg1);
+        adapter_service_->submit_gameplay_action(action_type, target_id, arg0, arg1);
     }
 }
 
@@ -394,7 +395,7 @@ void Gs1GodotRegionalTechTreePanelController::rebuild_tech_tree_cards()
 
         row_requirements.push_back(reputation_requirement);
         Dictionary spec;
-        spec["setup_id"] = GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE;
+        spec["setup_id"] = static_cast<int>(k_regional_map_tech_tree_view_id);
         spec["element_id"] = static_cast<int>(unlock_def.unlock_id);
         spec["entry_kind"] = GS1_PROGRESSION_ENTRY_REPUTATION_UNLOCK;
         const auto found_state = entry_state_by_id.find(static_cast<std::uint16_t>(unlock_def.unlock_id));
@@ -419,7 +420,7 @@ void Gs1GodotRegionalTechTreePanelController::rebuild_tech_tree_cards()
 
         row_requirements.push_back(reputation_requirement);
         Dictionary action;
-        action["type"] = static_cast<int>(GS1_UI_ACTION_NONE);
+        action["type"] = static_cast<int>(GS1_GAMEPLAY_ACTION_NONE);
         action["target_id"] = static_cast<int64_t>(node_def.tech_node_id.value);
         action["arg0"] = static_cast<int64_t>(node_def.faction_id.value);
         action["arg1"] = 0;
@@ -429,12 +430,12 @@ void Gs1GodotRegionalTechTreePanelController::rebuild_tech_tree_cards()
         {
             if ((found_state->second.flags & GS1_PROGRESSION_ENTRY_FLAG_ACTIONABLE) != 0U)
             {
-                action["type"] = static_cast<int>(GS1_UI_ACTION_CLAIM_TECHNOLOGY_NODE);
+                action["type"] = static_cast<int>(GS1_GAMEPLAY_ACTION_CLAIM_TECHNOLOGY_NODE);
             }
         }
 
         Dictionary spec;
-        spec["setup_id"] = GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE;
+        spec["setup_id"] = static_cast<int>(k_regional_map_tech_tree_view_id);
         spec["element_id"] = static_cast<int>(node_def.tech_node_id.value);
         spec["entry_kind"] = GS1_PROGRESSION_ENTRY_TECHNOLOGY_NODE;
         spec["flags"] = static_cast<int>(
@@ -558,7 +559,7 @@ void Gs1GodotRegionalTechTreePanelController::handle_action_pressed(std::int64_t
     }
 
     Button* button = resolve_object<Button>(found->second.object_id);
-    if (button == nullptr || !submit_ui_action_)
+    if (button == nullptr || !submit_gameplay_action_)
     {
         return;
     }
@@ -568,7 +569,7 @@ void Gs1GodotRegionalTechTreePanelController::handle_action_pressed(std::int64_t
         return;
     }
 
-    submit_ui_action_(
+    submit_gameplay_action_(
         as_int(button->get_meta("action_type", 0), 0),
         as_int(button->get_meta("target_id", 0), 0),
         as_int(button->get_meta("arg0", 0), 0),
@@ -577,13 +578,13 @@ void Gs1GodotRegionalTechTreePanelController::handle_action_pressed(std::int64_t
 
 void Gs1GodotRegionalTechTreePanelController::handle_close_pressed()
 {
-    if (!submit_ui_action_)
+    if (!submit_gameplay_action_)
     {
         return;
     }
 
-    submit_ui_action_(
-        k_ui_action_close_regional_map_tech_tree,
+    submit_gameplay_action_(
+        k_gameplay_action_close_regional_map_tech_tree,
         0,
         0,
         0);

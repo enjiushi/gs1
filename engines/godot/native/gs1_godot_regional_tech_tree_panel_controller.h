@@ -29,7 +29,7 @@ class Gs1GodotRegionalTechTreePanelController final
     GDCLASS(Gs1GodotRegionalTechTreePanelController, godot::Control)
 
 public:
-    using SubmitUiActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
+    using SubmitGameplayActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
 
     Gs1GodotRegionalTechTreePanelController() = default;
     ~Gs1GodotRegionalTechTreePanelController() override = default;
@@ -38,7 +38,7 @@ public:
     void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
-    void set_submit_ui_action_callback(SubmitUiActionFn callback);
+    void set_submit_gameplay_action_callback(SubmitGameplayActionFn callback);
     void handle_action_pressed(std::int64_t button_key);
     void handle_close_pressed();
     [[nodiscard]] bool is_panel_visible() const;
@@ -83,7 +83,7 @@ private:
 
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
-    void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
+    void submit_gameplay_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
     void refresh_from_game_state_view();
     void apply_overlay_layout();
     void apply_progression_view_visibility();
@@ -131,7 +131,7 @@ private:
     godot::Label* title_ {nullptr};
     godot::ScrollContainer* summary_scroll_ {nullptr};
     godot::GridContainer* actions_ {nullptr};
-    SubmitUiActionFn submit_ui_action_ {};
+    SubmitGameplayActionFn submit_gameplay_action_ {};
     std::vector<Gs1ProgressionEntryView> progression_entries_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> action_buttons_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> marker_cells_ {};

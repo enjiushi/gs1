@@ -20,7 +20,7 @@ class Gs1GodotSiteHudController final
     GDCLASS(Gs1GodotSiteHudController, godot::Control)
 
 public:
-    using SubmitUiActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
+    using SubmitGameplayActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
     using SubmitStorageViewFn = std::function<void(int storage_id, int event_kind)>;
     using SubmitContextRequestFn = std::function<void(int tile_x, int tile_y, int flags)>;
 
@@ -31,7 +31,7 @@ public:
     void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
-    void set_submit_ui_action_callback(SubmitUiActionFn callback);
+    void set_submit_gameplay_action_callback(SubmitGameplayActionFn callback);
     void set_submit_storage_view_callback(SubmitStorageViewFn callback);
     void set_submit_context_request_callback(SubmitContextRequestFn callback);
     void set_selected_tile(int tile_x, int tile_y);
@@ -66,7 +66,7 @@ private:
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
     void refresh_from_game_state_view();
-    void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
+    void submit_gameplay_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
     void submit_storage_view(int storage_id, int event_kind);
     void submit_context_request(int tile_x, int tile_y, int flags);
     [[nodiscard]] int worker_pack_storage_id() const noexcept;
@@ -98,7 +98,7 @@ private:
     godot::Button* protection_button_ {nullptr};
     godot::Button* tech_button_ {nullptr};
 
-    SubmitUiActionFn submit_ui_action_ {};
+    SubmitGameplayActionFn submit_gameplay_action_ {};
     SubmitStorageViewFn submit_storage_view_ {};
     SubmitContextRequestFn submit_context_request_ {};
     std::optional<HudState> hud_ {};

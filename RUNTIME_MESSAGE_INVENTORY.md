@@ -1,6 +1,6 @@
 # Runtime Message Inventory
 
-This document records the current runtime-to-host message families for the gameplay-state refactor in [refactor.md](/d:/testgame/gs1_upstream/refactor.md), along with keep/remove/replace decisions.
+This document records the current runtime-to-host message families for the completed gameplay-state refactor, along with keep/remove/replace decisions.
 
 The intent is to reduce `gs1_pop_runtime_message(...)` to a small semantic transport while the host reads authoritative gameplay state through `Gs1GameStateView` and targeted query helpers.
 

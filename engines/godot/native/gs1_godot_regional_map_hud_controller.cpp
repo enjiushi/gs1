@@ -42,8 +42,8 @@ void Gs1GodotRegionalMapHudController::_bind_methods()
 
 void Gs1GodotRegionalMapHudController::_ready()
 {
-    set_submit_ui_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
-        submit_ui_action(action_type, target_id, arg0, arg1);
+    set_submit_gameplay_action_callback([this](std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1) {
+        submit_gameplay_action(action_type, target_id, arg0, arg1);
     });
     cache_adapter_service();
     if (Control* owner = resolve_owner_control())
@@ -96,9 +96,9 @@ void Gs1GodotRegionalMapHudController::cache_ui_references(Control& owner)
     }
 }
 
-void Gs1GodotRegionalMapHudController::set_submit_ui_action_callback(SubmitUiActionFn callback)
+void Gs1GodotRegionalMapHudController::set_submit_gameplay_action_callback(SubmitGameplayActionFn callback)
 {
-    submit_ui_action_ = std::move(callback);
+    submit_gameplay_action_ = std::move(callback);
 }
 
 void Gs1GodotRegionalMapHudController::cache_adapter_service()
@@ -129,7 +129,7 @@ Control* Gs1GodotRegionalMapHudController::resolve_owner_control()
     return owner_control_;
 }
 
-void Gs1GodotRegionalMapHudController::submit_ui_action(
+void Gs1GodotRegionalMapHudController::submit_gameplay_action(
     std::int64_t action_type,
     std::int64_t target_id,
     std::int64_t arg0,
@@ -137,7 +137,7 @@ void Gs1GodotRegionalMapHudController::submit_ui_action(
 {
     if (adapter_service_ != nullptr)
     {
-        adapter_service_->submit_ui_action(action_type, target_id, arg0, arg1);
+        adapter_service_->submit_gameplay_action(action_type, target_id, arg0, arg1);
     }
 }
 
@@ -186,13 +186,13 @@ void Gs1GodotRegionalMapHudController::refresh_from_game_state_view()
 
 void Gs1GodotRegionalMapHudController::handle_tech_button_pressed()
 {
-    if (!submit_ui_action_)
+    if (!submit_gameplay_action_)
     {
         return;
     }
 
-    const Gs1UiAction action = tech_button_action();
-    submit_ui_action_(action.type, action.target_id, action.arg0, action.arg1);
+    const Gs1GameplayAction action = tech_button_action();
+    submit_gameplay_action_(action.type, action.target_id, action.arg0, action.arg1);
 }
 
 bool Gs1GodotRegionalMapHudController::handles_engine_message(Gs1EngineMessageType type) const noexcept
@@ -243,9 +243,9 @@ void Gs1GodotRegionalMapHudController::apply_tech_button()
 {
     if (tech_button_ != nullptr)
     {
-        const Gs1UiAction action = tech_button_action();
+        const Gs1GameplayAction action = tech_button_action();
         tech_button_->set_text(tech_button_label());
-        tech_button_->set_disabled(action.type == GS1_UI_ACTION_NONE);
+        tech_button_->set_disabled(action.type == GS1_GAMEPLAY_ACTION_NONE);
         tech_button_->set_meta("action_type", static_cast<int>(action.type));
         tech_button_->set_meta("target_id", static_cast<int>(action.target_id));
         tech_button_->set_meta("arg0", static_cast<std::int64_t>(action.arg0));
@@ -327,15 +327,15 @@ String Gs1GodotRegionalMapHudController::tech_button_label() const
     return tech_tree_visible ? String("Close Research") : String("Research & Unlocks");
 }
 
-Gs1UiAction Gs1GodotRegionalMapHudController::tech_button_action() const
+Gs1GameplayAction Gs1GodotRegionalMapHudController::tech_button_action() const
 {
-    Gs1UiAction action {};
+    Gs1GameplayAction action {};
     const bool tech_tree_visible =
         adapter_service_ != nullptr &&
         adapter_service_->ui_session_state().regional_tech.open;
     action.type = tech_tree_visible
-        ? GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE
-        : GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE;
+        ? GS1_GAMEPLAY_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE
+        : GS1_GAMEPLAY_ACTION_OPEN_REGIONAL_MAP_TECH_TREE;
     return action;
 }
 

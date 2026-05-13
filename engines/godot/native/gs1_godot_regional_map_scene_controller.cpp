@@ -266,22 +266,22 @@ void Gs1GodotRegionalMapSceneController::handle_runtime_message_reset()
     regional_material_cache_.clear();
 }
 
-void Gs1GodotRegionalMapSceneController::submit_ui_action(std::int64_t action_type, std::int64_t target_id)
+void Gs1GodotRegionalMapSceneController::submit_gameplay_action(std::int64_t action_type, std::int64_t target_id)
 {
     if (adapter_service_ != nullptr)
     {
-        adapter_service_->submit_ui_action(action_type, target_id, 0, 0);
+        adapter_service_->submit_gameplay_action(action_type, target_id, 0, 0);
     }
 }
 
 void Gs1GodotRegionalMapSceneController::select_regional_site(int site_id)
 {
-    submit_ui_action(UI_ACTION_SELECT_DEPLOYMENT_SITE, site_id);
+    submit_gameplay_action(GAMEPLAY_ACTION_SELECT_DEPLOYMENT_SITE, site_id);
 }
 
 void Gs1GodotRegionalMapSceneController::clear_regional_site_selection()
 {
-    submit_ui_action(UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION);
+    submit_gameplay_action(GAMEPLAY_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION);
 }
 
 void Gs1GodotRegionalMapSceneController::refresh_regional_map()

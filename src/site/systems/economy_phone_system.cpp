@@ -862,7 +862,8 @@ GameMessageSubscriptionSpan EconomyPhoneSystem::subscribed_game_messages() const
 
 HostMessageSubscriptionSpan EconomyPhoneSystem::subscribed_host_messages() const noexcept
 {
-    return {};
+    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_GAMEPLAY_ACTION};
+    return subscriptions;
 }
 
 std::optional<Gs1RuntimeProfileSystemId> EconomyPhoneSystem::profile_system_id() const noexcept
@@ -992,9 +993,66 @@ Gs1Status EconomyPhoneSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
+    if (message.type != GS1_HOST_EVENT_GAMEPLAY_ACTION)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    const auto& action = message.payload.gameplay_action.action;
+    GameMessage gameplay_message {};
+    switch (action.type)
+    {
+    case GS1_GAMEPLAY_ACTION_BUY_PHONE_LISTING:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        gameplay_message.type = GameMessageType::PhoneListingPurchaseRequested;
+        gameplay_message.set_payload(PhoneListingPurchaseRequestedMessage {
+            action.target_id,
+            static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
+            0U});
+        invocation.push_game_message(gameplay_message);
+        return GS1_STATUS_OK;
+
+    case GS1_GAMEPLAY_ACTION_SELL_PHONE_LISTING:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        gameplay_message.type = GameMessageType::PhoneListingSaleRequested;
+        gameplay_message.set_payload(PhoneListingSaleRequestedMessage {
+            action.target_id,
+            static_cast<std::uint16_t>(action.arg0 == 0ULL ? 1ULL : action.arg0),
+            0U});
+        invocation.push_game_message(gameplay_message);
+        return GS1_STATUS_OK;
+
+    case GS1_GAMEPLAY_ACTION_HIRE_CONTRACTOR:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        gameplay_message.type = GameMessageType::ContractorHireRequested;
+        gameplay_message.set_payload(ContractorHireRequestedMessage {
+            action.target_id,
+            static_cast<std::uint32_t>(action.arg0)});
+        invocation.push_game_message(gameplay_message);
+        return GS1_STATUS_OK;
+
+    case GS1_GAMEPLAY_ACTION_PURCHASE_SITE_UNLOCKABLE:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        gameplay_message.type = GameMessageType::SiteUnlockablePurchaseRequested;
+        gameplay_message.set_payload(SiteUnlockablePurchaseRequestedMessage {action.target_id});
+        invocation.push_game_message(gameplay_message);
+        return GS1_STATUS_OK;
+
+    default:
+        return GS1_STATUS_OK;
+    }
 }
 
 void EconomyPhoneSystem::run(RuntimeInvocation& invocation)
