@@ -2,6 +2,7 @@
 
 #include "site/site_projection_update_flags.h"
 #include "site/site_world_access.h"
+#include "runtime/game_runtime.h"
 #include "support/currency.h"
 
 #include <algorithm>

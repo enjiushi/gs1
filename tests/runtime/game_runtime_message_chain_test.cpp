@@ -161,6 +161,22 @@ std::vector<Gs1RuntimeMessage> drain_runtime_messages(GameRuntime& runtime)
     return messages;
 }
 
+template <typename Predicate>
+std::optional<std::size_t> find_message_index(
+    const std::vector<Gs1RuntimeMessage>& messages,
+    Predicate&& predicate)
+{
+    for (std::size_t index = 0U; index < messages.size(); ++index)
+    {
+        if (predicate(messages[index]))
+        {
+            return index;
+        }
+    }
+
+    return std::nullopt;
+}
+
 void run_phase1(GameRuntime& runtime, double real_delta_seconds, Gs1Phase1Result& out_result)
 {
     Gs1Phase1Request request {};
@@ -765,9 +781,25 @@ void task_reward_claim_emits_pending_claim_projection_then_reward_cue()
         assert(payload.list_kind == GS1_TASK_PRESENTATION_LIST_CLAIMED);
     }
 
-    const auto* reward_cue_message =
-        find_one_shot_cue_message(messages, GS1_ONE_SHOT_CUE_TASK_REWARD_CLAIMED);
-    assert(reward_cue_message != nullptr);
+    const auto claimed_task_index = find_message_index(messages, [](const Gs1RuntimeMessage& message) {
+        if (message.type != GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT)
+        {
+            return false;
+        }
+
+        return message.payload_as<Gs1EngineMessageTaskData>().task_instance_id == 1U;
+    });
+    assert(claimed_task_index.has_value());
+
+    const auto reward_cue_index = find_message_index(messages, [](const Gs1RuntimeMessage& message) {
+        return message.type == GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE &&
+            message.payload_as<Gs1EngineMessageOneShotCueData>().cue_kind ==
+            GS1_ONE_SHOT_CUE_TASK_REWARD_CLAIMED;
+    });
+    assert(reward_cue_index.has_value());
+    assert(*claimed_task_index < *reward_cue_index);
+
+    const auto* reward_cue_message = &messages[*reward_cue_index];
     {
         const auto& payload = reward_cue_message->payload_as<Gs1EngineMessageOneShotCueData>();
         assert(payload.subject_id == 1U);
@@ -823,9 +855,25 @@ void task_reward_claim_ui_action_claims_pending_task_and_emits_reward_cue()
         assert(payload.list_kind == GS1_TASK_PRESENTATION_LIST_CLAIMED);
     }
 
-    const auto* reward_cue_message =
-        find_one_shot_cue_message(messages, GS1_ONE_SHOT_CUE_TASK_REWARD_CLAIMED);
-    assert(reward_cue_message != nullptr);
+    const auto claimed_task_index = find_message_index(messages, [](const Gs1RuntimeMessage& message) {
+        if (message.type != GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT)
+        {
+            return false;
+        }
+
+        return message.payload_as<Gs1EngineMessageTaskData>().task_instance_id == 1U;
+    });
+    assert(claimed_task_index.has_value());
+
+    const auto reward_cue_index = find_message_index(messages, [](const Gs1RuntimeMessage& message) {
+        return message.type == GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE &&
+            message.payload_as<Gs1EngineMessageOneShotCueData>().cue_kind ==
+            GS1_ONE_SHOT_CUE_TASK_REWARD_CLAIMED;
+    });
+    assert(reward_cue_index.has_value());
+    assert(*claimed_task_index < *reward_cue_index);
+
+    const auto* reward_cue_message = &messages[*reward_cue_index];
     {
         const auto& payload = reward_cue_message->payload_as<Gs1EngineMessageOneShotCueData>();
         assert(payload.subject_id == 1U);
