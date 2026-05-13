@@ -73,6 +73,5 @@ private:
     std::vector<Gs1RuntimeRegionalMapLinkProjection> links_ {};
     std::optional<PendingRegionalMapState> pending_regional_map_state_ {};
     std::optional<Gs1RuntimeCampaignResourcesProjection> campaign_resources_ {};
-    bool tech_tree_visible_ {false};
     bool tech_button_connected_ {false};
 };

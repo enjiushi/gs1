@@ -3,54 +3,22 @@
 #include "gs1_godot_controller_context.h"
 
 #include <godot_cpp/core/class_db.hpp>
-#include <godot_cpp/core/object.hpp>
 #include <godot_cpp/core/memory.hpp>
+#include <godot_cpp/core/object.hpp>
 #include <godot_cpp/variant/callable_method_pointer.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 
 #include <algorithm>
-#include <utility>
 
 using namespace godot;
 
 namespace
 {
+constexpr std::int64_t k_ui_action_return_to_regional_map = 4;
+constexpr std::int64_t k_ui_action_close_site_protection_ui = 25;
 constexpr std::int64_t k_ui_action_set_site_protection_overlay_mode = 26;
-constexpr std::uint64_t pack_u32_pair(std::uint32_t high, std::uint32_t low) noexcept
-{
-    return (static_cast<std::uint64_t>(high) << 32U) | static_cast<std::uint64_t>(low);
-}
 
-template <typename Projection, typename Key, typename KeyFn>
-void upsert_projection(std::vector<Projection>& projections, Projection projection, Key key, KeyFn&& key_fn)
-{
-    const auto existing = std::find_if(projections.begin(), projections.end(), [&](const Projection& item) {
-        return key_fn(item) == key;
-    });
-    if (existing != projections.end())
-    {
-        *existing = std::move(projection);
-    }
-    else
-    {
-        projections.push_back(std::move(projection));
-    }
-}
-
-template <typename Projection, typename Predicate>
-void erase_projection_if(std::vector<Projection>& projections, Predicate&& predicate)
-{
-    projections.erase(
-        std::remove_if(projections.begin(), projections.end(), std::forward<Predicate>(predicate)),
-        projections.end());
-}
-
-void sort_ui_setups(std::vector<Gs1RuntimeUiSetupProjection>& setups)
-{
-    std::sort(setups.begin(), setups.end(), [](const auto& lhs, const auto& rhs) {
-        return lhs.setup_id < rhs.setup_id;
-    });
-}
+constexpr std::uint64_t k_site_result_return_button_key = 1U;
 
 template <typename T>
 T* resolve_object(const ObjectID object_id)
@@ -64,6 +32,7 @@ int as_int(const Variant& value, int fallback = 0)
     {
         return fallback;
     }
+
     switch (value.get_type())
     {
     case Variant::INT:
@@ -97,7 +66,7 @@ void dispatch_projected_button_pressed(std::int64_t controller_bits, std::int64_
         controller->handle_projected_button_pressed(button_key);
     }
 }
-}
+}  // namespace
 
 void Gs1GodotOverlayPanelController::_bind_methods()
 {
@@ -171,17 +140,18 @@ void Gs1GodotOverlayPanelController::cache_ui_references(Control& owner)
     {
         site_result_actions_ = Object::cast_to<VBoxContainer>(owner.find_child("SiteResultActions", true, false));
     }
+
     const std::int64_t controller_bits = static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(this));
     const struct ButtonBinding final
     {
         const char* name;
         std::int64_t mode;
     } bindings[] {
-        {"OverlayWindButton", 1},
-        {"OverlayHeatButton", 2},
-        {"OverlayDustButton", 3},
-        {"OverlayConditionButton", 4},
-        {"OverlayClearButton", 0},
+        {"OverlayWindButton", GS1_SITE_PROTECTION_OVERLAY_WIND},
+        {"OverlayHeatButton", GS1_SITE_PROTECTION_OVERLAY_HEAT},
+        {"OverlayDustButton", GS1_SITE_PROTECTION_OVERLAY_DUST},
+        {"OverlayConditionButton", GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION},
+        {"OverlayClearButton", GS1_SITE_PROTECTION_OVERLAY_NONE},
     };
     for (const ButtonBinding& binding : bindings)
     {
@@ -194,9 +164,10 @@ void Gs1GodotOverlayPanelController::cache_ui_references(Control& owner)
             }
         }
     }
+
     update_overlay_state_label();
-    update_protection_selector(find_ui_setup(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR));
-    update_site_result(find_ui_setup(GS1_UI_SETUP_SITE_RESULT));
+    update_protection_selector();
+    update_site_result();
 }
 
 void Gs1GodotOverlayPanelController::set_submit_ui_action_callback(SubmitUiActionFn callback)
@@ -244,150 +215,6 @@ void Gs1GodotOverlayPanelController::submit_ui_action(
     }
 }
 
-void Gs1GodotOverlayPanelController::reset_ui_setup_state() noexcept
-{
-    ui_setups_.clear();
-    pending_ui_setup_.reset();
-    ui_setup_indices_.clear();
-    pending_ui_setup_element_indices_.clear();
-}
-
-void Gs1GodotOverlayPanelController::rebuild_ui_setup_indices() noexcept
-{
-    ui_setup_indices_.clear();
-    ui_setup_indices_.reserve(ui_setups_.size());
-    for (std::size_t index = 0; index < ui_setups_.size(); ++index)
-    {
-        ui_setup_indices_[static_cast<std::uint16_t>(ui_setups_[index].setup_id)] = index;
-    }
-}
-
-void Gs1GodotOverlayPanelController::apply_ui_setup_message(const Gs1EngineMessage& message)
-{
-    switch (message.type)
-    {
-    case GS1_ENGINE_MESSAGE_BEGIN_UI_SETUP:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessageUiSetupData>();
-        pending_ui_setup_element_indices_.clear();
-        if (payload.mode == GS1_PROJECTION_MODE_DELTA)
-        {
-            const auto found = ui_setup_indices_.find(static_cast<std::uint16_t>(payload.setup_id));
-            if (found != ui_setup_indices_.end() && found->second < ui_setups_.size())
-            {
-                const auto& existing = ui_setups_[found->second];
-                pending_ui_setup_ = PendingUiSetup {};
-                pending_ui_setup_->setup_id = existing.setup_id;
-                pending_ui_setup_->presentation_type = existing.presentation_type;
-                pending_ui_setup_->context_id = existing.context_id;
-                pending_ui_setup_->elements = existing.elements;
-                pending_ui_setup_element_indices_.reserve(pending_ui_setup_->elements.size());
-                for (std::size_t index = 0; index < pending_ui_setup_->elements.size(); ++index)
-                {
-                    pending_ui_setup_element_indices_[pending_ui_setup_->elements[index].element_id] = index;
-                }
-            }
-            else
-            {
-                pending_ui_setup_ = PendingUiSetup {};
-            }
-        }
-        else
-        {
-            pending_ui_setup_ = PendingUiSetup {};
-        }
-
-        pending_ui_setup_->setup_id = payload.setup_id;
-        pending_ui_setup_->presentation_type = payload.presentation_type;
-        pending_ui_setup_->context_id = payload.context_id;
-        if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
-        {
-            pending_ui_setup_->elements.clear();
-        }
-        pending_ui_setup_->elements.reserve(std::max<std::size_t>(pending_ui_setup_->elements.size(), payload.element_count));
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_UI_ELEMENT_UPSERT:
-    {
-        if (!pending_ui_setup_.has_value())
-        {
-            break;
-        }
-        const auto& payload = message.payload_as<Gs1EngineMessageUiElementData>();
-        Gs1RuntimeUiElementProjection projection {};
-        projection.element_id = payload.element_id;
-        projection.element_type = payload.element_type;
-        projection.flags = payload.flags;
-        projection.action = payload.action;
-        projection.content_kind = payload.content_kind;
-        projection.primary_id = payload.primary_id;
-        projection.secondary_id = payload.secondary_id;
-        projection.quantity = payload.quantity;
-        const auto found = pending_ui_setup_element_indices_.find(projection.element_id);
-        if (found != pending_ui_setup_element_indices_.end() && found->second < pending_ui_setup_->elements.size())
-        {
-            pending_ui_setup_->elements[found->second] = projection;
-        }
-        else
-        {
-            pending_ui_setup_element_indices_[projection.element_id] = pending_ui_setup_->elements.size();
-            pending_ui_setup_->elements.push_back(std::move(projection));
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_END_UI_SETUP:
-    {
-        if (!pending_ui_setup_.has_value())
-        {
-            break;
-        }
-
-        Gs1RuntimeUiSetupProjection setup {};
-        setup.setup_id = pending_ui_setup_->setup_id;
-        setup.presentation_type = pending_ui_setup_->presentation_type;
-        setup.context_id = pending_ui_setup_->context_id;
-        setup.elements = std::move(pending_ui_setup_->elements);
-
-        if (setup.presentation_type == GS1_UI_SETUP_PRESENTATION_NORMAL)
-        {
-            erase_projection_if(ui_setups_, [](const auto& existing) {
-                return existing.presentation_type == GS1_UI_SETUP_PRESENTATION_NORMAL;
-            });
-        }
-
-        upsert_projection(ui_setups_, std::move(setup), pending_ui_setup_->setup_id, [](const auto& existing) {
-            return existing.setup_id;
-        });
-        sort_ui_setups(ui_setups_);
-        rebuild_ui_setup_indices();
-        pending_ui_setup_.reset();
-        pending_ui_setup_element_indices_.clear();
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_CLOSE_UI_SETUP:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessageCloseUiSetupData>();
-        erase_projection_if(ui_setups_, [&](const auto& setup) {
-            return setup.setup_id == payload.setup_id;
-        });
-        rebuild_ui_setup_indices();
-        break;
-    }
-    default:
-        break;
-    }
-}
-
-const Gs1RuntimeUiSetupProjection* Gs1GodotOverlayPanelController::find_ui_setup(Gs1UiSetupId setup_id) const noexcept
-{
-    const auto found = ui_setup_indices_.find(static_cast<std::uint16_t>(setup_id));
-    if (found == ui_setup_indices_.end() || found->second >= ui_setups_.size())
-    {
-        return nullptr;
-    }
-    return &ui_setups_[found->second];
-}
-
 void Gs1GodotOverlayPanelController::handle_overlay_mode_pressed(std::int64_t mode)
 {
     if (!submit_ui_action_)
@@ -406,18 +233,15 @@ void Gs1GodotOverlayPanelController::handle_projected_button_pressed(std::int64_
 {
     const std::uint64_t key = static_cast<std::uint64_t>(button_key);
     Button* button = nullptr;
-    auto protection_found = protection_selector_buttons_registry_.find(key);
-    if (protection_found != protection_selector_buttons_registry_.end())
+    if (const auto found = protection_selector_buttons_registry_.find(key);
+        found != protection_selector_buttons_registry_.end())
     {
-        button = resolve_object<Button>(protection_found->second.object_id);
+        button = resolve_object<Button>(found->second.object_id);
     }
-    else
+    else if (const auto found = site_result_buttons_registry_.find(key);
+             found != site_result_buttons_registry_.end())
     {
-        auto result_found = site_result_buttons_registry_.find(key);
-        if (result_found != site_result_buttons_registry_.end())
-        {
-            button = resolve_object<Button>(result_found->second.object_id);
-        }
+        button = resolve_object<Button>(found->second.object_id);
     }
     if (button == nullptr || !submit_ui_action_)
     {
@@ -433,38 +257,53 @@ void Gs1GodotOverlayPanelController::handle_projected_button_pressed(std::int64_
 
 bool Gs1GodotOverlayPanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept
 {
-    return type == GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE ||
-        type == GS1_ENGINE_MESSAGE_BEGIN_UI_SETUP ||
-        type == GS1_ENGINE_MESSAGE_UI_ELEMENT_UPSERT ||
-        type == GS1_ENGINE_MESSAGE_END_UI_SETUP ||
-        type == GS1_ENGINE_MESSAGE_CLOSE_UI_SETUP;
+    switch (type)
+    {
+    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
+    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
+    case GS1_ENGINE_MESSAGE_SITE_RESULT_READY:
+        return true;
+    default:
+        return false;
+    }
 }
 
 void Gs1GodotOverlayPanelController::handle_engine_message(const Gs1EngineMessage& message)
 {
-    apply_ui_setup_message(message);
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE:
-        overlay_state_ = message.payload_as<Gs1EngineMessageSiteProtectionOverlayData>();
+    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
+    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
+        break;
+    case GS1_ENGINE_MESSAGE_SITE_RESULT_READY:
+        site_result_ = message.payload_as<Gs1EngineMessageSiteResultData>();
         break;
     default:
         break;
     }
+
+    if (adapter_service_ != nullptr)
+    {
+        Gs1GameStateView view {};
+        if (adapter_service_->get_game_state_view(view) && view.app_state != GS1_APP_STATE_SITE_RESULT)
+        {
+            site_result_.reset();
+        }
+    }
+
     update_overlay_state_label();
-    update_protection_selector(find_ui_setup(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR));
-    update_site_result(find_ui_setup(GS1_UI_SETUP_SITE_RESULT));
+    update_protection_selector();
+    update_site_result();
 }
 
 void Gs1GodotOverlayPanelController::handle_runtime_message_reset()
 {
-    overlay_state_.reset();
-    reset_ui_setup_state();
+    site_result_.reset();
     protection_selector_buttons_registry_.clear();
     site_result_buttons_registry_.clear();
     update_overlay_state_label();
-    update_protection_selector(nullptr);
-    update_site_result(nullptr);
+    update_protection_selector();
+    update_site_result();
 }
 
 void Gs1GodotOverlayPanelController::update_overlay_state_label()
@@ -474,19 +313,26 @@ void Gs1GodotOverlayPanelController::update_overlay_state_label()
         return;
     }
 
-    const int overlay_mode = overlay_state_.has_value()
-        ? static_cast<int>(overlay_state_->mode)
-        : 0;
-    overlay_state_label_->set_text(vformat("Overlay Mode: %d", overlay_mode));
+    const auto mode =
+        adapter_service_ != nullptr
+            ? adapter_service_->ui_session_state().protection.overlay_mode
+            : GS1_SITE_PROTECTION_OVERLAY_NONE;
+    overlay_state_label_->set_text(vformat("Overlay Mode: %s", protection_mode_label(mode)));
 }
 
-void Gs1GodotOverlayPanelController::update_protection_selector(const Gs1RuntimeUiSetupProjection* setup)
+void Gs1GodotOverlayPanelController::update_protection_selector()
 {
+    const auto protection =
+        adapter_service_ != nullptr
+            ? adapter_service_->ui_session_state().protection
+            : Gs1GodotProtectionUiSessionState {};
+
     if (protection_selector_overlay_ != nullptr)
     {
-        protection_selector_overlay_->set_visible(setup != nullptr);
+        protection_selector_overlay_->set_visible(protection.selector_open);
     }
-    if (setup == nullptr)
+
+    if (!protection.selector_open)
     {
         prune_button_registry(protection_selector_buttons_registry_, {});
         return;
@@ -494,48 +340,58 @@ void Gs1GodotOverlayPanelController::update_protection_selector(const Gs1Runtime
 
     if (protection_selector_title_ != nullptr)
     {
-        String title = "Protection Overlay";
-        for (const auto& element : setup->elements)
-        {
-            if (element.element_type == GS1_UI_ELEMENT_LABEL)
-            {
-                title = protection_label(element);
-                break;
-            }
-        }
-        protection_selector_title_->set_text(title);
+        protection_selector_title_->set_text("Protection Overlay");
     }
 
     Array button_specs;
-    for (const auto& element : setup->elements)
+    const struct SelectorButtonSpec final
     {
-        if (element.element_type != GS1_UI_ELEMENT_BUTTON)
-        {
-            continue;
-        }
+        std::uint32_t element_id;
+        Gs1SiteProtectionOverlayMode mode;
+        std::int64_t action_type;
+    } button_defs[] {
+        {1U, GS1_SITE_PROTECTION_OVERLAY_WIND, k_ui_action_set_site_protection_overlay_mode},
+        {2U, GS1_SITE_PROTECTION_OVERLAY_HEAT, k_ui_action_set_site_protection_overlay_mode},
+        {3U, GS1_SITE_PROTECTION_OVERLAY_DUST, k_ui_action_set_site_protection_overlay_mode},
+        {4U, GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION, k_ui_action_set_site_protection_overlay_mode},
+        {5U, GS1_SITE_PROTECTION_OVERLAY_NONE, k_ui_action_close_site_protection_ui},
+    };
+    for (const SelectorButtonSpec& button_def : button_defs)
+    {
         Dictionary action;
-        action["type"] = static_cast<int>(element.action.type);
-        action["target_id"] = static_cast<int64_t>(element.action.target_id);
-        action["arg0"] = static_cast<int64_t>(element.action.arg0);
-        action["arg1"] = static_cast<int64_t>(element.action.arg1);
+        action["type"] = static_cast<int>(button_def.action_type);
+        action["target_id"] = 0;
+        action["arg0"] = static_cast<int64_t>(
+            button_def.action_type == k_ui_action_set_site_protection_overlay_mode
+                ? button_def.mode
+                : 0);
+        action["arg1"] = 0;
+
         Dictionary spec;
-        spec["setup_id"] = static_cast<int>(setup->setup_id);
-        spec["element_id"] = static_cast<int>(element.element_id);
-        spec["text"] = protection_label(element);
-        spec["flags"] = static_cast<int>(element.flags);
+        spec["setup_id"] = static_cast<int>(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
+        spec["element_id"] = static_cast<int>(button_def.element_id);
+        spec["text"] = button_def.action_type == k_ui_action_close_site_protection_ui
+            ? String("Close")
+            : protection_mode_label(button_def.mode);
+        spec["flags"] = 0;
         spec["action"] = action;
         button_specs.push_back(spec);
     }
-    reconcile_projected_buttons(protection_selector_buttons_, protection_selector_buttons_registry_, button_specs);
+    reconcile_projected_buttons(
+        protection_selector_buttons_,
+        protection_selector_buttons_registry_,
+        button_specs);
 }
 
-void Gs1GodotOverlayPanelController::update_site_result(const Gs1RuntimeUiSetupProjection* setup)
+void Gs1GodotOverlayPanelController::update_site_result()
 {
+    const bool visible = site_result_.has_value();
     if (site_result_overlay_ != nullptr)
     {
-        site_result_overlay_->set_visible(setup != nullptr);
+        site_result_overlay_->set_visible(visible);
     }
-    if (setup == nullptr)
+
+    if (!visible)
     {
         prune_button_registry(site_result_buttons_registry_, {});
         return;
@@ -547,38 +403,24 @@ void Gs1GodotOverlayPanelController::update_site_result(const Gs1RuntimeUiSetupP
     }
     if (site_result_summary_ != nullptr)
     {
-        String summary = "Site result received.";
-        for (const auto& element : setup->elements)
-        {
-            if (element.element_type == GS1_UI_ELEMENT_LABEL)
-            {
-                summary = site_result_text(element);
-                break;
-            }
-        }
-        site_result_summary_->set_text(summary);
+        site_result_summary_->set_text(site_result_text());
     }
 
+    Dictionary action;
+    action["type"] = static_cast<int>(k_ui_action_return_to_regional_map);
+    action["target_id"] = 0;
+    action["arg0"] = 0;
+    action["arg1"] = 0;
+
+    Dictionary spec;
+    spec["setup_id"] = static_cast<int>(GS1_UI_SETUP_SITE_RESULT);
+    spec["element_id"] = static_cast<int>(k_site_result_return_button_key);
+    spec["text"] = String("Return To Map");
+    spec["flags"] = 0;
+    spec["action"] = action;
+
     Array button_specs;
-    for (const auto& element : setup->elements)
-    {
-        if (element.element_type != GS1_UI_ELEMENT_BUTTON)
-        {
-            continue;
-        }
-        Dictionary action;
-        action["type"] = static_cast<int>(element.action.type);
-        action["target_id"] = static_cast<int64_t>(element.action.target_id);
-        action["arg0"] = static_cast<int64_t>(element.action.arg0);
-        action["arg1"] = static_cast<int64_t>(element.action.arg1);
-        Dictionary spec;
-        spec["setup_id"] = static_cast<int>(setup->setup_id);
-        spec["element_id"] = static_cast<int>(element.element_id);
-        spec["text"] = String("Return To Map");
-        spec["flags"] = static_cast<int>(element.flags);
-        spec["action"] = action;
-        button_specs.push_back(spec);
-    }
+    button_specs.push_back(spec);
     reconcile_projected_buttons(site_result_actions_, site_result_buttons_registry_, button_specs);
 }
 
@@ -591,19 +433,27 @@ void Gs1GodotOverlayPanelController::reconcile_projected_buttons(
     {
         return;
     }
+
     std::unordered_set<std::uint64_t> desired_keys;
     for (int64_t index = 0; index < button_specs.size(); ++index)
     {
         const Dictionary spec = button_specs[index];
-        const std::uint64_t stable_key = pack_u32_pair(
-            static_cast<std::uint32_t>(as_int(spec.get("setup_id", 0), 0)),
-            static_cast<std::uint32_t>(as_int(spec.get("element_id", 0), 0)));
+        const std::uint64_t stable_key =
+            (static_cast<std::uint64_t>(static_cast<std::uint32_t>(as_int(spec.get("setup_id", 0), 0))) << 32U) |
+            static_cast<std::uint32_t>(as_int(spec.get("element_id", 0), 0));
         desired_keys.insert(stable_key);
-        Button* button = upsert_button_node(container, registry, stable_key, vformat("Projected_%d", as_int(spec.get("element_id", 0), 0)), static_cast<int>(index));
+
+        Button* button = upsert_button_node(
+            container,
+            registry,
+            stable_key,
+            vformat("Projected_%d", as_int(spec.get("element_id", 0), 0)),
+            static_cast<int>(index));
         if (button == nullptr)
         {
             continue;
         }
+
         const Dictionary action = spec.get("action", Dictionary());
         button->set_text(String(spec.get("text", "Action")));
         button->set_disabled((as_int(spec.get("flags", 0), 0) & GS1_UI_ELEMENT_FLAG_DISABLED) != 0);
@@ -619,6 +469,7 @@ void Gs1GodotOverlayPanelController::reconcile_projected_buttons(
             button->connect("pressed", callback);
         }
     }
+
     prune_button_registry(registry, desired_keys);
 }
 
@@ -630,8 +481,7 @@ Button* Gs1GodotOverlayPanelController::upsert_button_node(
     int desired_index)
 {
     Button* button = nullptr;
-    auto found = registry.find(stable_key);
-    if (found != registry.end())
+    if (const auto found = registry.find(stable_key); found != registry.end())
     {
         button = resolve_object<Button>(found->second.object_id);
     }
@@ -643,9 +493,10 @@ Button* Gs1GodotOverlayPanelController::upsert_button_node(
         container->add_child(button);
         registry[stable_key].object_id = button->get_instance_id();
     }
+
     button->set_name(node_name);
     const int child_count = container->get_child_count();
-    const int clamped_index = std::clamp(desired_index, 0, child_count - 1);
+    const int clamped_index = std::clamp(desired_index, 0, std::max(0, child_count - 1));
     if (button->get_index() != clamped_index)
     {
         container->move_child(button, clamped_index);
@@ -664,6 +515,7 @@ void Gs1GodotOverlayPanelController::prune_button_registry(
             ++it;
             continue;
         }
+
         if (Button* button = resolve_object<Button>(it->second.object_id))
         {
             button->queue_free();
@@ -672,39 +524,46 @@ void Gs1GodotOverlayPanelController::prune_button_registry(
     }
 }
 
-String Gs1GodotOverlayPanelController::protection_label(const Gs1RuntimeUiElementProjection& element) const
+String Gs1GodotOverlayPanelController::protection_mode_label(Gs1SiteProtectionOverlayMode mode) const
 {
-    if (element.content_kind == 3U)
+    switch (mode)
     {
-        return "Protection Overlay";
+    case GS1_SITE_PROTECTION_OVERLAY_WIND:
+        return "Wind";
+    case GS1_SITE_PROTECTION_OVERLAY_HEAT:
+        return "Heat";
+    case GS1_SITE_PROTECTION_OVERLAY_DUST:
+        return "Dust";
+    case GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION:
+        return "Condition";
+    case GS1_SITE_PROTECTION_OVERLAY_NONE:
+    default:
+        return "Off";
     }
-    if (element.content_kind == 5U)
-    {
-        return "Close";
-    }
-    if (element.content_kind == 4U)
-    {
-        switch (element.primary_id)
-        {
-        case GS1_SITE_PROTECTION_OVERLAY_WIND:
-            return "Wind";
-        case GS1_SITE_PROTECTION_OVERLAY_HEAT:
-            return "Heat";
-        case GS1_SITE_PROTECTION_OVERLAY_DUST:
-            return "Dust";
-        case GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION:
-            return "Condition";
-        default:
-            break;
-        }
-    }
-    return "Action";
 }
 
-String Gs1GodotOverlayPanelController::site_result_text(const Gs1RuntimeUiElementProjection& element) const
+String Gs1GodotOverlayPanelController::site_result_text() const
 {
-    const String result = element.secondary_id == GS1_SITE_ATTEMPT_RESULT_COMPLETED
+    if (!site_result_.has_value())
+    {
+        return "Site result received.";
+    }
+
+    const String result = site_result_->result == GS1_SITE_ATTEMPT_RESULT_COMPLETED
         ? String("completed")
-        : (element.secondary_id == GS1_SITE_ATTEMPT_RESULT_FAILED ? String("failed") : String("resolved"));
-    return vformat("Site %d %s. Return to the regional map to continue.", static_cast<int>(element.primary_id), result);
+        : (site_result_->result == GS1_SITE_ATTEMPT_RESULT_FAILED ? String("failed") : String("resolved"));
+    if (site_result_->newly_revealed_site_count > 0U)
+    {
+        return vformat(
+            "Site %d %s. %d new site%s revealed. Return to the regional map to continue.",
+            static_cast<int>(site_result_->site_id),
+            result,
+            static_cast<int>(site_result_->newly_revealed_site_count),
+            site_result_->newly_revealed_site_count == 1U ? "" : "s");
+    }
+
+    return vformat(
+        "Site %d %s. Return to the regional map to continue.",
+        static_cast<int>(site_result_->site_id),
+        result);
 }

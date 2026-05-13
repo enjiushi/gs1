@@ -1,7 +1,6 @@
 #include "runtime/game_runtime.h"
 
 #include "campaign/systems/campaign_flow_system.h"
-#include "campaign/systems/campaign_presentation_system.h"
 #include "campaign/systems/campaign_time_system.h"
 #include "campaign/systems/campaign_system_context.h"
 #include "campaign/systems/faction_reputation_system.h"
@@ -21,20 +20,14 @@
 #include "site/systems/inventory_system.h"
 #include "site/systems/local_weather_resolve_system.h"
 #include "site/systems/modifier_system.h"
-#include "site/systems/phone_panel_system.h"
 #include "site/systems/plant_weather_contribution_system.h"
 #include "site/systems/placement_validation_system.h"
 #include "site/systems/site_completion_system.h"
 #include "site/systems/site_flow_system.h"
-#include "site/systems/site_presentation_system.h"
-#include "site/systems/site_protection_presentation_system.h"
 #include "site/systems/site_time_system.h"
 #include "site/systems/task_board_system.h"
 #include "site/systems/weather_event_system.h"
 #include "site/systems/worker_condition_system.h"
-#include "site/site_world_access.h"
-#include "support/currency.h"
-
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -222,75 +215,11 @@ constexpr auto record_timing_sample = [](auto& accumulator, double elapsed_ms) n
     accumulator.max_elapsed_ms = std::max(accumulator.max_elapsed_ms, elapsed_ms);
 };
 
-void queue_site_ready_runtime_messages(GameState& state)
-{
-    if (!state.campaign.has_value() || !state.active_site_run.has_value())
-    {
-        return;
-    }
-
-    auto resources = Gs1RuntimeMessage {};
-    resources.type = GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES;
-    auto& resource_payload = resources.emplace_payload<Gs1EngineMessageCampaignResourcesData>();
-    resource_payload.current_money = cash_value_from_cash_points(state.active_site_run->economy.current_cash);
-    resource_payload.total_reputation = state.campaign->technology_state.total_reputation;
-    resource_payload.village_reputation = TechnologySystem::faction_reputation(
-        *state.campaign,
-        FactionId {k_faction_village_committee});
-    resource_payload.forestry_reputation = TechnologySystem::faction_reputation(
-        *state.campaign,
-        FactionId {k_faction_forestry_bureau});
-    resource_payload.university_reputation = TechnologySystem::faction_reputation(
-        *state.campaign,
-        FactionId {k_faction_agricultural_university});
-    state.runtime_messages.push_back(resources);
-
-    auto action_message = Gs1RuntimeMessage {};
-    action_message.type = GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE;
-    auto& action_payload = action_message.emplace_payload<Gs1EngineMessageSiteActionData>();
-    action_payload.action_id = 0U;
-    action_payload.target_tile_x = 0;
-    action_payload.target_tile_y = 0;
-    action_payload.action_kind = GS1_SITE_ACTION_NONE;
-    action_payload.flags = GS1_SITE_ACTION_PRESENTATION_FLAG_CLEAR;
-    action_payload.progress_normalized = 0.0f;
-    action_payload.duration_minutes = 0.0f;
-    state.runtime_messages.push_back(action_message);
-
-    const auto worker_conditions = site_world_access::worker_conditions(*state.active_site_run);
-    auto hud_message = Gs1RuntimeMessage {};
-    hud_message.type = GS1_ENGINE_MESSAGE_HUD_STATE;
-    auto& hud_payload = hud_message.emplace_payload<Gs1EngineMessageHudStateData>();
-    hud_payload.player_health = worker_conditions.health;
-    hud_payload.player_hydration = worker_conditions.hydration;
-    hud_payload.player_nourishment = worker_conditions.nourishment;
-    hud_payload.player_energy = worker_conditions.energy;
-    hud_payload.player_morale = worker_conditions.morale;
-    hud_payload.current_money = cash_value_from_cash_points(state.active_site_run->economy.current_cash);
-    hud_payload.active_task_count =
-        static_cast<std::uint16_t>(state.active_site_run->task_board.accepted_task_ids.size());
-    hud_payload.current_action_kind =
-        static_cast<Gs1SiteActionKind>(state.active_site_run->site_action.action_kind);
-    hud_payload.site_completion_normalized =
-        state.active_site_run->counters.objective_progress_normalized;
-    hud_payload.warning_code = 0U;
-    state.runtime_messages.push_back(hud_message);
-
-    auto log_message = Gs1RuntimeMessage {};
-    log_message.type = GS1_ENGINE_MESSAGE_LOG_TEXT;
-    auto& log_payload = log_message.emplace_payload<Gs1EngineMessageLogTextData>();
-    log_payload.level = GS1_LOG_LEVEL_INFO;
-    strncpy_s(log_payload.text, sizeof(log_payload.text), "Started site attempt.", _TRUNCATE);
-    state.runtime_messages.push_back(log_message);
-}
-
-
 }  // namespace
 
 RuntimeInvocation::RuntimeInvocation(GameRuntime& runtime) noexcept
     : runtime_(&runtime)
     , owned_state_(&runtime.state_)
-    , presentation_state_(&runtime.presentation_state_)
     , app_state_(&runtime.state_.app_state)
     , campaign_(&runtime.state_.campaign)
     , active_site_run_(&runtime.state_.active_site_run)
@@ -302,7 +231,6 @@ RuntimeInvocation::RuntimeInvocation(GameRuntime& runtime) noexcept
 
 RuntimeInvocation::RuntimeInvocation(GameState& state) noexcept
     : owned_state_(&state)
-    , presentation_state_(nullptr)
     , app_state_(&state.app_state)
     , campaign_(&state.campaign)
     , active_site_run_(&state.active_site_run)
@@ -319,7 +247,6 @@ RuntimeInvocation::RuntimeInvocation(
     float move_direction_z,
     bool move_direction_present) noexcept
     : owned_state_(&state)
-    , presentation_state_(nullptr)
     , app_state_(&state.app_state)
     , campaign_(&state.campaign)
     , active_site_run_(&state.active_site_run)
@@ -344,9 +271,8 @@ RuntimeInvocation::RuntimeInvocation(
         float move_direction_x,
         float move_direction_y,
         float move_direction_z,
-        bool move_direction_present) noexcept
-    : presentation_state_(nullptr)
-    , app_state_(&app_state)
+    bool move_direction_present) noexcept
+    : app_state_(&app_state)
     , campaign_(&campaign)
     , active_site_run_(&active_site_run)
     , runtime_messages_(&runtime_messages)
@@ -489,7 +415,6 @@ void GameRuntime::initialize_system_registry()
         InventorySystem::access(),
         CraftSystem::access(),
         EconomyPhoneSystem::access(),
-        PhonePanelSystem::access(),
         CampDurabilitySystem::access(),
         DeviceSupportSystem::access(),
         DeviceMaintenanceSystem::access(),
@@ -545,9 +470,6 @@ void GameRuntime::initialize_system_registry()
     systems_.push_back(std::make_unique<InventorySystem>());
     systems_.push_back(std::make_unique<CraftSystem>());
     systems_.push_back(std::make_unique<EconomyPhoneSystem>());
-    systems_.push_back(std::make_unique<PhonePanelSystem>());
-    systems_.push_back(std::make_unique<SitePresentationSystem>());
-    systems_.push_back(std::make_unique<SiteProtectionPresentationSystem>());
     systems_.push_back(std::make_unique<CampDurabilitySystem>());
     systems_.push_back(std::make_unique<DeviceSupportSystem>());
     systems_.push_back(std::make_unique<ModifierSystem>());
@@ -556,8 +478,6 @@ void GameRuntime::initialize_system_registry()
     systems_.push_back(std::make_unique<SiteFlowSystem>());
     systems_.push_back(std::make_unique<FailureRecoverySystem>());
     systems_.push_back(std::make_unique<SiteCompletionSystem>());
-    systems_.push_back(std::make_unique<CampaignPresentationSystem>());
-
     for (const auto& system : systems_)
     {
         append_runtime_subscribers(message_subscribers_, system->subscribed_game_messages(), *system);
@@ -661,8 +581,6 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
         out_result.fixed_steps_executed += 1U;
     }
 
-    flush_site_presentation_if_dirty();
-
     status = dispatch_queued_messages();
     state_.active_site_run->host_move_direction = {};
     out_result.runtime_messages_queued = static_cast<std::uint32_t>(state_.runtime_messages.size());
@@ -685,8 +603,6 @@ Gs1Status GameRuntime::run_phase2(const Gs1Phase2Request& request, Gs1Phase2Resu
 
     out_result = {};
     out_result.struct_size = sizeof(Gs1Phase2Result);
-    const bool site_was_loading = state_.app_state == GS1_APP_STATE_SITE_LOADING;
-
     auto status = dispatch_host_messages(out_result.processed_host_message_count);
     if (status != GS1_STATUS_OK)
     {
@@ -699,25 +615,6 @@ Gs1Status GameRuntime::run_phase2(const Gs1Phase2Request& request, Gs1Phase2Resu
     {
         finish_phase();
         return status;
-    }
-
-    if (site_was_loading &&
-        state_.active_site_run.has_value() &&
-        state_.app_state == GS1_APP_STATE_SITE_ACTIVE)
-    {
-        GamePresentationRuntimeContext presentation_context {
-            state_.app_state,
-            state_.campaign,
-            state_.active_site_run,
-            presentation_state_.site_protection,
-            presentation_state_.presentation_runtime.phone_panel,
-            presentation_state_.ui_presentation,
-            presentation_state_.presentation_runtime,
-            state_.message_queue,
-            state_.runtime_messages,
-            state_.fixed_step_seconds};
-        presentation_.queue_site_bootstrap_messages(presentation_context);
-        queue_site_ready_runtime_messages(state_);
     }
 
     out_result.runtime_messages_queued = static_cast<std::uint32_t>(state_.runtime_messages.size());
@@ -767,22 +664,6 @@ Gs1Status GameRuntime::handle_message(const GameMessage& message)
     return dispatch_queued_messages();
 }
 
-void GameRuntime::flush_site_presentation_if_dirty()
-{
-    GamePresentationRuntimeContext presentation_context {
-        state_.app_state,
-        state_.campaign,
-        state_.active_site_run,
-        presentation_state_.site_protection,
-        presentation_state_.presentation_runtime.phone_panel,
-        presentation_state_.ui_presentation,
-        presentation_state_.presentation_runtime,
-        state_.message_queue,
-        state_.runtime_messages,
-        state_.fixed_step_seconds};
-    presentation_.flush_site_presentation_if_dirty(presentation_context);
-}
-
 Gs1Status GameRuntime::dispatch_queued_messages()
 {
     while (!state_.message_queue.empty())
@@ -794,11 +675,6 @@ Gs1Status GameRuntime::dispatch_queued_messages()
         if (status != GS1_STATUS_OK)
         {
             return status;
-        }
-
-        if (state_.active_site_run.has_value())
-        {
-            flush_site_presentation_if_dirty();
         }
 
     }

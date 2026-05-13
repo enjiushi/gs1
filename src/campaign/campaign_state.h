@@ -34,8 +34,6 @@ struct RegionalMapState final
     std::vector<SiteId> available_site_ids {};
     std::vector<SiteId> completed_site_ids {};
     std::optional<SiteId> selected_site_id {};
-    bool tech_tree_open {false};
-    FactionId selected_tech_tree_faction_id {FactionId {1U}};
 };
 
 struct CampaignState final

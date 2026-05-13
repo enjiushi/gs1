@@ -1,6 +1,5 @@
 #pragma once
 
-#include "app/game_presentation_coordinator.h"
 #include "campaign/systems/campaign_flow_system.h"
 #include "campaign/systems/campaign_time_system.h"
 #include "messages/game_message.h"
@@ -45,11 +44,6 @@ public:
 
     [[nodiscard]] GameState& state() noexcept { return state_; }
     [[nodiscard]] const GameState& state() const noexcept { return state_; }
-    [[nodiscard]] RuntimePresentationState& presentation_state() noexcept { return presentation_state_; }
-    [[nodiscard]] const RuntimePresentationState& presentation_state() const noexcept
-    {
-        return presentation_state_;
-    }
     [[nodiscard]] GameMessageQueue& message_queue() noexcept { return state_.message_queue; }
     [[nodiscard]] const GameMessageQueue& message_queue() const noexcept { return state_.message_queue; }
     [[nodiscard]] std::deque<Gs1RuntimeMessage>& runtime_messages() noexcept { return state_.runtime_messages; }
@@ -58,8 +52,6 @@ public:
         return state_.runtime_messages;
     }
     [[nodiscard]] Gs1Status handle_message(const GameMessage& message);
-    void flush_site_presentation_if_dirty();
-
     friend struct GameRuntimeProjectionTestAccess;
     friend class RuntimeInvocation;
 
@@ -93,7 +85,6 @@ private:
     Gs1RuntimeCreateDesc create_desc_ {};
     std::string adapter_config_json_utf8_ {};
     GameState state_ {};
-    RuntimePresentationState presentation_state_ {};
     RuntimeGameStateViewCache state_view_cache_ {};
     std::deque<Gs1HostMessage> host_messages_ {};
     std::vector<std::unique_ptr<IRuntimeSystem>> systems_ {};
@@ -105,7 +96,6 @@ private:
     TimingAccumulator fixed_step_timing_ {};
     std::array<ProfiledSystemState, static_cast<std::size_t>(GS1_RUNTIME_PROFILE_SYSTEM_COUNT)>
         profiled_systems_ {};
-    GamePresentationCoordinator presentation_ {};
     bool boot_initialized_ {false};
 };
 

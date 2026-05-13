@@ -307,7 +307,7 @@ bool Gs1GodotRegionalMapHudController::handles_engine_message(Gs1EngineMessageTy
     case GS1_ENGINE_MESSAGE_REGIONAL_MAP_HUD_LINK_REMOVE:
     case GS1_ENGINE_MESSAGE_END_REGIONAL_MAP_HUD_SNAPSHOT:
     case GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES:
-    case GS1_ENGINE_MESSAGE_SET_UI_SURFACE_VISIBILITY:
+    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
         return true;
     default:
         return false;
@@ -328,16 +328,9 @@ void Gs1GodotRegionalMapHudController::handle_engine_message(const Gs1EngineMess
         campaign_resources_ = message.payload_as<Gs1EngineMessageCampaignResourcesData>();
         apply_campaign_summary();
         break;
-    case GS1_ENGINE_MESSAGE_SET_UI_SURFACE_VISIBILITY:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessageUiSurfaceVisibilityData>();
-        if (payload.surface_id == GS1_UI_SURFACE_REGIONAL_TECH_TREE_OVERLAY)
-        {
-            tech_tree_visible_ = payload.visible != 0U;
-            apply_tech_button();
-        }
+    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
+        apply_tech_button();
         break;
-    }
     default:
         break;
     }
@@ -347,7 +340,6 @@ void Gs1GodotRegionalMapHudController::handle_runtime_message_reset()
 {
     reset_regional_map_state();
     campaign_resources_.reset();
-    tech_tree_visible_ = false;
     apply_selected_site_summary();
     apply_campaign_summary();
     apply_tech_button();
@@ -464,13 +456,19 @@ String Gs1GodotRegionalMapHudController::support_preview_text(int preview_mask) 
 
 String Gs1GodotRegionalMapHudController::tech_button_label() const
 {
-    return tech_tree_visible_ ? String("Close Research") : String("Research & Unlocks");
+    const bool tech_tree_visible =
+        adapter_service_ != nullptr &&
+        adapter_service_->ui_session_state().regional_tech.open;
+    return tech_tree_visible ? String("Close Research") : String("Research & Unlocks");
 }
 
 Gs1UiAction Gs1GodotRegionalMapHudController::tech_button_action() const
 {
     Gs1UiAction action {};
-    action.type = tech_tree_visible_
+    const bool tech_tree_visible =
+        adapter_service_ != nullptr &&
+        adapter_service_->ui_session_state().regional_tech.open;
+    action.type = tech_tree_visible
         ? GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE
         : GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE;
     return action;

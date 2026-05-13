@@ -173,7 +173,6 @@ bool Gs1GodotInventoryPanelController::handles_engine_message(Gs1EngineMessageTy
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_VIEW_STATE:
     case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
     case GS1_ENGINE_MESSAGE_SET_APP_STATE:
         return true;
@@ -186,38 +185,6 @@ void Gs1GodotInventoryPanelController::handle_engine_message(const Gs1EngineMess
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_VIEW_STATE:
-    {
-        refresh_from_game_state_view();
-        const auto& payload = message.payload_as<Gs1EngineMessageInventoryViewData>();
-        const auto* storage = find_storage(payload.storage_id);
-        const bool is_worker_pack_storage =
-            storage != nullptr && storage->container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK;
-
-        if (is_worker_pack_storage)
-        {
-            worker_pack_open_ = payload.event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT;
-            break;
-        }
-
-        if (payload.event_kind == GS1_INVENTORY_VIEW_EVENT_CLOSE)
-        {
-            if (opened_storage_.has_value() && opened_storage_->storage_id == payload.storage_id)
-            {
-                opened_storage_.reset();
-            }
-            break;
-        }
-
-        if (payload.event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT)
-        {
-            opened_storage_ = Gs1RuntimeInventoryViewProjection {};
-            opened_storage_->storage_id = payload.storage_id;
-            opened_storage_->slot_count = payload.slot_count;
-            opened_storage_->slots.clear();
-        }
-        break;
-    }
     case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
     {
         const auto& payload = message.payload_as<Gs1EngineMessagePresentationDirtyData>();
@@ -268,6 +235,7 @@ void Gs1GodotInventoryPanelController::refresh_from_game_state_view()
     }
 
     const Gs1SiteStateView& site = *view.active_site;
+    worker_pack_open_ = adapter_service_->ui_session_state().inventory.worker_pack_open;
     inventory_storages_.clear();
     inventory_storages_.reserve(site.storage_count);
     worker_pack_slots_.clear();

@@ -241,7 +241,9 @@ void Gs1GodotSiteHudController::handle_phone_pressed()
     {
         return;
     }
-    const bool open = phone_panel_.has_value() && (phone_panel_->flags & GS1_PHONE_PANEL_FLAG_OPEN) != 0U;
+    const bool open =
+        adapter_service_ != nullptr &&
+        adapter_service_->ui_session_state().phone.open;
     submit_ui_action_(open ? k_ui_action_close_phone_panel : k_ui_action_set_phone_panel_section, 0, open ? 0 : GS1_PHONE_PANEL_SECTION_HOME, 0);
 }
 
@@ -294,8 +296,6 @@ bool Gs1GodotSiteHudController::handles_engine_message(Gs1EngineMessageType type
     switch (type)
     {
     case GS1_ENGINE_MESSAGE_HUD_STATE:
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
-    case GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE:
     case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
     case GS1_ENGINE_MESSAGE_SET_APP_STATE:
         return true;
@@ -310,12 +310,6 @@ void Gs1GodotSiteHudController::handle_engine_message(const Gs1EngineMessage& me
     {
     case GS1_ENGINE_MESSAGE_HUD_STATE:
         hud_ = message.payload_as<Gs1EngineMessageHudStateData>();
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
-        phone_panel_ = message.payload_as<Gs1EngineMessagePhonePanelData>();
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE:
-        protection_overlay_ = message.payload_as<Gs1EngineMessageSiteProtectionOverlayData>();
         break;
     case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
     {
@@ -338,8 +332,6 @@ void Gs1GodotSiteHudController::handle_engine_message(const Gs1EngineMessage& me
 void Gs1GodotSiteHudController::handle_runtime_message_reset()
 {
     hud_.reset();
-    phone_panel_.reset();
-    protection_overlay_.reset();
     inventory_storages_.clear();
     rebuild_hud();
 }
@@ -424,8 +416,9 @@ void Gs1GodotSiteHudController::refresh_meter(ProgressBar* bar, Label* label, co
 
 void Gs1GodotSiteHudController::refresh_button_badges()
 {
-    const std::uint32_t flags = phone_panel_.has_value() ? phone_panel_->flags : 0U;
-    const bool phone_open = (flags & GS1_PHONE_PANEL_FLAG_OPEN) != 0U;
+    const auto* ui_session = adapter_service_ != nullptr ? &adapter_service_->ui_session_state() : nullptr;
+    const std::uint32_t flags = ui_session != nullptr ? ui_session->phone.badge_flags : 0U;
+    const bool phone_open = ui_session != nullptr && ui_session->phone.open;
     if (phone_button_ != nullptr)
     {
         phone_button_->set_pressed(phone_open);
@@ -436,7 +429,7 @@ void Gs1GodotSiteHudController::refresh_button_badges()
     }
     if (task_badge_label_ != nullptr)
     {
-        const std::uint32_t ready_count = phone_panel_.has_value() ? phone_panel_->completed_task_count : 0U;
+        const std::uint32_t ready_count = hud_.has_value() ? hud_->active_task_count : 0U;
         task_badge_label_->set_visible(ready_count > 0U || (flags & GS1_PHONE_PANEL_FLAG_TASKS_BADGE) != 0U);
         task_badge_label_->set_text(ready_count > 0U ? String::num_int64(ready_count) : String("!"));
     }
@@ -444,8 +437,10 @@ void Gs1GodotSiteHudController::refresh_button_badges()
     {
         pack_button_->set_disabled(worker_pack_storage_id() == 0);
     }
-    if (protection_button_ != nullptr && protection_overlay_.has_value())
+    if (protection_button_ != nullptr && ui_session != nullptr)
     {
-        protection_button_->set_pressed(protection_overlay_->mode != GS1_SITE_PROTECTION_OVERLAY_NONE);
+        protection_button_->set_pressed(
+            ui_session->protection.selector_open ||
+            ui_session->protection.overlay_mode != GS1_SITE_PROTECTION_OVERLAY_NONE);
     }
 }

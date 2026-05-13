@@ -9,7 +9,6 @@
 #include "site/inventory_state.h"
 #include "site/local_weather_resolve_state.h"
 #include "site/modifier_state.h"
-#include "site/phone_panel_state.h"
 #include "site/plant_weather_contribution_state.h"
 #include "site/site_objective_state.h"
 #include "site/task_board_state.h"
@@ -125,7 +124,6 @@ struct SiteRunState final
     TaskBoardState task_board {};
     ModifierState modifier {};
     EconomyState economy {};
-    PhonePanelState phone_panel {};
     CraftState craft {};
     ActionState site_action {};
     SiteHostMoveDirectionState host_move_direction {};

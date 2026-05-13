@@ -2,22 +2,12 @@
 
 #include "campaign/campaign_state.h"
 #include "gs1/state_view.h"
-#include "runtime/presentation_runtime_state.h"
-#include "runtime/site_protection_presentation_state.h"
-#include "runtime/ui_presentation_state.h"
 #include "site/site_run_state.h"
 
 #include <vector>
 
 namespace gs1
 {
-struct RuntimePresentationState final
-{
-    SiteProtectionPresentationState site_protection {};
-    UiPresentationState ui_presentation {};
-    PresentationRuntimeState presentation_runtime {};
-};
-
 struct RuntimeGameStateViewCache final
 {
     Gs1GameStateView root {};

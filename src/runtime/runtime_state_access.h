@@ -61,22 +61,6 @@ struct RuntimeMoveDirectionTag
 {
 };
 
-struct RuntimeSiteProtectionPresentationTag
-{
-};
-
-struct RuntimeUiPresentationTag
-{
-};
-
-struct RuntimePhonePanelPresentationTag
-{
-};
-
-struct RuntimePresentationRuntimeTag
-{
-};
-
 template <class System>
 struct system_state_tags;
 
@@ -113,11 +97,6 @@ public:
     [[nodiscard]] const GameRuntime* runtime() const noexcept { return runtime_; }
     [[nodiscard]] GameState* owned_state() noexcept { return owned_state_; }
     [[nodiscard]] const GameState* owned_state() const noexcept { return owned_state_; }
-    [[nodiscard]] RuntimePresentationState* presentation_state() noexcept { return presentation_state_; }
-    [[nodiscard]] const RuntimePresentationState* presentation_state() const noexcept
-    {
-        return presentation_state_;
-    }
     [[nodiscard]] GameMessageQueue& game_message_queue() noexcept { return *game_messages_; }
     [[nodiscard]] const GameMessageQueue& game_message_queue() const noexcept { return *game_messages_; }
     [[nodiscard]] std::deque<Gs1RuntimeMessage>& runtime_message_queue() noexcept
@@ -135,12 +114,9 @@ public:
 private:
     template <class Tag>
     friend decltype(auto) runtime_invocation_state_ref(RuntimeInvocation& invocation);
-    template <class Tag>
-    friend decltype(auto) runtime_invocation_state_ref(const RuntimeInvocation& invocation);
 
     GameRuntime* runtime_ {nullptr};
     GameState* owned_state_ {nullptr};
-    RuntimePresentationState* presentation_state_ {nullptr};
     Gs1AppState* app_state_ {nullptr};
     std::optional<CampaignState>* campaign_ {nullptr};
     std::optional<SiteRunState>* active_site_run_ {nullptr};
@@ -152,9 +128,6 @@ private:
 
 template <class Tag>
 decltype(auto) runtime_invocation_state_ref(RuntimeInvocation& invocation);
-
-template <class Tag>
-decltype(auto) runtime_invocation_state_ref(const RuntimeInvocation& invocation);
 
 template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeAppStateTag>(RuntimeInvocation& invocation)
@@ -202,90 +175,6 @@ inline decltype(auto) runtime_invocation_state_ref<RuntimeMoveDirectionTag>(Runt
     return (invocation.move_direction_);
 }
 
-template <>
-inline decltype(auto) runtime_invocation_state_ref<RuntimeSiteProtectionPresentationTag>(
-    RuntimeInvocation& invocation)
-{
-    return (invocation.presentation_state_->site_protection);
-}
-
-template <>
-inline decltype(auto) runtime_invocation_state_ref<RuntimeUiPresentationTag>(RuntimeInvocation& invocation)
-{
-    return (invocation.presentation_state_->ui_presentation);
-}
-
-template <>
-inline decltype(auto) runtime_invocation_state_ref<RuntimePhonePanelPresentationTag>(
-    RuntimeInvocation& invocation)
-{
-    return (invocation.presentation_state_->presentation_runtime.phone_panel);
-}
-
-template <>
-inline decltype(auto) runtime_invocation_state_ref<RuntimePresentationRuntimeTag>(RuntimeInvocation& invocation)
-{
-    return (invocation.presentation_state_->presentation_runtime);
-}
-
-template <>
-inline decltype(auto) runtime_invocation_state_ref<RuntimeAppStateTag>(const RuntimeInvocation& invocation)
-{
-    return (*invocation.app_state_);
-}
-
-template <>
-inline decltype(auto) runtime_invocation_state_ref<RuntimeCampaignTag>(const RuntimeInvocation& invocation)
-{
-    return (*invocation.campaign_);
-}
-
-template <>
-inline decltype(auto) runtime_invocation_state_ref<RuntimeActiveSiteRunTag>(const RuntimeInvocation& invocation)
-{
-    return (*invocation.active_site_run_);
-}
-
-template <>
-inline decltype(auto) runtime_invocation_state_ref<RuntimeFixedStepSecondsTag>(const RuntimeInvocation& invocation)
-{
-    return (*invocation.fixed_step_seconds_);
-}
-
-template <>
-inline decltype(auto) runtime_invocation_state_ref<RuntimeMoveDirectionTag>(const RuntimeInvocation& invocation)
-{
-    return runtime_invocation_state_ref<RuntimeMoveDirectionTag>(const_cast<RuntimeInvocation&>(invocation));
-}
-
-template <>
-inline decltype(auto) runtime_invocation_state_ref<RuntimeSiteProtectionPresentationTag>(
-    const RuntimeInvocation& invocation)
-{
-    return (invocation.presentation_state_->site_protection);
-}
-
-template <>
-inline decltype(auto) runtime_invocation_state_ref<RuntimeUiPresentationTag>(
-    const RuntimeInvocation& invocation)
-{
-    return (invocation.presentation_state_->ui_presentation);
-}
-
-template <>
-inline decltype(auto) runtime_invocation_state_ref<RuntimePhonePanelPresentationTag>(
-    const RuntimeInvocation& invocation)
-{
-    return (invocation.presentation_state_->presentation_runtime.phone_panel);
-}
-
-template <>
-inline decltype(auto) runtime_invocation_state_ref<RuntimePresentationRuntimeTag>(
-    const RuntimeInvocation& invocation)
-{
-    return (invocation.presentation_state_->presentation_runtime);
-}
-
 template <class System>
 class GameStateAccess final
 {
@@ -300,7 +189,7 @@ public:
     {
         using tags = typename system_state_tags<System>::type;
         static_assert(type_list_contains_v<Tag, tags>, "System cannot read this state tag.");
-        return runtime_invocation_state_ref<Tag>(std::as_const(*invocation_));
+        return runtime_invocation_state_ref<Tag>(*invocation_);
     }
 
     template <class Tag>

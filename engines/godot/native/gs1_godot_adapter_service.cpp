@@ -29,6 +29,86 @@ std::filesystem::path globalize_res_path(std::string_view res_path)
     return std::filesystem::path {absolute_path.utf8().get_data()};
 }
 
+constexpr std::uint64_t k_phone_signature_offset = 14695981039346656037ULL;
+constexpr std::uint64_t k_phone_signature_prime = 1099511628211ULL;
+
+std::uint64_t mix_phone_signature(std::uint64_t signature, std::uint64_t value) noexcept
+{
+    return (signature ^ value) * k_phone_signature_prime;
+}
+
+std::uint64_t phone_task_snapshot_signature(const Gs1SiteStateView& site) noexcept
+{
+    std::uint64_t signature =
+        mix_phone_signature(
+            mix_phone_signature(k_phone_signature_offset, site.task_count),
+            site.site_id);
+    for (std::uint32_t index = 0; index < site.task_count; ++index)
+    {
+        const Gs1TaskView& task = site.tasks[index];
+        signature = mix_phone_signature(signature, task.task_instance_id);
+        signature = mix_phone_signature(signature, task.task_template_id);
+        signature = mix_phone_signature(signature, task.publisher_faction_id);
+        signature = mix_phone_signature(signature, task.current_progress_amount);
+        signature = mix_phone_signature(signature, task.target_amount);
+        signature = mix_phone_signature(signature, task.required_count);
+        signature = mix_phone_signature(signature, task.runtime_list_kind);
+        signature = mix_phone_signature(signature, task.reward_draft_option_count);
+    }
+    return signature;
+}
+
+std::uint64_t phone_listing_snapshot_signature(
+    const Gs1SiteStateView& site,
+    std::uint8_t listing_kind) noexcept
+{
+    std::uint64_t signature =
+        mix_phone_signature(k_phone_signature_offset, listing_kind);
+    for (std::uint32_t index = 0; index < site.phone_listing_count; ++index)
+    {
+        const Gs1PhoneListingView& listing = site.phone_listings[index];
+        if (listing.listing_kind != listing_kind)
+        {
+            continue;
+        }
+
+        signature = mix_phone_signature(signature, listing.item_or_unlockable_id);
+        signature = mix_phone_signature(signature, listing.listing_id);
+        signature = mix_phone_signature(signature, static_cast<std::uint64_t>(listing.price_cash_points));
+        signature = mix_phone_signature(signature, listing.quantity);
+        signature = mix_phone_signature(signature, listing.stock_refresh_generation);
+        signature = mix_phone_signature(signature, listing.occupied);
+        signature = mix_phone_signature(signature, listing.generated_from_stock);
+    }
+    return signature;
+}
+
+std::uint32_t count_task_list_entries(const Gs1SiteStateView& site, std::uint8_t runtime_list_kind) noexcept
+{
+    std::uint32_t count = 0U;
+    for (std::uint32_t index = 0; index < site.task_count; ++index)
+    {
+        if (site.tasks[index].runtime_list_kind == runtime_list_kind)
+        {
+            count += 1U;
+        }
+    }
+    return count;
+}
+
+std::uint32_t count_phone_list_entries(const Gs1SiteStateView& site, std::uint8_t listing_kind) noexcept
+{
+    std::uint32_t count = 0U;
+    for (std::uint32_t index = 0; index < site.phone_listing_count; ++index)
+    {
+        if (site.phone_listings[index].listing_kind == listing_kind)
+        {
+            count += 1U;
+        }
+    }
+    return count;
+}
+
 }
 
 void Gs1GodotAdapterService::fail_runtime_session(const char* fallback_error_message)
@@ -51,6 +131,102 @@ void Gs1GodotAdapterService::fail_runtime_session(const char* fallback_error_mes
 Gs1GodotAdapterService::~Gs1GodotAdapterService()
 {
     runtime_session_.stop();
+}
+
+void Gs1GodotAdapterService::reset_ui_session_state() noexcept
+{
+    ui_session_state_ = {};
+}
+
+void Gs1GodotAdapterService::bump_ui_session_revision(std::uint32_t dirty_flags)
+{
+    ui_session_state_.revision += 1U;
+
+    if (dirty_flags == GS1_PRESENTATION_DIRTY_NONE)
+    {
+        return;
+    }
+
+    Gs1EngineMessage message {};
+    message.type = GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY;
+    auto& payload = message.emplace_payload<Gs1EngineMessagePresentationDirtyData>();
+    payload.dirty_flags = dirty_flags;
+    payload.reserved0 = 0U;
+    payload.reserved1 = 0U;
+    dispatch_or_buffer_engine_message(std::move(message));
+}
+
+void Gs1GodotAdapterService::sync_phone_badges_from_view(const Gs1GameStateView& view)
+{
+    if (view.has_active_site == 0U || view.active_site == nullptr)
+    {
+        ui_session_state_.phone.notification_state_initialized = false;
+        ui_session_state_.phone.task_snapshot_signature = 0U;
+        ui_session_state_.phone.buy_snapshot_signature = 0U;
+        ui_session_state_.phone.sell_snapshot_signature = 0U;
+        ui_session_state_.phone.service_snapshot_signature = 0U;
+        ui_session_state_.phone.badge_flags = 0U;
+        return;
+    }
+
+    const Gs1SiteStateView& site = *view.active_site;
+    auto& phone = ui_session_state_.phone;
+    const std::uint64_t next_task_signature = phone_task_snapshot_signature(site);
+    const std::uint64_t next_buy_signature =
+        phone_listing_snapshot_signature(site, GS1_PHONE_LISTING_PRESENTATION_BUY_ITEM);
+    const std::uint64_t next_sell_signature =
+        phone_listing_snapshot_signature(site, GS1_PHONE_LISTING_PRESENTATION_SELL_ITEM);
+    const std::uint64_t next_service_signature =
+        phone_listing_snapshot_signature(site, GS1_PHONE_LISTING_PRESENTATION_PURCHASE_UNLOCKABLE) ^
+        phone_listing_snapshot_signature(site, GS1_PHONE_LISTING_PRESENTATION_HIRE_CONTRACTOR);
+
+    if (phone.notification_state_initialized)
+    {
+        std::uint32_t new_badge_flags = 0U;
+        if (phone.task_snapshot_signature != next_task_signature &&
+            !(phone.open && phone.active_section == GS1_PHONE_PANEL_SECTION_TASKS))
+        {
+            new_badge_flags |= GS1_PHONE_PANEL_FLAG_TASKS_BADGE;
+        }
+        if (phone.buy_snapshot_signature != next_buy_signature &&
+            !(phone.open && phone.active_section == GS1_PHONE_PANEL_SECTION_BUY))
+        {
+            new_badge_flags |= GS1_PHONE_PANEL_FLAG_BUY_BADGE;
+        }
+        if (phone.sell_snapshot_signature != next_sell_signature &&
+            !(phone.open && phone.active_section == GS1_PHONE_PANEL_SECTION_SELL))
+        {
+            new_badge_flags |= GS1_PHONE_PANEL_FLAG_SELL_BADGE;
+        }
+        if (phone.service_snapshot_signature != next_service_signature &&
+            !(phone.open && phone.active_section == GS1_PHONE_PANEL_SECTION_HIRE))
+        {
+            new_badge_flags |= GS1_PHONE_PANEL_FLAG_HIRE_BADGE;
+        }
+
+        if (new_badge_flags != 0U)
+        {
+            phone.badge_flags |= new_badge_flags | GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE;
+        }
+    }
+
+    phone.task_snapshot_signature = next_task_signature;
+    phone.buy_snapshot_signature = next_buy_signature;
+    phone.sell_snapshot_signature = next_sell_signature;
+    phone.service_snapshot_signature = next_service_signature;
+    phone.notification_state_initialized = true;
+}
+
+void Gs1GodotAdapterService::sync_ui_session_from_view(const Gs1GameStateView& view)
+{
+    ui_session_state_.app_state = view.app_state;
+    sync_phone_badges_from_view(view);
+
+    if (view.has_active_site == 0U || view.active_site == nullptr)
+    {
+        ui_session_state_.inventory.worker_pack_open = false;
+        return;
+    }
 }
 
 void Gs1GodotAdapterService::begin_engine_message_buffering()
@@ -271,6 +447,7 @@ void Gs1GodotAdapterService::ensure_runtime_started()
         globalize_res_path("res://gs1/godot_config"));
 
     notify_runtime_message_reset();
+    reset_ui_session_state();
     if (!runtime_session_.start(gameplay_dll_path_, project_config_root_, &adapter_config_))
     {
         last_error_ = runtime_session_.last_error();
@@ -378,6 +555,7 @@ void Gs1GodotAdapterService::notify_runtime_message_reset()
 {
     clear_buffered_engine_messages();
     phase2_pending_ = false;
+    reset_ui_session_state();
     for (IGs1GodotEngineMessageSubscriber* subscriber : known_subscribers_)
     {
         if (subscriber != nullptr)
@@ -413,6 +591,12 @@ void Gs1GodotAdapterService::dispatch_engine_message(Gs1EngineMessage&& message)
 
 bool Gs1GodotAdapterService::submit_ui_action(const Gs1UiAction& action)
 {
+    if (handle_local_ui_action(action))
+    {
+        last_error_.clear();
+        return true;
+    }
+
     Gs1HostEvent event {};
     event.type = GS1_HOST_EVENT_UI_ACTION;
     event.payload.ui_action.action = action;
@@ -509,6 +693,15 @@ bool Gs1GodotAdapterService::submit_site_action_cancel(std::int64_t action_id, s
 
 bool Gs1GodotAdapterService::submit_site_storage_view(std::int64_t storage_id, std::int64_t event_kind)
 {
+    if (storage_id > 0 &&
+        handle_local_storage_view(
+            static_cast<std::uint32_t>(storage_id),
+            static_cast<Gs1InventoryViewEventKind>(event_kind)))
+    {
+        last_error_.clear();
+        return true;
+    }
+
     Gs1HostEvent event {};
     event.type = GS1_HOST_EVENT_SITE_STORAGE_VIEW;
     event.payload.site_storage_view.storage_id = static_cast<std::uint32_t>(storage_id);
@@ -553,6 +746,144 @@ bool Gs1GodotAdapterService::submit_site_scene_ready()
     return true;
 }
 
+bool Gs1GodotAdapterService::handle_local_storage_view(
+    std::uint32_t storage_id,
+    Gs1InventoryViewEventKind event_kind)
+{
+    Gs1GameStateView view {};
+    if (!runtime_session_.get_game_state_view(view) ||
+        view.has_active_site == 0U ||
+        view.active_site == nullptr)
+    {
+        return false;
+    }
+
+    const Gs1SiteStateView& site = *view.active_site;
+    if (storage_id == site.worker_pack_storage_id)
+    {
+        if (event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT)
+        {
+            ui_session_state_.inventory.worker_pack_open = true;
+            ui_session_state_.phone.open = false;
+            ui_session_state_.regional_tech.open = false;
+            ui_session_state_.protection.selector_open = false;
+            ui_session_state_.protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
+            bump_ui_session_revision(GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD);
+            return true;
+        }
+
+        if (event_kind == GS1_INVENTORY_VIEW_EVENT_CLOSE)
+        {
+            ui_session_state_.inventory.worker_pack_open = false;
+            bump_ui_session_revision(GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool Gs1GodotAdapterService::handle_local_ui_action(const Gs1UiAction& action)
+{
+    switch (action.type)
+    {
+    case GS1_UI_ACTION_SET_PHONE_PANEL_SECTION:
+    {
+        if (action.arg0 > static_cast<std::uint64_t>(GS1_PHONE_PANEL_SECTION_CART))
+        {
+            return false;
+        }
+
+        auto& phone = ui_session_state_.phone;
+        const auto requested_section = static_cast<Gs1PhonePanelSection>(action.arg0);
+        const std::uint32_t clear_badge_mask = [&]() -> std::uint32_t
+        {
+            switch (requested_section)
+            {
+            case GS1_PHONE_PANEL_SECTION_TASKS:
+                return GS1_PHONE_PANEL_FLAG_TASKS_BADGE;
+            case GS1_PHONE_PANEL_SECTION_BUY:
+                return GS1_PHONE_PANEL_FLAG_BUY_BADGE;
+            case GS1_PHONE_PANEL_SECTION_SELL:
+                return GS1_PHONE_PANEL_FLAG_SELL_BADGE;
+            case GS1_PHONE_PANEL_SECTION_HIRE:
+                return GS1_PHONE_PANEL_FLAG_HIRE_BADGE;
+            default:
+                return 0U;
+            }
+        }();
+
+        phone.open = true;
+        phone.active_section = requested_section;
+        phone.badge_flags &= ~(GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE | clear_badge_mask);
+        ui_session_state_.inventory.worker_pack_open = false;
+        ui_session_state_.protection.selector_open = false;
+        ui_session_state_.protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
+        ui_session_state_.regional_tech.open = false;
+        bump_ui_session_revision(
+            GS1_PRESENTATION_DIRTY_PHONE |
+            GS1_PRESENTATION_DIRTY_HUD |
+            GS1_PRESENTATION_DIRTY_SITE);
+        return true;
+    }
+
+    case GS1_UI_ACTION_CLOSE_PHONE_PANEL:
+        ui_session_state_.phone.open = false;
+        ui_session_state_.phone.badge_flags &= ~GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE;
+        bump_ui_session_revision(GS1_PRESENTATION_DIRTY_PHONE | GS1_PRESENTATION_DIRTY_HUD);
+        return true;
+
+    case GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
+        ui_session_state_.regional_tech.open = true;
+        ui_session_state_.phone.open = false;
+        ui_session_state_.inventory.worker_pack_open = false;
+        ui_session_state_.protection.selector_open = false;
+        ui_session_state_.protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
+        bump_ui_session_revision(GS1_PRESENTATION_DIRTY_REGIONAL_MAP | GS1_PRESENTATION_DIRTY_SITE);
+        return true;
+
+    case GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
+        ui_session_state_.regional_tech.open = false;
+        bump_ui_session_revision(GS1_PRESENTATION_DIRTY_REGIONAL_MAP);
+        return true;
+
+    case GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB:
+        if (action.target_id == 0U)
+        {
+            return false;
+        }
+        ui_session_state_.regional_tech.open = true;
+        ui_session_state_.regional_tech.selected_faction_id = action.target_id;
+        bump_ui_session_revision(GS1_PRESENTATION_DIRTY_REGIONAL_MAP);
+        return true;
+
+    case GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR:
+        ui_session_state_.protection.selector_open = true;
+        ui_session_state_.protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
+        ui_session_state_.phone.open = false;
+        ui_session_state_.inventory.worker_pack_open = false;
+        ui_session_state_.regional_tech.open = false;
+        bump_ui_session_revision(GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD);
+        return true;
+
+    case GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI:
+        ui_session_state_.protection.selector_open = false;
+        ui_session_state_.protection.overlay_mode = GS1_SITE_PROTECTION_OVERLAY_NONE;
+        bump_ui_session_revision(GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD);
+        return true;
+
+    case GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
+        ui_session_state_.protection.selector_open = false;
+        ui_session_state_.protection.overlay_mode =
+            static_cast<Gs1SiteProtectionOverlayMode>(action.arg0);
+        bump_ui_session_revision(GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD);
+        return true;
+
+    default:
+        return false;
+    }
+}
+
 bool Gs1GodotAdapterService::get_game_state_view(Gs1GameStateView& out_view)
 {
     if (!runtime_session_.get_game_state_view(out_view))
@@ -561,6 +892,7 @@ bool Gs1GodotAdapterService::get_game_state_view(Gs1GameStateView& out_view)
         return false;
     }
 
+    sync_ui_session_from_view(out_view);
     last_error_.clear();
     return true;
 }

@@ -56,7 +56,7 @@ This file is a quick orientation guide for agents working in this repository.
 - `AUDIO_ASSET_PLAN.md`: Audio sourcing and integration plan covering recommended ambience, SFX, and prototype music libraries, budget paths, and host-side playback parameter guidance aligned with the current density-based desert soundscape direction.
 - `STATE_TAXONOMY_INVENTORY.md`: Concrete gameplay-state refactor inventory that classifies current runtime state as gameplay-authoritative, exported read-state, host-owned UI/presentation, transient queue/input data, or migration-only compatibility state.
 - `RUNTIME_MESSAGE_INVENTORY.md`: Runtime-message family inventory with keep/remove/replace decisions plus the intended minimal coarse refresh message set for the post-projection host boundary.
-- `refactor.md`: Gameplay state refactor plan for moving authoritative gameplay reads to the exported `Gs1GameStateView` ABI, removing gameplay-owned UI/presentation state and projection-state transfer, and now also tracking the currently incomplete tasks still remaining in that migration.
+- `refactor.md`: Gameplay state refactor plan for moving authoritative gameplay reads to the exported `Gs1GameStateView` ABI, removing gameplay-owned UI/presentation state and projection-state transfer, and now also tracking the currently incomplete tasks still remaining in that migration, including the completed phone-panel and regional tech-tree session-state ownership cleanup slices.
 - `MISSING_DEFINITION_DESCRIPTIONS.md`: Notes for definitions that still need descriptions.
 - `TASK_BOARD_OPEN_QUESTIONS.md`: Follow-up product-contract questions for task-board reward presentation, claim lifetime, reward delivery semantics, and prototype board scope.
 

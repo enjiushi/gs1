@@ -632,10 +632,10 @@ This section records the remaining work still not completed in the current repos
 
 ### Incomplete gameplay-side cleanup
 
-- [ ] Move gameplay-owned UI/session/presentation state out of gameplay runtime ownership.
-- [ ] Remove or replace `UiPresentationState`, `PresentationRuntimeState`, and `SiteProtectionPresentationState` as gameplay-owned long-lived runtime state.
+- [x] Move gameplay-owned UI/session/presentation state out of gameplay runtime ownership.
+- [x] Remove or replace `UiPresentationState`, `PresentationRuntimeState`, and `SiteProtectionPresentationState` as gameplay-owned long-lived runtime state.
 - [x] Move phone-panel open state, active section state, badge state, and other local UI/session state out of gameplay-owned `PhonePanelState` unless a field is truly gameplay-authoritative.
-- [ ] Remove gameplay-owned regional tech-tree open/close UI state and other host-reconstructable UI state from gameplay runtime ownership.
+- [x] Remove gameplay-owned regional tech-tree open/close UI state and other host-reconstructable UI state from gameplay runtime ownership.
 - [ ] Remove gameplay-owned presentation dirty tracking and last-emitted presentation caches that exist only to drive host refreshes.
 
 ### Incomplete exported-state boundary cleanup

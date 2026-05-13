@@ -75,7 +75,6 @@ private:
     godot::Label* phone_state_label_ {nullptr};
     godot::VBoxContainer* phone_listings_ {nullptr};
     SubmitUiActionFn submit_ui_action_ {};
-    std::optional<Gs1RuntimePhonePanelProjection> phone_panel_state_ {};
     std::vector<Gs1RuntimePhoneListingProjection> phone_listings_state_ {};
     std::unordered_map<std::uint32_t, std::size_t> pending_listing_indices_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> phone_listing_buttons_ {};

@@ -40,7 +40,6 @@ enum class SiteComponent : std::uint8_t
     TaskBoard,
     Modifier,
     Economy,
-    PhonePanel,
     Craft,
     Action,
     Counters,
@@ -111,8 +110,6 @@ template <typename... Components>
         return "Modifier";
     case SiteComponent::Economy:
         return "Economy";
-    case SiteComponent::PhonePanel:
-        return "PhonePanel";
     case SiteComponent::Craft:
         return "Craft";
     case SiteComponent::Action:
@@ -683,9 +680,6 @@ public:
 
     [[nodiscard]] const EconomyState& read_economy() const noexcept { return site_run_.economy; }
     [[nodiscard]] EconomyState& own_economy() noexcept { return site_run_.economy; }
-
-    [[nodiscard]] const PhonePanelState& read_phone_panel() const noexcept { return site_run_.phone_panel; }
-    [[nodiscard]] PhonePanelState& own_phone_panel() noexcept { return site_run_.phone_panel; }
 
     [[nodiscard]] const CraftState& read_craft() const noexcept { return site_run_.craft; }
     [[nodiscard]] CraftState& own_craft() noexcept { return site_run_.craft; }

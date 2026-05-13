@@ -91,8 +91,6 @@ private:
     SubmitStorageViewFn submit_storage_view_ {};
     SubmitContextRequestFn submit_context_request_ {};
     std::optional<Gs1RuntimeHudProjection> hud_ {};
-    std::optional<Gs1RuntimePhonePanelProjection> phone_panel_ {};
-    std::optional<Gs1RuntimeProtectionOverlayProjection> protection_overlay_ {};
     std::vector<Gs1RuntimeInventoryStorageProjection> inventory_storages_ {};
     int selected_tile_x_ {0};
     int selected_tile_y_ {0};

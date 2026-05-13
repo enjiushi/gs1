@@ -22,6 +22,45 @@ public:
     virtual void handle_runtime_message_reset() = 0;
 };
 
+struct Gs1GodotPhoneUiSessionState final
+{
+    bool open {false};
+    bool notification_state_initialized {false};
+    Gs1PhonePanelSection active_section {GS1_PHONE_PANEL_SECTION_HOME};
+    std::uint32_t badge_flags {0U};
+    std::uint64_t task_snapshot_signature {0U};
+    std::uint64_t buy_snapshot_signature {0U};
+    std::uint64_t sell_snapshot_signature {0U};
+    std::uint64_t service_snapshot_signature {0U};
+};
+
+struct Gs1GodotRegionalTechUiSessionState final
+{
+    bool open {false};
+    std::uint32_t selected_faction_id {1U};
+};
+
+struct Gs1GodotProtectionUiSessionState final
+{
+    bool selector_open {false};
+    Gs1SiteProtectionOverlayMode overlay_mode {GS1_SITE_PROTECTION_OVERLAY_NONE};
+};
+
+struct Gs1GodotInventoryUiSessionState final
+{
+    bool worker_pack_open {false};
+};
+
+struct Gs1GodotUiSessionState final
+{
+    Gs1GodotPhoneUiSessionState phone {};
+    Gs1GodotRegionalTechUiSessionState regional_tech {};
+    Gs1GodotProtectionUiSessionState protection {};
+    Gs1GodotInventoryUiSessionState inventory {};
+    Gs1AppState app_state {GS1_APP_STATE_BOOT};
+    std::uint64_t revision {0U};
+};
+
 class Gs1GodotAdapterService final
 {
 public:
@@ -62,6 +101,10 @@ public:
     [[nodiscard]] bool submit_site_scene_ready();
     [[nodiscard]] bool get_game_state_view(Gs1GameStateView& out_view);
     [[nodiscard]] bool query_site_tile_view(std::uint32_t tile_index, Gs1SiteTileView& out_tile);
+    [[nodiscard]] const Gs1GodotUiSessionState& ui_session_state() const noexcept
+    {
+        return ui_session_state_;
+    }
 
     [[nodiscard]] const std::string& last_error() const noexcept { return last_error_; }
     [[nodiscard]] bool is_running() const noexcept { return runtime_session_.is_running(); }
@@ -78,6 +121,14 @@ private:
     void dispatch_engine_message(Gs1EngineMessage&& message);
     void dispatch_or_buffer_engine_message(Gs1EngineMessage&& message);
     [[nodiscard]] bool submit_ui_action(const Gs1UiAction& action);
+    [[nodiscard]] bool handle_local_ui_action(const Gs1UiAction& action);
+    [[nodiscard]] bool handle_local_storage_view(
+        std::uint32_t storage_id,
+        Gs1InventoryViewEventKind event_kind);
+    void reset_ui_session_state() noexcept;
+    void bump_ui_session_revision(std::uint32_t dirty_flags);
+    void sync_phone_badges_from_view(const Gs1GameStateView& view);
+    void sync_ui_session_from_view(const Gs1GameStateView& view);
     [[nodiscard]] bool queue_debug_http_command(std::string_view path, const std::string& body, std::string& out_error);
     void refresh_gameplay_dll_path();
     void refresh_project_config_root();
@@ -101,5 +152,6 @@ private:
     std::mutex pending_debug_http_commands_mutex_ {};
     std::vector<Gs1GodotDebugHttpCommand> pending_debug_http_commands_ {};
     std::vector<Gs1EngineMessage> buffered_engine_messages_ {};
+    Gs1GodotUiSessionState ui_session_state_ {};
     std::string last_error_ {};
 };

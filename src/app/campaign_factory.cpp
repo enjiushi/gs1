@@ -65,8 +65,6 @@ CampaignState CampaignFactory::create_prototype_campaign(
     campaign.campaign_days_total = campaign_days;
     campaign.campaign_days_remaining = campaign_days;
     campaign.app_state = GS1_APP_STATE_REGIONAL_MAP;
-    campaign.regional_map_state.tech_tree_open = false;
-    campaign.regional_map_state.selected_tech_tree_faction_id = FactionId {k_faction_village_committee};
     campaign.faction_progress.reserve(k_prototype_faction_defs.size());
     for (const auto& faction_def : k_prototype_faction_defs)
     {

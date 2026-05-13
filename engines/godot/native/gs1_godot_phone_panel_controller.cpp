@@ -192,7 +192,6 @@ bool Gs1GodotPhonePanelController::handles_engine_message(Gs1EngineMessageType t
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
     case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
     case GS1_ENGINE_MESSAGE_SET_APP_STATE:
         return true;
@@ -205,9 +204,6 @@ void Gs1GodotPhonePanelController::handle_engine_message(const Gs1EngineMessage&
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
-        phone_panel_state_ = message.payload_as<Gs1EngineMessagePhonePanelData>();
-        break;
     case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
     {
         const auto& payload = message.payload_as<Gs1EngineMessagePresentationDirtyData>();
@@ -230,7 +226,6 @@ void Gs1GodotPhonePanelController::handle_engine_message(const Gs1EngineMessage&
 
 void Gs1GodotPhonePanelController::handle_runtime_message_reset()
 {
-    phone_panel_state_.reset();
     phone_listings_state_.clear();
     pending_listing_indices_.clear();
     prune_button_registry(phone_listing_buttons_, {});
@@ -280,8 +275,9 @@ void Gs1GodotPhonePanelController::refresh_from_game_state_view()
 
 void Gs1GodotPhonePanelController::apply_panel_visibility()
 {
-    const bool panel_visible = phone_panel_state_.has_value() &&
-        (phone_panel_state_->flags & GS1_PHONE_PANEL_FLAG_OPEN) != 0U;
+    const bool panel_visible =
+        adapter_service_ != nullptr &&
+        adapter_service_->ui_session_state().phone.open;
     if (panel_ != nullptr)
     {
         panel_->set_visible(panel_visible);
@@ -295,15 +291,39 @@ void Gs1GodotPhonePanelController::update_phone_state_label()
         return;
     }
 
-    if (phone_panel_state_.has_value())
+    if (adapter_service_ != nullptr)
     {
+        const auto& phone_state = adapter_service_->ui_session_state().phone;
+        std::uint32_t buy_count = 0U;
+        std::uint32_t sell_count = 0U;
+        std::uint32_t service_count = 0U;
+        std::uint32_t cart_count = 0U;
+        for (const auto& listing : phone_listings_state_)
+        {
+            switch (listing.listing_kind)
+            {
+            case GS1_PHONE_LISTING_PRESENTATION_BUY_ITEM:
+                buy_count += 1U;
+                cart_count += listing.cart_quantity;
+                break;
+            case GS1_PHONE_LISTING_PRESENTATION_SELL_ITEM:
+                sell_count += 1U;
+                break;
+            case GS1_PHONE_LISTING_PRESENTATION_HIRE_CONTRACTOR:
+            case GS1_PHONE_LISTING_PRESENTATION_PURCHASE_UNLOCKABLE:
+                service_count += 1U;
+                break;
+            default:
+                break;
+            }
+        }
         phone_state_label_->set_text(vformat(
             "Phone Section: %d  Buy %d  Sell %d  Services %d  Cart %d",
-            static_cast<int>(phone_panel_state_->active_section),
-            static_cast<int>(phone_panel_state_->buy_listing_count),
-            static_cast<int>(phone_panel_state_->sell_listing_count),
-            static_cast<int>(phone_panel_state_->service_listing_count),
-            static_cast<int>(phone_panel_state_->cart_item_count)));
+            static_cast<int>(phone_state.active_section),
+            static_cast<int>(buy_count),
+            static_cast<int>(sell_count),
+            static_cast<int>(service_count),
+            static_cast<int>(cart_count)));
     }
     else
     {

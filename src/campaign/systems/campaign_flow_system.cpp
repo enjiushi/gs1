@@ -138,9 +138,6 @@ GameMessageSubscriptionSpan CampaignFlowSystem::subscribed_game_messages() const
         GameMessageType::StartNewCampaign,
         GameMessageType::SelectDeploymentSite,
         GameMessageType::ClearDeploymentSiteSelection,
-        GameMessageType::OpenRegionalMapTechTree,
-        GameMessageType::CloseRegionalMapTechTree,
-        GameMessageType::SelectRegionalMapTechTreeFaction,
         GameMessageType::StartSiteAttempt,
         GameMessageType::ReturnToRegionalMap,
         GameMessageType::SiteAttemptEnded,
@@ -265,40 +262,6 @@ Gs1Status process_campaign_flow_message(
         return GS1_STATUS_OK;
     }
 
-    case GameMessageType::OpenRegionalMapTechTree:
-    {
-        if (!campaign.has_value() || !app_state_supports_technology_tree(app_state))
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        campaign->regional_map_state.tech_tree_open = true;
-        return GS1_STATUS_OK;
-    }
-
-    case GameMessageType::CloseRegionalMapTechTree:
-    {
-        if (!campaign.has_value())
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        campaign->regional_map_state.tech_tree_open = false;
-        return GS1_STATUS_OK;
-    }
-
-    case GameMessageType::SelectRegionalMapTechTreeFaction:
-    {
-        if (!campaign.has_value() || !app_state_supports_technology_tree(app_state))
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        const auto& payload = message.payload_as<SelectRegionalMapTechTreeFactionMessage>();
-        campaign->regional_map_state.selected_tech_tree_faction_id = FactionId {payload.faction_id};
-        return GS1_STATUS_OK;
-    }
-
     case GameMessageType::StartSiteAttempt:
     {
         if (!campaign.has_value())
@@ -319,7 +282,6 @@ Gs1Status process_campaign_flow_message(
         }
 
         site->attempt_count += 1U;
-        campaign->regional_map_state.tech_tree_open = false;
         active_site_run = SiteRunFactory::create_site_run(*campaign, *site);
         campaign->active_site_id = SiteId {payload.site_id};
         app_state = GS1_APP_STATE_SITE_LOADING;
@@ -346,7 +308,6 @@ Gs1Status process_campaign_flow_message(
 
         active_site_run.reset();
         campaign->active_site_id.reset();
-        campaign->regional_map_state.tech_tree_open = false;
         app_state = GS1_APP_STATE_REGIONAL_MAP;
         campaign->app_state = app_state;
         rebuild_regional_map_caches(*campaign);
@@ -412,7 +373,6 @@ Gs1Status process_campaign_flow_message(
             }
         }
 
-        campaign->regional_map_state.tech_tree_open = false;
         app_state = GS1_APP_STATE_SITE_RESULT;
         campaign->app_state = app_state;
         rebuild_regional_map_caches(*campaign);

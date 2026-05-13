@@ -18,6 +18,7 @@ void Gs1GodotRegionalMapUiController::_bind_methods()
 void Gs1GodotRegionalMapUiController::_ready()
 {
     cache_adapter_service();
+    refresh_from_game_state_view();
     apply_surface_visibility();
 }
 
@@ -67,23 +68,16 @@ Control* Gs1GodotRegionalMapUiController::resolve_ui_root()
 
 bool Gs1GodotRegionalMapUiController::handles_engine_message(Gs1EngineMessageType type) const noexcept
 {
-    return type == GS1_ENGINE_MESSAGE_SET_UI_SURFACE_VISIBILITY;
+    return type == GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY ||
+        type == GS1_ENGINE_MESSAGE_SET_APP_STATE;
 }
 
 void Gs1GodotRegionalMapUiController::handle_engine_message(const Gs1EngineMessage& message)
 {
-    if (message.type == GS1_ENGINE_MESSAGE_SET_UI_SURFACE_VISIBILITY)
+    if (message.type == GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY ||
+        message.type == GS1_ENGINE_MESSAGE_SET_APP_STATE)
     {
-        const auto& payload = message.payload_as<Gs1EngineMessageUiSurfaceVisibilityData>();
-        const bool visible = payload.visible != 0U;
-        if (payload.surface_id == GS1_UI_SURFACE_REGIONAL_SELECTION_PANEL)
-        {
-            selection_visible_ = visible;
-        }
-        else if (payload.surface_id == GS1_UI_SURFACE_REGIONAL_TECH_TREE_OVERLAY)
-        {
-            tech_tree_visible_ = visible;
-        }
+        refresh_from_game_state_view();
     }
 
     apply_surface_visibility();
@@ -92,8 +86,27 @@ void Gs1GodotRegionalMapUiController::handle_engine_message(const Gs1EngineMessa
 void Gs1GodotRegionalMapUiController::handle_runtime_message_reset()
 {
     selection_visible_ = false;
-    tech_tree_visible_ = false;
     apply_surface_visibility();
+}
+
+void Gs1GodotRegionalMapUiController::refresh_from_game_state_view()
+{
+    if (adapter_service_ == nullptr)
+    {
+        selection_visible_ = false;
+        return;
+    }
+
+    Gs1GameStateView view {};
+    if (!adapter_service_->get_game_state_view(view) ||
+        view.has_campaign == 0U ||
+        view.campaign == nullptr)
+    {
+        selection_visible_ = false;
+        return;
+    }
+
+    selection_visible_ = view.campaign->selected_site_id > 0;
 }
 
 void Gs1GodotRegionalMapUiController::apply_surface_visibility()
@@ -114,7 +127,10 @@ void Gs1GodotRegionalMapUiController::apply_surface_visibility()
     }
     if (Control* overlay = Object::cast_to<Control>(ui_root->find_child("TechOverlay", true, false)))
     {
-        overlay->set_visible(tech_tree_visible_);
+        const bool tech_tree_visible =
+            adapter_service_ != nullptr &&
+            adapter_service_->ui_session_state().regional_tech.open;
+        overlay->set_visible(tech_tree_visible);
     }
 }
 

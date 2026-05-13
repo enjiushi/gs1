@@ -114,10 +114,8 @@ set(GS1_CONTENT_RUNTIME_SOURCES
     src/content/prototype_content.cpp)
 
 set(GS1_GAMEPLAY_CORE_SOURCES
-    src/app/game_presentation_coordinator.cpp
     src/app/campaign_factory.cpp
     src/app/site_run_factory.cpp
-    src/campaign/systems/campaign_presentation_system.cpp
     src/campaign/systems/campaign_flow_system.cpp
     src/campaign/systems/campaign_time_system.cpp
     src/campaign/systems/faction_reputation_system.cpp
@@ -137,13 +135,10 @@ set(GS1_GAMEPLAY_CORE_SOURCES
     src/site/systems/craft_system.cpp
     src/site/systems/local_weather_resolve_system.cpp
     src/site/systems/modifier_system.cpp
-    src/site/systems/phone_panel_system.cpp
     src/site/systems/plant_weather_contribution_system.cpp
     src/site/systems/placement_validation_system.cpp
     src/site/systems/site_completion_system.cpp
     src/site/systems/site_flow_system.cpp
-    src/site/systems/site_presentation_system.cpp
-    src/site/systems/site_protection_presentation_system.cpp
     src/site/systems/site_time_system.cpp
     src/site/systems/task_board_system.cpp
     src/site/systems/weather_event_system.cpp

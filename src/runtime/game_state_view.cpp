@@ -364,7 +364,7 @@ void rebuild_site_view(
             {0U, 0U, 0U, 0U, 0U, 0U, 0U}});
     }
 
-    for (const auto& listing : site_run.phone_panel.listings)
+    for (const auto& listing : site_run.economy.available_phone_listings)
     {
         cache.phone_listings.push_back(Gs1PhoneListingView {
             listing.listing_id,
