@@ -5,6 +5,7 @@
 #include "campaign/systems/campaign_time_system.h"
 #include "messages/game_message.h"
 #include "runtime/game_state.h"
+#include "runtime/game_state_view.h"
 #include "runtime/runtime_clock.h"
 #include "runtime/system_interface.h"
 #include "gs1/status.h"
@@ -33,6 +34,8 @@ public:
     [[nodiscard]] Gs1Status run_phase1(const Gs1Phase1Request& request, Gs1Phase1Result& out_result);
     [[nodiscard]] Gs1Status run_phase2(const Gs1Phase2Request& request, Gs1Phase2Result& out_result);
     [[nodiscard]] Gs1Status pop_runtime_message(Gs1RuntimeMessage& out_message);
+    [[nodiscard]] Gs1Status get_game_state_view(Gs1GameStateView& out_view);
+    [[nodiscard]] Gs1Status query_site_tile_view(std::uint32_t tile_index, Gs1SiteTileView& out_tile) const;
     [[nodiscard]] Gs1Status get_profiling_snapshot(Gs1RuntimeProfilingSnapshot& out_snapshot) const noexcept;
     void reset_profiling() noexcept;
     [[nodiscard]] Gs1Status set_profiled_system_enabled(
@@ -42,6 +45,11 @@ public:
 
     [[nodiscard]] GameState& state() noexcept { return state_; }
     [[nodiscard]] const GameState& state() const noexcept { return state_; }
+    [[nodiscard]] RuntimePresentationState& presentation_state() noexcept { return presentation_state_; }
+    [[nodiscard]] const RuntimePresentationState& presentation_state() const noexcept
+    {
+        return presentation_state_;
+    }
     [[nodiscard]] GameMessageQueue& message_queue() noexcept { return state_.message_queue; }
     [[nodiscard]] const GameMessageQueue& message_queue() const noexcept { return state_.message_queue; }
     [[nodiscard]] std::deque<Gs1RuntimeMessage>& runtime_messages() noexcept { return state_.runtime_messages; }
@@ -85,6 +93,8 @@ private:
     Gs1RuntimeCreateDesc create_desc_ {};
     std::string adapter_config_json_utf8_ {};
     GameState state_ {};
+    RuntimePresentationState presentation_state_ {};
+    RuntimeGameStateViewCache state_view_cache_ {};
     std::deque<Gs1HostMessage> host_messages_ {};
     std::vector<std::unique_ptr<IRuntimeSystem>> systems_ {};
     std::vector<IRuntimeSystem*> fixed_step_systems_ {};

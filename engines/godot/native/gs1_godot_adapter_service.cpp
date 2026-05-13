@@ -348,8 +348,7 @@ bool Gs1GodotAdapterService::drain_debug_http_commands()
 
 bool Gs1GodotAdapterService::drain_projection_messages()
 {
-    const Gs1RuntimeApi* api = runtime_session_.api();
-    if (api == nullptr || api->pop_engine_message == nullptr || runtime_session_.runtime() == nullptr)
+    if (!runtime_session_.is_running())
     {
         last_error_ = "Runtime session is not ready to drain engine messages.";
         return false;
@@ -358,14 +357,14 @@ bool Gs1GodotAdapterService::drain_projection_messages()
     Gs1EngineMessage message {};
     while (true)
     {
-        const Gs1Status status = api->pop_engine_message(runtime_session_.runtime(), &message);
-        if (status == GS1_STATUS_BUFFER_EMPTY)
+        if (!runtime_session_.pop_engine_message(message))
         {
-            break;
-        }
-        if (status != GS1_STATUS_OK)
-        {
-            last_error_ = "gs1_pop_engine_message failed with status " + std::to_string(static_cast<unsigned>(status));
+            const std::string& session_error = runtime_session_.last_error();
+            if (session_error.empty())
+            {
+                break;
+            }
+            last_error_ = session_error;
             return false;
         }
 
@@ -551,6 +550,30 @@ bool Gs1GodotAdapterService::submit_site_scene_ready()
         last_error_ = runtime_session_.last_error();
         return false;
     }
+    return true;
+}
+
+bool Gs1GodotAdapterService::get_game_state_view(Gs1GameStateView& out_view)
+{
+    if (!runtime_session_.get_game_state_view(out_view))
+    {
+        last_error_ = runtime_session_.last_error();
+        return false;
+    }
+
+    last_error_.clear();
+    return true;
+}
+
+bool Gs1GodotAdapterService::query_site_tile_view(std::uint32_t tile_index, Gs1SiteTileView& out_tile)
+{
+    if (!runtime_session_.query_site_tile_view(tile_index, out_tile))
+    {
+        last_error_ = runtime_session_.last_error();
+        return false;
+    }
+
+    last_error_.clear();
     return true;
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gs1/export.h"
+#include "gs1/state_view.h"
 #include "gs1/status.h"
 #include "gs1/types.h"
 
@@ -36,6 +37,15 @@ GS1_API Gs1Status gs1_run_phase2(
 GS1_API Gs1Status gs1_pop_runtime_message(
     Gs1RuntimeHandle* runtime,
     Gs1RuntimeMessage* out_message) GS1_NOEXCEPT;
+
+GS1_API Gs1Status gs1_get_game_state_view(
+    Gs1RuntimeHandle* runtime,
+    Gs1GameStateView* out_view) GS1_NOEXCEPT;
+
+GS1_API Gs1Status gs1_query_site_tile_view(
+    Gs1RuntimeHandle* runtime,
+    std::uint32_t tile_index,
+    Gs1SiteTileView* out_tile) GS1_NOEXCEPT;
 
 GS1_API Gs1Status gs1_get_runtime_profiling_snapshot(
     Gs1RuntimeHandle* runtime,

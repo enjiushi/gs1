@@ -151,6 +151,7 @@ set(GS1_GAMEPLAY_CORE_SOURCES
     src/site/craft_logic.cpp
     src/site/inventory_storage.cpp
     src/site/site_world.cpp
+    src/runtime/game_state_view.cpp
     src/runtime/game_runtime.cpp)
 
 add_library(gs1_gameplay_core STATIC

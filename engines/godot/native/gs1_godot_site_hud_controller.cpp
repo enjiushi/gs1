@@ -150,6 +150,7 @@ void Gs1GodotSiteHudController::cache_ui_references(Control& owner)
     bind_hud_button(craft_button_, owner, "HudCraftButton", controller_bits, &dispatch_craft_pressed);
     bind_hud_button(protection_button_, owner, "HudProtectionButton", controller_bits, &dispatch_protection_pressed);
     bind_hud_button(tech_button_, owner, "HudTechButton", controller_bits, &dispatch_tech_pressed);
+    refresh_from_game_state_view();
     rebuild_hud();
 }
 
@@ -295,9 +296,8 @@ bool Gs1GodotSiteHudController::handles_engine_message(Gs1EngineMessageType type
     case GS1_ENGINE_MESSAGE_HUD_STATE:
     case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
     case GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE:
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_HUD_SNAPSHOT:
-    case GS1_ENGINE_MESSAGE_SITE_HUD_STORAGE_UPSERT:
-    case GS1_ENGINE_MESSAGE_END_SITE_HUD_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
+    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
         return true;
     default:
         return false;
@@ -317,31 +317,18 @@ void Gs1GodotSiteHudController::handle_engine_message(const Gs1EngineMessage& me
     case GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE:
         protection_overlay_ = message.payload_as<Gs1EngineMessageSiteProtectionOverlayData>();
         break;
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_HUD_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
     {
-        const auto& payload = message.payload_as<Gs1EngineMessageSiteSnapshotData>();
-        if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
+        const auto& payload = message.payload_as<Gs1EngineMessagePresentationDirtyData>();
+        if ((payload.dirty_flags & (GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD)) != 0U)
         {
-            inventory_storages_.clear();
+            refresh_from_game_state_view();
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_SITE_HUD_STORAGE_UPSERT:
-    {
-        const auto projection = message.payload_as<Gs1EngineMessageInventoryStorageData>();
-        const auto found = std::find_if(inventory_storages_.begin(), inventory_storages_.end(), [&](const auto& existing) {
-            return existing.storage_id == projection.storage_id;
-        });
-        if (found != inventory_storages_.end())
-        {
-            *found = projection;
-        }
-        else
-        {
-            inventory_storages_.push_back(projection);
-        }
+    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
+        refresh_from_game_state_view();
         break;
-    }
     default:
         break;
     }
@@ -355,6 +342,39 @@ void Gs1GodotSiteHudController::handle_runtime_message_reset()
     protection_overlay_.reset();
     inventory_storages_.clear();
     rebuild_hud();
+}
+
+void Gs1GodotSiteHudController::refresh_from_game_state_view()
+{
+    if (adapter_service_ == nullptr)
+    {
+        return;
+    }
+
+    Gs1GameStateView view {};
+    if (!adapter_service_->get_game_state_view(view) ||
+        view.has_active_site == 0U ||
+        view.active_site == nullptr)
+    {
+        inventory_storages_.clear();
+        return;
+    }
+
+    const Gs1SiteStateView& site = *view.active_site;
+    inventory_storages_.clear();
+    inventory_storages_.reserve(site.storage_count);
+    for (std::uint32_t index = 0; index < site.storage_count; ++index)
+    {
+        const Gs1InventoryStorageView& storage_view = site.storages[index];
+        Gs1RuntimeInventoryStorageProjection storage {};
+        storage.storage_id = storage_view.storage_id;
+        storage.slot_count = static_cast<std::uint16_t>(std::min<std::uint32_t>(storage_view.slot_count, 65535U));
+        storage.tile_x = static_cast<std::int16_t>(storage_view.tile_x);
+        storage.tile_y = static_cast<std::int16_t>(storage_view.tile_y);
+        storage.container_kind = storage_view.container_kind;
+        storage.flags = static_cast<std::uint8_t>(storage_view.flags & 0xFFU);
+        inventory_storages_.push_back(storage);
+    }
 }
 
 void Gs1GodotSiteHudController::rebuild_hud()

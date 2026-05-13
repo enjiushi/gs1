@@ -35,6 +35,11 @@ public:
     [[nodiscard]] bool run_phase2(Gs1Phase2Result& out_phase2);
     [[nodiscard]] bool update(double delta_seconds, Gs1Phase1Result& out_phase1, Gs1Phase2Result& out_phase2);
     [[nodiscard]] bool submit_host_messages(const Gs1HostMessage* messages, std::uint32_t message_count);
+    [[nodiscard]] bool submit_host_events(const Gs1HostEvent* messages, std::uint32_t message_count);
+    [[nodiscard]] bool pop_runtime_message(Gs1RuntimeMessage& out_message);
+    [[nodiscard]] bool pop_engine_message(Gs1EngineMessage& out_message);
+    [[nodiscard]] bool get_game_state_view(Gs1GameStateView& out_view);
+    [[nodiscard]] bool query_site_tile_view(std::uint32_t tile_index, Gs1SiteTileView& out_tile);
 
 private:
     RuntimeDllLoader loader_ {};

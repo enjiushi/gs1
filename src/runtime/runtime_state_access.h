@@ -1,6 +1,7 @@
 #pragma once
 
 #include "runtime/game_state.h"
+#include "runtime/game_state_view.h"
 #include "gs1/status.h"
 
 #include <concepts>
@@ -108,6 +109,11 @@ public:
     [[nodiscard]] const GameRuntime* runtime() const noexcept { return runtime_; }
     [[nodiscard]] GameState* owned_state() noexcept { return owned_state_; }
     [[nodiscard]] const GameState* owned_state() const noexcept { return owned_state_; }
+    [[nodiscard]] RuntimePresentationState* presentation_state() noexcept { return presentation_state_; }
+    [[nodiscard]] const RuntimePresentationState* presentation_state() const noexcept
+    {
+        return presentation_state_;
+    }
     [[nodiscard]] GameMessageQueue& game_message_queue() noexcept { return *game_messages_; }
     [[nodiscard]] const GameMessageQueue& game_message_queue() const noexcept { return *game_messages_; }
     [[nodiscard]] std::deque<Gs1RuntimeMessage>& runtime_message_queue() noexcept
@@ -130,6 +136,7 @@ private:
 
     GameRuntime* runtime_ {nullptr};
     GameState* owned_state_ {nullptr};
+    RuntimePresentationState* presentation_state_ {nullptr};
     Gs1AppState* app_state_ {nullptr};
     std::optional<CampaignState>* campaign_ {nullptr};
     std::optional<SiteRunState>* active_site_run_ {nullptr};
@@ -195,19 +202,19 @@ template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeSiteProtectionPresentationTag>(
     RuntimeInvocation& invocation)
 {
-    return (invocation.owned_state_->site_protection_presentation);
+    return (invocation.presentation_state_->site_protection);
 }
 
 template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeUiPresentationTag>(RuntimeInvocation& invocation)
 {
-    return (invocation.owned_state_->ui_presentation);
+    return (invocation.presentation_state_->ui_presentation);
 }
 
 template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimePresentationRuntimeTag>(RuntimeInvocation& invocation)
 {
-    return (invocation.owned_state_->presentation_runtime);
+    return (invocation.presentation_state_->presentation_runtime);
 }
 
 template <>
@@ -244,21 +251,21 @@ template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeSiteProtectionPresentationTag>(
     const RuntimeInvocation& invocation)
 {
-    return (invocation.owned_state_->site_protection_presentation);
+    return (invocation.presentation_state_->site_protection);
 }
 
 template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeUiPresentationTag>(
     const RuntimeInvocation& invocation)
 {
-    return (invocation.owned_state_->ui_presentation);
+    return (invocation.presentation_state_->ui_presentation);
 }
 
 template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimePresentationRuntimeTag>(
     const RuntimeInvocation& invocation)
 {
-    return (invocation.owned_state_->presentation_runtime);
+    return (invocation.presentation_state_->presentation_runtime);
 }
 
 template <class System>

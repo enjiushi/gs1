@@ -54,6 +54,7 @@ protected:
 private:
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
+    void refresh_from_game_state_view();
     void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
     void submit_storage_view(int storage_id, int event_kind);
     void submit_context_request(int tile_x, int tile_y, int flags);

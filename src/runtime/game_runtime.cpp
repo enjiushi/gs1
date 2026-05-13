@@ -290,6 +290,7 @@ void queue_site_ready_runtime_messages(GameState& state)
 RuntimeInvocation::RuntimeInvocation(GameRuntime& runtime) noexcept
     : runtime_(&runtime)
     , owned_state_(&runtime.state_)
+    , presentation_state_(&runtime.presentation_state_)
     , app_state_(&runtime.state_.app_state)
     , campaign_(&runtime.state_.campaign)
     , active_site_run_(&runtime.state_.active_site_run)
@@ -301,6 +302,7 @@ RuntimeInvocation::RuntimeInvocation(GameRuntime& runtime) noexcept
 
 RuntimeInvocation::RuntimeInvocation(GameState& state) noexcept
     : owned_state_(&state)
+    , presentation_state_(nullptr)
     , app_state_(&state.app_state)
     , campaign_(&state.campaign)
     , active_site_run_(&state.active_site_run)
@@ -317,6 +319,7 @@ RuntimeInvocation::RuntimeInvocation(
     float move_direction_z,
     bool move_direction_present) noexcept
     : owned_state_(&state)
+    , presentation_state_(nullptr)
     , app_state_(&state.app_state)
     , campaign_(&state.campaign)
     , active_site_run_(&state.active_site_run)
@@ -342,7 +345,8 @@ RuntimeInvocation::RuntimeInvocation(
         float move_direction_y,
         float move_direction_z,
         bool move_direction_present) noexcept
-    : app_state_(&app_state)
+    : presentation_state_(nullptr)
+    , app_state_(&app_state)
     , campaign_(&campaign)
     , active_site_run_(&active_site_run)
     , runtime_messages_(&runtime_messages)
@@ -705,9 +709,9 @@ Gs1Status GameRuntime::run_phase2(const Gs1Phase2Request& request, Gs1Phase2Resu
             state_.app_state,
             state_.campaign,
             state_.active_site_run,
-            state_.site_protection_presentation,
-            state_.ui_presentation,
-            state_.presentation_runtime,
+            presentation_state_.site_protection,
+            presentation_state_.ui_presentation,
+            presentation_state_.presentation_runtime,
             state_.message_queue,
             state_.runtime_messages,
             state_.fixed_step_seconds};
@@ -732,6 +736,30 @@ Gs1Status GameRuntime::pop_runtime_message(Gs1RuntimeMessage& out_message)
     return GS1_STATUS_OK;
 }
 
+Gs1Status GameRuntime::get_game_state_view(Gs1GameStateView& out_view)
+{
+    if (out_view.struct_size != sizeof(Gs1GameStateView))
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    rebuild_game_state_view_cache(*this, state_view_cache_);
+    out_view = state_view_cache_.root;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status GameRuntime::query_site_tile_view(std::uint32_t tile_index, Gs1SiteTileView& out_tile) const
+{
+    if (!state_.active_site_run.has_value())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return build_site_tile_view(*state_.active_site_run, tile_index, out_tile)
+        ? GS1_STATUS_OK
+        : GS1_STATUS_INVALID_ARGUMENT;
+}
+
 Gs1Status GameRuntime::handle_message(const GameMessage& message)
 {
     state_.message_queue.push_back(message);
@@ -744,9 +772,9 @@ void GameRuntime::flush_site_presentation_if_dirty()
         state_.app_state,
         state_.campaign,
         state_.active_site_run,
-        state_.site_protection_presentation,
-        state_.ui_presentation,
-        state_.presentation_runtime,
+        presentation_state_.site_protection,
+        presentation_state_.ui_presentation,
+        presentation_state_.presentation_runtime,
         state_.message_queue,
         state_.runtime_messages,
         state_.fixed_step_seconds};

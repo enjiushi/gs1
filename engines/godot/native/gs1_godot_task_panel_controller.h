@@ -60,6 +60,7 @@ private:
 
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
+    void refresh_from_game_state_view();
     void update_task_summary();
     void reconcile_task_rows();
     void reconcile_modifier_rows();

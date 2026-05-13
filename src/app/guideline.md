@@ -12,7 +12,7 @@ Application-facing glue that assembles campaign/site state and exposes the gamep
 - `campaign_factory.h`: Factory declarations for creating and wiring campaign state.
 - `campaign_factory.cpp`: Campaign factory implementation and initialization wiring, including derived 8-neighbor regional-map adjacency from authored site tile coordinates.
 - `game_presentation_coordinator.h`: App-layer presentation facade declaration that is now trimmed down to the remaining low-level site projection emitters and dirty-flush helpers still used by runtime-owned presentation systems.
-- `game_presentation_coordinator.cpp`: App-layer facade implementation that now keeps only the low-level site projection publishers plus dirty-flush helpers while campaign/regional and site follow-up behavior moves through runtime systems.
+- `game_presentation_coordinator.cpp`: App-layer facade implementation that now keeps only the low-level site projection publishers plus dirty-flush helpers while campaign/regional and site follow-up behavior moves through runtime systems, with the Godot-facing site inventory/phone/task/HUD controllers now refreshed through coarse `PRESENTATION_DIRTY` signals plus the exported read-only gameplay-state view instead of dedicated per-panel snapshot streams.
 - `game_api.cpp`: Exported C API implementation that bridges hosts into the runtime/app layer.
 - `game_app.h`: Top-level gameplay app container that owns runtime-facing state.
 - `game_bootstrap.h`: Startup/bootstrap helpers for constructing the app and initial scene state.

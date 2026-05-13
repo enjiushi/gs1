@@ -173,11 +173,9 @@ bool Gs1GodotInventoryPanelController::handles_engine_message(Gs1EngineMessageTy
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_INVENTORY_PANEL_SNAPSHOT:
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_STORAGE_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_SLOT_UPSERT:
     case GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_VIEW_STATE:
-    case GS1_ENGINE_MESSAGE_END_SITE_INVENTORY_PANEL_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
+    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
         return true;
     default:
         return false;
@@ -188,70 +186,9 @@ void Gs1GodotInventoryPanelController::handle_engine_message(const Gs1EngineMess
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_INVENTORY_PANEL_SNAPSHOT:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessageSiteSnapshotData>();
-        in_site_snapshot_ = true;
-        if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
-        {
-            inventory_storages_.clear();
-            worker_pack_slots_.clear();
-            opened_storage_.reset();
-            worker_pack_open_ = false;
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_STORAGE_UPSERT:
-    {
-        const auto projection = message.payload_as<Gs1EngineMessageInventoryStorageData>();
-        const auto found = std::find_if(
-            inventory_storages_.begin(),
-            inventory_storages_.end(),
-            [&](const auto& existing) { return existing.storage_id == projection.storage_id; });
-        if (found != inventory_storages_.end())
-        {
-            *found = projection;
-        }
-        else
-        {
-            inventory_storages_.push_back(projection);
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_SLOT_UPSERT:
-    {
-        const auto projection = message.payload_as<Gs1EngineMessageInventorySlotData>();
-        std::vector<Gs1RuntimeInventorySlotProjection>* slots = nullptr;
-        if (projection.container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK)
-        {
-            slots = &worker_pack_slots_;
-        }
-        else if (opened_storage_.has_value() && opened_storage_->storage_id == projection.storage_id)
-        {
-            slots = &opened_storage_->slots;
-        }
-        if (slots == nullptr)
-        {
-            break;
-        }
-        const auto found = std::find_if(
-            slots->begin(),
-            slots->end(),
-            [&](const auto& existing) {
-                return existing.storage_id == projection.storage_id && existing.slot_index == projection.slot_index;
-            });
-        if (found != slots->end())
-        {
-            *found = projection;
-        }
-        else
-        {
-            slots->push_back(projection);
-        }
-        break;
-    }
     case GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_VIEW_STATE:
     {
+        refresh_from_game_state_view();
         const auto& payload = message.payload_as<Gs1EngineMessageInventoryViewData>();
         const auto* storage = find_storage(payload.storage_id);
         const bool is_worker_pack_storage =
@@ -281,8 +218,17 @@ void Gs1GodotInventoryPanelController::handle_engine_message(const Gs1EngineMess
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_END_SITE_INVENTORY_PANEL_SNAPSHOT:
-        in_site_snapshot_ = false;
+    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
+    {
+        const auto& payload = message.payload_as<Gs1EngineMessagePresentationDirtyData>();
+        if ((payload.dirty_flags & (GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD)) != 0U)
+        {
+            refresh_from_game_state_view();
+        }
+        break;
+    }
+    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
+        refresh_from_game_state_view();
         break;
     default:
         break;
@@ -299,8 +245,109 @@ void Gs1GodotInventoryPanelController::handle_runtime_message_reset()
     prune_slot_registry(worker_pack_slot_buttons_, {});
     prune_slot_registry(opened_storage_slot_buttons_, {});
     worker_pack_open_ = false;
-    in_site_snapshot_ = false;
     apply_panel_visibility();
+}
+
+void Gs1GodotInventoryPanelController::refresh_from_game_state_view()
+{
+    if (adapter_service_ == nullptr)
+    {
+        return;
+    }
+
+    Gs1GameStateView view {};
+    if (!adapter_service_->get_game_state_view(view) ||
+        view.has_active_site == 0U ||
+        view.active_site == nullptr)
+    {
+        inventory_storages_.clear();
+        worker_pack_slots_.clear();
+        opened_storage_.reset();
+        worker_pack_open_ = false;
+        return;
+    }
+
+    const Gs1SiteStateView& site = *view.active_site;
+    inventory_storages_.clear();
+    inventory_storages_.reserve(site.storage_count);
+    worker_pack_slots_.clear();
+
+    for (std::uint32_t index = 0; index < site.storage_count; ++index)
+    {
+        const Gs1InventoryStorageView& storage_view = site.storages[index];
+        Gs1RuntimeInventoryStorageProjection storage {};
+        storage.storage_id = storage_view.storage_id;
+        storage.slot_count = static_cast<std::uint16_t>(std::min<std::uint32_t>(storage_view.slot_count, 65535U));
+        storage.tile_x = static_cast<std::int16_t>(storage_view.tile_x);
+        storage.tile_y = static_cast<std::int16_t>(storage_view.tile_y);
+        storage.container_kind = storage_view.container_kind;
+        storage.flags = static_cast<std::uint8_t>(storage_view.flags & 0xFFU);
+        inventory_storages_.push_back(storage);
+    }
+
+    for (std::uint32_t index = 0; index < site.storage_slot_count; ++index)
+    {
+        const Gs1InventorySlotView& slot_view = site.storage_slots[index];
+        Gs1RuntimeInventorySlotProjection slot {};
+        slot.storage_id = slot_view.storage_id;
+        slot.container_kind = slot_view.container_kind;
+        slot.slot_index = slot_view.slot_index;
+        slot.flags = slot_view.occupied != 0U ? k_inventory_slot_flag_occupied : 0U;
+        slot.item_instance_id = slot_view.item_instance_id;
+        slot.item_id = slot_view.item_id;
+        slot.quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(slot_view.quantity, 65535U));
+        slot.condition = slot_view.condition;
+        slot.freshness = slot_view.freshness;
+        if (slot.container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK)
+        {
+            worker_pack_slots_.push_back(slot);
+        }
+    }
+
+    if (site.opened_device_storage_id == 0U)
+    {
+        opened_storage_.reset();
+    }
+    else if (!opened_storage_.has_value() || opened_storage_->storage_id != site.opened_device_storage_id)
+    {
+        opened_storage_ = Gs1RuntimeInventoryViewProjection {};
+        opened_storage_->storage_id = site.opened_device_storage_id;
+    }
+
+    if (opened_storage_.has_value())
+    {
+        opened_storage_->slots.clear();
+        for (std::uint32_t index = 0; index < site.storage_slot_count; ++index)
+        {
+            const Gs1InventorySlotView& slot_view = site.storage_slots[index];
+            if (slot_view.storage_id != opened_storage_->storage_id ||
+                slot_view.container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK)
+            {
+                continue;
+            }
+
+            Gs1RuntimeInventorySlotProjection slot {};
+            slot.storage_id = slot_view.storage_id;
+            slot.container_kind = slot_view.container_kind;
+            slot.slot_index = slot_view.slot_index;
+            slot.flags = slot_view.occupied != 0U ? k_inventory_slot_flag_occupied : 0U;
+            slot.item_instance_id = slot_view.item_instance_id;
+            slot.item_id = slot_view.item_id;
+            slot.quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(slot_view.quantity, 65535U));
+            slot.condition = slot_view.condition;
+            slot.freshness = slot_view.freshness;
+            opened_storage_->slots.push_back(slot);
+        }
+    }
+
+    if (opened_storage_.has_value())
+    {
+        const auto* storage = find_storage(opened_storage_->storage_id);
+        if (storage != nullptr)
+        {
+            opened_storage_->slot_count = storage->slot_count;
+        }
+    }
 }
 
 void Gs1GodotInventoryPanelController::apply_panel_visibility()

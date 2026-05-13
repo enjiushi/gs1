@@ -90,6 +90,7 @@ private:
     [[nodiscard]] std::deque<Gs1RuntimeMessage>& engine_messages() noexcept { return context().engine_messages; }
     [[nodiscard]] double fixed_step_seconds() const noexcept { return context().fixed_step_seconds; }
 
+    void queue_presentation_dirty_message(std::uint32_t dirty_flags);
     void queue_app_state_message(Gs1AppState app_state);
     void queue_ui_setup_begin_message(
         Gs1UiSetupId setup_id,

@@ -120,6 +120,31 @@ Gs1Status gs1_pop_runtime_message(
     return runtime->runtime.pop_runtime_message(*out_message);
 }
 
+Gs1Status gs1_get_game_state_view(
+    Gs1RuntimeHandle* runtime,
+    Gs1GameStateView* out_view) GS1_NOEXCEPT
+{
+    if (runtime == nullptr || out_view == nullptr)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    return runtime->runtime.get_game_state_view(*out_view);
+}
+
+Gs1Status gs1_query_site_tile_view(
+    Gs1RuntimeHandle* runtime,
+    std::uint32_t tile_index,
+    Gs1SiteTileView* out_tile) GS1_NOEXCEPT
+{
+    if (runtime == nullptr || out_tile == nullptr)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    return runtime->runtime.query_site_tile_view(tile_index, *out_tile);
+}
+
 Gs1Status gs1_get_runtime_profiling_snapshot(
     Gs1RuntimeHandle* runtime,
     Gs1RuntimeProfilingSnapshot* out_snapshot) GS1_NOEXCEPT

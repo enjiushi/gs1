@@ -60,6 +60,8 @@ public:
         std::int64_t slot_index,
         std::int64_t item_instance_id);
     [[nodiscard]] bool submit_site_scene_ready();
+    [[nodiscard]] bool get_game_state_view(Gs1GameStateView& out_view);
+    [[nodiscard]] bool query_site_tile_view(std::uint32_t tile_index, Gs1SiteTileView& out_tile);
 
     [[nodiscard]] const std::string& last_error() const noexcept { return last_error_; }
     [[nodiscard]] bool is_running() const noexcept { return runtime_session_.is_running(); }

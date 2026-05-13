@@ -646,6 +646,8 @@ struct Gs1HostMessage
     Gs1HostMessagePayload payload;
 };
 
+using Gs1HostEvent = Gs1HostMessage;
+
 struct Gs1Phase1Request
 {
     std::uint32_t struct_size;
@@ -1231,6 +1233,8 @@ private:
         static_assert(alignof(PayloadData) <= alignof(Gs1RuntimeMessage), "Runtime message payload data requires stronger alignment than Gs1RuntimeMessage.");
     }
 };
+
+using Gs1EngineMessage = Gs1RuntimeMessage;
 
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1RuntimeCreateDesc, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeTimingStats);

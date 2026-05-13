@@ -51,6 +51,7 @@ private:
         godot::ObjectID object_id {};
     };
 
+    void refresh_from_game_state_view();
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
     void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);

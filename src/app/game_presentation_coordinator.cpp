@@ -879,6 +879,21 @@ Gs1PhonePanelSection to_phone_panel_section(PhonePanelSection section) noexcept
 
 }  // namespace
 
+void GamePresentationCoordinator::queue_presentation_dirty_message(std::uint32_t dirty_flags)
+{
+    if (dirty_flags == GS1_PRESENTATION_DIRTY_NONE)
+    {
+        return;
+    }
+
+    auto message = make_engine_message(GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY);
+    auto& payload = message.emplace_payload<Gs1EngineMessagePresentationDirtyData>();
+    payload.dirty_flags = dirty_flags;
+    payload.reserved0 = 0U;
+    payload.revision = ++presentation_runtime_state().presentation_dirty_revision;
+    engine_messages().push_back(message);
+}
+
 void GamePresentationCoordinator::queue_app_state_message(Gs1AppState app_state)
 {
     if (ui_presentation_state().last_emitted_app_state.has_value() &&
@@ -891,6 +906,7 @@ void GamePresentationCoordinator::queue_app_state_message(Gs1AppState app_state)
     auto& payload = message.emplace_payload<Gs1EngineMessageSetAppStateData>();
     payload.app_state = app_state;
     engine_messages().push_back(message);
+    queue_presentation_dirty_message(GS1_PRESENTATION_DIRTY_APP_STATE);
     ui_presentation_state().last_emitted_app_state = app_state;
 }
 
@@ -2505,11 +2521,6 @@ void GamePresentationCoordinator::queue_site_bootstrap_messages()
     queue_all_site_device_visual_messages(GS1_ENGINE_MESSAGE_SITE_SCENE_DEVICE_VISUAL_UPSERT);
     queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_SCENE_SNAPSHOT);
 
-    queue_site_snapshot_begin_message(
-        GS1_PROJECTION_MODE_SNAPSHOT,
-        GS1_ENGINE_MESSAGE_BEGIN_SITE_INVENTORY_PANEL_SNAPSHOT);
-    queue_all_site_inventory_storage_upsert_messages(GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_STORAGE_UPSERT);
-    queue_all_site_inventory_slot_upsert_messages(GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_SLOT_UPSERT);
     if (active_site_run()->inventory.worker_pack_panel_open)
     {
         queue_site_inventory_view_state_message(
@@ -2532,36 +2543,17 @@ void GamePresentationCoordinator::queue_site_bootstrap_messages()
                 : static_cast<std::uint32_t>(opened_storage->slot_item_instance_ids.size()),
             GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_VIEW_STATE);
     }
-    queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_INVENTORY_PANEL_SNAPSHOT);
-
-    queue_site_snapshot_begin_message(
-        GS1_PROJECTION_MODE_SNAPSHOT,
-        GS1_ENGINE_MESSAGE_BEGIN_SITE_PHONE_PANEL_SNAPSHOT);
-    queue_all_site_phone_listing_upsert_messages(
-        GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_LISTING_UPSERT,
-        GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_LISTING_REMOVE);
-    queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_PHONE_PANEL_SNAPSHOT);
-
-    queue_site_snapshot_begin_message(
-        GS1_PROJECTION_MODE_SNAPSHOT,
-        GS1_ENGINE_MESSAGE_BEGIN_SITE_TASK_PANEL_SNAPSHOT);
-    queue_all_site_task_upsert_messages(GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_TASK_UPSERT);
-    queue_all_site_modifier_upsert_messages(
-        GS1_PROJECTION_MODE_SNAPSHOT,
-        GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_MODIFIER_LIST_BEGIN,
-        GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_MODIFIER_UPSERT);
-    queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_TASK_PANEL_SNAPSHOT);
 
     queue_site_snapshot_begin_message(
         GS1_PROJECTION_MODE_SNAPSHOT,
         GS1_ENGINE_MESSAGE_BEGIN_SITE_SUMMARY_SNAPSHOT);
     queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_SUMMARY_SNAPSHOT);
 
-    queue_site_snapshot_begin_message(
-        GS1_PROJECTION_MODE_SNAPSHOT,
-        GS1_ENGINE_MESSAGE_BEGIN_SITE_HUD_SNAPSHOT);
-    queue_all_site_inventory_storage_upsert_messages(GS1_ENGINE_MESSAGE_SITE_HUD_STORAGE_UPSERT);
-    queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_HUD_SNAPSHOT);
+    queue_hud_state_message();
+    queue_presentation_dirty_message(
+        GS1_PRESENTATION_DIRTY_SITE |
+        GS1_PRESENTATION_DIRTY_HUD |
+        GS1_PRESENTATION_DIRTY_PHONE);
 
     active_site_run()->pending_projection_update_flags = 0U;
     clear_pending_site_tile_projection_updates();
@@ -2676,53 +2668,20 @@ void GamePresentationCoordinator::queue_site_delta_messages(std::uint64_t dirty_
         queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_SCENE_SNAPSHOT);
     }
 
+    std::uint32_t presentation_dirty_flags = GS1_PRESENTATION_DIRTY_NONE;
+    if (site_dirty_flags != 0U)
+    {
+        presentation_dirty_flags |= GS1_PRESENTATION_DIRTY_SITE;
+    }
     if ((site_dirty_flags & SITE_PROJECTION_UPDATE_INVENTORY) != 0U)
     {
-        queue_site_snapshot_begin_message(
-            GS1_PROJECTION_MODE_DELTA,
-            GS1_ENGINE_MESSAGE_BEGIN_SITE_INVENTORY_PANEL_SNAPSHOT);
-        queue_pending_site_inventory_slot_upsert_messages(
-            GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_STORAGE_UPSERT,
-            GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_SLOT_UPSERT,
-            GS1_ENGINE_MESSAGE_SITE_INVENTORY_PANEL_VIEW_STATE);
-        queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_INVENTORY_PANEL_SNAPSHOT);
-
-        queue_site_snapshot_begin_message(
-            GS1_PROJECTION_MODE_DELTA,
-            GS1_ENGINE_MESSAGE_BEGIN_SITE_HUD_SNAPSHOT);
-        queue_all_site_inventory_storage_upsert_messages(GS1_ENGINE_MESSAGE_SITE_HUD_STORAGE_UPSERT);
-        queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_HUD_SNAPSHOT);
+        presentation_dirty_flags |= GS1_PRESENTATION_DIRTY_HUD;
     }
-
     if ((site_dirty_flags & SITE_PROJECTION_UPDATE_PHONE) != 0U)
     {
-        queue_site_snapshot_begin_message(
-            GS1_PROJECTION_MODE_DELTA,
-            GS1_ENGINE_MESSAGE_BEGIN_SITE_PHONE_PANEL_SNAPSHOT);
-        queue_all_site_phone_listing_upsert_messages(
-            GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_LISTING_UPSERT,
-            GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_LISTING_REMOVE);
-        queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_PHONE_PANEL_SNAPSHOT);
+        presentation_dirty_flags |= GS1_PRESENTATION_DIRTY_PHONE;
     }
-
-    if ((site_dirty_flags & (SITE_PROJECTION_UPDATE_TASKS | SITE_PROJECTION_UPDATE_MODIFIERS)) != 0U)
-    {
-        queue_site_snapshot_begin_message(
-            GS1_PROJECTION_MODE_DELTA,
-            GS1_ENGINE_MESSAGE_BEGIN_SITE_TASK_PANEL_SNAPSHOT);
-        if ((site_dirty_flags & SITE_PROJECTION_UPDATE_TASKS) != 0U)
-        {
-            queue_all_site_task_upsert_messages(GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_TASK_UPSERT);
-        }
-        if ((site_dirty_flags & SITE_PROJECTION_UPDATE_MODIFIERS) != 0U)
-        {
-            queue_all_site_modifier_upsert_messages(
-                GS1_PROJECTION_MODE_DELTA,
-                GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_MODIFIER_LIST_BEGIN,
-                GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_MODIFIER_UPSERT);
-        }
-        queue_site_snapshot_end_message(GS1_ENGINE_MESSAGE_END_SITE_TASK_PANEL_SNAPSHOT);
-    }
+    queue_presentation_dirty_message(presentation_dirty_flags);
 }
 
 void GamePresentationCoordinator::queue_site_action_update_message()

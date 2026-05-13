@@ -51,6 +51,7 @@ private:
         godot::ObjectID object_id {};
     };
 
+    void refresh_from_game_state_view();
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
     void submit_inventory_slot_tap(int storage_id, int container_kind, int slot_index, int item_instance_id);
@@ -105,5 +106,4 @@ private:
     mutable std::unordered_map<std::string, godot::Ref<godot::Texture2D>> texture_cache_ {};
     SubmitInventorySlotTapFn submit_inventory_slot_tap_ {};
     bool worker_pack_open_ {false};
-    bool in_site_snapshot_ {false};
 };

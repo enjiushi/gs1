@@ -14,6 +14,8 @@ struct Gs1RuntimeApi final
     decltype(&gs1_run_phase1) run_phase1 {nullptr};
     decltype(&gs1_run_phase2) run_phase2 {nullptr};
     decltype(&gs1_pop_runtime_message) pop_runtime_message {nullptr};
+    decltype(&gs1_get_game_state_view) get_game_state_view {nullptr};
+    decltype(&gs1_query_site_tile_view) query_site_tile_view {nullptr};
     decltype(&gs1_get_runtime_profiling_snapshot) get_runtime_profiling_snapshot {nullptr};
     decltype(&gs1_reset_runtime_profiling) reset_runtime_profiling {nullptr};
     decltype(&gs1_set_runtime_profile_system_enabled) set_runtime_profile_system_enabled {nullptr};

@@ -17,6 +17,7 @@
 #include <godot_cpp/variant/packed_string_array.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <string_view>
 #include <utility>
 
@@ -47,6 +48,17 @@ Ref<Texture2D> load_texture_2d(const String& path)
         return loader->load(path);
     }
     return Ref<Texture2D> {};
+}
+
+std::uint16_t projected_remaining_game_hours(double remaining_world_minutes) noexcept
+{
+    if (remaining_world_minutes <= 0.0)
+    {
+        return 0U;
+    }
+
+    const auto projected_hours = static_cast<std::uint32_t>(std::ceil(remaining_world_minutes / 60.0));
+    return static_cast<std::uint16_t>(std::min<std::uint32_t>(projected_hours, 65535U));
 }
 }
 
@@ -91,6 +103,7 @@ void Gs1GodotTaskPanelController::cache_ui_references(Control& owner)
     {
         modifier_rows_ = Object::cast_to<VBoxContainer>(owner.find_child("ModifierRows", true, false));
     }
+    refresh_from_game_state_view();
     update_task_summary();
     reconcile_task_rows();
     reconcile_modifier_rows();
@@ -128,12 +141,8 @@ bool Gs1GodotTaskPanelController::handles_engine_message(Gs1EngineMessageType ty
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_TASK_PANEL_SNAPSHOT:
-    case GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_TASK_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_TASK_REMOVE:
-    case GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_MODIFIER_LIST_BEGIN:
-    case GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_MODIFIER_UPSERT:
-    case GS1_ENGINE_MESSAGE_END_SITE_TASK_PANEL_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
+    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
         return true;
     default:
         return false;
@@ -144,114 +153,17 @@ void Gs1GodotTaskPanelController::handle_engine_message(const Gs1EngineMessage& 
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_TASK_PANEL_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
     {
-        const auto& payload = message.payload_as<Gs1EngineMessageSiteSnapshotData>();
-        in_site_snapshot_ = true;
-        pending_task_indices_.clear();
-        pending_modifier_indices_.clear();
-        if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
+        const auto& payload = message.payload_as<Gs1EngineMessagePresentationDirtyData>();
+        if ((payload.dirty_flags & GS1_PRESENTATION_DIRTY_SITE) != 0U)
         {
-            tasks_.clear();
-            active_modifiers_.clear();
-        }
-        else
-        {
-            for (std::size_t index = 0; index < tasks_.size(); ++index)
-            {
-                pending_task_indices_[tasks_[index].task_instance_id] = index;
-            }
-            for (std::size_t index = 0; index < active_modifiers_.size(); ++index)
-            {
-                pending_modifier_indices_[active_modifiers_[index].modifier_id] = index;
-            }
+            refresh_from_game_state_view();
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_TASK_UPSERT:
-    {
-        Gs1RuntimeTaskProjection projection = message.payload_as<Gs1EngineMessageTaskData>();
-        const auto found = pending_task_indices_.find(projection.task_instance_id);
-        if (found != pending_task_indices_.end() && found->second < tasks_.size())
-        {
-            tasks_[found->second] = projection;
-        }
-        else
-        {
-            pending_task_indices_[projection.task_instance_id] = tasks_.size();
-            tasks_.push_back(projection);
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_TASK_REMOVE:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessageTaskData>();
-        const auto found = pending_task_indices_.find(payload.task_instance_id);
-        if (found != pending_task_indices_.end() && found->second < tasks_.size())
-        {
-            const std::size_t index = found->second;
-            const std::size_t last_index = tasks_.size() - 1U;
-            if (index != last_index)
-            {
-                tasks_[index] = std::move(tasks_[last_index]);
-                pending_task_indices_[tasks_[index].task_instance_id] = index;
-            }
-            tasks_.pop_back();
-            pending_task_indices_.erase(found);
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_MODIFIER_LIST_BEGIN:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessageSiteModifierListData>();
-        pending_modifier_indices_.clear();
-        if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
-        {
-            active_modifiers_.clear();
-        }
-        else
-        {
-            for (std::size_t index = 0; index < active_modifiers_.size(); ++index)
-            {
-                pending_modifier_indices_[active_modifiers_[index].modifier_id] = index;
-            }
-        }
-        active_modifiers_.reserve(payload.modifier_count);
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_TASK_PANEL_MODIFIER_UPSERT:
-    {
-        Gs1RuntimeModifierProjection projection = message.payload_as<Gs1EngineMessageSiteModifierData>();
-        const auto found = pending_modifier_indices_.find(projection.modifier_id);
-        if (found != pending_modifier_indices_.end() && found->second < active_modifiers_.size())
-        {
-            active_modifiers_[found->second] = projection;
-        }
-        else
-        {
-            pending_modifier_indices_[projection.modifier_id] = active_modifiers_.size();
-            active_modifiers_.push_back(projection);
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_END_SITE_TASK_PANEL_SNAPSHOT:
-        std::sort(tasks_.begin(), tasks_.end(), [](const auto& lhs, const auto& rhs) {
-            if (lhs.list_kind != rhs.list_kind)
-            {
-                return lhs.list_kind < rhs.list_kind;
-            }
-            return lhs.task_instance_id < rhs.task_instance_id;
-        });
-        std::sort(active_modifiers_.begin(), active_modifiers_.end(), [](const auto& lhs, const auto& rhs) {
-            if (lhs.flags != rhs.flags)
-            {
-                return lhs.flags > rhs.flags;
-            }
-            return lhs.modifier_id < rhs.modifier_id;
-        });
-        pending_task_indices_.clear();
-        pending_modifier_indices_.clear();
-        in_site_snapshot_ = false;
+    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
+        refresh_from_game_state_view();
         break;
     default:
         break;
@@ -272,6 +184,76 @@ void Gs1GodotTaskPanelController::handle_runtime_message_reset()
     prune_button_registry(task_buttons_, {});
     prune_button_registry(modifier_buttons_, {});
     update_task_summary();
+}
+
+void Gs1GodotTaskPanelController::refresh_from_game_state_view()
+{
+    if (adapter_service_ == nullptr)
+    {
+        return;
+    }
+
+    Gs1GameStateView view {};
+    if (!adapter_service_->get_game_state_view(view) ||
+        view.has_active_site == 0U ||
+        view.active_site == nullptr)
+    {
+        tasks_.clear();
+        active_modifiers_.clear();
+        pending_task_indices_.clear();
+        pending_modifier_indices_.clear();
+        in_site_snapshot_ = false;
+        return;
+    }
+
+    const Gs1SiteStateView& site = *view.active_site;
+    tasks_.clear();
+    tasks_.reserve(site.task_count);
+    for (std::uint32_t index = 0; index < site.task_count; ++index)
+    {
+        const Gs1TaskView& task_view = site.tasks[index];
+        Gs1RuntimeTaskProjection task {};
+        task.task_instance_id = task_view.task_instance_id;
+        task.task_template_id = task_view.task_template_id;
+        task.publisher_faction_id = task_view.publisher_faction_id;
+        task.current_progress = static_cast<std::uint16_t>(std::min<std::uint32_t>(task_view.current_progress_amount, 65535U));
+        task.target_progress = static_cast<std::uint16_t>(std::min<std::uint32_t>(task_view.target_amount, 65535U));
+        task.list_kind = static_cast<Gs1TaskPresentationListKind>(task_view.runtime_list_kind);
+        task.flags = 1U;
+        tasks_.push_back(task);
+    }
+
+    active_modifiers_.clear();
+    active_modifiers_.reserve(site.active_modifier_count);
+    for (std::uint32_t index = 0; index < site.active_modifier_count; ++index)
+    {
+        const Gs1SiteModifierView& modifier_view = site.active_modifiers[index];
+        Gs1RuntimeModifierProjection modifier {};
+        modifier.modifier_id = modifier_view.modifier_id;
+        modifier.remaining_game_hours = projected_remaining_game_hours(modifier_view.remaining_world_minutes);
+        modifier.flags = modifier_view.timed != 0U ? GS1_SITE_MODIFIER_FLAG_TIMED : 0U;
+        modifier.reserved0 = 0U;
+        active_modifiers_.push_back(modifier);
+    }
+
+    std::sort(tasks_.begin(), tasks_.end(), [](const auto& lhs, const auto& rhs) {
+        if (lhs.list_kind != rhs.list_kind)
+        {
+            return lhs.list_kind < rhs.list_kind;
+        }
+        return lhs.task_instance_id < rhs.task_instance_id;
+    });
+    std::sort(active_modifiers_.begin(), active_modifiers_.end(), [](const auto& lhs, const auto& rhs) {
+        if (lhs.flags != rhs.flags)
+        {
+            return lhs.flags > rhs.flags;
+        }
+        return lhs.modifier_id < rhs.modifier_id;
+    });
+
+    pending_task_indices_.clear();
+    pending_modifier_indices_.clear();
+    in_site_snapshot_ = false;
 }
 
 void Gs1GodotTaskPanelController::update_task_summary()

@@ -2,6 +2,7 @@
 
 #include "gs1_godot_controller_context.h"
 #include "content/defs/item_defs.h"
+#include "support/currency.h"
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/core/class_db.hpp>
@@ -191,11 +192,9 @@ bool Gs1GodotPhonePanelController::handles_engine_message(Gs1EngineMessageType t
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_PHONE_PANEL_SNAPSHOT:
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_LISTING_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_LISTING_REMOVE:
     case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
-    case GS1_ENGINE_MESSAGE_END_SITE_PHONE_PANEL_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
+    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
         return true;
     default:
         return false;
@@ -209,61 +208,17 @@ void Gs1GodotPhonePanelController::handle_engine_message(const Gs1EngineMessage&
     case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
         phone_panel_state_ = message.payload_as<Gs1EngineMessagePhonePanelData>();
         break;
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_PHONE_PANEL_SNAPSHOT:
+    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
     {
-        const auto& payload = message.payload_as<Gs1EngineMessageSiteSnapshotData>();
-        pending_listing_indices_.clear();
-        if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
+        const auto& payload = message.payload_as<Gs1EngineMessagePresentationDirtyData>();
+        if ((payload.dirty_flags & (GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_PHONE)) != 0U)
         {
-            phone_listings_state_.clear();
-        }
-        else
-        {
-            for (std::size_t index = 0; index < phone_listings_state_.size(); ++index)
-            {
-                pending_listing_indices_[phone_listings_state_[index].listing_id] = index;
-            }
+            refresh_from_game_state_view();
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_LISTING_UPSERT:
-    {
-        Gs1RuntimePhoneListingProjection projection = message.payload_as<Gs1EngineMessagePhoneListingData>();
-        const auto found = pending_listing_indices_.find(projection.listing_id);
-        if (found != pending_listing_indices_.end() && found->second < phone_listings_state_.size())
-        {
-            phone_listings_state_[found->second] = projection;
-        }
-        else
-        {
-            pending_listing_indices_[projection.listing_id] = phone_listings_state_.size();
-            phone_listings_state_.push_back(projection);
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_LISTING_REMOVE:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessagePhoneListingData>();
-        const auto found = pending_listing_indices_.find(payload.listing_id);
-        if (found != pending_listing_indices_.end() && found->second < phone_listings_state_.size())
-        {
-            const std::size_t index = found->second;
-            const std::size_t last_index = phone_listings_state_.size() - 1U;
-            if (index != last_index)
-            {
-                phone_listings_state_[index] = std::move(phone_listings_state_[last_index]);
-                pending_listing_indices_[phone_listings_state_[index].listing_id] = index;
-            }
-            phone_listings_state_.pop_back();
-            pending_listing_indices_.erase(found);
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_END_SITE_PHONE_PANEL_SNAPSHOT:
-        std::sort(phone_listings_state_.begin(), phone_listings_state_.end(), [](const auto& lhs, const auto& rhs) {
-            return lhs.listing_id < rhs.listing_id;
-        });
-        pending_listing_indices_.clear();
+    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
+        refresh_from_game_state_view();
         break;
     default:
         break;
@@ -280,6 +235,47 @@ void Gs1GodotPhonePanelController::handle_runtime_message_reset()
     pending_listing_indices_.clear();
     prune_button_registry(phone_listing_buttons_, {});
     apply_panel_visibility();
+}
+
+void Gs1GodotPhonePanelController::refresh_from_game_state_view()
+{
+    if (adapter_service_ == nullptr)
+    {
+        return;
+    }
+
+    Gs1GameStateView view {};
+    if (!adapter_service_->get_game_state_view(view) ||
+        view.has_active_site == 0U ||
+        view.active_site == nullptr)
+    {
+        phone_listings_state_.clear();
+        pending_listing_indices_.clear();
+        return;
+    }
+
+    const Gs1SiteStateView& site = *view.active_site;
+    phone_listings_state_.clear();
+    phone_listings_state_.reserve(site.phone_listing_count);
+    for (std::uint32_t index = 0; index < site.phone_listing_count; ++index)
+    {
+        const Gs1PhoneListingView& listing_view = site.phone_listings[index];
+        Gs1RuntimePhoneListingProjection listing {};
+        listing.listing_id = listing_view.listing_id;
+        listing.item_or_unlockable_id = listing_view.item_or_unlockable_id;
+        listing.price = gs1::cash_value_from_cash_points(listing_view.price_cash_points);
+        listing.related_site_id = site.site_id;
+        listing.quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(listing_view.quantity, 65535U));
+        listing.cart_quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(listing_view.cart_quantity, 65535U));
+        listing.listing_kind = static_cast<Gs1PhoneListingPresentationKind>(listing_view.listing_kind);
+        listing.flags = listing_view.occupied != 0U ? 1U : 0U;
+        phone_listings_state_.push_back(listing);
+    }
+
+    std::sort(phone_listings_state_.begin(), phone_listings_state_.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.listing_id < rhs.listing_id;
+    });
+    pending_listing_indices_.clear();
 }
 
 void Gs1GodotPhonePanelController::apply_panel_visibility()
