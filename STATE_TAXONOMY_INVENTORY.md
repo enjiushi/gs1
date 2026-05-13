@@ -43,38 +43,23 @@ The classification buckets used here are:
 | Tile query helper | `gs1_query_site_tile_view(...)` and `build_site_tile_view(...)` | Exported read-state | Keep for dense ECS-backed tile reads. |
 | Backing view cache | `src/runtime/game_state_view.h` `RuntimeGameStateViewCache` | Exported read-state | Internal cache that backs ABI pointers; keep and continue rebinding after container changes. |
 
-## Host-Owned UI / Presentation State Still Stored in Gameplay Runtime
+## Host-Owned UI / Presentation State in the Current Tree
 
 | Area | Current location | Classification | Notes / target direction |
 | --- | --- | --- | --- |
-| Protection overlay open mode | `src/runtime/site_protection_presentation_state.h` `SiteProtectionPresentationState` | Host-owned UI/presentation | Move ownership to host-side overlay controller; gameplay should answer only gameplay queries or validations. |
-| Active UI setup/panel tracking | `src/runtime/ui_presentation_state.h` `UiPresentationState::active_ui_setups`, `active_ui_panels`, `active_normal_ui_setup` | Host-owned UI/presentation | Remove from gameplay once panel/setup projection traffic is retired. |
-| Last emitted app-state cache | `UiPresentationState::last_emitted_app_state` | Migration-only compatibility | Presentation emission dedupe only; not gameplay state. |
-| Regional tech-tree overlay open state | `UiPresentationState::regional_map_tech_tree_view_open` | Host-owned UI/presentation | Move to Godot/regional host controller local state. |
-| Phone open state | `src/runtime/presentation_runtime_state.h` `PhonePanelPresentationState::open` | Host-owned UI/presentation | Moved out of `SiteRunState`; still runtime-owned until host/controller-local ownership fully replaces it. |
-| Phone active section/tab | `PhonePanelPresentationState::active_section` | Host-owned UI/presentation | Moved out of gameplay-owned `PhonePanelState`; next step is host/controller-local ownership. |
-| Phone badge flags | `PhonePanelPresentationState::badge_flags` | Host-owned UI/presentation | Moved out of gameplay-owned `PhonePanelState`; host should ultimately own read/dismiss session state. |
-| Phone notification init bookkeeping | `PhonePanelPresentationState::notification_state_initialized` | Host-owned UI/presentation | Pure presentation-session state now stored in runtime presentation state rather than gameplay-owned site state. |
+| Godot adapter UI/session state | `engines/godot/native/gs1_godot_adapter_service.h` `Gs1GodotUiSessionState` | Host-owned UI/presentation | Correct ownership for phone, regional-tech, protection, inventory, and local badge/session state that is reconstructable from gameplay reads plus local interaction history. |
+| Legacy `src/ui/` folder | `src/ui/guideline.md` | Migration-only compatibility | The gameplay-owned UI view-model/presenter headers were removed; the folder remains only as a lightweight repo-navigation checkpoint until it is repurposed or removed entirely. |
 
 ## Migration-Only Compatibility and Projection Bookkeeping
 
 | Area | Current location | Classification | Notes / target direction |
 | --- | --- | --- | --- |
-| Phone listing cache | `PhonePanelState::listings` | Migration-only compatibility | Derived from economy/inventory/task state; replace with direct exported derived slice built from authoritative state. |
-| Phone count summaries | `PhonePanelState::visible_task_count`, `accepted_task_count`, `completed_task_count`, `claimed_task_count`, `buy_listing_count`, `sell_listing_count`, `service_listing_count`, `cart_item_count` | Migration-only compatibility | Derived presentation summaries; either compute into exported read-state cache or move host-side. |
-| Phone change signatures | `src/runtime/presentation_runtime_state.h` `PhonePanelPresentationState::{task_snapshot_signature,buy_snapshot_signature,sell_snapshot_signature,service_snapshot_signature}` | Migration-only compatibility | Remove after gameplay stops tracking host badge/session deltas. |
-| Runtime phone last-emitted ids | `src/runtime/presentation_runtime_state.h` `PresentationRuntimeState::last_emitted_phone_listing_ids` | Migration-only compatibility | Remove with phone snapshot/upsert retirement. |
-| Campaign unlock snapshot cache | `PresentationRuntimeState::campaign_unlock_snapshot` | Migration-only compatibility | Remove once progression UI reads directly from state and local host caches. |
-| Presentation dirty revision counter | `PresentationRuntimeState::presentation_dirty_revision` | Migration-only compatibility | Keep only if still useful as a coarse refresh signal; otherwise collapse into message-only invalidation. |
-| Site projection dirty flag mask | `SiteRunState::pending_projection_update_flags` | Migration-only compatibility | Remove as snapshot/upsert paths disappear. |
-| Full-tile projection dirty flag | `SiteRunState::pending_full_tile_projection_update` | Migration-only compatibility | Remove with tile snapshot retirement. |
-| Tile projection update vectors and masks | `SiteRunState::pending_tile_projection_updates`, `pending_tile_projection_update_mask` | Migration-only compatibility | Replace with direct tile reads and host-side reconciliation. |
-| Last projected tile cache | `SiteRunState::last_projected_tile_states` | Migration-only compatibility | Remove after no controller depends on tile upsert deltas. |
-| Inventory projection dirty flags and masks | `SiteRunState::pending_full_inventory_projection_update`, `pending_worker_pack_inventory_projection_updates`, `pending_worker_pack_inventory_projection_update_mask`, `pending_inventory_storage_descriptor_projection_update`, `pending_inventory_view_state_projection_update`, `pending_opened_inventory_storage_full_projection_update`, `pending_opened_inventory_storage_projection_updates`, `pending_opened_inventory_storage_projection_update_mask` | Migration-only compatibility | Remove after inventory UI reads directly from `Gs1SiteStateView`. |
-| Projection coordinator object | `src/app/game_presentation_coordinator.*` | Migration-only compatibility | Long-term shrink/remove as direct state reads replace snapshot/upsert emission. |
+| Transitional site dirty helpers | `src/site/systems/site_system_context.h` `mark_*projection_dirty(...)` | Migration-only compatibility | The helper names still exist so old site-system call sites compile, but they are now no-op shims and should disappear once those call sites are trimmed. |
+| Legacy projection-dirty flag catalog | `src/site/site_projection_update_flags.h` | Migration-only compatibility | Constants remain only so transitional call sites and compatibility-oriented tests can still name the old buckets while gameplay-owned projection bookkeeping is gone. |
+| Public runtime-message compatibility catalog | `include/gs1/types.h` legacy snapshot/panel/progression message enums and payload structs | Migration-only compatibility | Gameplay-side producers are gone from `src/`, but the public message catalog still carries obsolete families that should be deleted in a later host/smoke compatibility pass. |
 
 ## Current Boundary Rule After This Inventory
 
 - Treat `GameState`, `CampaignState`, `SiteRunState`, and ECS-backed world data as authoritative gameplay state.
 - Treat `RuntimeGameStateViewCache` and `gs1_query_site_tile_view(...)` as the durable exported read boundary.
-- Treat `UiPresentationState`, `PresentationRuntimeState`, `SiteProtectionPresentationState`, and the phone/session/pending-projection fields listed above as removal or migration targets, not architecture we should preserve.
+- Treat the Godot adapter's local UI session structs as the correct home for host-owned presentation state, and treat the remaining no-op projection-dirty helpers plus obsolete public runtime-message catalog entries as compatibility cleanup targets rather than architecture we should preserve.

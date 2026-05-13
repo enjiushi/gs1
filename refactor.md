@@ -654,8 +654,8 @@ This section records the remaining work still not completed in the current repos
 
 ### Incomplete gameplay presentation-system cleanup
 
-- [ ] Remove or heavily reduce gameplay presentation coordinator responsibilities that exist only to emit host projection snapshots/upserts.
-- [ ] Remove gameplay presentation systems and subscribers that only serve projection/UI emission rather than gameplay authority.
+- [x] Remove or heavily reduce gameplay presentation coordinator responsibilities that exist only to emit host projection snapshots/upserts.
+- [x] Remove gameplay presentation systems and subscribers that only serve projection/UI emission rather than gameplay authority.
 - [ ] Finish trimming internal `GameMessage` usage so presentation-only/state-transfer traffic no longer survives as gameplay message flow.
 
 ### Incomplete Godot host migration

@@ -18,4 +18,4 @@ Gameplay/runtime implementation grouped by ownership domain and integration boun
 - `site/`: Active site-run state, ECS world helpers, and site-owned systems, including harvest action execution plus worker-pack harvest output routing, campaign-aware recipe/item unlock filtering, Village-specific shovel, excavation, buff, and custom-food runtime hooks, and now dedicated runtime-system site presentation follow-up for action/cue/protection UI reactions instead of app-layer post-message coordination, with system entrypoints constructing their own local runtime contexts directly instead of routing through file-local context wrapper helpers when no extra abstraction is needed.
 - `support/`: Shared lightweight support types such as IDs.
 - `testing/`: Runtime-side helpers that back the system-test framework.
-- `ui/`: View-model and presenter state projected for the frontend/runtime host.
+- `ui/`: Legacy UI folder retained only for its guideline after the orphaned gameplay-owned view-model and presenter headers were removed from the refactor path.
