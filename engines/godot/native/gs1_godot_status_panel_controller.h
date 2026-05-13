@@ -1,7 +1,6 @@
 #pragma once
 
 #include "gs1_godot_adapter_service.h"
-#include "gs1_godot_projection_types.h"
 
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/rich_text_label.hpp>
@@ -33,13 +32,18 @@ protected:
 private:
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
+    void refresh_from_game_state_view();
     void rebuild_status_label();
 
     godot::Control* owner_control_ {nullptr};
     Gs1GodotAdapterService* adapter_service_ {nullptr};
-    std::optional<Gs1RuntimeCampaignResourcesProjection> campaign_resources_ {};
-    std::optional<Gs1RuntimeHudProjection> hud_state_ {};
-    std::optional<Gs1RuntimeSiteActionProjection> site_action_state_ {};
     godot::RichTextLabel* status_label_ {nullptr};
     godot::String last_action_message_ {};
+    Gs1AppState app_state_ {GS1_APP_STATE_BOOT};
+    std::int32_t total_reputation_ {0};
+    std::int32_t village_reputation_ {0};
+    std::int32_t forestry_reputation_ {0};
+    std::int32_t university_reputation_ {0};
+    std::optional<float> site_cash_ {};
+    std::optional<Gs1SiteActionKind> current_action_kind_ {};
 };

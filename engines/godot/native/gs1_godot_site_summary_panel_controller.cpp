@@ -5,6 +5,8 @@
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 
+#include <algorithm>
+
 using namespace godot;
 
 void Gs1GodotSiteSummaryPanelController::_bind_methods()
@@ -18,6 +20,8 @@ void Gs1GodotSiteSummaryPanelController::_ready()
     {
         cache_ui_references(*owner);
     }
+    refresh_from_game_state_view();
+    rebuild_summary();
 }
 
 void Gs1GodotSiteSummaryPanelController::_exit_tree()
@@ -40,7 +44,6 @@ void Gs1GodotSiteSummaryPanelController::cache_ui_references(Control& owner)
     {
         site_summary_ = Object::cast_to<RichTextLabel>(owner.find_child("SiteSummary", true, false));
     }
-    rebuild_summary();
 }
 
 void Gs1GodotSiteSummaryPanelController::cache_adapter_service()
@@ -73,73 +76,63 @@ Control* Gs1GodotSiteSummaryPanelController::resolve_owner_control()
 
 bool Gs1GodotSiteSummaryPanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept
 {
-    switch (type)
+    return type == GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY ||
+        type == GS1_ENGINE_MESSAGE_SET_APP_STATE;
+}
+
+void Gs1GodotSiteSummaryPanelController::refresh_from_game_state_view()
+{
+    state_.reset();
+    if (adapter_service_ == nullptr)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SUMMARY_SNAPSHOT:
-    case GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE:
-    case GS1_ENGINE_MESSAGE_SITE_WEATHER_UPDATE:
-    case GS1_ENGINE_MESSAGE_HUD_STATE:
-    case GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE:
-    case GS1_ENGINE_MESSAGE_END_SITE_SUMMARY_SNAPSHOT:
-        return true;
-    default:
-        return false;
+        return;
     }
+
+    Gs1GameStateView view {};
+    if (!adapter_service_->get_game_state_view(view) ||
+        view.has_active_site == 0U ||
+        view.active_site == nullptr)
+    {
+        return;
+    }
+
+    const Gs1SiteStateView& site = *view.active_site;
+    State state {};
+    state.site_id = site.site_id;
+    state.width = site.tile_width;
+    state.height = site.tile_height;
+    state.worker_tile_x = site.worker.tile_x;
+    state.worker_tile_y = site.worker.tile_y;
+    state.weather_heat = site.weather.heat;
+    state.weather_wind = site.weather.wind;
+    state.weather_dust = site.weather.dust;
+    state.health = site.worker.health;
+    state.hydration = site.worker.hydration;
+    state.nourishment = site.worker.nourishment;
+    state.energy = site.worker.energy;
+    state.morale = site.worker.morale;
+    state.has_worker = site.worker.worker_entity_id != 0U;
+    state.has_action = site.action.has_current_action != 0U;
+    state.action_kind = site.action.action_kind;
+    if (state.has_action && site.action.total_action_minutes > 0.0)
+    {
+        const double completed = site.action.total_action_minutes - site.action.remaining_action_minutes;
+        state.action_progress = static_cast<float>(std::clamp(
+            completed / site.action.total_action_minutes,
+            0.0,
+            1.0));
+    }
+    state_ = state;
 }
 
 void Gs1GodotSiteSummaryPanelController::handle_engine_message(const Gs1EngineMessage& message)
 {
-    switch (message.type)
+    if (message.type == GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY ||
+        message.type == GS1_ENGINE_MESSAGE_SET_APP_STATE)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SUMMARY_SNAPSHOT:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessageSiteSnapshotData>();
-        if (!state_.has_value())
-        {
-            state_ = State {};
-        }
-        state_->site_id = payload.site_id;
-        state_->width = payload.width;
-        state_->height = payload.height;
-        if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
-        {
-            state_->worker.reset();
-            state_->weather.reset();
-        }
-        break;
+        refresh_from_game_state_view();
+        rebuild_summary();
     }
-    case GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE:
-        if (state_.has_value()) state_->worker = message.payload_as<Gs1EngineMessageWorkerData>();
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_WEATHER_UPDATE:
-        if (state_.has_value()) state_->weather = message.payload_as<Gs1EngineMessageWeatherData>();
-        break;
-    case GS1_ENGINE_MESSAGE_HUD_STATE:
-        if (state_.has_value()) state_->hud = message.payload_as<Gs1EngineMessageHudStateData>();
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE:
-    {
-        if (!state_.has_value())
-        {
-            break;
-        }
-        const auto& payload = message.payload_as<Gs1EngineMessageSiteActionData>();
-        if ((payload.flags & GS1_SITE_ACTION_PRESENTATION_FLAG_CLEAR) != 0U)
-        {
-            state_->site_action.reset();
-        }
-        else
-        {
-            state_->site_action = payload;
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_END_SITE_SUMMARY_SNAPSHOT:
-        break;
-    default:
-        break;
-    }
-    rebuild_summary();
 }
 
 void Gs1GodotSiteSummaryPanelController::handle_runtime_message_reset()
@@ -150,8 +143,21 @@ void Gs1GodotSiteSummaryPanelController::handle_runtime_message_reset()
 
 void Gs1GodotSiteSummaryPanelController::rebuild_summary()
 {
+    if (site_title_ == nullptr && site_summary_ == nullptr)
+    {
+        return;
+    }
+
     if (!state_.has_value())
     {
+        if (site_title_ != nullptr)
+        {
+            site_title_->set_text("Site");
+        }
+        if (site_summary_ != nullptr)
+        {
+            site_summary_->set_text(String());
+        }
         return;
     }
 
@@ -163,45 +169,35 @@ void Gs1GodotSiteSummaryPanelController::rebuild_summary()
     PackedStringArray site_lines;
     site_lines.push_back(vformat("Size: %d x %d", static_cast<int>(state_->width), static_cast<int>(state_->height)));
 
-    if (state_->worker.has_value())
+    if (state_->has_worker)
     {
-        const auto& worker = state_->worker.value();
         site_lines.push_back(vformat(
             "Worker: (%.1f, %.1f)  Action %d",
-            worker.tile_x,
-            worker.tile_y,
-            static_cast<int>(worker.current_action_kind)));
+            static_cast<double>(state_->worker_tile_x),
+            static_cast<double>(state_->worker_tile_y),
+            static_cast<int>(state_->action_kind)));
     }
 
-    if (state_->weather.has_value())
-    {
-        const auto& weather = state_->weather.value();
-        site_lines.push_back(vformat(
-            "Weather H/W/D: %.1f / %.1f / %.1f",
-            weather.heat,
-            weather.wind,
-            weather.dust));
-    }
+    site_lines.push_back(vformat(
+        "Weather H/W/D: %.1f / %.1f / %.1f",
+        state_->weather_heat,
+        state_->weather_wind,
+        state_->weather_dust));
 
-    if (state_->hud.has_value())
-    {
-        const auto& hud = state_->hud.value();
         site_lines.push_back(vformat(
             "Meters HP/HY/NO/EN/MO: %.1f / %.1f / %.1f / %.1f / %.1f",
-            hud.player_health,
-            hud.player_hydration,
-            hud.player_nourishment,
-            hud.player_energy,
-            hud.player_morale));
-    }
+            state_->health,
+            state_->hydration,
+            state_->nourishment,
+            state_->energy,
+            state_->morale));
 
-    if (state_->site_action.has_value())
+    if (state_->has_action)
     {
-        const auto& site_action = state_->site_action.value();
         site_lines.push_back(vformat(
             "Current Action: kind %d  progress %.2f",
-            static_cast<int>(site_action.action_kind),
-            site_action.progress_normalized));
+            static_cast<int>(state_->action_kind),
+            state_->action_progress));
     }
 
     if (site_summary_ != nullptr)

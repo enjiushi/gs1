@@ -152,7 +152,7 @@ void Gs1GodotAdapterService::bump_ui_session_revision(std::uint32_t dirty_flags)
     auto& payload = message.emplace_payload<Gs1EngineMessagePresentationDirtyData>();
     payload.dirty_flags = dirty_flags;
     payload.reserved0 = 0U;
-    payload.reserved1 = 0U;
+    payload.revision = ui_session_state_.revision;
     dispatch_or_buffer_engine_message(std::move(message));
 }
 

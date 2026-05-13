@@ -1,7 +1,6 @@
 #pragma once
 
 #include "gs1_godot_adapter_service.h"
-#include "gs1_godot_projection_types.h"
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/control.hpp>
@@ -52,6 +51,18 @@ protected:
     static void _bind_methods();
 
 private:
+    struct HudState final
+    {
+        float player_health {0.0f};
+        float player_hydration {0.0f};
+        float player_nourishment {0.0f};
+        float player_energy {0.0f};
+        float player_morale {0.0f};
+        float current_money {0.0f};
+        float site_completion_normalized {0.0f};
+        std::uint32_t active_task_count {0U};
+    };
+
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
     void refresh_from_game_state_view();
@@ -90,8 +101,8 @@ private:
     SubmitUiActionFn submit_ui_action_ {};
     SubmitStorageViewFn submit_storage_view_ {};
     SubmitContextRequestFn submit_context_request_ {};
-    std::optional<Gs1RuntimeHudProjection> hud_ {};
-    std::vector<Gs1RuntimeInventoryStorageProjection> inventory_storages_ {};
+    std::optional<HudState> hud_ {};
+    int worker_pack_storage_id_ {0};
     int selected_tile_x_ {0};
     int selected_tile_y_ {0};
 };

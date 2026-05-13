@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gs1_godot_adapter_service.h"
-#include "gs1_godot_projection_types.h"
+#include "gs1/state_view.h"
 
 #include <godot_cpp/classes/base_button.hpp>
 #include <godot_cpp/classes/control.hpp>
@@ -14,6 +14,7 @@
 #include <godot_cpp/variant/vector2i.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -43,13 +44,8 @@ protected:
     static void _bind_methods();
 
 private:
-    [[nodiscard]] std::size_t site_tile_capacity(const Gs1RuntimeSiteProjection& site) const noexcept;
-    [[nodiscard]] std::optional<std::uint32_t> site_tile_index(
-        const Gs1RuntimeSiteProjection& site,
-        std::uint16_t x,
-        std::uint16_t y) const noexcept;
     void reset_site_state() noexcept;
-    void apply_site_message(const Gs1EngineMessage& message);
+    void refresh_from_game_state_view();
     void cache_adapter_service();
     void cache_ui_references();
     [[nodiscard]] godot::Control* resolve_ui_root();
@@ -60,8 +56,8 @@ private:
     void apply_selected_tile_if_needed();
     void mark_selected_tile_dirty();
     void clamp_selected_tile();
-    [[nodiscard]] const Gs1RuntimeSiteProjection* active_site() const;
-    [[nodiscard]] const Gs1RuntimeTileProjection* tile_at(const godot::Vector2i& tile_coord) const;
+    [[nodiscard]] const Gs1SiteStateView* active_site() const;
+    [[nodiscard]] bool query_tile_at(const godot::Vector2i& tile_coord, Gs1SiteTileView& out_tile) const;
     [[nodiscard]] int find_worker_pack_storage_id() const;
     [[nodiscard]] int find_selected_tile_storage_id();
     void plant_first_seed_on_selected_tile();
@@ -125,14 +121,9 @@ private:
     mutable std::unordered_map<int, godot::String> plant_name_cache_ {};
     mutable std::unordered_map<int, godot::String> structure_name_cache_ {};
 
-    std::optional<Gs1RuntimeSiteProjection> site_state_ {};
-    std::optional<Gs1RuntimeSiteProjection> pending_site_state_ {};
-    std::unordered_map<std::uint32_t, std::size_t> pending_inventory_storage_indices_ {};
-    std::unordered_map<std::uint64_t, std::size_t> pending_worker_pack_slot_indices_ {};
-    std::unordered_map<std::uint64_t, std::size_t> pending_opened_storage_slot_indices_ {};
-    std::unordered_map<std::uint32_t, std::size_t> pending_task_indices_ {};
-    std::unordered_map<std::uint32_t, std::size_t> pending_phone_listing_indices_ {};
-    std::unordered_map<std::uint32_t, std::size_t> pending_modifier_indices_ {};
+    std::optional<Gs1SiteStateView> site_state_ {};
+    std::vector<Gs1InventoryStorageView> inventory_storages_ {};
+    std::vector<Gs1InventorySlotView> inventory_slots_ {};
 
     godot::Control* site_panel_ {nullptr};
     godot::Label* tile_label_ {nullptr};

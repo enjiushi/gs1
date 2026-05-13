@@ -1,6 +1,7 @@
 #include "gs1_godot_site_hud_controller.h"
 
 #include "gs1_godot_controller_context.h"
+#include "support/currency.h"
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/callable_method_pointer.hpp>
@@ -293,38 +294,16 @@ void Gs1GodotSiteHudController::handle_tech_pressed()
 
 bool Gs1GodotSiteHudController::handles_engine_message(Gs1EngineMessageType type) const noexcept
 {
-    switch (type)
-    {
-    case GS1_ENGINE_MESSAGE_HUD_STATE:
-    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
-        return true;
-    default:
-        return false;
-    }
+    return type == GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY ||
+        type == GS1_ENGINE_MESSAGE_SET_APP_STATE;
 }
 
 void Gs1GodotSiteHudController::handle_engine_message(const Gs1EngineMessage& message)
 {
-    switch (message.type)
+    if (message.type == GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY ||
+        message.type == GS1_ENGINE_MESSAGE_SET_APP_STATE)
     {
-    case GS1_ENGINE_MESSAGE_HUD_STATE:
-        hud_ = message.payload_as<Gs1EngineMessageHudStateData>();
-        break;
-    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessagePresentationDirtyData>();
-        if ((payload.dirty_flags & (GS1_PRESENTATION_DIRTY_SITE | GS1_PRESENTATION_DIRTY_HUD)) != 0U)
-        {
-            refresh_from_game_state_view();
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
         refresh_from_game_state_view();
-        break;
-    default:
-        break;
     }
     rebuild_hud();
 }
@@ -332,12 +311,14 @@ void Gs1GodotSiteHudController::handle_engine_message(const Gs1EngineMessage& me
 void Gs1GodotSiteHudController::handle_runtime_message_reset()
 {
     hud_.reset();
-    inventory_storages_.clear();
+    worker_pack_storage_id_ = 0;
     rebuild_hud();
 }
 
 void Gs1GodotSiteHudController::refresh_from_game_state_view()
 {
+    hud_.reset();
+    worker_pack_storage_id_ = 0;
     if (adapter_service_ == nullptr)
     {
         return;
@@ -348,31 +329,33 @@ void Gs1GodotSiteHudController::refresh_from_game_state_view()
         view.has_active_site == 0U ||
         view.active_site == nullptr)
     {
-        inventory_storages_.clear();
         return;
     }
 
     const Gs1SiteStateView& site = *view.active_site;
-    inventory_storages_.clear();
-    inventory_storages_.reserve(site.storage_count);
-    for (std::uint32_t index = 0; index < site.storage_count; ++index)
+    HudState hud {};
+    hud.player_health = site.worker.health;
+    hud.player_hydration = site.worker.hydration;
+    hud.player_nourishment = site.worker.nourishment;
+    hud.player_energy = site.worker.energy;
+    hud.player_morale = site.worker.morale;
+    hud.current_money = gs1::cash_value_from_cash_points(site.current_cash_points);
+    hud.site_completion_normalized = site.counters.objective_progress_normalized;
+    for (std::uint32_t index = 0; index < site.task_count; ++index)
     {
-        const Gs1InventoryStorageView& storage_view = site.storages[index];
-        Gs1RuntimeInventoryStorageProjection storage {};
-        storage.storage_id = storage_view.storage_id;
-        storage.slot_count = static_cast<std::uint16_t>(std::min<std::uint32_t>(storage_view.slot_count, 65535U));
-        storage.tile_x = static_cast<std::int16_t>(storage_view.tile_x);
-        storage.tile_y = static_cast<std::int16_t>(storage_view.tile_y);
-        storage.container_kind = storage_view.container_kind;
-        storage.flags = static_cast<std::uint8_t>(storage_view.flags & 0xFFU);
-        inventory_storages_.push_back(storage);
+        if (site.tasks[index].runtime_list_kind != GS1_TASK_PRESENTATION_LIST_CLAIMED)
+        {
+            hud.active_task_count += 1U;
+        }
     }
+    worker_pack_storage_id_ = static_cast<int>(site.worker_pack_storage_id);
+    hud_ = hud;
 }
 
 void Gs1GodotSiteHudController::rebuild_hud()
 {
-    const Gs1RuntimeHudProjection fallback {};
-    const Gs1RuntimeHudProjection& hud = hud_.has_value() ? hud_.value() : fallback;
+    const HudState fallback {};
+    const HudState& hud = hud_.has_value() ? hud_.value() : fallback;
     refresh_meter(health_bar_, health_label_, "Health", hud.player_health);
     refresh_meter(hydration_bar_, hydration_label_, "Water", hud.player_hydration);
     refresh_meter(nourishment_bar_, nourishment_label_, "Food", hud.player_nourishment);
@@ -391,14 +374,7 @@ void Gs1GodotSiteHudController::rebuild_hud()
 
 int Gs1GodotSiteHudController::worker_pack_storage_id() const noexcept
 {
-    for (const auto& storage : inventory_storages_)
-    {
-        if (storage.container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK)
-        {
-            return static_cast<int>(storage.storage_id);
-        }
-    }
-    return 0;
+    return worker_pack_storage_id_;
 }
 
 void Gs1GodotSiteHudController::refresh_meter(ProgressBar* bar, Label* label, const char* name, float value)

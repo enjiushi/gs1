@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gs1_godot_adapter_service.h"
-#include "gs1_godot_projection_types.h"
+#include "gs1/state_view.h"
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/control.hpp>
@@ -31,6 +31,18 @@ class Gs1GodotRegionalSelectionPanelController final
 public:
     using SubmitUiActionFn = std::function<void(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1)>;
 
+    struct RegionalSiteState final
+    {
+        std::uint32_t site_id {0};
+        Gs1SiteState site_state {GS1_SITE_STATE_LOCKED};
+        std::int32_t grid_x {0};
+        std::int32_t grid_y {0};
+        std::uint32_t support_package_id {0};
+        std::uint32_t exported_support_item_offset {0};
+        std::uint32_t exported_support_item_count {0};
+        std::uint32_t nearby_aura_modifier_id_count {0};
+    };
+
     Gs1GodotRegionalSelectionPanelController() = default;
     ~Gs1GodotRegionalSelectionPanelController() override = default;
 
@@ -58,35 +70,15 @@ private:
         godot::ObjectID object_id {};
     };
 
-    struct PendingUiPanel final
-    {
-        Gs1UiPanelId panel_id {GS1_UI_PANEL_NONE};
-        std::uint32_t context_id {0};
-        std::vector<Gs1RuntimeUiPanelTextProjection> text_lines {};
-        std::vector<Gs1RuntimeUiPanelSlotActionProjection> slot_actions {};
-        std::vector<Gs1RuntimeUiPanelListItemProjection> list_items {};
-        std::vector<Gs1RuntimeUiPanelListActionProjection> list_actions {};
-    };
-
-    struct PendingRegionalMapState final
-    {
-        std::vector<Gs1RuntimeRegionalMapSiteProjection> sites {};
-        std::vector<Gs1RuntimeRegionalMapLinkProjection> links {};
-    };
-
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
     void submit_ui_action(std::int64_t action_type, std::int64_t target_id, std::int64_t arg0, std::int64_t arg1);
-    void reset_ui_panel_state() noexcept;
-    void apply_ui_panel_message(const Gs1EngineMessage& message);
-    void rebuild_ui_panel_indices() noexcept;
-    [[nodiscard]] const Gs1RuntimeUiPanelProjection* find_ui_panel(Gs1UiPanelId panel_id) const noexcept;
     void reset_regional_map_state() noexcept;
-    void apply_regional_map_message(const Gs1EngineMessage& message);
-    [[nodiscard]] const Gs1RuntimeRegionalMapSiteProjection* resolve_selected_site();
-    void apply_panel_visibility(const Gs1RuntimeRegionalMapSiteProjection* selected_site);
-    void apply_title_and_summary(const Gs1RuntimeRegionalMapSiteProjection* selected_site);
-    void refresh_selection_panel_actions_and_summaries(const Gs1RuntimeRegionalMapSiteProjection* selected_site);
+    void refresh_from_game_state_view();
+    [[nodiscard]] const RegionalSiteState* resolve_selected_site() const;
+    void apply_panel_visibility(const RegionalSiteState* selected_site);
+    void apply_title_and_summary(const RegionalSiteState* selected_site);
+    void refresh_selection_panel_actions_and_summaries(const RegionalSiteState* selected_site);
     void rebuild_selection_panel();
     void reconcile_action_buttons(const godot::Array& button_specs);
     [[nodiscard]] godot::Button* upsert_button_node(
@@ -99,21 +91,17 @@ private:
         std::unordered_map<std::uint64_t, ProjectedButtonRecord>& registry,
         const std::unordered_set<std::uint64_t>& desired_keys);
     [[nodiscard]] godot::String item_name_for(int item_id) const;
-    [[nodiscard]] godot::String faction_name_for(int faction_id) const;
-    [[nodiscard]] godot::String panel_text_line(const Gs1RuntimeUiPanelTextProjection& line) const;
-    [[nodiscard]] godot::String panel_slot_label(const Gs1RuntimeUiPanelSlotActionProjection& slot_action) const;
-    [[nodiscard]] godot::String selection_action_label(const godot::String& text, const godot::Dictionary& action) const;
-    [[nodiscard]] godot::String site_button_text(const Gs1RuntimeRegionalMapSiteProjection& site) const;
-    [[nodiscard]] godot::String site_tooltip(const Gs1RuntimeRegionalMapSiteProjection& site) const;
-    [[nodiscard]] godot::String site_state_name(int site_state) const;
-    [[nodiscard]] godot::String site_deployment_summary(const Gs1RuntimeRegionalMapSiteProjection& site) const;
-    [[nodiscard]] godot::String support_preview_text(int preview_mask) const;
-    [[nodiscard]] godot::Vector2i regional_grid_coord(const Gs1RuntimeRegionalMapSiteProjection& site) const;
-    void refresh_support_summary(const Gs1RuntimeUiPanelProjection* selection_panel);
-    void refresh_loadout_panel(const Gs1RuntimeUiPanelProjection* selection_panel);
+    [[nodiscard]] godot::String site_button_text(const RegionalSiteState& site) const;
+    [[nodiscard]] godot::String site_tooltip(const RegionalSiteState& site) const;
+    [[nodiscard]] godot::String site_state_name(Gs1SiteState site_state) const;
+    [[nodiscard]] godot::String site_deployment_summary(const RegionalSiteState& site) const;
+    [[nodiscard]] godot::String support_preview_text(const RegionalSiteState& site) const;
+    [[nodiscard]] godot::Vector2i regional_grid_coord(const RegionalSiteState& site) const;
+    void refresh_support_summary(const RegionalSiteState* selected_site);
+    void refresh_loadout_panel();
     [[nodiscard]] godot::Ref<godot::Texture2D> item_icon_for(std::uint32_t item_id) const;
     [[nodiscard]] godot::Ref<godot::Texture2D> load_cached_texture(const godot::String& path) const;
-    [[nodiscard]] std::uint64_t loadout_slot_key(std::uint32_t slot_id) const noexcept;
+    [[nodiscard]] std::uint64_t loadout_slot_key(std::uint32_t item_id, std::uint32_t slot_index) const noexcept;
     godot::Button* upsert_loadout_slot_button(
         std::uint64_t stable_key,
         const godot::String& node_name,
@@ -131,21 +119,11 @@ private:
     godot::Label* loadout_empty_label_ {nullptr};
     godot::VBoxContainer* actions_ {nullptr};
     SubmitUiActionFn submit_ui_action_ {};
-    std::vector<Gs1RuntimeUiPanelProjection> ui_panels_ {};
-    std::optional<PendingUiPanel> pending_ui_panel_ {};
-    std::unordered_map<std::uint16_t, std::size_t> ui_panel_indices_ {};
-    std::unordered_map<std::uint16_t, std::size_t> pending_ui_panel_text_line_indices_ {};
-    std::unordered_map<std::uint16_t, std::size_t> pending_ui_panel_slot_action_indices_ {};
-    std::unordered_map<std::uint64_t, std::size_t> pending_ui_panel_list_item_indices_ {};
-    std::unordered_map<std::uint64_t, std::size_t> pending_ui_panel_list_action_indices_ {};
-    std::optional<std::uint32_t> selected_site_projection_id_ {};
-    std::vector<Gs1RuntimeRegionalMapSiteProjection> sites_ {};
-    std::vector<Gs1RuntimeRegionalMapLinkProjection> links_ {};
-    std::optional<PendingRegionalMapState> pending_regional_map_state_ {};
+    std::vector<RegionalSiteState> sites_ {};
+    std::vector<Gs1LoadoutSlotView> selected_site_loadout_slots_ {};
     int selected_site_id_ {0};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> action_buttons_ {};
     std::unordered_map<std::uint64_t, LoadoutSlotRecord> loadout_slot_buttons_ {};
     mutable std::unordered_map<int, godot::String> item_name_cache_ {};
-    mutable std::unordered_map<int, godot::String> faction_name_cache_ {};
     mutable std::unordered_map<std::string, godot::Ref<godot::Texture2D>> texture_cache_ {};
 };

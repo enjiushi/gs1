@@ -1,7 +1,6 @@
 #pragma once
 
 #include "gs1_godot_adapter_service.h"
-#include "gs1_godot_projection_types.h"
 
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/rich_text_label.hpp>
@@ -20,6 +19,23 @@ public:
     Gs1GodotRegionalSummaryPanelController() = default;
     ~Gs1GodotRegionalSummaryPanelController() override = default;
 
+    struct RegionalSiteState final
+    {
+        std::uint32_t site_id {0};
+        Gs1SiteState site_state {GS1_SITE_STATE_LOCKED};
+        std::int32_t grid_x {0};
+        std::int32_t grid_y {0};
+        std::uint32_t support_package_id {0};
+        std::uint32_t exported_support_item_count {0};
+        std::uint32_t nearby_aura_modifier_count {0};
+    };
+
+    struct RegionalLinkState final
+    {
+        std::uint32_t from_site_id {0};
+        std::uint32_t to_site_id {0};
+    };
+
     void _ready() override;
     void _exit_tree() override;
 
@@ -32,29 +48,21 @@ protected:
     static void _bind_methods();
 
 private:
-    struct PendingRegionalMapState final
-    {
-        std::vector<Gs1RuntimeRegionalMapSiteProjection> sites {};
-        std::vector<Gs1RuntimeRegionalMapLinkProjection> links {};
-    };
-
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
-    void reset_regional_map_state() noexcept;
-    void apply_regional_map_message(const Gs1EngineMessage& message);
+    void refresh_from_game_state_view();
     void apply_summary_text();
     void apply_graph_text();
     [[nodiscard]] godot::String build_regional_map_overview_text(
-        const std::vector<Gs1RuntimeRegionalMapSiteProjection>& sites,
-        const std::vector<Gs1RuntimeRegionalMapLinkProjection>& links) const;
+        const std::vector<RegionalSiteState>& sites,
+        const std::vector<RegionalLinkState>& links) const;
 
     godot::Control* owner_control_ {nullptr};
     Gs1GodotAdapterService* adapter_service_ {nullptr};
     godot::RichTextLabel* regional_map_summary_ {nullptr};
     godot::RichTextLabel* regional_map_graph_ {nullptr};
     std::optional<std::uint32_t> selected_site_id_ {};
-    std::vector<Gs1RuntimeRegionalMapSiteProjection> sites_ {};
-    std::vector<Gs1RuntimeRegionalMapLinkProjection> links_ {};
-    std::optional<PendingRegionalMapState> pending_regional_map_state_ {};
-    std::optional<Gs1RuntimeCampaignResourcesProjection> campaign_resources_ {};
+    std::vector<RegionalSiteState> sites_ {};
+    std::vector<RegionalLinkState> links_ {};
+    std::int32_t total_reputation_ {0};
 };

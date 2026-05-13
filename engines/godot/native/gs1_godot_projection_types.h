@@ -133,12 +133,7 @@ using Gs1RuntimePlacementPreviewTileProjection = Gs1EngineMessagePlacementPrevie
 using Gs1RuntimePlacementFailureProjection = Gs1EngineMessagePlacementFailureData;
 using Gs1RuntimeTaskProjection = Gs1EngineMessageTaskData;
 using Gs1RuntimePhoneListingProjection = Gs1EngineMessagePhoneListingData;
-using Gs1RuntimePhonePanelProjection = Gs1EngineMessagePhonePanelData;
-using Gs1RuntimeProtectionOverlayProjection = Gs1EngineMessageSiteProtectionOverlayData;
 using Gs1RuntimeModifierProjection = Gs1EngineMessageSiteModifierData;
-using Gs1RuntimeHudProjection = Gs1EngineMessageHudStateData;
-using Gs1RuntimeCampaignResourcesProjection = Gs1EngineMessageCampaignResourcesData;
-using Gs1RuntimeSiteActionProjection = Gs1EngineMessageSiteActionData;
 using Gs1RuntimeSiteResultProjection = Gs1EngineMessageSiteResultData;
 
 struct Gs1RuntimeOneShotCueProjection final
@@ -165,8 +160,6 @@ struct Gs1RuntimeSiteProjection final
     std::vector<Gs1RuntimeModifierProjection> active_modifiers {};
     std::vector<Gs1RuntimePhoneListingProjection> phone_listings {};
     bool worker_pack_open {false};
-    Gs1RuntimePhonePanelProjection phone_panel {};
-    Gs1RuntimeProtectionOverlayProjection protection_overlay {};
     std::optional<Gs1RuntimeInventoryViewProjection> opened_storage {};
     std::optional<Gs1RuntimeCraftContextProjection> craft_context {};
     std::optional<Gs1RuntimePlacementPreviewProjection> placement_preview {};

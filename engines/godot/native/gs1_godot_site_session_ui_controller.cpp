@@ -8,103 +8,17 @@
 
 #include <godot_cpp/classes/input_event_key.hpp>
 #include <godot_cpp/classes/label.hpp>
-#include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/object.hpp>
 #include <godot_cpp/core/property_info.hpp>
 
 #include <algorithm>
-#include <limits>
 #include <string_view>
-#include <utility>
 
 using namespace godot;
 
 namespace
 {
-constexpr std::uint16_t k_invalid_tile_coordinate = std::numeric_limits<std::uint16_t>::max();
-
-template <typename Projection, typename Key, typename KeyFn>
-void upsert_projection(std::vector<Projection>& projections, Projection projection, Key key, KeyFn&& key_fn)
-{
-    const auto existing = std::find_if(projections.begin(), projections.end(), [&](const Projection& item) {
-        return key_fn(item) == key;
-    });
-    if (existing != projections.end())
-    {
-        *existing = std::move(projection);
-    }
-    else
-    {
-        projections.push_back(std::move(projection));
-    }
-}
-
-void sort_inventory_slots(std::vector<Gs1RuntimeInventorySlotProjection>& slots)
-{
-    std::sort(slots.begin(), slots.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.storage_id != rhs.storage_id)
-        {
-            return lhs.storage_id < rhs.storage_id;
-        }
-        return lhs.slot_index < rhs.slot_index;
-    });
-}
-
-void sort_inventory_storages(std::vector<Gs1RuntimeInventoryStorageProjection>& storages)
-{
-    std::sort(storages.begin(), storages.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.container_kind != rhs.container_kind)
-        {
-            return lhs.container_kind < rhs.container_kind;
-        }
-        return lhs.storage_id < rhs.storage_id;
-    });
-}
-
-void sort_tasks(std::vector<Gs1RuntimeTaskProjection>& tasks)
-{
-    std::sort(tasks.begin(), tasks.end(), [](const auto& lhs, const auto& rhs) {
-        return lhs.task_instance_id < rhs.task_instance_id;
-    });
-}
-
-void sort_phone_listings(std::vector<Gs1RuntimePhoneListingProjection>& listings)
-{
-    std::sort(listings.begin(), listings.end(), [](const auto& lhs, const auto& rhs) {
-        return lhs.listing_id < rhs.listing_id;
-    });
-}
-
-void sort_modifiers(std::vector<Gs1RuntimeModifierProjection>& modifiers)
-{
-    std::sort(modifiers.begin(), modifiers.end(), [](const auto& lhs, const auto& rhs) {
-        return lhs.modifier_id < rhs.modifier_id;
-    });
-}
-
-void sort_craft_options(std::vector<Gs1RuntimeCraftContextOptionProjection>& options)
-{
-    std::sort(options.begin(), options.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.output_item_id != rhs.output_item_id)
-        {
-            return lhs.output_item_id < rhs.output_item_id;
-        }
-        return lhs.recipe_id < rhs.recipe_id;
-    });
-}
-
-void sort_placement_preview_tiles(std::vector<Gs1RuntimePlacementPreviewTileProjection>& tiles)
-{
-    std::sort(tiles.begin(), tiles.end(), [](const auto& lhs, const auto& rhs) {
-        if (lhs.y != rhs.y)
-        {
-            return lhs.y < rhs.y;
-        }
-        return lhs.x < rhs.x;
-    });
-}
-
 String string_from_view(std::string_view value)
 {
     return String::utf8(value.data(), static_cast<int>(value.size()));
@@ -130,6 +44,9 @@ void Gs1GodotSiteSessionUiController::_ready()
     cache_adapter_service();
     cache_ui_references();
     wire_static_buttons();
+    refresh_from_game_state_view();
+    refresh_visibility();
+    apply_selected_tile_if_needed();
     set_process_input(true);
 }
 
@@ -156,6 +73,51 @@ void Gs1GodotSiteSessionUiController::set_ui_root_path(const NodePath& path)
 NodePath Gs1GodotSiteSessionUiController::get_ui_root_path() const
 {
     return ui_root_path_;
+}
+
+void Gs1GodotSiteSessionUiController::reset_site_state() noexcept
+{
+    site_state_.reset();
+    inventory_storages_.clear();
+    inventory_slots_.clear();
+}
+
+void Gs1GodotSiteSessionUiController::refresh_from_game_state_view()
+{
+    reset_site_state();
+    if (adapter_service_ == nullptr)
+    {
+        return;
+    }
+
+    Gs1GameStateView view {};
+    if (!adapter_service_->get_game_state_view(view))
+    {
+        return;
+    }
+
+    current_app_state_ = static_cast<int>(view.app_state);
+    if (view.has_active_site == 0U || view.active_site == nullptr)
+    {
+        return;
+    }
+
+    site_state_ = *view.active_site;
+    if (site_state_->storage_count > 0U && site_state_->storages != nullptr)
+    {
+        inventory_storages_.assign(
+            site_state_->storages,
+            site_state_->storages + site_state_->storage_count);
+    }
+    if (site_state_->storage_slot_count > 0U && site_state_->storage_slots != nullptr)
+    {
+        inventory_slots_.assign(
+            site_state_->storage_slots,
+            site_state_->storage_slots + site_state_->storage_slot_count);
+    }
+
+    site_state_->storages = inventory_storages_.empty() ? nullptr : inventory_storages_.data();
+    site_state_->storage_slots = inventory_slots_.empty() ? nullptr : inventory_slots_.data();
 }
 
 void Gs1GodotSiteSessionUiController::cache_adapter_service()
@@ -250,509 +212,24 @@ void Gs1GodotSiteSessionUiController::bind_button(BaseButton* button, const Call
     button->connect("pressed", callback);
 }
 
-std::size_t Gs1GodotSiteSessionUiController::site_tile_capacity(const Gs1RuntimeSiteProjection& site) const noexcept
-{
-    return static_cast<std::size_t>(site.width) * static_cast<std::size_t>(site.height);
-}
-
-std::optional<std::uint32_t> Gs1GodotSiteSessionUiController::site_tile_index(
-    const Gs1RuntimeSiteProjection& site,
-    std::uint16_t x,
-    std::uint16_t y) const noexcept
-{
-    if (x >= site.width || y >= site.height)
-    {
-        return std::nullopt;
-    }
-    return static_cast<std::uint32_t>(
-        static_cast<std::size_t>(y) * static_cast<std::size_t>(site.width) + static_cast<std::size_t>(x));
-}
-
-void Gs1GodotSiteSessionUiController::reset_site_state() noexcept
-{
-    site_state_.reset();
-    pending_site_state_.reset();
-    pending_inventory_storage_indices_.clear();
-    pending_worker_pack_slot_indices_.clear();
-    pending_opened_storage_slot_indices_.clear();
-    pending_task_indices_.clear();
-    pending_phone_listing_indices_.clear();
-    pending_modifier_indices_.clear();
-}
-
-void Gs1GodotSiteSessionUiController::apply_site_message(const Gs1EngineMessage& message)
-{
-    switch (message.type)
-    {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessageSiteSnapshotData>();
-        if (payload.mode == GS1_PROJECTION_MODE_DELTA && site_state_.has_value())
-        {
-            pending_site_state_ = site_state_;
-        }
-        else
-        {
-            pending_site_state_ = Gs1RuntimeSiteProjection {};
-        }
-        pending_site_state_->site_id = payload.site_id;
-        pending_site_state_->site_archetype_id = payload.site_archetype_id;
-        pending_site_state_->width = payload.width;
-        pending_site_state_->height = payload.height;
-        pending_inventory_storage_indices_.clear();
-        pending_worker_pack_slot_indices_.clear();
-        pending_opened_storage_slot_indices_.clear();
-        pending_task_indices_.clear();
-        pending_phone_listing_indices_.clear();
-        pending_modifier_indices_.clear();
-        if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
-        {
-            pending_site_state_->tiles.assign(site_tile_capacity(*pending_site_state_), Gs1RuntimeTileProjection {});
-            for (Gs1RuntimeTileProjection& tile : pending_site_state_->tiles)
-            {
-                tile.x = k_invalid_tile_coordinate;
-                tile.y = k_invalid_tile_coordinate;
-            }
-            pending_site_state_->inventory_storages.clear();
-            pending_site_state_->worker_pack_slots.clear();
-            pending_site_state_->tasks.clear();
-            pending_site_state_->active_modifiers.clear();
-            pending_site_state_->phone_listings.clear();
-            pending_site_state_->worker_pack_open = false;
-            pending_site_state_->phone_panel = Gs1RuntimePhonePanelProjection {};
-            pending_site_state_->protection_overlay = Gs1RuntimeProtectionOverlayProjection {};
-            pending_site_state_->opened_storage.reset();
-            pending_site_state_->craft_context.reset();
-            pending_site_state_->placement_preview.reset();
-            pending_site_state_->placement_preview_tiles.clear();
-            pending_site_state_->placement_failure.reset();
-            pending_site_state_->worker.reset();
-            pending_site_state_->camp.reset();
-            pending_site_state_->weather.reset();
-        }
-        else if (pending_site_state_->tiles.size() != site_tile_capacity(*pending_site_state_))
-        {
-            pending_site_state_->tiles.assign(site_tile_capacity(*pending_site_state_), Gs1RuntimeTileProjection {});
-            for (Gs1RuntimeTileProjection& tile : pending_site_state_->tiles)
-            {
-                tile.x = k_invalid_tile_coordinate;
-                tile.y = k_invalid_tile_coordinate;
-            }
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT:
-    {
-        if (!pending_site_state_.has_value())
-        {
-            break;
-        }
-        Gs1RuntimeTileProjection projection = message.payload_as<Gs1EngineMessageSiteTileData>();
-        const auto tile_index = site_tile_index(*pending_site_state_, projection.x, projection.y);
-        if (tile_index.has_value())
-        {
-            pending_site_state_->tiles[*tile_index] = projection;
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE:
-        if (pending_site_state_.has_value()) pending_site_state_->worker = message.payload_as<Gs1EngineMessageWorkerData>();
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_CAMP_UPDATE:
-        if (pending_site_state_.has_value()) pending_site_state_->camp = message.payload_as<Gs1EngineMessageCampData>();
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_WEATHER_UPDATE:
-        if (pending_site_state_.has_value()) pending_site_state_->weather = message.payload_as<Gs1EngineMessageWeatherData>();
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT:
-    {
-        if (!pending_site_state_.has_value())
-        {
-            break;
-        }
-        Gs1RuntimeInventoryStorageProjection projection = message.payload_as<Gs1EngineMessageInventoryStorageData>();
-        const auto found = pending_inventory_storage_indices_.find(projection.storage_id);
-        if (found != pending_inventory_storage_indices_.end() &&
-            found->second < pending_site_state_->inventory_storages.size())
-        {
-            pending_site_state_->inventory_storages[found->second] = projection;
-        }
-        else
-        {
-            pending_inventory_storage_indices_[projection.storage_id] = pending_site_state_->inventory_storages.size();
-            pending_site_state_->inventory_storages.push_back(projection);
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT:
-    {
-        if (!pending_site_state_.has_value())
-        {
-            break;
-        }
-        Gs1RuntimeInventorySlotProjection projection = message.payload_as<Gs1EngineMessageInventorySlotData>();
-        std::vector<Gs1RuntimeInventorySlotProjection>* slots = nullptr;
-        if (projection.container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK)
-        {
-            slots = &pending_site_state_->worker_pack_slots;
-        }
-        else if (pending_site_state_->opened_storage.has_value() &&
-                 pending_site_state_->opened_storage->storage_id == projection.storage_id)
-        {
-            slots = &pending_site_state_->opened_storage->slots;
-        }
-        if (slots == nullptr)
-        {
-            break;
-        }
-        const std::uint64_t slot_key =
-            (static_cast<std::uint64_t>(projection.storage_id) << 32U) | projection.slot_index;
-        auto& slot_indices =
-            slots == &pending_site_state_->worker_pack_slots
-                ? pending_worker_pack_slot_indices_
-                : pending_opened_storage_slot_indices_;
-        const auto found = slot_indices.find(slot_key);
-        if (found != slot_indices.end() && found->second < slots->size())
-        {
-            (*slots)[found->second] = projection;
-        }
-        else
-        {
-            slot_indices[slot_key] = slots->size();
-            slots->push_back(projection);
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE:
-    {
-        if (!pending_site_state_.has_value())
-        {
-            break;
-        }
-        const auto& payload = message.payload_as<Gs1EngineMessageInventoryViewData>();
-        const auto storage = std::find_if(
-            pending_site_state_->inventory_storages.begin(),
-            pending_site_state_->inventory_storages.end(),
-            [&](const auto& projection) { return projection.storage_id == payload.storage_id; });
-        const bool is_worker_pack_storage =
-            storage != pending_site_state_->inventory_storages.end() &&
-            storage->container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK;
-        if (is_worker_pack_storage)
-        {
-            pending_site_state_->worker_pack_open = payload.event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT;
-            break;
-        }
-        if (payload.event_kind == GS1_INVENTORY_VIEW_EVENT_CLOSE)
-        {
-            if (pending_site_state_->opened_storage.has_value() &&
-                pending_site_state_->opened_storage->storage_id == payload.storage_id)
-            {
-                pending_site_state_->opened_storage.reset();
-            }
-            break;
-        }
-        if (payload.event_kind == GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT)
-        {
-            pending_site_state_->opened_storage = Gs1RuntimeInventoryViewProjection {};
-            pending_site_state_->opened_storage->storage_id = payload.storage_id;
-            pending_site_state_->opened_storage->slot_count = payload.slot_count;
-            pending_site_state_->opened_storage->slots.clear();
-            pending_opened_storage_slot_indices_.clear();
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_BEGIN:
-    {
-        if (!pending_site_state_.has_value())
-        {
-            break;
-        }
-        const auto& payload = message.payload_as<Gs1EngineMessageCraftContextData>();
-        pending_site_state_->craft_context = Gs1RuntimeCraftContextProjection {};
-        pending_site_state_->craft_context->tile_x = payload.tile_x;
-        pending_site_state_->craft_context->tile_y = payload.tile_y;
-        pending_site_state_->craft_context->flags = payload.flags;
-        pending_site_state_->craft_context->options.clear();
-        pending_site_state_->craft_context->options.reserve(payload.option_count);
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_OPTION_UPSERT:
-        if (pending_site_state_.has_value() && pending_site_state_->craft_context.has_value())
-        {
-            pending_site_state_->craft_context->options.push_back(
-                message.payload_as<Gs1EngineMessageCraftContextOptionData>());
-        }
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_END:
-        if (pending_site_state_.has_value() && pending_site_state_->craft_context.has_value())
-        {
-            sort_craft_options(pending_site_state_->craft_context->options);
-        }
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW:
-    {
-        if (!pending_site_state_.has_value())
-        {
-            break;
-        }
-        const auto& payload = message.payload_as<Gs1EngineMessagePlacementPreviewData>();
-        if ((payload.flags & 1U) == 0U)
-        {
-            pending_site_state_->placement_preview.reset();
-            pending_site_state_->placement_preview_tiles.clear();
-        }
-        else
-        {
-            pending_site_state_->placement_preview = payload;
-            pending_site_state_->placement_preview_tiles.clear();
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW_TILE_UPSERT:
-    {
-        if (!pending_site_state_.has_value())
-        {
-            break;
-        }
-        Gs1RuntimePlacementPreviewTileProjection projection =
-            message.payload_as<Gs1EngineMessagePlacementPreviewTileData>();
-        upsert_projection(
-            pending_site_state_->placement_preview_tiles,
-            projection,
-            (static_cast<std::uint64_t>(static_cast<std::uint16_t>(projection.x)) << 16U) |
-                static_cast<std::uint16_t>(projection.y),
-            [](const auto& tile) {
-                return (static_cast<std::uint64_t>(static_cast<std::uint16_t>(tile.x)) << 16U) |
-                       static_cast<std::uint16_t>(tile.y);
-            });
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_FAILURE:
-    {
-        auto* site =
-            pending_site_state_.has_value() ? &pending_site_state_.value()
-                                            : (site_state_.has_value() ? &site_state_.value() : nullptr);
-        if (site != nullptr)
-        {
-            site->placement_failure = message.payload_as<Gs1EngineMessagePlacementFailureData>();
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT:
-    {
-        if (!pending_site_state_.has_value())
-        {
-            break;
-        }
-        Gs1RuntimeTaskProjection projection = message.payload_as<Gs1EngineMessageTaskData>();
-        const auto found = pending_task_indices_.find(projection.task_instance_id);
-        if (found != pending_task_indices_.end() && found->second < pending_site_state_->tasks.size())
-        {
-            pending_site_state_->tasks[found->second] = projection;
-        }
-        else
-        {
-            pending_task_indices_[projection.task_instance_id] = pending_site_state_->tasks.size();
-            pending_site_state_->tasks.push_back(projection);
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_TASK_REMOVE:
-    {
-        if (!pending_site_state_.has_value())
-        {
-            break;
-        }
-        const auto& payload = message.payload_as<Gs1EngineMessageTaskData>();
-        const auto found = pending_task_indices_.find(payload.task_instance_id);
-        if (found == pending_task_indices_.end() || found->second >= pending_site_state_->tasks.size())
-        {
-            break;
-        }
-        const std::size_t index = found->second;
-        const std::size_t last_index = pending_site_state_->tasks.size() - 1U;
-        if (index != last_index)
-        {
-            pending_site_state_->tasks[index] = std::move(pending_site_state_->tasks[last_index]);
-            pending_task_indices_[pending_site_state_->tasks[index].task_instance_id] = index;
-        }
-        pending_site_state_->tasks.pop_back();
-        pending_task_indices_.erase(found);
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT:
-    {
-        if (!pending_site_state_.has_value())
-        {
-            break;
-        }
-        Gs1RuntimePhoneListingProjection projection = message.payload_as<Gs1EngineMessagePhoneListingData>();
-        const auto found = pending_phone_listing_indices_.find(projection.listing_id);
-        if (found != pending_phone_listing_indices_.end() &&
-            found->second < pending_site_state_->phone_listings.size())
-        {
-            pending_site_state_->phone_listings[found->second] = projection;
-        }
-        else
-        {
-            pending_phone_listing_indices_[projection.listing_id] = pending_site_state_->phone_listings.size();
-            pending_site_state_->phone_listings.push_back(projection);
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE:
-    {
-        if (!pending_site_state_.has_value())
-        {
-            break;
-        }
-        const auto& payload = message.payload_as<Gs1EngineMessagePhoneListingData>();
-        const auto found = pending_phone_listing_indices_.find(payload.listing_id);
-        if (found == pending_phone_listing_indices_.end() ||
-            found->second >= pending_site_state_->phone_listings.size())
-        {
-            break;
-        }
-        const std::size_t index = found->second;
-        const std::size_t last_index = pending_site_state_->phone_listings.size() - 1U;
-        if (index != last_index)
-        {
-            pending_site_state_->phone_listings[index] = std::move(pending_site_state_->phone_listings[last_index]);
-            pending_phone_listing_indices_[pending_site_state_->phone_listings[index].listing_id] = index;
-        }
-        pending_site_state_->phone_listings.pop_back();
-        pending_phone_listing_indices_.erase(found);
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
-        if (pending_site_state_.has_value()) pending_site_state_->phone_panel = message.payload_as<Gs1EngineMessagePhonePanelData>();
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_MODIFIER_LIST_BEGIN:
-    {
-        if (!pending_site_state_.has_value())
-        {
-            break;
-        }
-        const auto& payload = message.payload_as<Gs1EngineMessageSiteModifierListData>();
-        if (payload.mode == GS1_PROJECTION_MODE_SNAPSHOT)
-        {
-            pending_site_state_->active_modifiers.clear();
-        }
-        pending_site_state_->active_modifiers.reserve(payload.modifier_count);
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_MODIFIER_UPSERT:
-    {
-        if (!pending_site_state_.has_value())
-        {
-            break;
-        }
-        Gs1RuntimeModifierProjection projection = message.payload_as<Gs1EngineMessageSiteModifierData>();
-        const auto found = pending_modifier_indices_.find(projection.modifier_id);
-        if (found != pending_modifier_indices_.end() &&
-            found->second < pending_site_state_->active_modifiers.size())
-        {
-            pending_site_state_->active_modifiers[found->second] = projection;
-        }
-        else
-        {
-            pending_modifier_indices_[projection.modifier_id] = pending_site_state_->active_modifiers.size();
-            pending_site_state_->active_modifiers.push_back(projection);
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE:
-    {
-        auto* site =
-            pending_site_state_.has_value() ? &pending_site_state_.value()
-                                            : (site_state_.has_value() ? &site_state_.value() : nullptr);
-        if (site != nullptr)
-        {
-            site->protection_overlay = message.payload_as<Gs1EngineMessageSiteProtectionOverlayData>();
-        }
-        break;
-    }
-    case GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE:
-        break;
-    case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
-    {
-        if (!pending_site_state_.has_value())
-        {
-            break;
-        }
-        sort_inventory_storages(pending_site_state_->inventory_storages);
-        sort_inventory_slots(pending_site_state_->worker_pack_slots);
-        if (pending_site_state_->opened_storage.has_value())
-        {
-            sort_inventory_slots(pending_site_state_->opened_storage->slots);
-        }
-        sort_tasks(pending_site_state_->tasks);
-        sort_modifiers(pending_site_state_->active_modifiers);
-        sort_phone_listings(pending_site_state_->phone_listings);
-        sort_placement_preview_tiles(pending_site_state_->placement_preview_tiles);
-        site_state_ = std::move(pending_site_state_);
-        pending_site_state_.reset();
-        pending_inventory_storage_indices_.clear();
-        pending_worker_pack_slot_indices_.clear();
-        pending_opened_storage_slot_indices_.clear();
-        pending_task_indices_.clear();
-        pending_phone_listing_indices_.clear();
-        pending_modifier_indices_.clear();
-        break;
-    }
-    default:
-        break;
-    }
-}
-
 bool Gs1GodotSiteSessionUiController::handles_engine_message(Gs1EngineMessageType type) const noexcept
 {
-    switch (type)
-    {
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT:
-    case GS1_ENGINE_MESSAGE_SITE_TILE_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE:
-    case GS1_ENGINE_MESSAGE_SITE_CAMP_UPDATE:
-    case GS1_ENGINE_MESSAGE_SITE_WEATHER_UPDATE:
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_STORAGE_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_SLOT_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_INVENTORY_VIEW_STATE:
-    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_BEGIN:
-    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_OPTION_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_CRAFT_CONTEXT_END:
-    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW:
-    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_PREVIEW_TILE_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_FAILURE:
-    case GS1_ENGINE_MESSAGE_SITE_TASK_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_TASK_REMOVE:
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_LISTING_REMOVE:
-    case GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE:
-    case GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE:
-    case GS1_ENGINE_MESSAGE_SITE_MODIFIER_LIST_BEGIN:
-    case GS1_ENGINE_MESSAGE_SITE_MODIFIER_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE:
-    case GS1_ENGINE_MESSAGE_END_SITE_SNAPSHOT:
-        return true;
-    default:
-        return false;
-    }
+    return type == GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY ||
+        type == GS1_ENGINE_MESSAGE_SET_APP_STATE;
 }
 
 void Gs1GodotSiteSessionUiController::handle_engine_message(const Gs1EngineMessage& message)
 {
-    if (message.type == GS1_ENGINE_MESSAGE_SET_APP_STATE)
+    if (message.type == GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY ||
+        message.type == GS1_ENGINE_MESSAGE_SET_APP_STATE)
     {
-        current_app_state_ = static_cast<int>(message.payload_as<Gs1EngineMessageSetAppStateData>().app_state);
+        refresh_from_game_state_view();
         if (current_app_state_ < APP_STATE_SITE_LOADING || current_app_state_ > APP_STATE_SITE_RESULT)
         {
-            reset_site_state();
             cached_storage_lookup_.clear();
         }
     }
 
-    apply_site_message(message);
     refresh_visibility();
     mark_selected_tile_dirty();
     apply_selected_tile_if_needed();
@@ -807,7 +284,7 @@ void Gs1GodotSiteSessionUiController::handle_input_event(const Ref<InputEvent>& 
 
 void Gs1GodotSiteSessionUiController::refresh_visibility()
 {
-    const bool has_site_projection = site_state_.has_value() || pending_site_state_.has_value();
+    const bool has_site_projection = site_state_.has_value();
     const bool site_visible =
         has_site_projection ||
         (current_app_state_ >= APP_STATE_SITE_LOADING &&
@@ -832,22 +309,23 @@ void Gs1GodotSiteSessionUiController::refresh_selected_tile_if_needed()
     }
 
     clamp_selected_tile();
-    const Gs1RuntimeTileProjection* selected_tile = tile_at(selected_tile_);
+    Gs1SiteTileView selected_tile_view {};
+    const bool has_tile = query_tile_at(selected_tile_, selected_tile_view);
     if (tile_label_ != nullptr)
     {
         String tile_text = vformat(
             "Selected Tile: (%d, %d)  Plant: %s  Structure: %s",
             selected_tile_.x,
             selected_tile_.y,
-            selected_tile != nullptr && selected_tile->plant_type_id != 0U ? plant_name_for(static_cast<int>(selected_tile->plant_type_id)) : String("None"),
-            selected_tile != nullptr && selected_tile->structure_type_id != 0U ? structure_name_for(static_cast<int>(selected_tile->structure_type_id)) : String("None"));
-        if (selected_tile != nullptr)
+            has_tile && selected_tile_view.plant_id != 0U ? plant_name_for(static_cast<int>(selected_tile_view.plant_id)) : String("None"),
+            has_tile && selected_tile_view.structure_id != 0U ? structure_name_for(static_cast<int>(selected_tile_view.structure_id)) : String("None"));
+        if (has_tile)
         {
             tile_text += vformat(
                 "  Wind %.2f  Moisture %.2f  Fertility %.2f",
-                selected_tile->local_wind,
-                selected_tile->moisture,
-                selected_tile->soil_fertility);
+                selected_tile_view.local_wind,
+                selected_tile_view.moisture,
+                selected_tile_view.soil_fertility);
         }
         tile_label_->set_text(tile_text);
     }
@@ -869,14 +347,14 @@ void Gs1GodotSiteSessionUiController::mark_selected_tile_dirty()
 
 void Gs1GodotSiteSessionUiController::clamp_selected_tile()
 {
-    const Gs1RuntimeSiteProjection* site_state = active_site();
-    const int width = std::max(1, site_state != nullptr ? static_cast<int>(site_state->width) : 1);
-    const int height = std::max(1, site_state != nullptr ? static_cast<int>(site_state->height) : 1);
+    const Gs1SiteStateView* site_state = active_site();
+    const int width = std::max(1, site_state != nullptr ? static_cast<int>(site_state->tile_width) : 1);
+    const int height = std::max(1, site_state != nullptr ? static_cast<int>(site_state->tile_height) : 1);
     selected_tile_.x = std::clamp(selected_tile_.x, 0, width - 1);
     selected_tile_.y = std::clamp(selected_tile_.y, 0, height - 1);
 }
 
-const Gs1RuntimeSiteProjection* Gs1GodotSiteSessionUiController::active_site() const
+const Gs1SiteStateView* Gs1GodotSiteSessionUiController::active_site() const
 {
     if (!site_state_.has_value())
     {
@@ -885,57 +363,45 @@ const Gs1RuntimeSiteProjection* Gs1GodotSiteSessionUiController::active_site() c
     return &site_state_.value();
 }
 
-const Gs1RuntimeTileProjection* Gs1GodotSiteSessionUiController::tile_at(const Vector2i& tile_coord) const
+bool Gs1GodotSiteSessionUiController::query_tile_at(const Vector2i& tile_coord, Gs1SiteTileView& out_tile) const
 {
-    const Gs1RuntimeSiteProjection* site_state = active_site();
-    if (site_state == nullptr || site_state->width == 0 || site_state->height == 0)
+    const Gs1SiteStateView* site_state = active_site();
+    if (site_state == nullptr || site_state->tile_width == 0U || site_state->tile_height == 0U)
     {
-        return nullptr;
+        return false;
     }
     if (tile_coord.x < 0 || tile_coord.y < 0 ||
-        tile_coord.x >= site_state->width || tile_coord.y >= site_state->height)
+        tile_coord.x >= static_cast<int>(site_state->tile_width) ||
+        tile_coord.y >= static_cast<int>(site_state->tile_height))
     {
-        return nullptr;
+        return false;
+    }
+    if (adapter_service_ == nullptr)
+    {
+        return false;
     }
 
-    const std::size_t index =
-        static_cast<std::size_t>(tile_coord.y) * static_cast<std::size_t>(site_state->width) +
-        static_cast<std::size_t>(tile_coord.x);
-    if (index >= site_state->tiles.size())
-    {
-        return nullptr;
-    }
-
-    return &site_state->tiles[index];
+    const std::uint32_t tile_index =
+        static_cast<std::uint32_t>(tile_coord.y) * site_state->tile_width +
+        static_cast<std::uint32_t>(tile_coord.x);
+    return adapter_service_->query_site_tile_view(tile_index, out_tile);
 }
 
 int Gs1GodotSiteSessionUiController::find_worker_pack_storage_id() const
 {
-    const Gs1RuntimeSiteProjection* site_state = active_site();
-    if (site_state == nullptr)
-    {
-        return 0;
-    }
-
-    for (const auto& storage : site_state->inventory_storages)
-    {
-        if (static_cast<int>(storage.container_kind) == CONTAINER_WORKER_PACK)
-        {
-            return static_cast<int>(storage.storage_id);
-        }
-    }
-    return 0;
+    const Gs1SiteStateView* site_state = active_site();
+    return site_state != nullptr ? static_cast<int>(site_state->worker_pack_storage_id) : 0;
 }
 
 int Gs1GodotSiteSessionUiController::find_selected_tile_storage_id()
 {
-    const Gs1RuntimeSiteProjection* site_state = active_site();
+    const Gs1SiteStateView* site_state = active_site();
     if (site_state == nullptr)
     {
         return 0;
     }
 
-    for (const auto& storage : site_state->inventory_storages)
+    for (const auto& storage : inventory_storages_)
     {
         const int tile_x = storage.tile_x;
         const int tile_y = storage.tile_y;
@@ -951,14 +417,21 @@ int Gs1GodotSiteSessionUiController::find_selected_tile_storage_id()
 
 void Gs1GodotSiteSessionUiController::plant_first_seed_on_selected_tile()
 {
-    const Gs1RuntimeSiteProjection* site_state = active_site();
-    if (site_state == nullptr)
+    const int worker_pack_storage_id = find_worker_pack_storage_id();
+    if (worker_pack_storage_id == 0)
     {
         return;
     }
 
-    for (const auto& slot : site_state->worker_pack_slots)
+    for (const auto& slot : inventory_slots_)
     {
+        if (slot.storage_id != static_cast<std::uint32_t>(worker_pack_storage_id) ||
+            slot.occupied == 0U ||
+            slot.item_id == 0U)
+        {
+            continue;
+        }
+
         const auto* item_def = gs1::find_item_def(gs1::ItemId {slot.item_id});
         if (item_def == nullptr || item_def->linked_plant_id.value == 0U)
         {
@@ -1120,10 +593,10 @@ void Gs1GodotSiteSessionUiController::on_open_nearest_storage_pressed()
 
 void Gs1GodotSiteSessionUiController::on_close_storage_pressed()
 {
-    const Gs1RuntimeSiteProjection* site_state = active_site();
-    if (site_state != nullptr && site_state->opened_storage.has_value())
+    const Gs1SiteStateView* site_state = active_site();
+    if (site_state != nullptr && site_state->opened_device_storage_id != 0U)
     {
-        submit_storage_view(static_cast<int>(site_state->opened_storage->storage_id), INVENTORY_VIEW_EVENT_CLOSE);
+        submit_storage_view(static_cast<int>(site_state->opened_device_storage_id), INVENTORY_VIEW_EVENT_CLOSE);
     }
 }
 

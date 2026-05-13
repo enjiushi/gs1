@@ -1,7 +1,6 @@
 #pragma once
 
 #include "gs1_godot_adapter_service.h"
-#include "gs1_godot_projection_types.h"
 
 #include <godot_cpp/classes/control.hpp>
 #include <godot_cpp/classes/label.hpp>
@@ -35,16 +34,27 @@ private:
     struct State final
     {
         std::uint32_t site_id {0};
-        std::uint16_t width {0};
-        std::uint16_t height {0};
-        std::optional<Gs1RuntimeWorkerProjection> worker {};
-        std::optional<Gs1RuntimeWeatherProjection> weather {};
-        std::optional<Gs1RuntimeHudProjection> hud {};
-        std::optional<Gs1RuntimeSiteActionProjection> site_action {};
+        std::uint32_t width {0};
+        std::uint32_t height {0};
+        std::int32_t worker_tile_x {0};
+        std::int32_t worker_tile_y {0};
+        float weather_heat {0.0f};
+        float weather_wind {0.0f};
+        float weather_dust {0.0f};
+        float health {0.0f};
+        float hydration {0.0f};
+        float nourishment {0.0f};
+        float energy {0.0f};
+        float morale {0.0f};
+        Gs1SiteActionKind action_kind {GS1_SITE_ACTION_NONE};
+        float action_progress {0.0f};
+        bool has_worker {false};
+        bool has_action {false};
     };
 
     void cache_adapter_service();
     [[nodiscard]] godot::Control* resolve_owner_control();
+    void refresh_from_game_state_view();
     void rebuild_summary();
 
     godot::Control* owner_control_ {nullptr};
