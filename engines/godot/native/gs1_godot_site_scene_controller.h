@@ -100,15 +100,12 @@ private:
     void ensure_presenter_created();
     void position_bootstrap_camera();
     void cache_adapter_service();
-
-    void apply_site_snapshot_begin(const Gs1EngineMessageSiteSnapshotData& payload);
+    void refresh_from_game_state_view();
     void apply_site_snapshot_end();
     void apply_site_tile_upsert(const Gs1EngineMessageSiteTileData& payload);
     void apply_site_worker_update(const Gs1EngineMessageWorkerData& payload);
     void apply_site_plant_visual_upsert(const Gs1EngineMessageSitePlantVisualData& payload);
-    void apply_site_plant_visual_remove(const Gs1EngineMessageSiteVisualRemoveData& payload);
     void apply_site_device_visual_upsert(const Gs1EngineMessageSiteDeviceVisualData& payload);
-    void apply_site_device_visual_remove(const Gs1EngineMessageSiteVisualRemoveData& payload);
 
     void clear_visuals();
     void clear_tiles();

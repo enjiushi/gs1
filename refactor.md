@@ -664,7 +664,7 @@ This section records the remaining work still not completed in the current repos
 - [x] Replace remaining regional-map snapshot consumers with direct state-read controllers.
 - [x] Replace remaining site-session snapshot/upsert consumers with direct state-read controllers.
 - [ ] Replace remaining scene/panel controllers that still depend on projection message families with host-owned UI/session state plus authoritative gameplay-state reads.
-- [ ] Keep scene/lifecycle coordination messages such as `SITE_SCENE_READY`, but stop relying on projection snapshots as the primary read path.
+- [x] Keep scene/lifecycle coordination messages such as `SITE_SCENE_READY`, but stop relying on projection snapshots as the primary read path.
 - [ ] Preserve stable gameplay-ID to Godot-object reconciliation while completing the migration away from projection-state transfer.
 
 ### Incomplete host-boundary simplification

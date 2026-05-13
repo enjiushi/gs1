@@ -1,8 +1,9 @@
 #include "gs1_godot_site_scene_controller.h"
 
 #include "gs1_godot_controller_context.h"
-#include "gs1_godot_projection_types.h"
 #include "godot_progression_resources.h"
+#include "content/defs/plant_defs.h"
+#include "content/defs/structure_defs.h"
 
 #include <godot_cpp/classes/base_material3d.hpp>
 #include <godot_cpp/classes/box_mesh.hpp>
@@ -29,6 +30,7 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <optional>
 #include <vector>
 
 using namespace godot;
@@ -58,7 +60,7 @@ constexpr const char* k_tile_texture_paths[k_tile_texture_band_count] = {
 constexpr const char* k_highway_texture_path = "res://assets/terrain/textures/road dirt.png";
 constexpr const char* k_worker_placeholder_scene_path = "res://scenes/site_player_placeholder.tscn";
 
-Color color_for_tile(const Gs1RuntimeTileProjection& tile) noexcept
+Color color_for_tile(const Gs1EngineMessageSiteTileData& tile) noexcept
 {
     float r = 0.76f;
     float g = 0.69f;
@@ -187,6 +189,180 @@ bool is_tile_batch_key(std::uint32_t batch_key) noexcept
 {
     return (batch_key & 0xe0000000U) == k_tile_batch_key_mask;
 }
+
+std::uint16_t quantize_density(float density) noexcept
+{
+    const float quantized = std::round(std::clamp(density, 0.0f, 2.0f) * 128.0f);
+    return static_cast<std::uint16_t>(std::clamp(quantized, 1.0f, 255.0f));
+}
+
+float plant_height_scale(const gs1::PlantDef& plant_def, float plant_density) noexcept
+{
+    float base_scale = 0.8f;
+    switch (plant_def.height_class)
+    {
+    case gs1::PlantHeightClass::Low:
+        base_scale = 0.8f;
+        break;
+    case gs1::PlantHeightClass::Medium:
+        base_scale = 1.15f;
+        break;
+    case gs1::PlantHeightClass::Tall:
+        base_scale = 1.55f;
+        break;
+    case gs1::PlantHeightClass::None:
+    default:
+        base_scale = 0.65f;
+        break;
+    }
+
+    return base_scale * std::clamp(0.65f + (plant_density * 0.55f), 0.65f, 1.75f);
+}
+
+float device_height_scale(const gs1::StructureDef& structure_def, float integrity) noexcept
+{
+    const float footprint_scale = std::max(
+        1.0f,
+        static_cast<float>(std::max(structure_def.footprint_width, structure_def.footprint_height)));
+    return std::clamp((0.75f + (0.35f * integrity)) * footprint_scale, 0.75f, 2.75f);
+}
+
+std::uint64_t plant_visual_id_for_tile(const Gs1SiteTileView& tile) noexcept
+{
+    return tile.tile_entity_id != 0U ? tile.tile_entity_id : tile_gameplay_id(
+        static_cast<std::uint16_t>(tile.tile_x),
+        static_cast<std::uint16_t>(tile.tile_y));
+}
+
+std::uint64_t device_visual_id_for_tile(const Gs1SiteTileView& tile) noexcept
+{
+    return tile.device_entity_id != 0U
+        ? tile.device_entity_id
+        : (tile_gameplay_id(static_cast<std::uint16_t>(tile.tile_x), static_cast<std::uint16_t>(tile.tile_y)) | 0x1000000000000000ULL);
+}
+
+Gs1EngineMessageSiteTileData make_tile_payload(const Gs1SiteTileView& tile) noexcept
+{
+    Gs1EngineMessageSiteTileData payload {};
+    payload.x = static_cast<std::uint16_t>(std::max(tile.tile_x, 0));
+    payload.y = static_cast<std::uint16_t>(std::max(tile.tile_y, 0));
+    payload.terrain_type_id = tile.terrain_type_id;
+    payload.plant_type_id = tile.plant_id;
+    payload.structure_type_id = tile.structure_id;
+    payload.ground_cover_type_id = tile.ground_cover_type_id;
+    payload.plant_density = tile.plant_density;
+    payload.sand_burial = tile.sand_burial;
+    payload.local_wind = tile.local_wind;
+    payload.wind_protection = tile.plant_wind_protection + tile.device_wind_protection;
+    payload.heat_protection = tile.plant_heat_protection + tile.device_heat_protection;
+    payload.dust_protection = tile.plant_dust_protection + tile.device_dust_protection;
+    payload.moisture = tile.moisture;
+    payload.soil_fertility = tile.soil_fertility;
+    payload.soil_salinity = tile.soil_salinity;
+    const float quantized_integrity =
+        std::round(std::clamp(tile.device_integrity, 0.0f, 1.0f) * 100.0f);
+    payload.device_integrity_quantized = static_cast<std::uint16_t>(
+        std::clamp(quantized_integrity, 0.0f, 100.0f));
+    payload.excavation_depth = tile.excavation_depth;
+    payload.visible_excavation_depth = tile.excavation_depth;
+    return payload;
+}
+
+std::optional<Gs1EngineMessageSitePlantVisualData> make_plant_visual_payload(const Gs1SiteTileView& tile)
+{
+    if (tile.plant_id == 0U)
+    {
+        return std::nullopt;
+    }
+
+    const auto* plant_def = gs1::find_plant_def(gs1::PlantId {tile.plant_id});
+    if (plant_def == nullptr)
+    {
+        return std::nullopt;
+    }
+
+    Gs1EngineMessageSitePlantVisualData payload {};
+    payload.visual_id = plant_visual_id_for_tile(tile);
+    payload.plant_type_id = tile.plant_id;
+    payload.anchor_tile_x = static_cast<float>(tile.tile_x);
+    payload.anchor_tile_y = static_cast<float>(tile.tile_y);
+    payload.height_scale = plant_height_scale(*plant_def, tile.plant_density);
+    payload.density_quantized = quantize_density(tile.plant_density);
+    payload.footprint_width = plant_def->footprint_width;
+    payload.footprint_height = plant_def->footprint_height;
+    payload.height_class = static_cast<std::uint8_t>(plant_def->height_class);
+    payload.focus = static_cast<std::uint8_t>(plant_def->focus);
+    payload.flags = 0U;
+    if (gs1::plant_focus_has_aura(plant_def->focus))
+    {
+        payload.flags |= GS1_SITE_PLANT_VISUAL_FLAG_HAS_AURA;
+    }
+    if (gs1::plant_focus_has_wind_projection(plant_def->focus))
+    {
+        payload.flags |= GS1_SITE_PLANT_VISUAL_FLAG_HAS_WIND_PROJECTION;
+    }
+    if (plant_def->growable)
+    {
+        payload.flags |= GS1_SITE_PLANT_VISUAL_FLAG_GROWABLE;
+    }
+    return payload;
+}
+
+std::optional<Gs1EngineMessageSiteDeviceVisualData> make_device_visual_payload(const Gs1SiteTileView& tile)
+{
+    if (tile.structure_id == 0U)
+    {
+        return std::nullopt;
+    }
+
+    const auto* structure_def = gs1::find_structure_def(gs1::StructureId {tile.structure_id});
+    if (structure_def == nullptr)
+    {
+        return std::nullopt;
+    }
+
+    Gs1EngineMessageSiteDeviceVisualData payload {};
+    payload.visual_id = device_visual_id_for_tile(tile);
+    payload.structure_type_id = tile.structure_id;
+    payload.anchor_tile_x = static_cast<float>(tile.tile_x);
+    payload.anchor_tile_y = static_cast<float>(tile.tile_y);
+    payload.integrity_normalized = std::clamp(tile.device_integrity, 0.0f, 1.0f);
+    payload.height_scale = device_height_scale(*structure_def, payload.integrity_normalized);
+    payload.footprint_width = structure_def->footprint_width;
+    payload.footprint_height = structure_def->footprint_height;
+    payload.flags = 0U;
+    if (structure_def->grants_storage)
+    {
+        payload.flags |= GS1_SITE_DEVICE_VISUAL_FLAG_HAS_STORAGE;
+    }
+    if (structure_def->crafting_station_kind != gs1::CraftingStationKind::None)
+    {
+        payload.flags |= GS1_SITE_DEVICE_VISUAL_FLAG_IS_CRAFTING_STATION;
+    }
+    if (tile.device_fixed_integrity != 0U)
+    {
+        payload.flags |= GS1_SITE_DEVICE_VISUAL_FLAG_FIXED_INTEGRITY;
+    }
+    return payload;
+}
+
+Gs1EngineMessageWorkerData make_worker_payload(
+    const Gs1WorkerStateView& worker,
+    const Gs1SiteActionView& action) noexcept
+{
+    Gs1EngineMessageWorkerData payload {};
+    payload.entity_id = worker.worker_entity_id;
+    payload.tile_x = worker.world_x;
+    payload.tile_y = worker.world_y;
+    payload.facing_degrees = worker.facing_degrees;
+    payload.health_normalized = worker.health;
+    payload.hydration_normalized = worker.hydration;
+    payload.energy_normalized = worker.energy_cap > 0.0f ? (worker.energy / worker.energy_cap) : 0.0f;
+    payload.flags = worker.is_sheltered != 0U ? 1U : 0U;
+    payload.current_action_kind = action.action_kind;
+    payload.reserved0 = 0U;
+    return payload;
+}
 }
 
 void Gs1GodotSiteSceneController::_bind_methods()
@@ -197,6 +373,7 @@ void Gs1GodotSiteSceneController::_ready()
 {
     ensure_presenter_created();
     cache_adapter_service();
+    refresh_from_game_state_view();
 }
 
 void Gs1GodotSiteSceneController::_exit_tree()
@@ -310,52 +487,16 @@ void Gs1GodotSiteSceneController::cache_adapter_service()
 
 bool Gs1GodotSiteSceneController::handles_engine_message(Gs1EngineMessageType type) const noexcept
 {
-    switch (type)
-    {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SCENE_SNAPSHOT:
-    case GS1_ENGINE_MESSAGE_SITE_SCENE_TILE_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_SCENE_WORKER_UPDATE:
-    case GS1_ENGINE_MESSAGE_SITE_SCENE_PLANT_VISUAL_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_SCENE_PLANT_VISUAL_REMOVE:
-    case GS1_ENGINE_MESSAGE_SITE_SCENE_DEVICE_VISUAL_UPSERT:
-    case GS1_ENGINE_MESSAGE_SITE_SCENE_DEVICE_VISUAL_REMOVE:
-    case GS1_ENGINE_MESSAGE_END_SITE_SCENE_SNAPSHOT:
-        return true;
-    default:
-        return false;
-    }
+    return type == GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY ||
+        type == GS1_ENGINE_MESSAGE_SET_APP_STATE;
 }
 
 void Gs1GodotSiteSceneController::handle_engine_message(const Gs1EngineMessage& message)
 {
-    switch (message.type)
+    if (message.type == GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY ||
+        message.type == GS1_ENGINE_MESSAGE_SET_APP_STATE)
     {
-    case GS1_ENGINE_MESSAGE_BEGIN_SITE_SCENE_SNAPSHOT:
-        apply_site_snapshot_begin(message.payload_as<Gs1EngineMessageSiteSnapshotData>());
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_SCENE_TILE_UPSERT:
-        apply_site_tile_upsert(message.payload_as<Gs1EngineMessageSiteTileData>());
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_SCENE_WORKER_UPDATE:
-        apply_site_worker_update(message.payload_as<Gs1EngineMessageWorkerData>());
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_SCENE_PLANT_VISUAL_UPSERT:
-        apply_site_plant_visual_upsert(message.payload_as<Gs1EngineMessageSitePlantVisualData>());
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_SCENE_PLANT_VISUAL_REMOVE:
-        apply_site_plant_visual_remove(message.payload_as<Gs1EngineMessageSiteVisualRemoveData>());
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_SCENE_DEVICE_VISUAL_UPSERT:
-        apply_site_device_visual_upsert(message.payload_as<Gs1EngineMessageSiteDeviceVisualData>());
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_SCENE_DEVICE_VISUAL_REMOVE:
-        apply_site_device_visual_remove(message.payload_as<Gs1EngineMessageSiteVisualRemoveData>());
-        break;
-    case GS1_ENGINE_MESSAGE_END_SITE_SCENE_SNAPSHOT:
-        apply_site_snapshot_end();
-        break;
-    default:
-        break;
+        refresh_from_game_state_view();
     }
 }
 
@@ -375,19 +516,63 @@ void Gs1GodotSiteSceneController::handle_runtime_message_reset()
     refresh_camera_frame();
 }
 
-void Gs1GodotSiteSceneController::apply_site_snapshot_begin(const Gs1EngineMessageSiteSnapshotData& payload)
+void Gs1GodotSiteSceneController::refresh_from_game_state_view()
 {
-    last_width_ = payload.width;
-    last_height_ = payload.height;
-    refresh_camera_frame();
-    if (payload.mode != GS1_PROJECTION_MODE_SNAPSHOT)
+    if (adapter_service_ == nullptr)
     {
         return;
     }
 
+    Gs1GameStateView view {};
+    if (!adapter_service_->get_game_state_view(view) ||
+        view.has_active_site == 0U ||
+        view.active_site == nullptr)
+    {
+        clear_visuals();
+        clear_tiles();
+        active_snapshot_serial_ = 0U;
+        reconcile_full_snapshot_ = false;
+        worker_seen_in_snapshot_ = false;
+        last_width_ = -1;
+        last_height_ = -1;
+        refresh_camera_frame();
+        return;
+    }
+
+    const Gs1SiteStateView& site = *view.active_site;
+    last_width_ = static_cast<std::int32_t>(site.tile_width);
+    last_height_ = static_cast<std::int32_t>(site.tile_height);
+    refresh_camera_frame();
+
     active_snapshot_serial_ += 1U;
     reconcile_full_snapshot_ = true;
     worker_seen_in_snapshot_ = false;
+
+    for (std::uint32_t tile_index = 0; tile_index < site.tile_count; ++tile_index)
+    {
+        Gs1SiteTileView tile {};
+        if (!adapter_service_->query_site_tile_view(tile_index, tile))
+        {
+            continue;
+        }
+
+        apply_site_tile_upsert(make_tile_payload(tile));
+        if (const auto plant_payload = make_plant_visual_payload(tile); plant_payload.has_value())
+        {
+            apply_site_plant_visual_upsert(plant_payload.value());
+        }
+        if (const auto device_payload = make_device_visual_payload(tile); device_payload.has_value())
+        {
+            apply_site_device_visual_upsert(device_payload.value());
+        }
+    }
+
+    if (site.worker.worker_entity_id != 0U)
+    {
+        apply_site_worker_update(make_worker_payload(site.worker, site.action));
+    }
+
+    apply_site_snapshot_end();
 }
 
 void Gs1GodotSiteSceneController::apply_site_snapshot_end()
@@ -453,25 +638,6 @@ void Gs1GodotSiteSceneController::apply_site_tile_upsert(const Gs1EngineMessageS
     const std::uint64_t tile_id = tile_gameplay_id(payload.x, payload.y);
 
     auto tile_found = tile_nodes_.find(tile_id);
-    const Gs1RuntimeTileProjection tile {
-        payload.x,
-        payload.y,
-        payload.terrain_type_id,
-        payload.plant_type_id,
-        payload.structure_type_id,
-        payload.ground_cover_type_id,
-        payload.plant_density,
-        payload.sand_burial,
-        payload.local_wind,
-        payload.wind_protection,
-        payload.heat_protection,
-        payload.dust_protection,
-        payload.moisture,
-        payload.soil_fertility,
-        payload.soil_salinity,
-        payload.device_integrity_quantized,
-        payload.excavation_depth,
-        payload.visible_excavation_depth};
 
     TileNodeRecord updated_record {};
     if (tile_found != tile_nodes_.end())
@@ -488,7 +654,7 @@ void Gs1GodotSiteSceneController::apply_site_tile_upsert(const Gs1EngineMessageS
     updated_record.sand_burial = payload.sand_burial;
     updated_record.plant_density = payload.plant_density;
     updated_record.visible_excavation_depth = payload.visible_excavation_depth;
-    updated_record.color = color_for_tile(tile);
+    updated_record.color = color_for_tile(payload);
     updated_record.last_seen_snapshot_serial = reconcile_full_snapshot_ ? active_snapshot_serial_ : 0U;
 
     const std::uint32_t next_batch_key = tile_batch_key_for_record(updated_record);
@@ -578,11 +744,6 @@ void Gs1GodotSiteSceneController::apply_site_plant_visual_upsert(const Gs1Engine
         payload.footprint_height);
 }
 
-void Gs1GodotSiteSceneController::apply_site_plant_visual_remove(const Gs1EngineMessageSiteVisualRemoveData& payload)
-{
-    remove_instanced_visual(plant_visuals_, payload.visual_id);
-}
-
 void Gs1GodotSiteSceneController::apply_site_device_visual_upsert(const Gs1EngineMessageSiteDeviceVisualData& payload)
 {
     const float integrity = std::clamp(payload.integrity_normalized, 0.0f, 1.0f);
@@ -617,11 +778,6 @@ void Gs1GodotSiteSceneController::apply_site_device_visual_upsert(const Gs1Engin
         true,
         payload.footprint_width,
         payload.footprint_height);
-}
-
-void Gs1GodotSiteSceneController::apply_site_device_visual_remove(const Gs1EngineMessageSiteVisualRemoveData& payload)
-{
-    remove_instanced_visual(device_visuals_, payload.visual_id);
 }
 
 void Gs1GodotSiteSceneController::clear_visuals()
