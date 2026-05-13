@@ -636,13 +636,13 @@ This section records the remaining work still not completed in the current repos
 - [x] Remove or replace `UiPresentationState`, `PresentationRuntimeState`, and `SiteProtectionPresentationState` as gameplay-owned long-lived runtime state.
 - [x] Move phone-panel open state, active section state, badge state, and other local UI/session state out of gameplay-owned `PhonePanelState` unless a field is truly gameplay-authoritative.
 - [x] Remove gameplay-owned regional tech-tree open/close UI state and other host-reconstructable UI state from gameplay runtime ownership.
-- [ ] Remove gameplay-owned presentation dirty tracking and last-emitted presentation caches that exist only to drive host refreshes.
+- [x] Remove gameplay-owned presentation dirty tracking and last-emitted presentation caches that exist only to drive host refreshes.
 
 ### Incomplete exported-state boundary cleanup
 
-- [ ] Keep using the new exported `Gs1GameStateView` / query surface, but stop treating gameplay-side projection/session state as part of the gameplay architecture that must be maintained long-term.
-- [ ] Continue shrinking long-lived gameplay runtime state toward gameplay-authoritative data only.
-- [ ] Remove projection dirty/update caches and similar intermediate presentation bookkeeping from gameplay-owned site runtime state where practical.
+- [x] Keep using the new exported `Gs1GameStateView` / query surface, but stop treating gameplay-side projection/session state as part of the gameplay architecture that must be maintained long-term.
+- [x] Continue shrinking long-lived gameplay runtime state toward gameplay-authoritative data only.
+- [x] Remove projection dirty/update caches and similar intermediate presentation bookkeeping from gameplay-owned site runtime state where practical.
 
 ### Incomplete runtime-message cleanup
 
@@ -670,7 +670,7 @@ This section records the remaining work still not completed in the current repos
 ### Incomplete host-boundary simplification
 
 - [ ] Keep `gs1_pop_runtime_message(...)` only for the reduced semantic message set rather than as the primary host read path.
-- [ ] Finish shifting host/controller logic to "read state directly, use messages for intent/lifecycle/coarse refresh" rather than "consume projection stream to learn authoritative state."
+- [x] Finish shifting host/controller logic to "read state directly, use messages for intent/lifecycle/coarse refresh" rather than "consume projection stream to learn authoritative state."
 
 ### Incomplete documentation and inventory work
 

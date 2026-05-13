@@ -695,46 +695,13 @@ public:
 
     void mark_projection_dirty(std::uint64_t dirty_flags) noexcept
     {
-        if ((dirty_flags & SITE_PROJECTION_UPDATE_TILES) != 0U)
-        {
-            site_run_.pending_full_tile_projection_update = true;
-        }
-        if ((dirty_flags & SITE_PROJECTION_UPDATE_INVENTORY) != 0U)
-        {
-            site_run_.pending_full_inventory_projection_update = true;
-            site_run_.pending_inventory_storage_descriptor_projection_update = true;
-            if (site_run_.inventory.opened_device_storage_id != 0U)
-            {
-                site_run_.pending_opened_inventory_storage_full_projection_update = true;
-            }
-        }
-
-        site_run_.pending_projection_update_flags |= dirty_flags;
+        // Compatibility shim while site systems are migrated off gameplay-owned projection dirties.
+        (void)dirty_flags;
     }
 
     void mark_tile_projection_dirty(TileCoord coord) noexcept
     {
-        if (!site_world_access::tile_coord_in_bounds(site_run_, coord))
-        {
-            return;
-        }
-
-        const auto tile_count = site_world_access::tile_count(site_run_);
-        if (site_run_.pending_tile_projection_update_mask.size() != tile_count)
-        {
-            site_run_.pending_tile_projection_update_mask.assign(tile_count, 0U);
-            site_run_.pending_tile_projection_updates.clear();
-        }
-
-        const auto index = site_world_access::tile_index(site_run_, coord);
-        if (index < site_run_.pending_tile_projection_update_mask.size() &&
-            site_run_.pending_tile_projection_update_mask[index] == 0U)
-        {
-            site_run_.pending_tile_projection_update_mask[index] = 1U;
-            site_run_.pending_tile_projection_updates.push_back(coord);
-        }
-
-        site_run_.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_TILES;
+        (void)coord;
     }
 
     void mark_inventory_slot_projection_dirty(
@@ -763,82 +730,22 @@ public:
 
     void mark_inventory_storage_descriptors_projection_dirty() noexcept
     {
-        site_run_.pending_inventory_storage_descriptor_projection_update = true;
-        site_run_.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_INVENTORY;
     }
 
     void mark_inventory_view_state_projection_dirty() noexcept
     {
-        site_run_.pending_inventory_view_state_projection_update = true;
-        site_run_.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_INVENTORY;
     }
 
     void mark_opened_inventory_storage_full_projection_dirty() noexcept
     {
-        if (site_run_.inventory.opened_device_storage_id == 0U)
-        {
-            return;
-        }
-
-        site_run_.pending_opened_inventory_storage_full_projection_update = true;
-        site_run_.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_INVENTORY;
     }
 
     void mark_inventory_slot_projection_dirty_by_storage(
         std::uint32_t storage_id,
         std::uint32_t slot_index) noexcept
     {
-        if (storage_id == 0U)
-        {
-            return;
-        }
-
-        std::vector<std::uint32_t>* pending_updates = nullptr;
-        std::vector<std::uint8_t>* pending_update_mask = nullptr;
-        std::uint32_t slot_count = 0U;
-
-        if (storage_id == site_run_.inventory.worker_pack_storage_id)
-        {
-            pending_updates = &site_run_.pending_worker_pack_inventory_projection_updates;
-            pending_update_mask = &site_run_.pending_worker_pack_inventory_projection_update_mask;
-            slot_count = site_run_.inventory.worker_pack_slot_count;
-        }
-        else if (storage_id == site_run_.inventory.opened_device_storage_id)
-        {
-            const auto* storage_state =
-                inventory_storage::storage_container_state_for_storage_id(site_run_, storage_id);
-            if (storage_state == nullptr)
-            {
-                return;
-            }
-
-            pending_updates = &site_run_.pending_opened_inventory_storage_projection_updates;
-            pending_update_mask = &site_run_.pending_opened_inventory_storage_projection_update_mask;
-            slot_count = static_cast<std::uint32_t>(storage_state->slot_item_instance_ids.size());
-        }
-        else
-        {
-            return;
-        }
-
-        if (slot_index >= slot_count || pending_updates == nullptr || pending_update_mask == nullptr)
-        {
-            return;
-        }
-
-        if (pending_update_mask->size() != slot_count)
-        {
-            pending_update_mask->assign(slot_count, 0U);
-            pending_updates->clear();
-        }
-
-        if ((*pending_update_mask)[slot_index] == 0U)
-        {
-            (*pending_update_mask)[slot_index] = 1U;
-            pending_updates->push_back(slot_index);
-        }
-
-        site_run_.pending_projection_update_flags |= SITE_PROJECTION_UPDATE_INVENTORY;
+        (void)storage_id;
+        (void)slot_index;
     }
 
 private:

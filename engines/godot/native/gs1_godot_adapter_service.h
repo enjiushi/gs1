@@ -117,6 +117,7 @@ private:
     void fail_runtime_session(const char* fallback_error_message);
     [[nodiscard]] bool drain_debug_http_commands();
     bool drain_projection_messages();
+    bool poll_gameplay_state_notifications();
     void notify_runtime_message_reset();
     void dispatch_engine_message(Gs1EngineMessage&& message);
     void dispatch_or_buffer_engine_message(Gs1EngineMessage&& message);
@@ -153,5 +154,7 @@ private:
     std::vector<Gs1GodotDebugHttpCommand> pending_debug_http_commands_ {};
     std::vector<Gs1EngineMessage> buffered_engine_messages_ {};
     Gs1GodotUiSessionState ui_session_state_ {};
+    Gs1AppState last_dispatched_gameplay_app_state_ {GS1_APP_STATE_BOOT};
+    bool has_dispatched_gameplay_app_state_ {false};
     std::string last_error_ {};
 };

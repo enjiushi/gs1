@@ -294,6 +294,11 @@ void Gs1GodotAdapterService::begin_frame(double delta_seconds)
         fail_runtime_session("Failed to drain runtime phase 1 projection messages.");
         return;
     }
+    if (!poll_gameplay_state_notifications())
+    {
+        fail_runtime_session("Failed to poll runtime phase 1 gameplay state notifications.");
+        return;
+    }
 
     phase2_pending_ = true;
     last_error_.clear();
@@ -459,6 +464,11 @@ void Gs1GodotAdapterService::ensure_runtime_started()
         fail_runtime_session("Failed to drain startup projection messages.");
         return;
     }
+    if (!poll_gameplay_state_notifications())
+    {
+        fail_runtime_session("Failed to poll startup gameplay state notifications.");
+        return;
+    }
 
     last_error_.clear();
 }
@@ -551,10 +561,46 @@ bool Gs1GodotAdapterService::drain_projection_messages()
     return true;
 }
 
+bool Gs1GodotAdapterService::poll_gameplay_state_notifications()
+{
+    if (!runtime_session_.is_running())
+    {
+        last_error_ = "Runtime session is not ready to read gameplay state.";
+        return false;
+    }
+
+    Gs1GameStateView view {};
+    if (!runtime_session_.get_game_state_view(view))
+    {
+        last_error_ = runtime_session_.last_error();
+        return false;
+    }
+
+    sync_ui_session_from_view(view);
+
+    if (!has_dispatched_gameplay_app_state_ ||
+        last_dispatched_gameplay_app_state_ != view.app_state)
+    {
+        Gs1EngineMessage app_state_message {};
+        app_state_message.type = GS1_ENGINE_MESSAGE_SET_APP_STATE;
+        auto& payload = app_state_message.emplace_payload<Gs1EngineMessageSetAppStateData>();
+        payload.app_state = view.app_state;
+        dispatch_or_buffer_engine_message(std::move(app_state_message));
+        last_dispatched_gameplay_app_state_ = view.app_state;
+        has_dispatched_gameplay_app_state_ = true;
+    }
+
+    bump_ui_session_revision(GS1_PRESENTATION_DIRTY_ALL);
+    last_error_.clear();
+    return true;
+}
+
 void Gs1GodotAdapterService::notify_runtime_message_reset()
 {
     clear_buffered_engine_messages();
     phase2_pending_ = false;
+    has_dispatched_gameplay_app_state_ = false;
+    last_dispatched_gameplay_app_state_ = GS1_APP_STATE_BOOT;
     reset_ui_session_state();
     for (IGs1GodotEngineMessageSubscriber* subscriber : known_subscribers_)
     {

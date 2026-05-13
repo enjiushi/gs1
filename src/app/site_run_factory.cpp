@@ -434,8 +434,6 @@ SiteRunState SiteRunFactory::create_site_run(
             run.site_world->set_tile(workbench_tile, tile);
         }
     }
-    run.pending_tile_projection_update_mask.assign(run.site_world->tile_count(), 0U);
-    run.last_projected_tile_states.assign(run.site_world->tile_count(), ProjectedSiteTileState {});
     inventory_storage::initialize_site_inventory_storage(run);
 
     return run;

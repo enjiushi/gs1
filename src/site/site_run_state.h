@@ -17,18 +17,11 @@
 
 #include <cstdint>
 #include <memory>
-#include <optional>
 #include <vector>
 
 namespace gs1
 {
 class SiteWorld;
-
-struct PendingInventorySlotProjectionUpdate final
-{
-    std::uint32_t storage_id {0};
-    std::uint32_t slot_index {0};
-};
 
 enum class SiteRunStatus : std::uint32_t
 {
@@ -77,27 +70,6 @@ struct SiteCounters final
     bool all_tracked_living_plants_stable {false};
 };
 
-struct ProjectedSiteTileState final
-{
-    std::uint32_t terrain_type_id {0};
-    std::uint32_t plant_type_id {0};
-    std::uint32_t structure_type_id {0};
-    std::uint32_t ground_cover_type_id {0};
-    std::uint16_t plant_density_quantized {0};
-    std::uint16_t sand_burial_quantized {0};
-    std::uint16_t local_wind_quantized {0};
-    std::uint16_t wind_protection_quantized {0};
-    std::uint16_t heat_protection_quantized {0};
-    std::uint16_t dust_protection_quantized {0};
-    std::uint16_t moisture_quantized {0};
-    std::uint16_t soil_fertility_quantized {0};
-    std::uint16_t soil_salinity_quantized {0};
-    std::uint16_t device_integrity_quantized {0};
-    std::uint8_t excavation_depth {0};
-    std::uint8_t visible_excavation_depth {0};
-    bool valid {false};
-};
-
 struct SiteHostMoveDirectionState final
 {
     float world_move_x {0.0f};
@@ -133,18 +105,5 @@ struct SiteRunState final
     PlantWeatherContributionState plant_weather_contribution {};
     DeviceWeatherContributionState device_weather_contribution {};
     std::uint32_t result_newly_revealed_site_count {0};
-    std::uint64_t pending_projection_update_flags {0};
-    bool pending_full_tile_projection_update {false};
-    std::vector<TileCoord> pending_tile_projection_updates {};
-    std::vector<std::uint8_t> pending_tile_projection_update_mask {};
-    std::vector<ProjectedSiteTileState> last_projected_tile_states {};
-    bool pending_full_inventory_projection_update {false};
-    std::vector<std::uint32_t> pending_worker_pack_inventory_projection_updates {};
-    std::vector<std::uint8_t> pending_worker_pack_inventory_projection_update_mask {};
-    bool pending_inventory_storage_descriptor_projection_update {false};
-    bool pending_inventory_view_state_projection_update {false};
-    bool pending_opened_inventory_storage_full_projection_update {false};
-    std::vector<std::uint32_t> pending_opened_inventory_storage_projection_updates {};
-    std::vector<std::uint8_t> pending_opened_inventory_storage_projection_update_mask {};
 };
 }  // namespace gs1
