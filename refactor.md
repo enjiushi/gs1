@@ -625,3 +625,60 @@ If we proceed with this direction, the implementation plan I would follow is:
 6. Delete obsolete runtime message types and gameplay presentation systems.
 7. Trim internal `GameMessage` down to semantic intent/fact broadcast semantics.
 8. Repair smoke host, Godot adapter, and tests afterward one by one against the new gameplay-side architecture.
+
+## Current Incomplete Tasks
+
+This section records the remaining work still not completed in the current repository state relative to the target architecture described above.
+
+### Incomplete gameplay-side cleanup
+
+- [ ] Move gameplay-owned UI/session/presentation state out of gameplay runtime ownership.
+- [ ] Remove or replace `UiPresentationState`, `PresentationRuntimeState`, and `SiteProtectionPresentationState` as gameplay-owned long-lived runtime state.
+- [x] Move phone-panel open state, active section state, badge state, and other local UI/session state out of gameplay-owned `PhonePanelState` unless a field is truly gameplay-authoritative.
+- [ ] Remove gameplay-owned regional tech-tree open/close UI state and other host-reconstructable UI state from gameplay runtime ownership.
+- [ ] Remove gameplay-owned presentation dirty tracking and last-emitted presentation caches that exist only to drive host refreshes.
+
+### Incomplete exported-state boundary cleanup
+
+- [ ] Keep using the new exported `Gs1GameStateView` / query surface, but stop treating gameplay-side projection/session state as part of the gameplay architecture that must be maintained long-term.
+- [ ] Continue shrinking long-lived gameplay runtime state toward gameplay-authoritative data only.
+- [ ] Remove projection dirty/update caches and similar intermediate presentation bookkeeping from gameplay-owned site runtime state where practical.
+
+### Incomplete runtime-message cleanup
+
+- [ ] Delete snapshot/state-transfer/runtime-projection message families that only exist to mirror readable gameplay state.
+- [ ] Remove site/regional snapshot begin/end message flows where the same authoritative state is already readable through the exported state view.
+- [ ] Remove tile/listing/task/inventory/modifier upsert/remove message families whose payloads duplicate exported readable state.
+- [ ] Remove UI setup, UI panel, progression-view, and UI-surface visibility projection traffic that exists only to transfer authoritative UI state from gameplay to the host.
+- [ ] Reduce runtime-to-host messaging to lifecycle answers, app/scene-flow answers, logs, simple coarse refresh notifications, and any small number of truly event-like one-shot cues that are not naturally derivable from state.
+
+### Incomplete gameplay presentation-system cleanup
+
+- [ ] Remove or heavily reduce gameplay presentation coordinator responsibilities that exist only to emit host projection snapshots/upserts.
+- [ ] Remove gameplay presentation systems and subscribers that only serve projection/UI emission rather than gameplay authority.
+- [ ] Finish trimming internal `GameMessage` usage so presentation-only/state-transfer traffic no longer survives as gameplay message flow.
+
+### Incomplete Godot host migration
+
+- [ ] Finish migrating the Godot adapter from snapshot/upsert projection consumption to direct gameplay-state reads through `Gs1GameStateView` and targeted query helpers.
+- [ ] Replace remaining regional-map snapshot consumers with direct state-read controllers.
+- [ ] Replace remaining site-session snapshot/upsert consumers with direct state-read controllers.
+- [ ] Replace remaining scene/panel controllers that still depend on projection message families with host-owned UI/session state plus authoritative gameplay-state reads.
+- [ ] Keep scene/lifecycle coordination messages such as `SITE_SCENE_READY`, but stop relying on projection snapshots as the primary read path.
+- [ ] Preserve stable gameplay-ID to Godot-object reconciliation while completing the migration away from projection-state transfer.
+
+### Incomplete host-boundary simplification
+
+- [ ] Keep `gs1_pop_runtime_message(...)` only for the reduced semantic message set rather than as the primary host read path.
+- [ ] Finish shifting host/controller logic to "read state directly, use messages for intent/lifecycle/coarse refresh" rather than "consume projection stream to learn authoritative state."
+
+### Incomplete documentation and inventory work
+
+- [x] Create and/or check in a concrete state taxonomy inventory that classifies current state as gameplay-authoritative, exported-read-state, host-owned UI/presentation, transient intent queue data, or migration-only compatibility state.
+- [x] Create and/or check in a message inventory with keep/remove/replace decisions for the current runtime message families.
+- [x] Record the intended minimal first-pass coarse refresh message set once the remaining projection traffic is removed.
+
+### Incomplete deferred follow-up work
+
+- [ ] Rework tests around authoritative state-view assertions instead of projection-message transcripts once the architecture cleanup is complete.
+- [ ] Repair smoke hosts, shared-host compatibility paths, and broader test coverage after the gameplay-side and Godot-side architecture cleanup is actually finished.

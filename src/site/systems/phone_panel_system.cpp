@@ -18,8 +18,15 @@ struct system_state_tags<PhonePanelSystem>
     using type = type_list<
         RuntimeCampaignTag,
         RuntimeActiveSiteRunTag,
+        RuntimePhonePanelPresentationTag,
         RuntimeFixedStepSecondsTag,
         RuntimeMoveDirectionTag>;
+};
+
+template <>
+struct state_owner<RuntimePhonePanelPresentationTag>
+{
+    using type = PhonePanelSystem;
 };
 
 namespace
@@ -84,7 +91,7 @@ std::uint32_t badge_flag_for_section(PhonePanelSection section) noexcept
 }
 
 bool section_is_visible(
-    const PhonePanelState& phone_panel,
+    const PhonePanelPresentationState& phone_panel,
     PhonePanelSection section) noexcept
 {
     return phone_panel.open && phone_panel.active_section == section;
@@ -369,6 +376,8 @@ void sync_phone_panel_projection(
     bool force_dirty = false)
 {
     auto& phone_panel = phone_panel_world(invocation).own_phone_panel();
+    auto access = phone_panel_access(invocation);
+    auto& phone_presentation = access.template write<RuntimePhonePanelPresentationTag>();
 
     std::vector<PhoneListingState> projected_listings {};
     build_projected_listings(invocation, projected_listings);
@@ -403,35 +412,35 @@ void sync_phone_panel_projection(
     const auto next_service_signature =
         listing_snapshot_signature(projected_listings, PhoneListingKind::PurchaseUnlockable) ^
         listing_snapshot_signature(projected_listings, PhoneListingKind::HireContractor);
-    const auto previous_badge_flags = phone_panel.badge_flags;
+    const auto previous_badge_flags = phone_presentation.badge_flags;
 
-    if (phone_panel.notification_state_initialized)
+    if (phone_presentation.notification_state_initialized)
     {
         std::uint32_t new_badge_flags = 0U;
-        if (phone_panel.task_snapshot_signature != next_task_signature &&
-            !section_is_visible(phone_panel, PhonePanelSection::Tasks))
+        if (phone_presentation.task_snapshot_signature != next_task_signature &&
+            !section_is_visible(phone_presentation, PhonePanelSection::Tasks))
         {
             new_badge_flags |= GS1_PHONE_PANEL_FLAG_TASKS_BADGE;
         }
-        if (phone_panel.buy_snapshot_signature != next_buy_signature &&
-            !section_is_visible(phone_panel, PhonePanelSection::Buy))
+        if (phone_presentation.buy_snapshot_signature != next_buy_signature &&
+            !section_is_visible(phone_presentation, PhonePanelSection::Buy))
         {
             new_badge_flags |= GS1_PHONE_PANEL_FLAG_BUY_BADGE;
         }
-        if (phone_panel.sell_snapshot_signature != next_sell_signature &&
-            !section_is_visible(phone_panel, PhonePanelSection::Sell))
+        if (phone_presentation.sell_snapshot_signature != next_sell_signature &&
+            !section_is_visible(phone_presentation, PhonePanelSection::Sell))
         {
             new_badge_flags |= GS1_PHONE_PANEL_FLAG_SELL_BADGE;
         }
-        if (phone_panel.service_snapshot_signature != next_service_signature &&
-            !section_is_visible(phone_panel, PhonePanelSection::Hire))
+        if (phone_presentation.service_snapshot_signature != next_service_signature &&
+            !section_is_visible(phone_presentation, PhonePanelSection::Hire))
         {
             new_badge_flags |= GS1_PHONE_PANEL_FLAG_HIRE_BADGE;
         }
 
         if (new_badge_flags != 0U)
         {
-            phone_panel.badge_flags |= new_badge_flags | GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE;
+            phone_presentation.badge_flags |= new_badge_flags | GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE;
         }
     }
 
@@ -445,7 +454,7 @@ void sync_phone_panel_projection(
         phone_panel.sell_listing_count != sell_listing_count ||
         phone_panel.service_listing_count != service_listing_count ||
         phone_panel.cart_item_count != cart_item_count ||
-        previous_badge_flags != phone_panel.badge_flags;
+        previous_badge_flags != phone_presentation.badge_flags;
 
     phone_panel.listings = std::move(projected_listings);
     phone_panel.visible_task_count = visible_task_count;
@@ -456,11 +465,11 @@ void sync_phone_panel_projection(
     phone_panel.sell_listing_count = sell_listing_count;
     phone_panel.service_listing_count = service_listing_count;
     phone_panel.cart_item_count = cart_item_count;
-    phone_panel.task_snapshot_signature = next_task_signature;
-    phone_panel.buy_snapshot_signature = next_buy_signature;
-    phone_panel.sell_snapshot_signature = next_sell_signature;
-    phone_panel.service_snapshot_signature = next_service_signature;
-    phone_panel.notification_state_initialized = true;
+    phone_presentation.task_snapshot_signature = next_task_signature;
+    phone_presentation.buy_snapshot_signature = next_buy_signature;
+    phone_presentation.sell_snapshot_signature = next_sell_signature;
+    phone_presentation.service_snapshot_signature = next_service_signature;
+    phone_presentation.notification_state_initialized = true;
 
     if (changed || force_dirty)
     {
@@ -514,6 +523,7 @@ Gs1Status PhonePanelSystem::process_game_message(
     {
     case GameMessageType::SiteRunStarted:
         phone_panel_world(invocation).own_phone_panel() = PhonePanelState {};
+        access.template write<RuntimePhonePanelPresentationTag>() = PhonePanelPresentationState {};
         sync_phone_panel_projection(invocation, true);
         return GS1_STATUS_OK;
 
@@ -521,7 +531,7 @@ Gs1Status PhonePanelSystem::process_game_message(
     {
         const auto requested_section =
             message.payload_as<PhonePanelSectionRequestedMessage>().section;
-        auto& phone_panel = phone_panel_world(invocation).own_phone_panel();
+        auto& phone_presentation = access.template write<RuntimePhonePanelPresentationTag>();
         PhonePanelSection section = PhonePanelSection::Home;
         if (!try_map_phone_panel_section(requested_section, section))
         {
@@ -530,21 +540,21 @@ Gs1Status PhonePanelSystem::process_game_message(
 
         bool dirty = false;
         const auto updated_badge_flags =
-            (phone_panel.badge_flags & ~GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) &
+            (phone_presentation.badge_flags & ~GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) &
             ~badge_flag_for_section(section);
-        if (phone_panel.badge_flags != updated_badge_flags)
+        if (phone_presentation.badge_flags != updated_badge_flags)
         {
-            phone_panel.badge_flags = updated_badge_flags;
+            phone_presentation.badge_flags = updated_badge_flags;
             dirty = true;
         }
-        if (!phone_panel.open)
+        if (!phone_presentation.open)
         {
-            phone_panel.open = true;
+            phone_presentation.open = true;
             dirty = true;
         }
-        if (phone_panel.active_section != section)
+        if (phone_presentation.active_section != section)
         {
-            phone_panel.active_section = section;
+            phone_presentation.active_section = section;
             dirty = true;
         }
         if (dirty)
@@ -556,18 +566,18 @@ Gs1Status PhonePanelSystem::process_game_message(
 
     case GameMessageType::ClosePhonePanel:
     {
-        auto& phone_panel = phone_panel_world(invocation).own_phone_panel();
+        auto& phone_presentation = access.template write<RuntimePhonePanelPresentationTag>();
         bool dirty = false;
         const auto updated_badge_flags =
-            phone_panel.badge_flags & ~GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE;
-        if (phone_panel.badge_flags != updated_badge_flags)
+            phone_presentation.badge_flags & ~GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE;
+        if (phone_presentation.badge_flags != updated_badge_flags)
         {
-            phone_panel.badge_flags = updated_badge_flags;
+            phone_presentation.badge_flags = updated_badge_flags;
             dirty = true;
         }
-        if (phone_panel.open)
+        if (phone_presentation.open)
         {
-            phone_panel.open = false;
+            phone_presentation.open = false;
             dirty = true;
         }
         if (dirty)

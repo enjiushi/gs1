@@ -27,6 +27,7 @@ struct GamePresentationRuntimeContext final
     std::optional<CampaignState>& campaign;
     std::optional<SiteRunState>& active_site_run;
     SiteProtectionPresentationState& protection_presentation;
+    PhonePanelPresentationState& phone_panel_presentation;
     UiPresentationState& ui_presentation;
     PresentationRuntimeState& presentation_runtime;
     GameMessageQueue& message_queue;
@@ -69,6 +70,14 @@ private:
     [[nodiscard]] const SiteProtectionPresentationState& protection_presentation_state() const noexcept
     {
         return context().protection_presentation;
+    }
+    [[nodiscard]] PhonePanelPresentationState& phone_panel_presentation_state() noexcept
+    {
+        return context().phone_panel_presentation;
+    }
+    [[nodiscard]] const PhonePanelPresentationState& phone_panel_presentation_state() const noexcept
+    {
+        return context().phone_panel_presentation;
     }
     [[nodiscard]] UiPresentationState& ui_presentation_state() noexcept
     {

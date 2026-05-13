@@ -69,6 +69,10 @@ struct RuntimeUiPresentationTag
 {
 };
 
+struct RuntimePhonePanelPresentationTag
+{
+};
+
 struct RuntimePresentationRuntimeTag
 {
 };
@@ -212,6 +216,13 @@ inline decltype(auto) runtime_invocation_state_ref<RuntimeUiPresentationTag>(Run
 }
 
 template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimePhonePanelPresentationTag>(
+    RuntimeInvocation& invocation)
+{
+    return (invocation.presentation_state_->presentation_runtime.phone_panel);
+}
+
+template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimePresentationRuntimeTag>(RuntimeInvocation& invocation)
 {
     return (invocation.presentation_state_->presentation_runtime);
@@ -259,6 +270,13 @@ inline decltype(auto) runtime_invocation_state_ref<RuntimeUiPresentationTag>(
     const RuntimeInvocation& invocation)
 {
     return (invocation.presentation_state_->ui_presentation);
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimePhonePanelPresentationTag>(
+    const RuntimeInvocation& invocation)
+{
+    return (invocation.presentation_state_->presentation_runtime.phone_panel);
 }
 
 template <>

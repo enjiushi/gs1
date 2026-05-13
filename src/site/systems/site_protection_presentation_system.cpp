@@ -208,6 +208,7 @@ struct system_state_tags<SiteProtectionPresentationSystem>
         RuntimeAppStateTag,
         RuntimeCampaignTag,
         RuntimeActiveSiteRunTag,
+        RuntimePhonePanelPresentationTag,
         RuntimeSiteProtectionPresentationTag>;
 };
 
@@ -261,6 +262,7 @@ Gs1Status SiteProtectionPresentationSystem::process_host_message(
     auto& app_state = access.template read<RuntimeAppStateTag>();
     auto& campaign = access.template read<RuntimeCampaignTag>();
     auto& active_site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const auto& phone_panel = access.template read<RuntimePhonePanelPresentationTag>();
     auto& protection = access.template write<RuntimeSiteProtectionPresentationTag>();
 
     if (message.type == GS1_HOST_EVENT_SITE_STORAGE_VIEW)
@@ -271,7 +273,7 @@ Gs1Status SiteProtectionPresentationSystem::process_host_message(
             {
                 clear_protection_ui_state(protection);
             }
-            if (active_site_run.has_value() && active_site_run->phone_panel.open)
+            if (active_site_run.has_value() && phone_panel.open)
             {
                 queue_close_phone_panel(invocation);
             }
@@ -296,6 +298,7 @@ Gs1Status SiteProtectionPresentationSystem::process_game_message(
     auto& app_state = access.template read<RuntimeAppStateTag>();
     auto& campaign = access.template read<RuntimeCampaignTag>();
     auto& active_site_run = access.template read<RuntimeActiveSiteRunTag>();
+    const auto& phone_panel = access.template read<RuntimePhonePanelPresentationTag>();
     auto& protection = access.template write<RuntimeSiteProtectionPresentationTag>();
 
     switch (message.type)
@@ -313,7 +316,7 @@ Gs1Status SiteProtectionPresentationSystem::process_game_message(
         if (active_site_run.has_value())
         {
             queue_close_site_inventory_panels(invocation, *active_site_run);
-            if (active_site_run->phone_panel.open)
+            if (phone_panel.open)
             {
                 queue_close_phone_panel(invocation);
             }
@@ -355,7 +358,7 @@ Gs1Status SiteProtectionPresentationSystem::process_game_message(
                 clear_protection_ui_state(protection);
             }
             queue_site_protection_overlay_state_message(invocation, active_site_run, protection);
-            if (active_site_run.has_value() && active_site_run->phone_panel.open)
+            if (active_site_run.has_value() && phone_panel.open)
             {
                 queue_close_phone_panel(invocation);
             }
@@ -385,7 +388,7 @@ Gs1Status SiteProtectionPresentationSystem::process_game_message(
             return GS1_STATUS_OK;
         }
         queue_close_site_inventory_panels(invocation, *active_site_run);
-        if (active_site_run->phone_panel.open)
+        if (phone_panel.open)
         {
             queue_close_phone_panel(invocation);
         }

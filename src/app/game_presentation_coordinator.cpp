@@ -2393,9 +2393,10 @@ void GamePresentationCoordinator::queue_site_phone_panel_state_message()
     }
 
     const auto& phone_panel = active_site_run()->phone_panel;
+    const auto& phone_panel_presentation = phone_panel_presentation_state();
     auto message = make_engine_message(GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE);
     auto& payload = message.emplace_payload<Gs1EngineMessagePhonePanelData>();
-    payload.active_section = to_phone_panel_section(phone_panel.active_section);
+    payload.active_section = to_phone_panel_section(phone_panel_presentation.active_section);
     payload.reserved0[0] = 0U;
     payload.reserved0[1] = 0U;
     payload.reserved0[2] = 0U;
@@ -2407,12 +2408,12 @@ void GamePresentationCoordinator::queue_site_phone_panel_state_message()
     payload.sell_listing_count = phone_panel.sell_listing_count;
     payload.service_listing_count = phone_panel.service_listing_count;
     payload.cart_item_count = phone_panel.cart_item_count;
-    payload.flags = phone_panel.badge_flags |
-        (phone_panel.open ? GS1_PHONE_PANEL_FLAG_OPEN : 0U);
+    payload.flags = phone_panel_presentation.badge_flags |
+        (phone_panel_presentation.open ? GS1_PHONE_PANEL_FLAG_OPEN : 0U);
     engine_messages().push_back(message);
     queue_ui_surface_visibility_message(
         GS1_UI_SURFACE_SITE_PHONE_PANEL,
-        phone_panel.open);
+        phone_panel_presentation.open);
 }
 
 void GamePresentationCoordinator::queue_site_protection_overlay_state_message()
