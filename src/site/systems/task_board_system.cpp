@@ -23,11 +23,7 @@ namespace gs1
 template <>
 struct system_state_tags<TaskBoardSystem>
 {
-    using type = type_list<
-        RuntimeCampaignTag,
-        RuntimeActiveSiteRunTag,
-        RuntimeFixedStepSecondsTag,
-        RuntimeMoveDirectionTag>;
+    using type = type_list<RuntimeCampaignTag, RuntimeFixedStepSecondsTag>;
 };
 
 namespace
@@ -52,16 +48,9 @@ enum class PlantProtectionChannel : std::uint8_t
     return *campaign;
 }
 
-[[nodiscard]] SiteRunState& task_board_site_run(RuntimeInvocation& invocation)
-{
-    auto access = task_board_access(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    return *site_run;
-}
-
 [[nodiscard]] SiteWorldAccess<TaskBoardSystem> task_board_world(RuntimeInvocation& invocation)
 {
-    return SiteWorldAccess<TaskBoardSystem> {task_board_site_run(invocation)};
+    return SiteWorldAccess<TaskBoardSystem> {invocation};
 }
 
 [[nodiscard]] GameMessageQueue& task_board_message_queue(RuntimeInvocation& invocation)
@@ -559,7 +548,7 @@ std::vector<ItemId> collect_item_candidates(
         }
 
         std::vector<ItemId> candidates {};
-        const auto* site_content = find_prototype_site_content(task_board_site_run(invocation).site_id);
+        const auto* site_content = find_prototype_site_content(task_board_world(invocation).site_id());
         if (site_content == nullptr)
         {
             return candidates;
@@ -1887,7 +1876,7 @@ bool refresh_normal_task_pool(
     bool force_dirty = false) noexcept
 {
     auto& board = task_board_world(invocation).own_task_board();
-    if (onboarding_chain_effective(task_board_site_run(invocation).site_id, board))
+    if (onboarding_chain_effective(task_board_world(invocation).site_id(), board))
     {
         return false;
     }
@@ -2075,7 +2064,7 @@ bool item_is_buyable_from_authored_phone_stock(
         return false;
     }
 
-    const auto* site_content = find_prototype_site_content(task_board_site_run(invocation).site_id);
+    const auto* site_content = find_prototype_site_content(task_board_world(invocation).site_id());
     if (site_content == nullptr)
     {
         return false;
@@ -2184,12 +2173,14 @@ void handle_task_reward_claim_requested(
     board.claimed_task_ids.push_back(task->task_instance_id);
 
     const bool claimed_onboarding_task =
-        find_onboarding_seed_def(task_board_site_run(invocation).site_id, task->task_template_id) != nullptr;
+        find_onboarding_seed_def(task_board_world(invocation).site_id(), task->task_template_id) != nullptr;
     const bool had_follow_up_task_template = task->has_follow_up_task_template;
     if (task->has_follow_up_task_template)
     {
         const auto* follow_up_seed =
-            find_onboarding_seed_def(task_board_site_run(invocation).site_id, task->follow_up_task_template_id);
+            find_onboarding_seed_def(
+                task_board_world(invocation).site_id(),
+                task->follow_up_task_template_id);
         const auto* follow_up_template_def =
             find_task_template_def(task->follow_up_task_template_id);
         if (follow_up_seed != nullptr && follow_up_template_def != nullptr)
@@ -2207,7 +2198,7 @@ void handle_task_reward_claim_requested(
     const bool onboarding_finished =
         claimed_onboarding_task &&
         !had_follow_up_task_template &&
-        !onboarding_chain_effective(task_board_site_run(invocation).site_id, board);
+        !onboarding_chain_effective(task_board_world(invocation).site_id(), board);
     if (onboarding_finished)
     {
         (void)refresh_normal_task_pool(invocation, true);
@@ -2747,9 +2738,8 @@ Gs1Status TaskBoardSystem::process_game_message(
 {
     auto access = make_game_state_access<TaskBoardSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
     const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    if (!campaign.has_value())
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -2762,7 +2752,7 @@ Gs1Status TaskBoardSystem::process_game_message(
         if ((message.payload_as<SiteRefreshTickMessage>().refresh_mask &
                 SITE_REFRESH_TICK_TASK_BOARD) != 0U &&
             !onboarding_chain_effective(
-                task_board_site_run(invocation).site_id,
+                task_board_world(invocation).site_id(),
                 task_board_world(invocation).read_task_board()))
         {
             (void)refresh_normal_task_pool(invocation, true);
@@ -2897,14 +2887,13 @@ void TaskBoardSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<TaskBoardSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
     const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    if (!campaign.has_value())
     {
         return;
     }
     auto& board = task_board_world(invocation).own_task_board();
-    if (onboarding_chain_effective(task_board_site_run(invocation).site_id, board))
+    if (onboarding_chain_effective(task_board_world(invocation).site_id(), board))
     {
         board.minutes_until_next_refresh = 0.0;
     }

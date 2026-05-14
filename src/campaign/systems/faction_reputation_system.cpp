@@ -1,6 +1,7 @@
 #include "campaign/systems/faction_reputation_system.h"
 
 #include "campaign/campaign_state.h"
+#include "campaign/systems/campaign_system_context.h"
 #include "content/defs/faction_defs.h"
 #include "runtime/game_runtime.h"
 
@@ -11,14 +12,14 @@ namespace gs1
 namespace
 {
 FactionProgressState* find_faction_progress_mut(
-    CampaignState& campaign,
+    std::vector<FactionProgressState>& faction_progress,
     FactionId faction_id) noexcept
 {
-    for (auto& faction_progress : campaign.faction_progress)
+    for (auto& faction_progress_state : faction_progress)
     {
-        if (faction_progress.faction_id == faction_id)
+        if (faction_progress_state.faction_id == faction_id)
         {
-            return &faction_progress;
+            return &faction_progress_state;
         }
     }
 
@@ -34,7 +35,7 @@ Gs1Status process_faction_reputation_message(
 template <>
 struct system_state_tags<FactionReputationSystem>
 {
-    using type = type_list<RuntimeCampaignTag>;
+    using type = type_list<RuntimeCampaignFactionProgressTag>;
 };
 
 const char* FactionReputationSystem::name() const noexcept
@@ -67,9 +68,8 @@ Gs1Status FactionReputationSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<FactionReputationSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    if (!campaign.has_value())
+    auto campaign = make_campaign_state_access(invocation);
+    if (!campaign.has_campaign())
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -100,15 +100,15 @@ Gs1Status process_faction_reputation_message(
         return GS1_STATUS_OK;
     }
 
-    auto access = make_game_state_access<FactionReputationSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    if (!campaign.has_value())
+    auto campaign = make_campaign_state_access(invocation);
+    if (!campaign.has_campaign())
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
     const auto& payload = message.payload_as<FactionReputationAwardRequestedMessage>();
-    auto* faction_progress = find_faction_progress_mut(*campaign, FactionId {payload.faction_id});
+    auto* faction_progress =
+        find_faction_progress_mut(campaign.faction_progress(), FactionId {payload.faction_id});
     if (faction_progress == nullptr)
     {
         return GS1_STATUS_NOT_FOUND;

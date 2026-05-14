@@ -67,19 +67,18 @@ Gs1Status process_message(
     gs1::RuntimeInvocation& invocation,
     const gs1::GameMessage& message)
 {
-    auto access = gs1::make_game_state_access<gs1::DeviceMaintenanceSystem>(invocation);
-    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
-    gs1::SiteWorldAccess<gs1::DeviceMaintenanceSystem> world {*site_run};
+    gs1::SiteWorldAccess<gs1::DeviceMaintenanceSystem> world {invocation};
     auto& message_queue = invocation.game_message_queue();
     if (message.type == gs1::GameMessageType::SiteRunStarted)
     {
-        if (!world.has_world() || site_run->site_world == nullptr)
+        auto* site_world = world.own_site_world();
+        if (!world.has_world() || site_world == nullptr)
         {
             return GS1_STATUS_OK;
         }
 
         auto source_query =
-            site_run->site_world->ecs_world()
+            site_world->ecs_world()
                 .query_builder<
                     const gs1::site_ecs::TileCoordComponent,
                     const gs1::site_ecs::DeviceStructureId,
@@ -110,12 +109,13 @@ Gs1Status process_message(
     {
         const auto& payload = message.payload_as<gs1::SiteDeviceRepairedMessage>();
         const gs1::TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
-        if (!world.tile_coord_in_bounds(target_tile) || site_run->site_world == nullptr)
+        auto* site_world = world.own_site_world();
+        if (!world.tile_coord_in_bounds(target_tile) || site_world == nullptr)
         {
             return GS1_STATUS_INVALID_ARGUMENT;
         }
 
-        const auto anchor_device = site_run->site_world->tile_device(target_tile);
+        const auto anchor_device = site_world->tile_device(target_tile);
         if (anchor_device.structure_id.value == 0U)
         {
             return GS1_STATUS_OK;
@@ -130,14 +130,14 @@ Gs1Status process_message(
                     return;
                 }
 
-                auto device = site_run->site_world->tile_device(footprint_coord);
+                auto device = site_world->tile_device(footprint_coord);
                 if (device.structure_id != anchor_device.structure_id)
                 {
                     return;
                 }
 
                 device.device_integrity = 1.0f;
-                site_run->site_world->set_tile_device(footprint_coord, device);
+                site_world->set_tile_device(footprint_coord, device);
                 emit_device_condition_changed_message(
                     message_queue,
                     footprint_coord,
@@ -154,9 +154,10 @@ Gs1Status process_message(
 
     const auto& payload = message.payload_as<gs1::SiteDevicePlacedMessage>();
     const gs1::TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
-    if (!world.tile_coord_in_bounds(target_tile) || site_run->site_world == nullptr)
+    auto* site_world = world.own_site_world();
+    if (!world.tile_coord_in_bounds(target_tile) || site_world == nullptr)
     {
-            return GS1_STATUS_INVALID_ARGUMENT;
+        return GS1_STATUS_INVALID_ARGUMENT;
     }
 
     gs1::for_each_tile_in_footprint(
@@ -168,7 +169,7 @@ Gs1Status process_message(
                 return;
             }
 
-            site_run->site_world->set_tile_device(
+            site_world->set_tile_device(
                 footprint_coord,
                 gs1::SiteWorld::TileDeviceData {
                     gs1::StructureId {payload.structure_id},
@@ -188,8 +189,7 @@ Gs1Status process_message(
 void run_system(gs1::RuntimeInvocation& invocation)
 {
     auto access = gs1::make_game_state_access<gs1::DeviceMaintenanceSystem>(invocation);
-    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
-    gs1::SiteWorldAccess<gs1::DeviceMaintenanceSystem> world {*site_run};
+    gs1::SiteWorldAccess<gs1::DeviceMaintenanceSystem> world {invocation};
     auto& message_queue = invocation.game_message_queue();
     if (!world.has_world())
     {
@@ -208,12 +208,13 @@ void run_system(gs1::RuntimeInvocation& invocation)
         std::fabs(world.read_weather().weather_wind),
         std::fabs(world.read_weather().weather_dust)});
     const float weather_factor = std::clamp(max_weather_meter / k_weather_meter_max, 0.0f, 1.0f);
-    if (site_run->site_world == nullptr)
+    auto* site_world = world.own_site_world();
+    if (site_world == nullptr)
     {
         return;
     }
 
-    auto& ecs_world = site_run->site_world->ecs_world();
+    auto& ecs_world = site_world->ecs_world();
     auto device_query =
         ecs_world.query_builder<
             const gs1::site_ecs::TileCoordComponent,
@@ -279,7 +280,7 @@ void run_system(gs1::RuntimeInvocation& invocation)
 
     for (const BrokenDeviceEntry& broken : broken_devices)
     {
-        site_run->site_world->set_tile_device(
+        site_world->set_tile_device(
             broken.coord,
             gs1::SiteWorld::TileDeviceData {});
         emit_device_condition_changed_message(
@@ -336,9 +337,8 @@ Gs1Status DeviceMaintenanceSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<DeviceMaintenanceSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
+    SiteWorldAccess<DeviceMaintenanceSystem> world {invocation};
+    if (!world.has_world())
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -357,9 +357,8 @@ Gs1Status DeviceMaintenanceSystem::process_host_message(
 
 void DeviceMaintenanceSystem::run(RuntimeInvocation& invocation)
 {
-    auto access = make_game_state_access<DeviceMaintenanceSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
+    SiteWorldAccess<DeviceMaintenanceSystem> world {invocation};
+    if (!world.has_world())
     {
         return;
     }

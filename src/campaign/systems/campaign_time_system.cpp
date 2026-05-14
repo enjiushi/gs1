@@ -1,6 +1,7 @@
 #include "campaign/systems/campaign_time_system.h"
 
 #include "campaign/campaign_state.h"
+#include "campaign/systems/campaign_system_context.h"
 #include "runtime/game_runtime.h"
 
 namespace gs1
@@ -56,24 +57,24 @@ Gs1Status CampaignTimeSystem::process_host_message(
 
 void CampaignTimeSystem::run(RuntimeInvocation& invocation)
 {
-    auto access = make_game_state_access<CampaignTimeSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    if (!campaign.has_value())
+    auto campaign = make_campaign_state_access(invocation);
+    if (!campaign.has_campaign())
     {
         return;
     }
 
+    auto access = make_game_state_access<CampaignTimeSystem>(invocation);
     const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
 
-    campaign->campaign_clock_minutes_elapsed +=
+    campaign.campaign_clock_minutes_elapsed() +=
         runtime_minutes_from_real_seconds(fixed_step_seconds);
 
     const auto elapsed_days =
         static_cast<std::uint32_t>(
-            campaign->campaign_clock_minutes_elapsed / k_runtime_minutes_per_day);
-    campaign->campaign_days_remaining =
-        (elapsed_days >= campaign->campaign_days_total)
+            campaign.campaign_clock_minutes_elapsed() / k_runtime_minutes_per_day);
+    campaign.campaign_days_remaining() =
+        (elapsed_days >= campaign.campaign_days_total())
             ? 0U
-            : (campaign->campaign_days_total - elapsed_days);
+            : (campaign.campaign_days_total() - elapsed_days);
 }
 }  // namespace gs1

@@ -31,13 +31,7 @@ Gs1Status process_message(
 void run_system(gs1::RuntimeInvocation& invocation)
 {
     auto access = gs1::make_game_state_access<gs1::DeviceSupportSystem>(invocation);
-    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return;
-    }
-
-    gs1::SiteWorldAccess<gs1::DeviceSupportSystem> world {*site_run};
+    gs1::SiteWorldAccess<gs1::DeviceSupportSystem> world {invocation};
     if (!world.has_world())
     {
         return;
@@ -51,7 +45,13 @@ void run_system(gs1::RuntimeInvocation& invocation)
     }
 
     const auto& tuning = gs1::gameplay_tuning_def().device_support;
-    auto& ecs_world = site_run->site_world->ecs_world();
+    auto* ecs_world_ptr = world.ecs_world_ptr();
+    if (ecs_world_ptr == nullptr)
+    {
+        return;
+    }
+
+    auto& ecs_world = *ecs_world_ptr;
     auto device_query =
         ecs_world.query_builder<
             const gs1::site_ecs::TileCoordComponent,
@@ -85,7 +85,7 @@ void run_system(gs1::RuntimeInvocation& invocation)
             }
 
             const auto tile_entity_id =
-                site_run->site_world->tile_entity_id(coord_component.value);
+                world.tile_entity_id(coord_component.value);
             const float tile_heat = tile_entity_id == 0U
                 ? 0.0f
                 : ecs_world.entity(tile_entity_id).get<gs1::site_ecs::TileHeat>().value;
@@ -136,9 +136,8 @@ Gs1Status DeviceSupportSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<DeviceSupportSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
+    gs1::SiteWorldAccess<gs1::DeviceSupportSystem> world {invocation};
+    if (!world.has_world())
     {
         return GS1_STATUS_INVALID_STATE;
     }

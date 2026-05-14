@@ -78,13 +78,12 @@ Gs1Status SiteTimeSystem::process_host_message(
 void SiteTimeSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<SiteTimeSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
+    SiteWorldAccess<SiteTimeSystem> world {invocation};
+    if (!world.has_world())
     {
         return;
     }
 
-    SiteWorldAccess<SiteTimeSystem> world {*site_run};
     auto& message_queue = invocation.game_message_queue();
     const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
     auto& clock = world.own_time();

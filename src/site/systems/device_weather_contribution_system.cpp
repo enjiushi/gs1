@@ -107,12 +107,17 @@ void mark_tiles_affected_by_source(
 }
 
 gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
-    gs1::SiteRunState& site_run,
     gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem>& world,
     const gs1::WeatherDirectionStep& wind_direction,
     gs1::TileCoord target_coord)
 {
-    auto& ecs_world = site_run.site_world->ecs_world();
+    const auto* site_world = world.read_site_world();
+    if (site_world == nullptr)
+    {
+        return {};
+    }
+
+    auto& ecs_world = site_world->ecs_world();
     gs1::SiteWorld::TileWeatherContributionData total = gs1::zero_weather_contribution();
 
     for (const auto sample : gs1::k_weather_contribution_samples)
@@ -123,7 +128,7 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
             continue;
         }
 
-        const auto source_entity_id = site_run.site_world->device_entity_id(source_coord);
+        const auto source_entity_id = world.device_entity_id(source_coord);
         if (source_entity_id == 0U)
         {
             continue;
@@ -199,7 +204,6 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
 }
 
 void write_tile_contribution(
-    gs1::SiteRunState& site_run,
     gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem>& world,
     std::uint32_t tile_index,
     const gs1::SiteWorld::TileWeatherContributionData& contribution)
@@ -209,13 +213,19 @@ void write_tile_contribution(
         return;
     }
 
-    const auto entity_id = site_run.site_world->tile_entity_id(world.tile_coord(tile_index));
+    const auto* site_world = world.own_site_world();
+    if (site_world == nullptr)
+    {
+        return;
+    }
+
+    const auto entity_id = site_world->tile_entity_id(world.tile_coord(tile_index));
     if (entity_id == 0U)
     {
         return;
     }
 
-    site_run.site_world->ecs_world().entity(entity_id).set<gs1::site_ecs::TileDeviceWeatherContribution>({
+    site_world->ecs_world().entity(entity_id).set<gs1::site_ecs::TileDeviceWeatherContribution>({
         contribution.heat_protection,
         contribution.wind_protection,
         contribution.dust_protection,
@@ -228,17 +238,10 @@ Gs1Status process_message(
     gs1::RuntimeInvocation& invocation,
     const gs1::GameMessage& message)
 {
-    auto access = gs1::make_game_state_access<gs1::DeviceWeatherContributionSystem>(invocation);
-    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem> world {*site_run};
+    gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem> world {invocation};
     if (!world.has_world())
     {
-        return GS1_STATUS_OK;
+        return GS1_STATUS_INVALID_STATE;
     }
 
     auto& runtime = world.own_device_weather_runtime();
@@ -297,14 +300,7 @@ Gs1Status process_message(
 
 void run_system(gs1::RuntimeInvocation& invocation)
 {
-    auto access = gs1::make_game_state_access<gs1::DeviceWeatherContributionSystem>(invocation);
-    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return;
-    }
-
-    gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem> world {*site_run};
+    gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem> world {invocation};
     if (!world.has_world())
     {
         return;
@@ -337,10 +333,9 @@ void run_system(gs1::RuntimeInvocation& invocation)
     {
         const gs1::TileCoord target_coord = world.tile_coord(tile_index);
         write_tile_contribution(
-            *site_run,
             world,
             tile_index,
-            recompute_tile_contribution(*site_run, world, wind_direction, target_coord));
+            recompute_tile_contribution(world, wind_direction, target_coord));
     }
 
     clear_dirty_tiles(runtime);
@@ -385,13 +380,6 @@ Gs1Status DeviceWeatherContributionSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<DeviceWeatherContributionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
     return process_message(invocation, message);
 }
 
@@ -406,13 +394,6 @@ Gs1Status DeviceWeatherContributionSystem::process_host_message(
 
 void DeviceWeatherContributionSystem::run(RuntimeInvocation& invocation)
 {
-    auto access = make_game_state_access<DeviceWeatherContributionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return;
-    }
-
     run_system(invocation);
 }
 }  // namespace gs1

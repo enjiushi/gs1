@@ -1,153 +1,213 @@
 # State Resolver Architecture Plan
 
-This document proposes a refactor path from the current direct tagged-state-access model toward a resolver-driven, plug-friendly runtime structure.
+This document proposes a refactor path from the current direct tagged-state-access model toward a `StateManager`-centered runtime structure where:
 
-The goal is not to weaken ownership. The goal is to keep strict ownership of mutable state while replacing hard knowledge of peer systems with stable state-service contracts.
+- `StateManager` is the only cross-owner read path
+- a resolver is simply an `IRuntimeSystem` that owns one or more state sets
+- each resolver registers itself for the specific `StateSetId` values it owns
+- every state set always has a default resolver installed in `StateManager`
+- cross-owner mutation still goes through `GameMessage`
+
+The goal is not to weaken ownership. The goal is to keep strict ownership of mutable state while removing hard wiring between peer systems.
+
+## Implementation Status
+
+This section tracks the current GS1 refactor status relative to this plan.
+
+### What Has Been Done
+
+- Added split authoritative runtime storage for app, campaign, and site state sets instead of relying only on the old aggregate `GameState` shape.
+- Added `StateSetId` inventory and typed state-set traits/wrappers in `src/runtime/state_set.h`.
+- Added `StateManager` in `src/runtime/state_manager.h` and `src/runtime/state_manager.cpp`.
+- Registered runtime systems as owners/resolvers by explicit `StateSetId` ownership instead of implicit aggregate access.
+- Enforced the additional cache-layout rule:
+  - every non-container state set wrapper is explicitly aligned to 64 bytes
+  - compile-time validation checks that contract
+- Updated `RuntimeInvocation` and runtime state access so split-backed reads/writes can still hydrate and flush compatibility aggregate views where needed.
+- Added split-backed site-world access paths so site systems can work against their owned slices directly instead of always tunneling through assembled `SiteRunState`.
+- Migrated the main site owner systems to the split-backed ownership model, including:
+  - action execution
+  - camp durability
+  - craft
+  - device maintenance
+  - device support
+  - device weather contribution
+  - ecology
+  - economy phone
+  - failure recovery
+  - inventory
+  - local weather resolve
+  - modifier
+  - placement validation
+  - plant weather contribution
+  - site completion
+  - site flow
+  - site time
+  - task board
+  - weather event
+  - worker condition
+- Migrated campaign flow away from direct gameplay-system dependency on `RuntimeActiveSiteRunTag` by using split-backed active-site helpers.
+- Kept cross-owner mutation on `GameMessage`.
+- Updated build wiring so the new state-manager implementation is compiled into the gameplay core.
+- Updated repo guidance docs and folder guidelines to describe the split-state runtime direction.
+
+### Current Verified Build State
+
+Verified locally on the current refactor branch/worktree:
+
+- `cmake --build build --config Debug --target gs1_gameplay_core`
+- `cmake --build build --config Debug --target gs1_game`
+
+Both builds are green.
+
+### What Is Still Compatibility-Only
+
+The following pieces still exist mainly to support compatibility during the transition:
+
+- `RuntimeActiveSiteRunTag` support in `src/runtime/runtime_state_access.h`
+- fallback aggregate-site access path in `src/site/systems/site_system_context.h`
+- compatibility hydration/flush paths that assemble aggregate campaign/site views from split state sets
+
+These are no longer the primary gameplay-system path for the migrated systems, but they still exist to avoid breaking older access surfaces during the transition.
+
+### What Is Next
+
+The next refactor slice should focus on reducing transitional duplication and tightening the architecture around the now-working split-state path:
+
+- consolidate duplicated split-state assembly/write-back helpers so campaign/site compatibility hydration does not reimplement the same mapping logic in multiple places
+- decide whether the compatibility aggregate-site path should remain temporarily or be removed after downstream callers are fully migrated
+- move more read-only runtime helpers and exported view builders to use split state directly where practical instead of assembling aggregate compatibility objects first
+- review whether `RuntimeActiveSiteRunTag` can be deleted entirely once no remaining compatibility callers need it
+- continue aligning follow-up plans with `COMPILE_TIME_RUNTIME_STATE_PLAN.md`
+
+### TODO List
+
+- deduplicate campaign/site state-set assembly and write-back helper code
+- audit remaining compatibility-only access surfaces and remove any no longer needed
+- consider replacing broad compatibility `CampaignState` or `SiteRunState` hydration in read-only paths with narrower direct split-state reads
+- add focused tests for:
+  - duplicate `StateSetId` owner registration rejection
+  - split-state fallback/default resolver behavior
+  - compatibility hydration/write-back correctness for migrated systems
+- review warning policy for the expected MSVC `C4324` alignment warnings caused by intentional `alignas(64)` state-set wrappers
+- keep future system additions aligned with:
+  - explicit owned-state-set registration
+  - `StateManager` cross-owner reads
+  - `GameMessage` cross-owner mutation
 
 ## Intent
 
-Today the runtime already has a strong ownership rule:
+Today the runtime already has the right high-level ownership rule:
 
 - each system owns a specific mutable state slice
 - other systems may read some slices
 - cross-owner mutation should happen through `GameMessage`
 
-That direction is good and should stay.
+That direction should stay.
 
-The current pain point is coupling:
+The pain point is structural coupling:
 
-- a system often needs to know that another specific state slice exists
-- a game feature may feel like it needs a dependency tree of systems instead of one clean capability
-- removing one system can force structural rewiring instead of graceful fallback
+- a caller often needs to know that another specific system exists
+- fallback behavior is hard to express cleanly when an owner is absent
+- feature composition becomes wiring-heavy instead of state-set-driven
 
-Your proposed direction is a good fit if we shape it carefully, and the refactor should follow this pattern:
+The refactor should move to this model:
 
-- introduce a central state resolver manager
-- define one state-set contract per owned state slice
+- introduce a central `StateManager`
+- define one resolver slot per owned state set
 - keep a full default resolver set inside `StateManager`
-- initialize all default resolvers at game-runtime startup
-- allow a gameplay system to override the default resolver for any state set it owns by implementing and registering that contract
-- let `RuntimeInvocation` stay as runtime context only
-- let systems read through `StateManager::query(...)` and write only through their owned resolver path
+- initialize all default resolvers at runtime startup in `StateSetId` order
+- allow gameplay systems to register themselves as the active resolver for the state sets they own
+- keep `RuntimeInvocation` as transient runtime context only
+- let systems read through `StateManager::query(...)`
+- let only the owning resolver mutate the state set it owns
 
-## Core Recommendation
+## Additional State Layout Rule
 
-The strongest version of the idea is:
-
-- use a central `StateManager`
-- keep the default resolver set inside that manager
-- keep actual mutable state ownership inside the owning systems or owning runtime slices
-- use `query(...)` for read access and resolver ownership for mutation
-- keep cross-owner writes on `GameMessage` or owner-handled request flow
-
-In short:
-
-- centralize lookup
-- centralize fallback behavior
-- do not centralize unrestricted gameplay authority
-
-That keeps the current ownership model intact while removing most compile-time and wiring-time coupling.
-
-## Why This Is Better Than A Plain State Manager
-
-If the new manager directly owns all state and gives everyone broad mutable access, it will create a larger coupling problem than the current one:
-
-- dependencies become implicit
-- ownership becomes blurry
-- testing gets harder because every system can reach everything
-- plug-in and plug-out becomes dangerous because behavior becomes hidden in global access
-
-If the manager is instead only the registry and dispatch point for state-capability resolvers:
-
-- systems can depend on capabilities instead of concrete peers
-- missing systems can fall back to safe default behavior
-- ownership stays explicit
-- tests can swap resolvers cheaply
-- feature modules become more optional
-
-## Design Principles
-
-### 1. Resolver interfaces are capability contracts
-
-Each resolver interface should describe a stable gameplay capability, not a concrete subsystem.
-
-Good examples:
-
-- `IWeatherStateResolver`
-- `ITechnologyStateResolver`
-- `IInventoryQueryResolver`
-- `IPlacementRulesResolver`
-- `ITaskBoardQueryResolver`
-
-Bad examples:
-
-- `ILocalWeatherSystemBridge`
-- `IFactionReputationSystemAccess`
-- `IUseTaskBoardSystemInternals`
-
-The interface should express what a caller needs, not who currently implements it.
-
-### 2. Mutable ownership stays local
-
-Only resolver systems may mutate a state set. Everyone else reads through `StateManager::query(...)`.
-
-Resolvers may expose:
-
-- read-only state views
-- derived query answers
-- capability checks
-- request submission entry points that translate into `GameMessage`
-
-Resolvers should not become backdoors for direct writes into another owner's state.
+For this refactor, every non-container state set must be explicitly aligned to a 64-byte cache line.
 
 Rule:
 
-- cross-owner reads may go through resolvers
-- cross-owner writes should still go through messages, commands, or owner-handled requests
+- if a state set is a non-container state, its storage wrapper must be `alignas(64)`
+- the runtime should validate that contract with compile-time checks
+- container-backed state sets may still use their natural container alignment, but the state-set wrapper itself may still be aligned when practical
+
+This rule exists so the runtime-owned authoritative storage for scalar or aggregate non-container state sets follows a predictable cache-line layout instead of leaving that to compiler-default packing.
+
+## Core Rules
+
+### 1. `StateManager` is the cross-owner read path
+
+Cross-owner reads go through `StateManager`, not through peer-system interfaces.
+
+Rule:
+
+- non-owners read through `StateManager::query(...)`
+- owners write through the owned resolver path
+- cross-owner writes still go through `GameMessage`
+
+### 2. A resolver is an owner system
+
+A resolver is not a separate interface category.
+
+A resolver is:
+
+- an `IRuntimeSystem`
+- a system that owns one or more state sets
+- a system that registers itself in `StateManager` for those owned state sets
+
+If a system owns no state sets, it is not a resolver.
 
 ### 3. Every state set has a default resolver
 
-Each state set should always have a registered default resolver inside `StateManager`.
+Each `StateSetId` must always have a default resolver installed in `StateManager`.
 
-Default resolvers should be explicit about which mode they represent:
+Default resolvers should represent explicit fallback semantics such as:
 
 - empty capability
 - disabled feature
-- unsupported action
-- fallback authored/static behavior
+- neutral authored behavior
+- unsupported action that safely no-ops
 
-Examples:
+This is what allows plug-in and plug-out behavior without breaking readers.
 
-- no weather system installed -> default weather resolver returns neutral weather
-- no technology system installed -> default technology resolver answers "nothing unlocked"
-- no task board system installed -> default task queries return empty lists
+### 4. Resolver registration is by `StateSetId`
 
-This is what enables true plug-in and plug-out behavior.
+The runtime should not infer resolver ownership from interface inheritance.
 
-### 4. System implementations may override defaults
+Instead:
 
-If a system owns the authoritative state for a state set, it may implement that resolver contract and register itself as the active resolver.
+- the system declares which state sets it owns
+- `StateManager` registers that system for those `StateSetId` values
+- `StateManager` tracks both the default resolver and the active resolver for each state set
 
-Examples:
+One system may register for multiple state sets if it owns multiple state sets.
 
-- `WeatherEventSystem` may implement `IWeatherStateResolver`
-- `TechnologySystem` may implement `ITechnologyStateResolver`
-- `InventorySystem` may implement `IInventoryQueryResolver`
+### 5. Default tracking belongs to `StateManager`
 
-The system then becomes the provider for that capability without callers knowing about the concrete system type.
+`IRuntimeSystem` should not expose `is_default_resolver()`.
 
-### 5. Resolver lookup should be explicit and typed
+The runtime already knows which resolver is the default because `StateManager` installs and tracks it by `StateSetId`.
 
-Avoid stringly-typed service lookup.
+That means:
 
-Prefer compile-time typed registration such as:
+- default-ness is registration state, not system identity
+- `StateManager` decides whether the default resolver or a custom resolver is active for a given state set
+- default ticking should iterate state sets in `StateSetId` order
 
-- state-set enum
-- interface type
-- single active provider pointer/reference per state set
-- guaranteed default fallback
+## Current-Refactor-Aligned Examples
 
-That fits the codebase’s current tagged-state-access direction and keeps overhead low.
+Examples that match the current refactor direction better:
+
+- `WeatherEventSystem` may register as the resolver for `StateSetId::RawWeather`
+- `LocalWeatherResolveSystem` may register as the resolver for `StateSetId::ResolvedWeather`
+- `TechnologySystem` may register as the resolver for the technology-related state sets it owns
+- `InventorySystem` may register as the resolver for the inventory-related state sets it owns
+- `PlacementValidationSystem` reads state, but if it owns no state set, it is not a resolver
+
+The key point is not that a system implements a resolver interface.
+
+The key point is that a system owns specific state sets and registers itself for those state sets in `StateManager`.
 
 ## Proposed Runtime Model
 
@@ -158,56 +218,63 @@ Keep gameplay state grouped by ownership domain:
 - app state
 - campaign state
 - active site-run state
-- site ECS-owned sparse/dense domains
+- site ECS-owned sparse and dense domains
 - runtime clocks and transient input snapshots
 
 These remain the authoritative data containers.
 
-## B. Resolver registry
+## B. `StateManager`
 
-Add a runtime-owned manager that stores:
+`StateManager` should own:
 
-- the full default resolver set
-- the currently active custom owner for each state set
-- read permission state for systems
+- the authoritative storage slot for each `StateSetId`
+- the default resolver pointer for each `StateSetId`
+- the active resolver pointer for each `StateSetId`
+- the default resolver storage container
+
+`StateManager` should not infer ownership from polymorphic interface shape. It should track ownership explicitly by state set.
 
 Example shape:
 
 ```cpp
-template <class ResolverTag>
-struct resolver_traits;
-
 class StateManager final
 {
 public:
-    void initialize_defaults();
-    void tick_defaults();
+    StateManager();
 
-    template <class ResolverTag>
-    const typename resolver_traits<ResolverTag>::interface_type& get() const noexcept;
+    template <class System>
+    void register_resolver(System& system) noexcept;
 
-    template <class ResolverTag>
-    void register_override(const typename resolver_traits<ResolverTag>::interface_type& resolver) noexcept;
+    void tick_defaults(RuntimeInvocation& invocation);
 
-    template <class ResolverTag>
-    void clear_override() noexcept;
+    template <StateSetId Id>
+    [[nodiscard]] const typename state_traits<Id>::type& query() const noexcept;
+
+    template <class System, StateSetId Id>
+    [[nodiscard]] typename state_traits<Id>::type& state() noexcept;
 };
 ```
 
 The manager owns:
 
-- a full default resolver set for every state set
-- optional override pointer/reference per capability
+- one authoritative storage object per state set
+- one default resolver per state set
+- one active resolver pointer per state set
 
-The manager does not own gameplay state itself.
+The manager does not centralize unrestricted gameplay authority.
 
-## C. Resolver context
+## C. `RuntimeInvocation`
 
-`RuntimeInvocation` should stay as a context carrier for transient tick inputs, runtime timing, and message submission helpers.
+`RuntimeInvocation` should stay a context carrier for:
 
-It should not be the place where state access lives.
+- transient tick inputs
+- fixed-step timing
+- runtime message submission
+- game-message submission
 
-All state access should go through `StateManager`.
+It should not become the cross-owner state access API.
+
+All cross-owner reads should go through `StateManager`.
 
 ## D. Owner systems
 
@@ -217,8 +284,7 @@ Owner systems keep responsibility for:
 - subscribing to gameplay messages
 - fixed-step updates
 - lifecycle initialization and teardown
-
-If a system implements one or more resolver interfaces, it also becomes the active provider for those capabilities during registration.
+- registering themselves as resolvers for the state sets they own
 
 ## E. Default resolvers
 
@@ -226,15 +292,19 @@ Default resolvers should live inside `StateManager` as a complete baseline set.
 
 They should be:
 
-- initialized at game-runtime startup
-- present for every state set
-- tickable from `StateManager`
-- safe when the custom resolver for that state set is absent
-- skipped from default ticking when a custom resolver has replaced that state set
+- allocated up front
+- stored in `StateSetId` order
+- tracked separately from active resolvers
+- ticked only when they are still the active resolver for that state set
 
 ## Code Example
 
-This is the pattern the refactor should follow.
+This example reflects the updated direction:
+
+- `StateManager` is the read path
+- systems register by `StateSetId`
+- default tracking stays inside `StateManager`
+- `IRuntimeSystem` does not expose `is_default_resolver()`
 
 ```cpp
 class RuntimeInvocation;
@@ -310,6 +380,7 @@ struct state_traits<StateSetId::Plants>
 template <StateSetId Id>
 consteval bool state_contract_is_valid()
 {
+    using wrapper_type = typename state_traits<Id>::wrapper_type;
     using state_type = typename state_traits<Id>::type;
     using element_type = typename state_traits<Id>::element_type;
 
@@ -318,7 +389,9 @@ consteval bool state_contract_is_valid()
         return std::is_trivially_copyable_v<element_type> && std::is_standard_layout_v<element_type>;
     }
 
-    return std::is_trivially_copyable_v<state_type> && std::is_standard_layout_v<state_type>;
+    return
+        std::is_standard_layout_v<state_type> &&
+        alignof(wrapper_type) >= 64U;
 }
 
 static_assert(state_contract_is_valid<StateSetId::RawWeather>());
@@ -326,75 +399,56 @@ static_assert(state_contract_is_valid<StateSetId::ResolvedWeather>());
 static_assert(state_contract_is_valid<StateSetId::PlacementRules>());
 static_assert(state_contract_is_valid<StateSetId::Plants>());
 
-class IRuntimeSystem
-{
-public:
-    virtual ~IRuntimeSystem() = default;
-    [[nodiscard]] virtual const char* name() const noexcept = 0;
-    [[nodiscard]] virtual bool is_default_resolver() const noexcept = 0;
-    virtual void tick(RuntimeInvocation& invocation, StateManager& state_manager) = 0;
-};
+virtual void run(RuntimeInvocation& invocation, StateManager& state_manager) = 0;
+// `RuntimeInvocation` stays the transient runtime context for timing, input, and message flow.
+// `StateManager` is the shared read path and the owner of resolver registration/default tracking.
 
 class DefaultRawWeatherResolver final : public IRuntimeSystem
 {
 public:
-    [[nodiscard]] const char* name() const noexcept override { return "DefaultRawWeatherResolver"; }
-    [[nodiscard]] bool is_default_resolver() const noexcept override { return true; }
-    void tick(RuntimeInvocation& invocation, StateManager& state_manager) override;
+    static constexpr std::array<StateSetId, 1> k_owned_state_sets {StateSetId::RawWeather};
+    void run(RuntimeInvocation& invocation, StateManager& state_manager) override;
 };
 
 class DefaultResolvedWeatherResolver final : public IRuntimeSystem
 {
 public:
-    [[nodiscard]] const char* name() const noexcept override { return "DefaultResolvedWeatherResolver"; }
-    [[nodiscard]] bool is_default_resolver() const noexcept override { return true; }
-    void tick(RuntimeInvocation& invocation, StateManager& state_manager) override;
+    static constexpr std::array<StateSetId, 1> k_owned_state_sets {StateSetId::ResolvedWeather};
+    void run(RuntimeInvocation& invocation, StateManager& state_manager) override;
 };
 
 class DefaultPlacementRulesResolver final : public IRuntimeSystem
 {
 public:
-    [[nodiscard]] const char* name() const noexcept override { return "DefaultPlacementRulesResolver"; }
-    [[nodiscard]] bool is_default_resolver() const noexcept override { return true; }
-    void tick(RuntimeInvocation& invocation, StateManager& state_manager) override;
+    static constexpr std::array<StateSetId, 1> k_owned_state_sets {StateSetId::PlacementRules};
+    void run(RuntimeInvocation& invocation, StateManager& state_manager) override;
 };
 
 class DefaultPlantResolver final : public IRuntimeSystem
 {
 public:
-    [[nodiscard]] const char* name() const noexcept override { return "DefaultPlantResolver"; }
-    [[nodiscard]] bool is_default_resolver() const noexcept override { return true; }
-    void tick(RuntimeInvocation& invocation, StateManager& state_manager) override;
+    static constexpr std::array<StateSetId, 1> k_owned_state_sets {StateSetId::Plants};
+    void run(RuntimeInvocation& invocation, StateManager& state_manager) override;
 };
 
 class WeatherResolverSystem final : public IRuntimeSystem
 {
 public:
-    static constexpr std::array<StateSetId, 1> k_write_states {StateSetId::ResolvedWeather};
-
-    [[nodiscard]] const char* name() const noexcept override { return "WeatherResolverSystem"; }
-    [[nodiscard]] bool is_default_resolver() const noexcept override { return false; }
-    void tick(RuntimeInvocation& invocation, StateManager& state_manager) override;
+    static constexpr std::array<StateSetId, 1> k_owned_state_sets {StateSetId::ResolvedWeather};
+    void run(RuntimeInvocation& invocation, StateManager& state_manager) override;
 };
 
 class PlantResolverSystem final : public IRuntimeSystem
 {
 public:
-    static constexpr std::array<StateSetId, 1> k_write_states {StateSetId::Plants};
-
-    [[nodiscard]] const char* name() const noexcept override { return "PlantResolverSystem"; }
-    [[nodiscard]] bool is_default_resolver() const noexcept override { return false; }
-    void tick(RuntimeInvocation& invocation, StateManager& state_manager) override;
+    static constexpr std::array<StateSetId, 1> k_owned_state_sets {StateSetId::Plants};
+    void run(RuntimeInvocation& invocation, StateManager& state_manager) override;
 };
 
 class PlacementValidationSystem final : public IRuntimeSystem
 {
 public:
-    static constexpr std::array<StateSetId, 0> k_write_states {};
-
-    [[nodiscard]] const char* name() const noexcept override { return "PlacementValidationSystem"; }
-    [[nodiscard]] bool is_default_resolver() const noexcept override { return false; }
-    void tick(RuntimeInvocation& invocation, StateManager& state_manager) override;
+    void run(RuntimeInvocation& invocation, StateManager& state_manager) override;
 };
 
 class StateManager final
@@ -408,33 +462,38 @@ public:
         state_slots_[index(StateSetId::ResolvedWeather)] = &resolved_weather_state_;
         state_slots_[index(StateSetId::PlacementRules)] = &placement_rules_state_;
         state_slots_[index(StateSetId::Plants)] = &plant_state_;
-        emplace_default_system<DefaultRawWeatherResolver>();
-        emplace_default_system<DefaultResolvedWeatherResolver>();
-        emplace_default_system<DefaultPlacementRulesResolver>();
-        emplace_default_system<DefaultPlantResolver>();
-    }
 
-    void register_system(IRuntimeSystem& system)
-    {
-        resolver_systems_.push_back(&system);
+        default_resolver_systems_.reserve(static_cast<std::size_t>(StateSetId::Count));
+        default_resolver_systems_.resize(static_cast<std::size_t>(StateSetId::Count));
+
+        assign_default_resolver<StateSetId::RawWeather, DefaultRawWeatherResolver>();
+        assign_default_resolver<StateSetId::ResolvedWeather, DefaultResolvedWeatherResolver>();
+        assign_default_resolver<StateSetId::PlacementRules, DefaultPlacementRulesResolver>();
+        assign_default_resolver<StateSetId::Plants, DefaultPlantResolver>();
     }
 
     template <class System>
-    void register_resolver(System& system)
+    void register_resolver(System& system) noexcept
     {
-        for (const StateSetId state_set : System::k_write_states)
+        for (const StateSetId state_set : System::k_owned_state_sets)
         {
-            resolver_owner_[index(state_set)] = &system;
+            active_resolver_by_state_set_[index(state_set)] = &system;
         }
     }
 
     void tick_defaults(RuntimeInvocation& invocation)
     {
-        for (IRuntimeSystem* resolver : resolver_systems_)
+        for (std::size_t i = 0; i < static_cast<std::size_t>(StateSetId::Count); ++i)
         {
-            if (resolver->is_default_resolver())
+            IRuntimeSystem* const default_resolver = default_resolver_by_state_set_[i];
+            if (default_resolver == nullptr)
             {
-                resolver->tick(invocation, *this);
+                continue;
+            }
+
+            if (active_resolver_by_state_set_[i] == default_resolver)
+            {
+                default_resolver->run(invocation, *this);
             }
         }
     }
@@ -445,9 +504,10 @@ public:
         return state_ref<Id>();
     }
 
-    template <StateSetId Id>
+    template <class System, StateSetId Id>
     [[nodiscard]] typename state_traits<Id>::type& state() noexcept
     {
+        static_assert(system_owns_state_set<System, Id>(), "System cannot mutate a state set it does not own.");
         return state_ref_mut<Id>();
     }
 
@@ -458,20 +518,22 @@ public:
         {
             return plant_state_.size();
         }
+
         return 1U;
     }
 
     template <StateSetId Id>
-    [[nodiscard]] const typename state_traits<Id>::type& query(std::uint32_t index_or_key) const
+    [[nodiscard]] const typename state_traits<Id>::element_type& query(std::uint32_t index_or_key) const
     {
         static_assert(Id == StateSetId::Plants, "keyed query is only valid for container state sets");
         return plant_state_.at(index_or_key);
     }
 
-    template <StateSetId Id>
-    [[nodiscard]] typename state_traits<Id>::type& query(std::uint32_t index_or_key)
+    template <class System, StateSetId Id>
+    [[nodiscard]] typename state_traits<Id>::element_type& element_state(std::uint32_t index_or_key)
     {
         static_assert(Id == StateSetId::Plants, "keyed query is only valid for container state sets");
+        static_assert(system_owns_state_set<System, Id>(), "System cannot mutate a state set it does not own.");
         return plant_state_.at(index_or_key);
     }
 
@@ -481,14 +543,29 @@ private:
         return static_cast<std::size_t>(state_set);
     }
 
-    template <class System, class... Args>
-    System& emplace_default_system(Args&&... args)
+    template <class System, StateSetId Id>
+    static consteval bool system_owns_state_set()
+    {
+        for (const StateSetId owned_state_set : System::k_owned_state_sets)
+        {
+            if (owned_state_set == Id)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    template <StateSetId Id, class System, class... Args>
+    System& assign_default_resolver(Args&&... args)
     {
         auto system = std::make_unique<System>(std::forward<Args>(args)...);
-        System& ref = *system;
-        resolver_systems_.push_back(&ref);
-        default_systems_.push_back(std::move(system));
-        return ref;
+        IRuntimeSystem* const resolver = system.get();
+        default_resolver_systems_[index(Id)] = std::move(system);
+        default_resolver_by_state_set_[index(Id)] = resolver;
+        active_resolver_by_state_set_[index(Id)] = resolver;
+        return *static_cast<System*>(resolver);
     }
 
     template <StateSetId Id>
@@ -509,47 +586,50 @@ private:
     std::vector<PlantState> plant_state_ {};
     std::array<void*, static_cast<std::size_t>(StateSetId::Count)> state_slots_ {};
 
-    std::array<IRuntimeSystem*, static_cast<std::size_t>(StateSetId::Count)> resolver_owner_ {};
-    std::vector<std::unique_ptr<IRuntimeSystem>> default_systems_ {};
-    std::vector<IRuntimeSystem*> resolver_systems_ {};
+    std::array<IRuntimeSystem*, static_cast<std::size_t>(StateSetId::Count)> default_resolver_by_state_set_ {};
+    std::array<IRuntimeSystem*, static_cast<std::size_t>(StateSetId::Count)> active_resolver_by_state_set_ {};
+    std::vector<std::unique_ptr<IRuntimeSystem>> default_resolver_systems_ {};
 };
 
-inline void DefaultRawWeatherResolver::tick(RuntimeInvocation&, StateManager& state_manager)
+inline void DefaultRawWeatherResolver::run(RuntimeInvocation&, StateManager& state_manager)
 {
-    state_manager.state<StateSetId::RawWeather>().base_wind = 0.0f;
+    state_manager.state<DefaultRawWeatherResolver, StateSetId::RawWeather>().base_wind = 0.0f;
 }
 
-inline void DefaultResolvedWeatherResolver::tick(RuntimeInvocation&, StateManager& state_manager)
-{
-    state_manager.state<StateSetId::ResolvedWeather>().wind = 0.0f;
-}
-
-inline void DefaultPlacementRulesResolver::tick(RuntimeInvocation&, StateManager& state_manager)
-{
-    state_manager.state<StateSetId::PlacementRules>().max_allowed_wind = 40.0f;
-}
-
-inline void DefaultPlantResolver::tick(RuntimeInvocation&, StateManager&)
-{
-}
-
-inline void WeatherResolverSystem::tick(RuntimeInvocation&, StateManager& state_manager)
+inline void DefaultResolvedWeatherResolver::run(RuntimeInvocation&, StateManager& state_manager)
 {
     const RawWeatherState& raw_weather = state_manager.query<StateSetId::RawWeather>();
-    state_manager.state<StateSetId::ResolvedWeather>().wind = raw_weather.base_wind;
+    state_manager.state<DefaultResolvedWeatherResolver, StateSetId::ResolvedWeather>().wind = raw_weather.base_wind;
 }
 
-inline void PlantResolverSystem::tick(RuntimeInvocation&, StateManager& state_manager)
+inline void DefaultPlacementRulesResolver::run(RuntimeInvocation&, StateManager& state_manager)
+{
+    state_manager.state<DefaultPlacementRulesResolver, StateSetId::PlacementRules>().max_allowed_wind = 40.0f;
+}
+
+inline void DefaultPlantResolver::run(RuntimeInvocation&, StateManager&)
+{
+}
+
+inline void WeatherResolverSystem::run(RuntimeInvocation&, StateManager& state_manager)
+{
+    const RawWeatherState& raw_weather = state_manager.query<StateSetId::RawWeather>();
+    state_manager.state<WeatherResolverSystem, StateSetId::ResolvedWeather>().wind = raw_weather.base_wind;
+}
+
+inline void PlantResolverSystem::run(RuntimeInvocation&, StateManager& state_manager)
 {
     const ResolvedWeatherState& weather = state_manager.query<StateSetId::ResolvedWeather>();
-    std::vector<PlantState>& plants = state_manager.state<StateSetId::Plants>();
+
     for (std::size_t i = 0; i < state_manager.query_count<StateSetId::Plants>(); ++i)
     {
-        plants.at(i).growth += weather.wind < 20.0f ? 1.0f : 0.25f;
+        PlantState& plant =
+            state_manager.element_state<PlantResolverSystem, StateSetId::Plants>(static_cast<std::uint32_t>(i));
+        plant.growth += weather.wind < 20.0f ? 1.0f : 0.25f;
     }
 }
 
-inline void PlacementValidationSystem::tick(RuntimeInvocation&, StateManager& state_manager)
+inline void PlacementValidationSystem::run(RuntimeInvocation&, StateManager& state_manager)
 {
     const ResolvedWeatherState& weather = state_manager.query<StateSetId::ResolvedWeather>();
     const PlacementRulesState& rules = state_manager.query<StateSetId::PlacementRules>();
@@ -562,119 +642,78 @@ class GameRuntime
 public:
     GameRuntime()
     {
-        auto& weather_system = emplace_system<WeatherResolverSystem>();
-        auto& plant_system = emplace_system<PlantResolverSystem>();
-        auto& placement_reader = emplace_system<PlacementValidationSystem>();
+        state_manager_.register_resolver(weather_system_);
+        state_manager_.register_resolver(plant_system_);
 
-        state_manager_.register_resolver(weather_system);
-        state_manager_.register_resolver(plant_system);
-
-        fixed_step_systems_.push_back(&weather_system);
-        fixed_step_systems_.push_back(&plant_system);
-        fixed_step_systems_.push_back(&placement_reader);
+        fixed_step_systems_.push_back(&weather_system_);
+        fixed_step_systems_.push_back(&plant_system_);
+        fixed_step_systems_.push_back(&placement_reader_);
     }
 
     void tick()
     {
         state_manager_.tick_defaults(runtime_invocation_);
+
         for (IRuntimeSystem* system : fixed_step_systems_)
         {
-            system->tick(runtime_invocation_, state_manager_);
+            system->run(runtime_invocation_, state_manager_);
         }
     }
 
 private:
-    template <class System, class... Args>
-    System& emplace_system(Args&&... args)
-    {
-        auto system = std::make_unique<System>(std::forward<Args>(args)...);
-        System& ref = *system;
-        state_manager_.register_system(ref);
-        systems_.push_back(std::move(system));
-        return ref;
-    }
-
     RuntimeInvocation runtime_invocation_ {};
     StateManager state_manager_ {};
-    std::vector<std::unique_ptr<IRuntimeSystem>> systems_ {};
+    WeatherResolverSystem weather_system_ {};
+    PlantResolverSystem plant_system_ {};
+    PlacementValidationSystem placement_reader_ {};
     std::vector<IRuntimeSystem*> fixed_step_systems_ {};
 };
 ```
 
 The important pattern here is:
 
-- `StateManager` owns the default resolver set and the state-set access gates
-- `StateManager` initializes the default resolver set at startup
+- `StateManager` owns the default resolver set and the active resolver mapping
+- default resolvers are stored and indexed in `StateSetId` order
+- `StateManager` tracks which resolver is the default for each state set
 - only one resolver may own a state set at a time
-- `StateManager::tick_defaults()` iterates resolver systems and ticks only the default ones
-- `RuntimeInvocation` no longer owns global game state access
-- runtime systems are owned in `GameRuntime::systems_`, matching the current repo pattern
-- `GameRuntime` creates only the custom systems it actually uses
-- `StateManager` creates and owns the default resolver systems internally
-- `StateManager` stores state as indexed opaque slots, with typed access resolved through `state_traits`
-- each state set has exactly one authoritative storage object
-- container state sets have exactly one container, so `query(index)` is never ambiguous
-- query-by-index only applies to the one container owned by that state set
-- internal systems and controllers read through `StateManager::query<StateSetId::X>()`
-- mutation stays inside resolver systems through `StateManager::state<StateSetId::X>()`
-- compile-time traits enforce the trivial-state rule, and the one-container rule is documented as a required code comment contract
+- `RuntimeInvocation` no longer acts as the cross-owner state-access surface
+- internal readers use `StateManager::query<StateSetId::X>()`
+- mutation stays inside the owning resolver through `StateManager::state<System, StateSetId::X>()`
+- a non-owner system such as `PlacementValidationSystem` is not a resolver
+- container-backed state sets still map to exactly one container
 
 ## Container Example
 
-When a state set needs a container, keep that state set to exactly one vector.
+When a state set needs a container, keep that state set to exactly one container.
 
 ```cpp
-#include <vector>
 struct PlantState final
 {
     float growth {0.0f};
 };
 
-class StateManager
+class PlantResolverSystem final : public IRuntimeSystem
 {
 public:
-    std::size_t query_count() const noexcept
-    {
-        return plants_.size();
-    }
+    static constexpr std::array<StateSetId, 1> k_owned_state_sets {StateSetId::Plants};
 
-    PlantState& query(std::uint32_t index)
+    void run(RuntimeInvocation&, StateManager& state_manager) override
     {
-        return plants_.at(index);
-    }
-
-    const PlantState& query(std::uint32_t index) const
-    {
-        return plants_.at(index);
-    }
-
-    std::vector<PlantState>& plants() noexcept
-    {
-        return plants_;
-    }
-
-private:
-    std::vector<PlantState> plants_ {};
-};
-
-class PlantResolverSystem
-{
-public:
-    void tick(StateManager& state_manager)
-    {
-        for (std::size_t i = 0; i < state_manager.query_count(); ++i)
+        for (std::size_t i = 0; i < state_manager.query_count<StateSetId::Plants>(); ++i)
         {
-            state_manager.query(static_cast<std::uint32_t>(i)).growth += 1.0f;
+            PlantState& plant =
+                state_manager.element_state<PlantResolverSystem, StateSetId::Plants>(static_cast<std::uint32_t>(i));
+            plant.growth += 1.0f;
         }
     }
 };
 
-class PlantReaderSystem
+class PlantReaderSystem final : public IRuntimeSystem
 {
 public:
-    void tick(const StateManager& state_manager, std::uint32_t index)
+    void run(RuntimeInvocation&, StateManager& state_manager) override
     {
-        const PlantState& plant = state_manager.query(index);
+        const PlantState& plant = state_manager.query<StateSetId::Plants>(0);
         const float growth = plant.growth;
         (void)growth;
     }
@@ -684,8 +723,7 @@ public:
 This pattern means:
 
 - one state set maps to one container
-- `query(index)` has only one meaning
-- the state set stays stable without extra query-shape branching
+- query-by-index has one meaning
 - the collection can grow and shrink without exposing multiple storage paths
 
 ## Adapter Example
@@ -713,500 +751,244 @@ template <Gs1StateSetId StateSet>
 }
 ```
 
-That keeps the exported structs trivial and lets the adapter read authoritative gameplay state without a cached query layer. The adapter should treat the returned pointer as transient and cast it according to the enum it passed in.
+That keeps the exported structs trivial and lets the adapter read authoritative gameplay state without a cached query layer.
 
-## Resolver Categories
+## Resolver Definition
 
-Not every dependency should use the same resolver style.
+A resolver is defined by ownership, not by interface type.
 
-### 1. Snapshot/query resolvers
+Definition:
 
-Use these when a caller needs read-only facts.
+- if an `IRuntimeSystem` owns one or more state sets and registers for them in `StateManager`, it is a resolver
+- if an `IRuntimeSystem` owns no state sets, it is not a resolver
 
-Examples:
+That means:
 
-- read current weather
-- read unlock status
-- read site inventory summary
-- read worker condition
+- there is no separate resolver class hierarchy requirement
+- there is no resolver-category split
+- there is no request-resolver subtype
 
-### 2. Policy resolvers
-
-Use these when a caller needs a decision or derived answer.
-
-Examples:
-
-- can this item be purchased
-- can this structure be placed here
-- is this recipe eligible
-- what local-weather multiplier applies
-
-### 3. Request resolvers
-
-Use these when a caller needs to ask another owner to do something, but should not know who owns it.
-
-Examples:
-
-- request unlock purchase
-- request task claim
-- request inventory transfer
-
-Important:
-
-- request resolvers should usually enqueue `GameMessage` or another owner-handled command
-- they should not directly mutate non-owned state
-
-## What Should Not Become A Resolver
-
-Do not turn everything into a resolver.
-
-Keep these as they are:
-
-- fixed-step execution order
-- system lifecycle
-- message subscriptions
-- low-level ECS iteration helpers
-- runtime create/destroy flow
-
-Resolvers are for capability decoupling, not for replacing the whole runtime model.
+The owning system itself is the resolver for the state sets it owns.
 
 ## Compatibility With Current GS1 Rules
 
-This design can fit the current repo rules if we preserve the following:
+This design fits the current repo rules if we preserve the following:
 
 - systems still own their state slices
-- direct system-to-system mutation still stays forbidden
+- direct system-to-system mutation stays forbidden
 - `GameMessage` remains the cross-owner mutation path
 - ECS ownership stays private to the owner system
-- resolver answers are read-only or request-based
+- read access goes through `StateManager`
 
-That means this proposal is an extension of the current ownership model, not a rejection of it.
+That makes this proposal an extension of the current ownership model, not a rejection of it.
 
 ## Benefits
 
 ### Plug-friendly composition
 
-A game can install:
+A runtime can install:
 
-- only inventory
-- inventory plus technology
-- technology without task board
-- custom weather without the default weather owner
+- default resolver only
+- custom resolver system for one state set
+- one custom resolver system that owns multiple state sets
 
-as long as defaults exist for omitted capabilities.
+as long as every state set still has a default resolver.
 
-### Reduced compile-time coupling
+### Reduced structural coupling
 
 A caller depends on:
 
-- `IInventoryQueryResolver`
+- `StateManager::query<StateSetId::X>()`
 
 instead of:
 
-- `InventorySystem`
-- `InventoryState`
-- helper functions scattered across site runtime files
+- direct knowledge of peer-owned mutation paths
+- concrete peer-system wiring for read access
 
-### Better testing
+### Better ownership visibility
 
-A system test can provide:
+Ownership stays visible because:
 
-- fake resolver
-- default resolver
-- real resolver
-
-without spinning up unrelated systems.
-
-### Cleaner feature replacement
-
-A project can replace:
-
-- default technology logic
-- weather policy
-- task generation rules
-
-by swapping resolver providers rather than editing all dependents.
+- each state set has one active resolver
+- resolver registration is explicit
+- a non-owner does not become a resolver accidentally
 
 ## Risks
 
 ### 1. Hidden dependency sprawl
 
-If systems pull many resolvers ad hoc, dependencies become less visible.
+If systems read many state sets ad hoc, dependencies become less visible.
 
 Mitigation:
 
-- require each system to declare its consumed resolver tags
-- keep a compile-time dependency list beside message subscriptions
+- require each system to declare its consumed state sets beside its owned state sets
+- keep dependency declarations near message subscriptions
 
 ### 2. Resolver bloat
 
-If interfaces become too large, they become mini god-APIs.
+If one system starts claiming too many unrelated state sets, ownership boundaries blur.
 
 Mitigation:
 
-- split resolvers by capability
-- prefer narrow contracts
-- keep query and request concerns separate
+- keep ownership grouped by real gameplay domain
+- keep state-set ownership explicit and reviewable
 
 ### 3. Write-path leakage
 
-If a resolver starts returning mutable references into another owner's data, ownership collapses.
+If `StateManager::state(...)` becomes broadly callable, ownership collapses.
 
 Mitigation:
 
-- no cross-owner mutable references through resolver interfaces
-- requests go through commands/messages only
+- keep mutation on owner-only APIs
+- keep cross-owner mutation on `GameMessage`
 
-### 4. Lifetime and registration bugs
+### 4. Registration bugs
 
-If a system registers as resolver and then goes away, stale references can remain.
+If resolver registration does not match actual ownership, the wrong system may become active for a state set.
 
 Mitigation:
 
-- registration and unregistration belong to runtime system setup/teardown
-- registry stores stable pointers only while the system lifetime is guaranteed
-
-## Recommended Terminology
-
-To keep this architecture understandable, I recommend these terms:
-
-- `state slice`: authoritative owned mutable data
-- `resolver`: typed capability interface for non-owned access
-- `default resolver`: fallback implementation when no owner system overrides it
-- `provider system`: a system that implements and registers a resolver
-- `request`: cross-owner mutation intent, usually routed through message flow
-- `query`: read-only access or derived answer
-
-Avoid calling the new object just `StateManager` unless its role is narrowly defined, because that name tends to imply global authority and unrestricted access.
-
-Better names:
-
-- `StateResolverRegistry`
-- `GameplayCapabilityRegistry`
-- `StateServiceRegistry`
-
-My recommendation is `StateResolverRegistry`.
-
-## Proposed GS1 Refactor Shape
-
-The current runtime already has:
-
-- `RuntimeInvocation`
-- tag-based read/write access
-- `state_owner<Tag>`
-- system interfaces and message subscriptions
-
-That means the migration can be incremental.
-
-### Step 1. Keep current state ownership and add resolver registry
-
-Do not replace `GameState`, `SiteRunState`, or the ownership tags first.
-
-First add:
-
-- resolver interfaces
-- resolver registry
-- default resolver registration
-
-### Step 2. Add a resolver-dependency declaration beside each system
-
-Each system should declare:
-
-- subscribed game messages
-- subscribed host messages
-- consumed resolver tags
-- owned state tags
-
-This preserves architectural visibility.
-
-### Step 3. Convert read-only peer access to resolver calls
-
-Replace cases where systems currently know too much about peer-owned state with typed resolver usage.
-
-Best early targets:
-
-- technology eligibility reads
-- inventory availability reads
-- weather-derived policy reads
-- task-board lookup reads
-
-### Step 4. Keep mutation on message flow
-
-Do not let resolver adoption bypass `GameMessage`.
-
-If a system wants another ownership domain to change:
-
-- emit message
-- let owner resolve it
-
-### Step 5. Add project-specific override support
-
-When the runtime builds systems, let a game/plugin install:
-
-- no override
-- custom override
-- full provider system
-
-This is the step that unlocks reusable composition.
-
-## Suggested Runtime Contracts
-
-### Resolver declaration
-
-```cpp
-struct WeatherResolverTag {};
-
-class IWeatherStateResolver
-{
-public:
-    virtual ~IWeatherStateResolver() = default;
-    [[nodiscard]] virtual WeatherSnapshot current_weather(const ResolverReadContext& context) const = 0;
-    [[nodiscard]] virtual LocalWeatherSnapshot local_weather_at(
-        const ResolverReadContext& context,
-        TileCoord tile) const = 0;
-};
-```
-
-### Default resolver
-
-```cpp
-class DefaultWeatherStateResolver final : public IWeatherStateResolver
-{
-public:
-    [[nodiscard]] WeatherSnapshot current_weather(const ResolverReadContext& context) const override;
-    [[nodiscard]] LocalWeatherSnapshot local_weather_at(
-        const ResolverReadContext& context,
-        TileCoord tile) const override;
-};
-```
-
-### Provider system
-
-```cpp
-class WeatherEventSystem final
-    : public IRuntimeSystem
-    , public IWeatherStateResolver
-{
-public:
-    // system methods
-    // resolver methods
-};
-```
-
-### Registry usage
-
-```cpp
-const auto& weather = invocation.resolvers().get<WeatherResolverTag>();
-const auto snapshot = weather.current_weather(read_context);
-```
-
-## Execution Order And Plugging Rules
-
-Resolvers reduce structural dependency, but they do not remove all ordering concerns.
-
-Rules should be:
-
-- every capability has a default resolver
-- registering a provider overrides the default
-- systems may assume the resolver exists
-- systems may not assume a specific concrete provider exists
-- a provider system is still responsible for running in a valid fixed-step order for its own state updates
-
-Important:
-
-Plugging out a system means:
-
-- the capability still exists
-- behavior falls back to default semantics
-
-It does not mean:
-
-- all previous behaviors still happen identically
-
-That distinction should be explicit in the docs and in tests.
-
-## Open Design Choices
-
-These need a decision before implementation:
-
-### 1. Interface granularity
-
-Do we want:
-
-- one resolver per state slice
-
-or:
-
-- one resolver per gameplay capability
-
-I recommend capability-first, because it is more stable than mirroring storage layout.
-
-### 2. Default behavior strictness
-
-Should missing capabilities:
-
-- silently no-op
-- return neutral values
-- return "unsupported"
-- assert in debug
-
-I recommend:
-
-- safe neutral runtime behavior
-- plus debug-visible logging for unexpectedly missing non-optional capabilities
-
-### 3. Resolver implementation base
-
-Should resolvers be:
-
-- pure interfaces with virtual dispatch
-- template traits with static dispatch
-- function-table structs
-
-I recommend:
-
-- typed interface plus registry first
-
-because it is the fastest to adopt incrementally in the current codebase.
-
-If performance later matters in hot paths, specific high-frequency resolvers can be flattened into function-table or trait-based forms.
-
-### 4. Read context shape
-
-Should resolvers receive:
-
-- full `RuntimeInvocation`
-- dedicated narrow `ResolverReadContext`
-
-I recommend:
-
-- narrow context
-
-because otherwise the new architecture will keep too much accidental reach.
+- validate ownership declarations
+- validate one active owner per state set
+- add runtime assertions for duplicate resolver registration
 
 ## Migration Plan
 
-### Phase 0. Architecture inventory
+### Phase 0. Ownership inventory
 
 Document:
 
 - current owned state slices
+- candidate `StateSetId` values
 - read-only peer access points
 - cross-owner write paths
-- candidate resolver capabilities
 
-Deliverable:
-
-- dependency inventory appendix added to this document or a follow-up inventory doc
-
-### Phase 1. Runtime scaffolding
+### Phase 1. `StateManager` scaffolding
 
 Add:
 
-- `StateResolverRegistry`
-- resolver tag traits
-- default resolver registration
-- resolver access from `RuntimeInvocation`
+- `StateSetId` inventory
+- per-state-set storage slots
+- default resolver storage ordered by `StateSetId`
+- default resolver tracking
+- active resolver tracking
 
 Do not change gameplay behavior yet.
 
-### Phase 2. Resolver declarations
+### Phase 2. Ownership declarations
 
-Introduce the first resolver interfaces for the highest-coupling read paths.
+Add per-system ownership declarations such as:
 
-Suggested first batch:
+- owned state sets
+- consumed state sets
+- subscribed game messages
+- subscribed host messages
 
-- weather
-- technology/unlock queries
-- inventory queries
-- task-board queries
+This preserves architectural visibility.
 
-### Phase 3. Provider registration
+### Phase 3. Resolver registration
 
-Let existing owner systems implement and register those resolvers.
+Let owner systems register themselves for the state sets they own.
 
 Examples:
 
 - `WeatherEventSystem`
+- `LocalWeatherResolveSystem`
 - `TechnologySystem`
 - `InventorySystem`
-- `TaskBoardSystem`
 
-### Phase 4. Caller migration
+### Phase 4. Reader migration
 
-Replace direct peer-state reads with resolver usage in selected systems.
+Replace direct peer reads with `StateManager::query(...)` in selected systems.
 
-Do this one vertical slice at a time.
+Best early targets:
 
-### Phase 5. Request-path cleanup
+- weather-derived reads
+- technology eligibility reads
+- inventory availability reads
 
-Where needed, add request resolvers that only translate intent into owner-handled messages.
+### Phase 5. Owner-only mutation enforcement
 
-Do not convert owner writes into direct calls.
+Tighten write access so that:
 
-### Phase 6. Plugin composition layer
+- only the owner resolver can mutate its state set
+- non-owners cannot call the mutation path
+- cross-owner change requests still use `GameMessage`
 
-Add runtime/system-build configuration that allows:
-
-- default resolver only
-- custom provider system
-- custom non-system provider
-
-This is where game-specific composition becomes first-class.
-
-### Phase 7. Documentation and tests
+### Phase 6. Tests and validation
 
 Add:
 
-- resolver contract docs
-- default-behavior docs
-- tests for missing-provider fallback
-- tests for provider override behavior
+- duplicate-owner assertions
+- default-resolver fallback tests
+- custom-resolver override tests
+- focused regressions for migrated read paths
 
 ## Recommended First Implementation Slice
 
-The best first slice is not inventory or task board.
+The best first slice is weather, because:
 
-The best first slice is weather or technology, because:
-
-- each is clearly owned
-- many other systems only need read/query access
+- ownership is clear
+- multiple systems only need read access
 - default fallback behavior is easy to define
 
-My preferred order:
+Recommended order:
 
-1. add registry core
-2. add `IWeatherStateResolver`
-3. add default neutral weather resolver
-4. let the real weather owner override it
-5. migrate one dependent system to use the resolver
-6. prove plug-out behavior with a focused test
+1. add `StateManager` scaffolding
+2. install default weather resolvers by `StateSetId`
+3. register the real weather owner for the weather state sets it owns
+4. migrate one dependent reader to `StateManager::query(...)`
+5. add a focused fallback-versus-override test
 
-After that, repeat for technology and inventory.
+## Resolved Design Choices
+
+These points are no longer open for this refactor direction.
+
+### 1. Granularity
+
+Choose the second direction: group behavior by gameplay/domain capability rather than forcing one isolated resolver type per tiny storage detail.
+
+In this refactor, that still means registration happens by `StateSetId`, but one resolver system may own and register multiple related state sets when that matches the real ownership boundary.
+
+### 2. Default behavior strictness
+
+Use the previously recommended behavior:
+
+- safe neutral runtime behavior when a custom owner is absent
+- debug-visible logging for unexpectedly missing non-optional capabilities
+
+This keeps plug-out behavior safe without hiding mistakes during development.
+
+### 3. Implementation shape
+
+Follow the code example in this document.
+
+That means:
+
+- a resolver remains a normal `IRuntimeSystem`
+- `StateManager` stores and tracks the default resolvers
+- registration happens by owned `StateSetId`
+- there is no separate resolver-interface hierarchy and no alternate resolver base model
+
+### 4. Runtime context and access model
+
+A resolver is also a system, so it should behave like one.
+
+That means:
+
+- it runs through the normal runtime/system flow
+- it reads through `StateManager`
+- it mutates only the state sets it owns
+- cross-owner mutation still goes through `GameMessage`
 
 ## Final Recommendation
 
-I think your idea is strong if we phrase it as:
+The right framing for this refactor is:
 
-- central resolver registry
-- default capability resolvers
-- owner systems override defaults by implementing resolver interfaces
-- reads and derived decisions go through resolvers
-- writes still go through owner-controlled message flow
+- central `StateManager`
+- default resolvers installed and tracked by `StateSetId`
+- owner systems register themselves as resolvers for the state sets they own
+- cross-owner reads go through `StateManager`
+- cross-owner writes stay on `GameMessage`
 
-That gives you:
-
-- decoupled systems
-- plug-friendly game composition
-- preserved ownership
-- fewer hard dependency trees
-
-The main thing I would avoid is turning this into a single central mutable state manager with unrestricted access. That would solve dependency wiring in the short term, but it would weaken the architecture you already built around owned state and message-driven coordination.
-
-## Concrete Next Steps
-
-1. Approve the resolver-registry direction and the rule that resolvers are read/query/request contracts, not cross-owner mutable access.
-2. Decide the first resolver batch: I recommend weather, technology, and inventory.
-3. Add runtime scaffolding for the registry without changing behavior.
-4. Migrate one vertical slice and test the default-versus-provider override behavior.
-5. Expand capability by capability instead of trying to convert the whole runtime in one pass.
+The main thing to avoid is treating resolver-ness as interface inheritance or service-type taxonomy. In this design, resolver-ness comes from state ownership plus registration, and `StateManager` remains the source of truth for both default tracking and cross-owner reads.

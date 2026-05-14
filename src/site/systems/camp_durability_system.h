@@ -9,6 +9,11 @@ namespace gs1
 class CampDurabilitySystem final : public IRuntimeSystem
 {
 public:
+    [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
+    {
+        return site_access_owned_state_sets<CampDurabilitySystem>();
+    }
+
     [[nodiscard]] const char* name() const noexcept override;
     [[nodiscard]] GameMessageSubscriptionSpan subscribed_game_messages() const noexcept override;
     [[nodiscard]] HostMessageSubscriptionSpan subscribed_host_messages() const noexcept override;
@@ -39,10 +44,6 @@ public:
 template <>
 struct system_state_tags<CampDurabilitySystem>
 {
-    using type = type_list<
-        RuntimeCampaignTag,
-        RuntimeActiveSiteRunTag,
-        RuntimeFixedStepSecondsTag,
-        RuntimeMoveDirectionTag>;
+    using type = type_list<RuntimeFixedStepSecondsTag>;
 };
 }  // namespace gs1

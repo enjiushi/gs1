@@ -29,7 +29,6 @@ struct system_state_tags<ActionExecutionSystem>
 {
     using type = type_list<
         RuntimeCampaignTag,
-        RuntimeActiveSiteRunTag,
         RuntimeFixedStepSecondsTag,
         RuntimeMoveDirectionTag>;
 };
@@ -92,9 +91,7 @@ bool worker_pack_has_item(
 
 bool shovel_bonus_active(RuntimeInvocation& invocation) noexcept
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     const auto& effects = world.read_modifier().resolved_village_technology_effects;
     return (effects.shovel_meter_cost_reduction > 0.0f ||
             effects.shovel_plant_duration_reduction > 0.0f ||
@@ -109,9 +106,7 @@ float shovel_meter_cost_reduction(RuntimeInvocation& invocation) noexcept
         return 0.0f;
     }
 
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     return std::clamp(
         world.read_modifier().resolved_village_technology_effects.shovel_meter_cost_reduction,
         0.0f,
@@ -127,9 +122,7 @@ float shovel_duration_reduction_for_action(
         return 0.0f;
     }
 
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     const auto& effects = world.read_modifier().resolved_village_technology_effects;
     const float reduction =
         kind == ActionKind::Plant
@@ -151,9 +144,7 @@ float excavation_meter_cost_reduction(
     RuntimeInvocation& invocation,
     ExcavationDepth depth) noexcept
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     const auto& effects = world.read_modifier().resolved_village_technology_effects;
     if (depth == ExcavationDepth::Careful)
     {
@@ -170,9 +161,7 @@ float excavation_duration_reduction(
     RuntimeInvocation& invocation,
     ExcavationDepth depth) noexcept
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     const auto& effects = world.read_modifier().resolved_village_technology_effects;
     if (depth == ExcavationDepth::Careful)
     {
@@ -378,9 +367,7 @@ const PlantHarvestOutputDef* find_harvest_output_by_kind(
 float harvest_bonus_proc_chance_percent(
     RuntimeInvocation& invocation) noexcept
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     return std::clamp(
         world.read_modifier().resolved_bureau_technology_effects.harvest_bonus_proc_chance_percent,
         0.0f,
@@ -390,18 +377,14 @@ float harvest_bonus_proc_chance_percent(
 HarvestBonusTier unlocked_harvest_bonus_tier(
     RuntimeInvocation& invocation) noexcept
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     return world.read_modifier().resolved_bureau_technology_effects.unlocked_harvest_bonus_tier;
 }
 
 float harvest_bonus_higher_tier_bias_percent(
     RuntimeInvocation& invocation) noexcept
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     return std::clamp(
         world.read_modifier()
             .resolved_bureau_technology_effects.harvest_bonus_higher_tier_bias_percent,
@@ -415,9 +398,7 @@ HarvestBonusRoll resolve_harvest_bonus_roll(
     TileCoord target_tile,
     const PlantDef& plant_def) noexcept
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     const auto& harvest_effects = world.read_modifier().resolved_bureau_technology_effects;
     const auto unlocked_tier = harvest_effects.unlocked_harvest_bonus_tier;
     if (unlocked_tier == HarvestBonusTier::None)
@@ -667,9 +648,7 @@ std::vector<ResolvedHarvestOutputStack> resolve_harvest_outputs(
     const PlantDef& plant_def,
     float plant_density)
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     std::vector<ResolvedHarvestOutputStack> resolved_outputs {};
     if (!harvest_awards_item(plant_def, plant_density))
     {
@@ -725,9 +704,11 @@ bool inventory_can_fit_harvest_outputs(
     RuntimeInvocation& invocation,
     const std::vector<ResolvedHarvestOutputStack>& resolved_outputs) noexcept
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const auto worker_pack = inventory_storage::worker_pack_container(*site_run);
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
+    const auto worker_pack =
+        inventory_storage::worker_pack_container(
+            world.read_inventory(),
+            world.ecs_world_ptr());
     if (!worker_pack.is_valid())
     {
         return resolved_outputs.empty();
@@ -741,7 +722,8 @@ bool inventory_can_fit_harvest_outputs(
         }
 
         if (!inventory_storage::can_fit_item_in_container(
-                *site_run,
+                world.own_inventory(),
+                world.ecs_world_ptr(),
                 worker_pack,
                 ItemId {resolved_output.item_id},
                 resolved_output.quantity))
@@ -1013,9 +995,7 @@ double compute_duration_minutes(
     std::uint32_t item_id,
     const CraftRecipeDef* craft_recipe = nullptr) noexcept
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     const std::uint16_t safe_quantity = quantity == 0U ? 1U : quantity;
     const double duration =
         action_unit_duration_minutes(invocation, kind, primary_subject_id, item_id, craft_recipe) *
@@ -1171,9 +1151,7 @@ DeferredWorkerMeterDelta resolve_worker_meter_cost_delta(
     std::uint32_t primary_subject_id = 0U,
     const CraftRecipeDef* craft_recipe = nullptr)
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     const auto worker = world.read_worker();
     const auto local_weather = world.read_tile_local_weather(worker.position.tile_coord);
     const auto& action_cost_modifiers = world.read_modifier().resolved_action_cost_modifiers;
@@ -1479,9 +1457,7 @@ bool should_reactivate_plant_placement_mode_after_completion(
         return false;
     }
 
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     const std::uint32_t available_quantity =
         available_worker_pack_item_quantity(
             world.read_inventory(),
@@ -1553,16 +1529,15 @@ SiteActionFailureReason validate_reserved_item_completion(
     RuntimeInvocation& invocation,
     const ActionState& action_state)
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     for (const auto& reserved_stack : action_state.reserved_input_item_stacks)
     {
         const auto available_quantity =
             reserved_stack.container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK
             ? available_worker_pack_item_quantity(world.read_inventory(), reserved_stack.item_id)
             : inventory_storage::available_item_quantity_in_container_kind(
-                  *site_run,
+                  world.own_inventory(),
+                  world.ecs_world_ptr(),
                   reserved_stack.container_kind,
                   reserved_stack.item_id);
         if (available_quantity < reserved_stack.quantity)
@@ -1578,9 +1553,7 @@ SiteActionFailureReason validate_repair_target(
     RuntimeInvocation& invocation,
     TileCoord target_tile) noexcept
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     if (!world.tile_coord_in_bounds(target_tile))
     {
         return SiteActionFailureReason::InvalidTarget;
@@ -1605,9 +1578,7 @@ SiteActionFailureReason validate_harvest_target(
     TileCoord target_tile,
     const PlantDef** out_plant_def = nullptr) noexcept
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     if (!world.tile_coord_in_bounds(target_tile))
     {
         return SiteActionFailureReason::InvalidTarget;
@@ -1627,7 +1598,10 @@ SiteActionFailureReason validate_harvest_target(
 
     const bool awards_item = harvest_awards_item(*plant_def, tile.ecology.plant_density);
     if (awards_item &&
-        inventory_storage::worker_pack_container(*site_run).is_valid() == false)
+        !inventory_storage::worker_pack_container(
+            world.read_inventory(),
+            world.ecs_world_ptr())
+             .is_valid())
     {
         return SiteActionFailureReason::InvalidState;
     }
@@ -1650,9 +1624,11 @@ bool inventory_can_fit_all_excavation_rewards(
         return true;
     }
 
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    const auto worker_pack = inventory_storage::worker_pack_container(*site_run);
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
+    const auto worker_pack =
+        inventory_storage::worker_pack_container(
+            world.read_inventory(),
+            world.ecs_world_ptr());
     if (!worker_pack.is_valid())
     {
         return false;
@@ -1683,7 +1659,8 @@ bool inventory_can_fit_all_excavation_rewards(
         }
 
         if (!inventory_storage::can_fit_item_in_container(
-                *site_run,
+                world.own_inventory(),
+                world.ecs_world_ptr(),
                 worker_pack,
                 entry.item_id,
                 1U))
@@ -1700,9 +1677,7 @@ SiteActionFailureReason validate_excavation_target(
     TileCoord target_tile,
     ExcavationDepth requested_depth) noexcept
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     if (!world.tile_coord_in_bounds(target_tile))
     {
         return SiteActionFailureReason::InvalidTarget;
@@ -1851,9 +1826,7 @@ ItemId resolve_excavation_reward_item(
     TileCoord target_tile,
     ExcavationDepth depth) noexcept
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     const auto* depth_def = find_excavation_depth_def(depth);
     if (depth_def == nullptr)
     {
@@ -1883,23 +1856,21 @@ const CraftRecipeDef* resolve_craft_recipe_for_action(
     std::uint32_t output_item_id,
     std::uint64_t* out_device_entity_id = nullptr) noexcept
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     if (output_item_id == 0U || !world.tile_coord_in_bounds(target_tile))
     {
         return nullptr;
     }
 
     const auto tile = world.read_tile(target_tile);
-    if (!structure_is_crafting_station(tile.device.structure_id) || site_run->site_world == nullptr)
+    if (!structure_is_crafting_station(tile.device.structure_id) || !world.has_world())
     {
         return nullptr;
     }
 
     if (out_device_entity_id != nullptr)
     {
-        *out_device_entity_id = site_run->site_world->device_entity_id(target_tile);
+        *out_device_entity_id = world.device_entity_id(target_tile);
     }
 
     return find_craft_recipe_def(tile.device.structure_id, ItemId {output_item_id});
@@ -1911,16 +1882,17 @@ bool craft_ingredients_available_for_action(
     std::uint64_t device_entity_id,
     const CraftRecipeDef& recipe_def)
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     const auto cached_items = craft_logic::nearby_item_instance_ids_for_device(
-        *site_run,
+        world.read_inventory(),
+        world.ecs_world_ptr(),
+        world.read_worker().position.tile_coord,
         world.read_craft(),
         device_entity_id,
         target_tile);
     return craft_logic::can_satisfy_recipe_requirements(
-        *site_run,
+        world.read_inventory(),
+        world.ecs_world_ptr(),
         cached_items,
         recipe_def);
 }
@@ -1931,8 +1903,7 @@ bool craft_output_fits_for_action(
     std::uint64_t device_entity_id,
     const CraftRecipeDef& recipe_def)
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     const auto* structure_def = find_structure_def(recipe_def.station_structure_id);
     if (structure_def == nullptr || !structure_def->grants_storage || structure_def->storage_slot_count == 0U)
     {
@@ -1940,9 +1911,16 @@ bool craft_output_fits_for_action(
     }
 
     const auto source_containers =
-        craft_logic::collect_nearby_source_containers(*site_run, target_tile);
+        craft_logic::collect_nearby_source_containers(
+            world.own_inventory(),
+            world.ecs_world_ptr(),
+            world.read_worker().position.tile_coord,
+            target_tile);
     const auto output_container =
-        inventory_storage::find_device_storage_container(*site_run, device_entity_id);
+        inventory_storage::find_device_storage_container(
+            world.own_inventory(),
+            world.ecs_world_ptr(),
+            device_entity_id);
     if (!output_container.is_valid())
     {
         auto remaining = static_cast<std::uint32_t>(recipe_def.output_quantity);
@@ -1957,7 +1935,8 @@ bool craft_output_fits_for_action(
     }
 
     return craft_logic::can_store_output_after_recipe_consumption(
-        *site_run,
+        world.read_inventory(),
+        world.ecs_world_ptr(),
         output_container,
         source_containers,
         recipe_def);
@@ -2012,7 +1991,7 @@ double action_elapsed_minutes_for_step(
 }
 
 std::optional<TileCoord> resolve_action_approach_tile(
-    const SiteRunState& site_run,
+    const SiteWorld& site_world,
     const SiteWorld::WorkerData& worker,
     TileCoord target_tile,
     bool interaction_range_allowed)
@@ -2020,13 +1999,13 @@ std::optional<TileCoord> resolve_action_approach_tile(
     if (interaction_range_allowed)
     {
         return device_interaction_logic::resolve_interaction_range_approach_tile(
-            site_run,
+            site_world,
             worker,
             target_tile);
     }
 
     return device_interaction_logic::resolve_direct_approach_tile(
-        site_run,
+        site_world,
         worker,
         target_tile);
 }
@@ -2035,9 +2014,7 @@ bool action_target_supports_interaction_range(
     RuntimeInvocation& invocation,
     TileCoord target_tile) noexcept
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     if (!world.tile_coord_in_bounds(target_tile))
     {
         return false;
@@ -2055,9 +2032,7 @@ bool worker_is_at_action_approach_tile(
         return true;
     }
 
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     return device_interaction_logic::worker_is_at_tile(
         world.read_worker(),
         *action_state.approach_tile);
@@ -2067,9 +2042,7 @@ void begin_action_execution(
     RuntimeInvocation& invocation,
     ActionState& action_state)
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     if (!action_state.current_action_id.has_value() || action_has_started(action_state))
     {
         return;
@@ -2191,9 +2164,7 @@ TileCoord resolve_initial_placement_mode_tile(
     RuntimeInvocation& invocation,
     TileCoord requested_target_tile) noexcept
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     if (world.tile_coord_in_bounds(requested_target_tile))
     {
         return requested_target_tile;
@@ -2210,9 +2181,7 @@ void update_placement_mode_preview(
     PlacementModeState& placement_mode,
     TileCoord target_tile)
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     const TileCoord aligned_target_tile = align_tile_anchor_to_footprint(
         target_tile,
         resolve_action_placement_footprint(
@@ -2241,9 +2210,7 @@ bool placement_mode_can_commit_to_tile(
     PlacementModeState& placement_mode,
     TileCoord target_tile)
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     update_placement_mode_preview(invocation, placement_mode, target_tile);
     return placement_mode.target_tile.has_value() &&
         world.tile_coord_in_bounds(*placement_mode.target_tile) &&
@@ -2483,9 +2450,7 @@ void emit_action_fact_messages(
 
     case ActionKind::Excavate:
     {
-        auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-        auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-        auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+        auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
         const auto depth = excavation_depth_from_subject_id(action_state.primary_subject_id);
         const auto item_id = resolve_excavation_reward_item(invocation, target_tile, depth);
         auto excavation = world.read_tile_excavation(target_tile);
@@ -2514,9 +2479,7 @@ SiteActionFailureReason validate_craft_completion(
     RuntimeInvocation& invocation,
     const ActionState& action_state)
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     if (!action_state.target_tile.has_value() || action_state.secondary_subject_id == 0U)
     {
         return SiteActionFailureReason::InvalidState;
@@ -2528,7 +2491,7 @@ SiteActionFailureReason validate_craft_completion(
         return SiteActionFailureReason::InvalidState;
     }
 
-    if (!world.tile_coord_in_bounds(*action_state.target_tile) || site_run->site_world == nullptr)
+    if (!world.tile_coord_in_bounds(*action_state.target_tile) || !world.has_world())
     {
         return SiteActionFailureReason::InvalidTarget;
     }
@@ -2539,7 +2502,7 @@ SiteActionFailureReason validate_craft_completion(
         return SiteActionFailureReason::InvalidTarget;
     }
 
-    const auto device_entity_id = site_run->site_world->device_entity_id(*action_state.target_tile);
+    const auto device_entity_id = world.device_entity_id(*action_state.target_tile);
     if (device_entity_id == 0U)
     {
         return SiteActionFailureReason::InvalidTarget;
@@ -2636,9 +2599,7 @@ Gs1Status handle_start_site_action(
     RuntimeInvocation& invocation,
     const StartSiteActionMessage& payload)
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     auto& action_state = world.own_action();
     const ActionKind action_kind = to_action_kind(payload.action_kind);
     const bool deferred_target_selection =
@@ -3042,11 +3003,13 @@ Gs1Status handle_start_site_action(
         {
             const auto worker = world.read_worker();
             const auto approach_tile =
-                resolve_action_approach_tile(
-                    *site_run,
-                    worker,
-                    target_tile,
-                    action_target_supports_interaction_range(invocation, target_tile));
+                world.read_site_world() != nullptr
+                    ? resolve_action_approach_tile(
+                          *world.read_site_world(),
+                          worker,
+                          target_tile,
+                          action_target_supports_interaction_range(invocation, target_tile))
+                    : std::optional<TileCoord> {};
             if (!approach_tile.has_value())
             {
                 clear_action_state(action_state);
@@ -3093,9 +3056,7 @@ Gs1Status handle_cancel_site_action(
     RuntimeInvocation& invocation,
     const CancelSiteActionMessage& payload)
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     auto& action_state = world.own_action();
         const bool cancels_current =
             (payload.flags & GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION) != 0U;
@@ -3140,9 +3101,7 @@ Gs1Status handle_placement_mode_cursor_moved(
     RuntimeInvocation& invocation,
     const PlacementModeCursorMovedMessage& payload)
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     auto& action_state = world.own_action();
         if (!has_active_placement_mode(action_state))
         {
@@ -3200,13 +3159,11 @@ Gs1Status ActionExecutionSystem::process_game_message(
 {
     auto access = make_game_state_access<ActionExecutionSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
+    if (!campaign.has_value() || !world.has_world())
     {
         return GS1_STATUS_INVALID_STATE;
     }
-
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
     auto& action_state = world.own_action();
     const auto& payload_type = message.type;
     switch (payload_type)
@@ -3283,8 +3240,8 @@ Gs1Status ActionExecutionSystem::process_host_message(
 {
     auto access = make_game_state_access<ActionExecutionSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
+    if (!campaign.has_value() || !world.has_world())
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -3325,7 +3282,7 @@ Gs1Status ActionExecutionSystem::process_host_message(
                 message.payload.site_action_cancel.flags});
 
     case GS1_HOST_EVENT_SITE_CONTEXT_REQUEST:
-        if (!site_run->site_action.placement_mode.active)
+        if (!world.read_action().placement_mode.active)
         {
             return GS1_STATUS_OK;
         }
@@ -3345,13 +3302,11 @@ void ActionExecutionSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<ActionExecutionSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
+    if (!campaign.has_value() || !world.has_world())
     {
         return;
     }
-
-    auto world = SiteWorldAccess<ActionExecutionSystem> {*site_run};
     auto& action_state = world.own_action();
     if (is_action_waiting_for_worker_approach(action_state) &&
         worker_is_at_action_approach_tile(invocation, action_state))

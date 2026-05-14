@@ -12,11 +12,16 @@ namespace gs1::device_interaction_logic
 {
 inline constexpr float k_worker_tile_epsilon_squared = 0.0025f;
 
+inline bool tile_is_traversable(const SiteWorld& site_world, TileCoord coord) noexcept
+{
+    return site_world.contains(coord) &&
+        site_world.tile_at(coord).static_data.traversable;
+}
+
 inline bool tile_is_traversable(const SiteRunState& site_run, TileCoord coord) noexcept
 {
     return site_run.site_world != nullptr &&
-        site_run.site_world->contains(coord) &&
-        site_run.site_world->tile_at(coord).static_data.traversable;
+        tile_is_traversable(*site_run.site_world, coord);
 }
 
 inline bool tile_in_interaction_range(TileCoord source, TileCoord target) noexcept
@@ -35,11 +40,11 @@ inline bool worker_is_at_tile(
 }
 
 inline std::optional<TileCoord> resolve_direct_approach_tile(
-    const SiteRunState& site_run,
+    const SiteWorld& site_world,
     const SiteWorld::WorkerData& worker,
     TileCoord target_tile)
 {
-    if (tile_is_traversable(site_run, target_tile))
+    if (tile_is_traversable(site_world, target_tile))
     {
         return target_tile;
     }
@@ -62,7 +67,7 @@ inline std::optional<TileCoord> resolve_direct_approach_tile(
         const TileCoord candidate {
             target_tile.x + offset.x,
             target_tile.y + offset.y};
-        if (!tile_is_traversable(site_run, candidate))
+        if (!tile_is_traversable(site_world, candidate))
         {
             continue;
         }
@@ -80,8 +85,18 @@ inline std::optional<TileCoord> resolve_direct_approach_tile(
     return best_tile;
 }
 
-inline std::optional<TileCoord> resolve_interaction_range_approach_tile(
+inline std::optional<TileCoord> resolve_direct_approach_tile(
     const SiteRunState& site_run,
+    const SiteWorld::WorkerData& worker,
+    TileCoord target_tile)
+{
+    return site_run.site_world == nullptr
+        ? std::optional<TileCoord> {}
+        : resolve_direct_approach_tile(*site_run.site_world, worker, target_tile);
+}
+
+inline std::optional<TileCoord> resolve_interaction_range_approach_tile(
+    const SiteWorld& site_world,
     const SiteWorld::WorkerData& worker,
     TileCoord target_tile)
 {
@@ -104,7 +119,7 @@ inline std::optional<TileCoord> resolve_interaction_range_approach_tile(
         const TileCoord candidate {
             target_tile.x + offset.x,
             target_tile.y + offset.y};
-        if (!tile_is_traversable(site_run, candidate))
+        if (!tile_is_traversable(site_world, candidate))
         {
             continue;
         }
@@ -122,8 +137,18 @@ inline std::optional<TileCoord> resolve_interaction_range_approach_tile(
     return best_tile;
 }
 
-inline bool worker_is_in_interaction_range(
+inline std::optional<TileCoord> resolve_interaction_range_approach_tile(
     const SiteRunState& site_run,
+    const SiteWorld::WorkerData& worker,
+    TileCoord target_tile)
+{
+    return site_run.site_world == nullptr
+        ? std::optional<TileCoord> {}
+        : resolve_interaction_range_approach_tile(*site_run.site_world, worker, target_tile);
+}
+
+inline bool worker_is_in_interaction_range(
+    const SiteWorld& site_world,
     const SiteWorld::WorkerData& worker,
     TileCoord target_tile) noexcept
 {
@@ -132,6 +157,15 @@ inline bool worker_is_in_interaction_range(
         return false;
     }
 
-    return tile_is_traversable(site_run, worker.position.tile_coord);
+    return tile_is_traversable(site_world, worker.position.tile_coord);
+}
+
+inline bool worker_is_in_interaction_range(
+    const SiteRunState& site_run,
+    const SiteWorld::WorkerData& worker,
+    TileCoord target_tile) noexcept
+{
+    return site_run.site_world != nullptr &&
+        worker_is_in_interaction_range(*site_run.site_world, worker, target_tile);
 }
 }  // namespace gs1::device_interaction_logic

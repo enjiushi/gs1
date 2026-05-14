@@ -1,6 +1,7 @@
 #pragma once
 
 #include "messages/game_message.h"
+#include "runtime/runtime_state_access.h"
 #include "site/inventory_storage.h"
 #include "site/site_run_state.h"
 #include "site/site_world_access.h"
@@ -9,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <utility>
 
 namespace gs1
 {
@@ -256,24 +258,80 @@ class SiteWorldAccess final
 {
 public:
     explicit SiteWorldAccess(SiteRunState& site_run) noexcept
-        : site_run_(site_run)
+        : site_run_(&site_run)
     {
     }
 
-    [[nodiscard]] SiteRunId site_run_id() const noexcept { return site_run_.site_run_id; }
-    [[nodiscard]] SiteId site_id() const noexcept { return site_run_.site_id; }
-    [[nodiscard]] std::uint32_t site_id_value() const noexcept { return site_run_.site_id.value; }
-    [[nodiscard]] std::uint32_t site_archetype_id() const noexcept { return site_run_.site_archetype_id; }
-    [[nodiscard]] std::uint32_t attempt_index() const noexcept { return site_run_.attempt_index; }
-    [[nodiscard]] std::uint64_t site_attempt_seed() const noexcept { return site_run_.site_attempt_seed; }
-    [[nodiscard]] SiteRunStatus run_status() const noexcept { return site_run_.run_status; }
+    explicit SiteWorldAccess(RuntimeInvocation& invocation) noexcept
+        : invocation_(&invocation)
+    {
+        if (!using_split_state_sets())
+        {
+            auto& active_site_run = runtime_invocation_state_ref<RuntimeActiveSiteRunTag>(invocation);
+            if (active_site_run.has_value())
+            {
+                site_run_ = &active_site_run.value();
+            }
+        }
+    }
 
-    [[nodiscard]] const SiteClockState& read_time() const noexcept { return site_run_.clock; }
-    [[nodiscard]] SiteClockState& own_time() noexcept { return site_run_.clock; }
+    [[nodiscard]] SiteRunId site_run_id() const noexcept
+    {
+        return using_split_state_sets()
+            ? invocation_->state_manager()->query<StateSetId::SiteRunMeta>(*invocation_->owned_state())->site_run_id
+            : site_run_->site_run_id;
+    }
+
+    [[nodiscard]] SiteId site_id() const noexcept
+    {
+        return using_split_state_sets()
+            ? invocation_->state_manager()->query<StateSetId::SiteRunMeta>(*invocation_->owned_state())->site_id
+            : site_run_->site_id;
+    }
+
+    [[nodiscard]] std::uint32_t site_id_value() const noexcept
+    {
+        return site_id().value;
+    }
+
+    [[nodiscard]] std::uint32_t site_archetype_id() const noexcept
+    {
+        return using_split_state_sets()
+            ? invocation_->state_manager()->query<StateSetId::SiteRunMeta>(*invocation_->owned_state())
+                  ->site_archetype_id
+            : site_run_->site_archetype_id;
+    }
+
+    [[nodiscard]] std::uint32_t attempt_index() const noexcept
+    {
+        return using_split_state_sets()
+            ? invocation_->state_manager()->query<StateSetId::SiteRunMeta>(*invocation_->owned_state())
+                  ->attempt_index
+            : site_run_->attempt_index;
+    }
+
+    [[nodiscard]] std::uint64_t site_attempt_seed() const noexcept
+    {
+        return using_split_state_sets()
+            ? invocation_->state_manager()->query<StateSetId::SiteRunMeta>(*invocation_->owned_state())
+                  ->site_attempt_seed
+            : site_run_->site_attempt_seed;
+    }
+
+    [[nodiscard]] SiteRunStatus run_status() const noexcept
+    {
+        return using_split_state_sets()
+            ? invocation_->state_manager()->query<StateSetId::SiteRunMeta>(*invocation_->owned_state())->run_status
+            : site_run_->run_status;
+    }
+
+    [[nodiscard]] const SiteClockState& read_time() const noexcept { return site_clock_state(); }
+    [[nodiscard]] SiteClockState& own_time() noexcept { return site_clock_state(); }
 
     [[nodiscard]] bool has_world() const noexcept
     {
-        return site_world_access::has_world(site_run_);
+        const auto* world = site_world_ptr();
+        return world != nullptr && world->initialized();
     }
 
     [[nodiscard]] std::uint32_t tile_width() const noexcept
@@ -328,6 +386,44 @@ public:
             "System must declare a tile-grid component as readable.");
         const auto* world = site_world_ptr();
         return world != nullptr && world->contains(coord) ? world->tile_index(coord) : 0U;
+    }
+
+    [[nodiscard]] std::uint64_t tile_entity_id(TileCoord coord) const noexcept
+    {
+        static_assert(
+            site_system_reads_any_tile_component<SystemTag>(),
+            "System must declare a tile-grid component as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr && world->contains(coord) ? world->tile_entity_id(coord) : 0U;
+    }
+
+    [[nodiscard]] std::uint64_t device_entity_id(TileCoord coord) const noexcept
+    {
+        static_assert(
+            site_system_reads_any_tile_component<SystemTag>(),
+            "System must declare a tile-grid component as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr && world->contains(coord) ? world->device_entity_id(coord) : 0U;
+    }
+
+    [[nodiscard]] std::uint64_t worker_entity_id() const noexcept
+    {
+        static_assert(
+            site_system_reads_any_worker_component<SystemTag>() ||
+                site_system_reads_any_tile_component<SystemTag>(),
+            "System must declare worker or tile access as readable.");
+        const auto* world = site_world_ptr();
+        return world != nullptr ? world->worker_entity_id() : 0U;
+    }
+
+    [[nodiscard]] flecs::world* ecs_world_ptr() noexcept
+    {
+        return site_world_ptr() != nullptr ? &site_world_ptr()->ecs_world() : nullptr;
+    }
+
+    [[nodiscard]] const flecs::world* ecs_world_ptr() const noexcept
+    {
+        return site_world_ptr() != nullptr ? &site_world_ptr()->ecs_world() : nullptr;
     }
 
     [[nodiscard]] SiteWorld::TileEcologyData read_tile_ecology(TileCoord coord) const noexcept
@@ -626,84 +722,270 @@ public:
         }
     }
 
-    [[nodiscard]] const CampState& read_camp() const noexcept { return site_run_.camp; }
-    [[nodiscard]] CampState& own_camp() noexcept { return site_run_.camp; }
+    [[nodiscard]] const CampState& read_camp() const noexcept { return camp_state(); }
+    [[nodiscard]] CampState& own_camp() noexcept { return camp_state(); }
 
-    [[nodiscard]] const InventoryState& read_inventory() const noexcept { return site_run_.inventory; }
-    [[nodiscard]] InventoryState& own_inventory() noexcept { return site_run_.inventory; }
+    [[nodiscard]] const InventoryState& read_inventory() const noexcept { return inventory_state(); }
+    [[nodiscard]] InventoryState& own_inventory() noexcept { return inventory_state(); }
 
-    [[nodiscard]] const ContractorState& read_contractor() const noexcept { return site_run_.contractor; }
-    [[nodiscard]] ContractorState& own_contractor() noexcept { return site_run_.contractor; }
+    [[nodiscard]] const ContractorState& read_contractor() const noexcept { return contractor_state(); }
+    [[nodiscard]] ContractorState& own_contractor() noexcept { return contractor_state(); }
 
-    [[nodiscard]] const WeatherState& read_weather() const noexcept { return site_run_.weather; }
-    [[nodiscard]] WeatherState& own_weather() noexcept { return site_run_.weather; }
+    [[nodiscard]] const WeatherState& read_weather() const noexcept { return weather_state(); }
+    [[nodiscard]] WeatherState& own_weather() noexcept { return weather_state(); }
+
+    [[nodiscard]] const SiteWorld* read_site_world() const noexcept
+    {
+        return site_world_ptr();
+    }
+
+    [[nodiscard]] SiteWorld* own_site_world() noexcept
+    {
+        return site_world_ptr();
+    }
 
     [[nodiscard]] const LocalWeatherResolveState& read_local_weather_runtime() const noexcept
     {
-        return site_run_.local_weather_resolve;
+        return local_weather_runtime_state();
     }
 
     [[nodiscard]] LocalWeatherResolveState& own_local_weather_runtime() noexcept
     {
-        return site_run_.local_weather_resolve;
+        return local_weather_runtime_state();
     }
 
     [[nodiscard]] const PlantWeatherContributionState& read_plant_weather_runtime() const noexcept
     {
-        return site_run_.plant_weather_contribution;
+        return plant_weather_runtime_state();
     }
 
     [[nodiscard]] PlantWeatherContributionState& own_plant_weather_runtime() noexcept
     {
-        return site_run_.plant_weather_contribution;
+        return plant_weather_runtime_state();
     }
 
     [[nodiscard]] const DeviceWeatherContributionState& read_device_weather_runtime() const noexcept
     {
-        return site_run_.device_weather_contribution;
+        return device_weather_runtime_state();
     }
 
     [[nodiscard]] DeviceWeatherContributionState& own_device_weather_runtime() noexcept
     {
-        return site_run_.device_weather_contribution;
+        return device_weather_runtime_state();
     }
 
-    [[nodiscard]] const EventState& read_event() const noexcept { return site_run_.event; }
-    [[nodiscard]] EventState& own_event() noexcept { return site_run_.event; }
+    [[nodiscard]] const EventState& read_event() const noexcept { return event_state(); }
+    [[nodiscard]] EventState& own_event() noexcept { return event_state(); }
 
-    [[nodiscard]] const TaskBoardState& read_task_board() const noexcept { return site_run_.task_board; }
-    [[nodiscard]] TaskBoardState& own_task_board() noexcept { return site_run_.task_board; }
+    [[nodiscard]] const TaskBoardState& read_task_board() const noexcept { return task_board_state(); }
+    [[nodiscard]] TaskBoardState& own_task_board() noexcept { return task_board_state(); }
 
-    [[nodiscard]] const ModifierState& read_modifier() const noexcept { return site_run_.modifier; }
-    [[nodiscard]] ModifierState& own_modifier() noexcept { return site_run_.modifier; }
+    [[nodiscard]] const ModifierState& read_modifier() const noexcept { return modifier_state(); }
+    [[nodiscard]] ModifierState& own_modifier() noexcept { return modifier_state(); }
 
-    [[nodiscard]] const EconomyState& read_economy() const noexcept { return site_run_.economy; }
-    [[nodiscard]] EconomyState& own_economy() noexcept { return site_run_.economy; }
+    [[nodiscard]] const EconomyState& read_economy() const noexcept { return economy_state(); }
+    [[nodiscard]] EconomyState& own_economy() noexcept { return economy_state(); }
 
-    [[nodiscard]] const CraftState& read_craft() const noexcept { return site_run_.craft; }
-    [[nodiscard]] CraftState& own_craft() noexcept { return site_run_.craft; }
+    [[nodiscard]] const CraftState& read_craft() const noexcept { return craft_state(); }
+    [[nodiscard]] CraftState& own_craft() noexcept { return craft_state(); }
 
-    [[nodiscard]] const ActionState& read_action() const noexcept { return site_run_.site_action; }
-    [[nodiscard]] ActionState& own_action() noexcept { return site_run_.site_action; }
+    [[nodiscard]] const ActionState& read_action() const noexcept { return action_state(); }
+    [[nodiscard]] ActionState& own_action() noexcept { return action_state(); }
 
-    [[nodiscard]] const SiteCounters& read_counters() const noexcept { return site_run_.counters; }
-    [[nodiscard]] SiteCounters& own_counters() noexcept { return site_run_.counters; }
+    [[nodiscard]] const SiteCounters& read_counters() const noexcept { return counters_state(); }
+    [[nodiscard]] SiteCounters& own_counters() noexcept { return counters_state(); }
 
-    [[nodiscard]] const SiteObjectiveState& read_objective() const noexcept { return site_run_.objective; }
-    [[nodiscard]] SiteObjectiveState& own_objective() noexcept { return site_run_.objective; }
+    [[nodiscard]] const SiteObjectiveState& read_objective() const noexcept { return objective_state(); }
+    [[nodiscard]] SiteObjectiveState& own_objective() noexcept { return objective_state(); }
 
 private:
+    [[nodiscard]] bool using_split_state_sets() const noexcept
+    {
+        return invocation_ != nullptr &&
+            invocation_->owned_state() != nullptr &&
+            invocation_->state_manager() != nullptr;
+    }
+
+    [[nodiscard]] SiteRunState& aggregate_site_run() const
+    {
+        return *site_run_;
+    }
+
+    [[nodiscard]] SiteClockState& site_clock_state() const
+    {
+        if (using_split_state_sets())
+        {
+            return invocation_->state_manager()->state<StateSetId::SiteClock>(*invocation_->owned_state()).value();
+        }
+        return aggregate_site_run().clock;
+    }
+
+    [[nodiscard]] CampState& camp_state() const
+    {
+        if (using_split_state_sets())
+        {
+            return invocation_->state_manager()->state<StateSetId::SiteCamp>(*invocation_->owned_state()).value();
+        }
+        return aggregate_site_run().camp;
+    }
+
+    [[nodiscard]] InventoryState& inventory_state() const
+    {
+        if (using_split_state_sets())
+        {
+            return invocation_->state_manager()->state<StateSetId::SiteInventory>(*invocation_->owned_state()).value();
+        }
+        return aggregate_site_run().inventory;
+    }
+
+    [[nodiscard]] ContractorState& contractor_state() const
+    {
+        if (using_split_state_sets())
+        {
+            return invocation_->state_manager()->state<StateSetId::SiteContractor>(*invocation_->owned_state())
+                .value();
+        }
+        return aggregate_site_run().contractor;
+    }
+
+    [[nodiscard]] WeatherState& weather_state() const
+    {
+        if (using_split_state_sets())
+        {
+            return invocation_->state_manager()->state<StateSetId::SiteWeather>(*invocation_->owned_state()).value();
+        }
+        return aggregate_site_run().weather;
+    }
+
+    [[nodiscard]] LocalWeatherResolveState& local_weather_runtime_state() const
+    {
+        if (using_split_state_sets())
+        {
+            return invocation_->state_manager()
+                ->state<StateSetId::SiteLocalWeatherResolve>(*invocation_->owned_state())
+                .value();
+        }
+        return aggregate_site_run().local_weather_resolve;
+    }
+
+    [[nodiscard]] PlantWeatherContributionState& plant_weather_runtime_state() const
+    {
+        if (using_split_state_sets())
+        {
+            return invocation_->state_manager()
+                ->state<StateSetId::SitePlantWeatherContribution>(*invocation_->owned_state())
+                .value();
+        }
+        return aggregate_site_run().plant_weather_contribution;
+    }
+
+    [[nodiscard]] DeviceWeatherContributionState& device_weather_runtime_state() const
+    {
+        if (using_split_state_sets())
+        {
+            return invocation_->state_manager()
+                ->state<StateSetId::SiteDeviceWeatherContribution>(*invocation_->owned_state())
+                .value();
+        }
+        return aggregate_site_run().device_weather_contribution;
+    }
+
+    [[nodiscard]] EventState& event_state() const
+    {
+        if (using_split_state_sets())
+        {
+            return invocation_->state_manager()->state<StateSetId::SiteEvent>(*invocation_->owned_state()).value();
+        }
+        return aggregate_site_run().event;
+    }
+
+    [[nodiscard]] TaskBoardState& task_board_state() const
+    {
+        if (using_split_state_sets())
+        {
+            return invocation_->state_manager()->state<StateSetId::SiteTaskBoard>(*invocation_->owned_state())
+                .value();
+        }
+        return aggregate_site_run().task_board;
+    }
+
+    [[nodiscard]] ModifierState& modifier_state() const
+    {
+        if (using_split_state_sets())
+        {
+            return invocation_->state_manager()->state<StateSetId::SiteModifier>(*invocation_->owned_state())
+                .value();
+        }
+        return aggregate_site_run().modifier;
+    }
+
+    [[nodiscard]] EconomyState& economy_state() const
+    {
+        if (using_split_state_sets())
+        {
+            return invocation_->state_manager()->state<StateSetId::SiteEconomy>(*invocation_->owned_state())
+                .value();
+        }
+        return aggregate_site_run().economy;
+    }
+
+    [[nodiscard]] CraftState& craft_state() const
+    {
+        if (using_split_state_sets())
+        {
+            return invocation_->state_manager()->state<StateSetId::SiteCraft>(*invocation_->owned_state()).value();
+        }
+        return aggregate_site_run().craft;
+    }
+
+    [[nodiscard]] ActionState& action_state() const
+    {
+        if (using_split_state_sets())
+        {
+            return invocation_->state_manager()->state<StateSetId::SiteAction>(*invocation_->owned_state()).value();
+        }
+        return aggregate_site_run().site_action;
+    }
+
+    [[nodiscard]] SiteCounters& counters_state() const
+    {
+        if (using_split_state_sets())
+        {
+            return invocation_->state_manager()->state<StateSetId::SiteCounters>(*invocation_->owned_state())
+                .value();
+        }
+        return aggregate_site_run().counters;
+    }
+
+    [[nodiscard]] SiteObjectiveState& objective_state() const
+    {
+        if (using_split_state_sets())
+        {
+            return invocation_->state_manager()->state<StateSetId::SiteObjective>(*invocation_->owned_state())
+                .value();
+        }
+        return aggregate_site_run().objective;
+    }
+
     [[nodiscard]] const SiteWorld* site_world_ptr() const noexcept
     {
-        return has_world() ? site_run_.site_world.get() : nullptr;
+        if (using_split_state_sets())
+        {
+            const auto& world_state =
+                invocation_->state_manager()->query<StateSetId::SiteWorld>(*invocation_->owned_state());
+            return world_state.has_value() ? world_state->site_world.get() : nullptr;
+        }
+
+        return site_run_ != nullptr ? site_run_->site_world.get() : nullptr;
     }
 
     [[nodiscard]] SiteWorld* site_world_ptr() noexcept
     {
-        return has_world() ? site_run_.site_world.get() : nullptr;
+        return const_cast<SiteWorld*>(std::as_const(*this).site_world_ptr());
     }
 
-    SiteRunState& site_run_;
+    RuntimeInvocation* invocation_ {nullptr};
+    SiteRunState* site_run_ {nullptr};
 };
 
 }  // namespace gs1

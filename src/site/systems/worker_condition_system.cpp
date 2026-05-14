@@ -662,18 +662,15 @@ Gs1Status WorkerConditionSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<WorkerConditionSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    SiteWorldAccess<WorkerConditionSystem> world {*site_run};
+    SiteWorldAccess<WorkerConditionSystem> world {invocation};
     auto& message_queue = invocation.game_message_queue();
     if (message.type == GameMessageType::SiteRunStarted)
     {
+        if (!world.has_world())
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+
         emit_worker_meters_changed_if_needed(world, message_queue);
         return GS1_STATUS_OK;
     }
@@ -723,14 +720,7 @@ Gs1Status WorkerConditionSystem::process_host_message(
 void WorkerConditionSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<WorkerConditionSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
-    {
-        return;
-    }
-
-    SiteWorldAccess<WorkerConditionSystem> world {*site_run};
+    SiteWorldAccess<WorkerConditionSystem> world {invocation};
     auto& message_queue = invocation.game_message_queue();
     const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
     if (!world.has_world())

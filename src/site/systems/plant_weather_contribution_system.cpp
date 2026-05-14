@@ -167,9 +167,8 @@ void mark_tiles_affected_by_source(
 }
 
 bool source_and_target_share_occupant_instance(
-    gs1::SiteRunState& site_run,
     gs1::SiteWorldAccess<gs1::PlantWeatherContributionSystem>& world,
-    flecs::world& ecs_world,
+    const flecs::world& ecs_world,
     gs1::TileCoord source_coord,
     gs1::TileCoord target_coord,
     gs1::PlantId source_plant_id) noexcept
@@ -184,7 +183,7 @@ bool source_and_target_share_occupant_instance(
         return false;
     }
 
-    const auto target_entity_id = site_run.site_world->tile_entity_id(target_coord);
+    const auto target_entity_id = world.tile_entity_id(target_coord);
     if (target_entity_id == 0U)
     {
         return false;
@@ -332,20 +331,25 @@ struct WindContributionInstanceEntry final
 }
 
 gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
-    gs1::SiteRunState& site_run,
     gs1::SiteWorldAccess<gs1::PlantWeatherContributionSystem>& world,
     const gs1::WeatherDirectionStep& wind_direction,
     std::uint8_t max_distance,
     gs1::TileCoord target_coord)
 {
-    auto& ecs_world = site_run.site_world->ecs_world();
     gs1::SiteWorld::TileWeatherContributionData total = gs1::zero_weather_contribution();
+    const auto* site_world = world.read_site_world();
+    if (site_world == nullptr)
+    {
+        return total;
+    }
+
+    auto& ecs_world = site_world->ecs_world();
     std::vector<WindContributionInstanceEntry> wind_instance_entries {};
     wind_instance_entries.reserve(8U);
     gs1::PlantId target_plant_id {};
     std::uint32_t target_ground_cover_type_id = 0U;
 
-    const auto target_entity_id = site_run.site_world->tile_entity_id(target_coord);
+    const auto target_entity_id = world.tile_entity_id(target_coord);
     if (target_entity_id != 0U)
     {
         const auto target_entity = ecs_world.entity(target_entity_id);
@@ -366,7 +370,7 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
             return;
         }
 
-        const auto source_entity_id = site_run.site_world->tile_entity_id(source_coord);
+        const auto source_entity_id = world.tile_entity_id(source_coord);
         if (source_entity_id == 0U)
         {
             return;
@@ -406,7 +410,6 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
             : gs1::TileFootprint {1U, 1U};
         const bool same_occupant_instance =
             source_and_target_share_occupant_instance(
-                site_run,
                 world,
                 ecs_world,
                 source_coord,
@@ -504,7 +507,6 @@ gs1::SiteWorld::TileWeatherContributionData recompute_tile_contribution(
 }
 
 void write_tile_contribution(
-    gs1::SiteRunState& site_run,
     gs1::SiteWorldAccess<gs1::PlantWeatherContributionSystem>& world,
     std::uint32_t tile_index,
     const gs1::SiteWorld::TileWeatherContributionData& contribution)
@@ -514,13 +516,19 @@ void write_tile_contribution(
         return;
     }
 
-    const auto entity_id = site_run.site_world->tile_entity_id(world.tile_coord(tile_index));
+    const auto* site_world = world.own_site_world();
+    if (site_world == nullptr)
+    {
+        return;
+    }
+
+    const auto entity_id = site_world->tile_entity_id(world.tile_coord(tile_index));
     if (entity_id == 0U)
     {
         return;
     }
 
-    site_run.site_world->ecs_world().entity(entity_id).set<gs1::site_ecs::TilePlantWeatherContribution>({
+    site_world->ecs_world().entity(entity_id).set<gs1::site_ecs::TilePlantWeatherContribution>({
         contribution.heat_protection,
         contribution.wind_protection,
         contribution.dust_protection,
@@ -533,17 +541,10 @@ Gs1Status process_message(
     gs1::RuntimeInvocation& invocation,
     const gs1::GameMessage& message)
 {
-    auto access = gs1::make_game_state_access<gs1::PlantWeatherContributionSystem>(invocation);
-    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    gs1::SiteWorldAccess<gs1::PlantWeatherContributionSystem> world {*site_run};
+    gs1::SiteWorldAccess<gs1::PlantWeatherContributionSystem> world {invocation};
     if (!world.has_world())
     {
-        return GS1_STATUS_OK;
+        return GS1_STATUS_INVALID_STATE;
     }
 
     auto& runtime = world.own_plant_weather_runtime();
@@ -598,14 +599,7 @@ Gs1Status process_message(
 
 void run_system(gs1::RuntimeInvocation& invocation)
 {
-    auto access = gs1::make_game_state_access<gs1::PlantWeatherContributionSystem>(invocation);
-    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return;
-    }
-
-    gs1::SiteWorldAccess<gs1::PlantWeatherContributionSystem> world {*site_run};
+    gs1::SiteWorldAccess<gs1::PlantWeatherContributionSystem> world {invocation};
     if (!world.has_world())
     {
         return;
@@ -639,10 +633,9 @@ void run_system(gs1::RuntimeInvocation& invocation)
     {
         const gs1::TileCoord target_coord = world.tile_coord(tile_index);
         write_tile_contribution(
-            *site_run,
             world,
             tile_index,
-            recompute_tile_contribution(*site_run, world, wind_direction, max_distance, target_coord));
+            recompute_tile_contribution(world, wind_direction, max_distance, target_coord));
     }
 
     clear_dirty_tiles(runtime);
@@ -685,13 +678,6 @@ Gs1Status PlantWeatherContributionSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<PlantWeatherContributionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
     return process_message(invocation, message);
 }
 
@@ -706,13 +692,6 @@ Gs1Status PlantWeatherContributionSystem::process_host_message(
 
 void PlantWeatherContributionSystem::run(RuntimeInvocation& invocation)
 {
-    auto access = make_game_state_access<PlantWeatherContributionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return;
-    }
-
     run_system(invocation);
 }
 }  // namespace gs1

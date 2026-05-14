@@ -85,35 +85,35 @@ Gs1Status SiteFlowSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto access = make_game_state_access<SiteFlowSystem>(invocation);
     if (message.type != GS1_HOST_EVENT_SITE_MOVE_DIRECTION)
     {
         return GS1_STATUS_OK;
     }
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
+
+    SiteWorldAccess<SiteFlowSystem> world {invocation};
+    if (!world.has_world())
     {
         return GS1_STATUS_OK;
     }
 
     const auto& payload = message.payload.site_move_direction;
-    site_run->host_move_direction.world_move_x = payload.world_move_x;
-    site_run->host_move_direction.world_move_y = payload.world_move_y;
-    site_run->host_move_direction.world_move_z = payload.world_move_z;
-    site_run->host_move_direction.present = true;
+    auto& move_direction = runtime_invocation_state_ref<RuntimeMoveDirectionTag>(invocation);
+    move_direction.world_move_x = payload.world_move_x;
+    move_direction.world_move_y = payload.world_move_y;
+    move_direction.world_move_z = payload.world_move_z;
+    move_direction.present = true;
     return GS1_STATUS_OK;
 }
 
 void SiteFlowSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<SiteFlowSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
+    SiteWorldAccess<SiteFlowSystem> world {invocation};
+    if (!world.has_world())
     {
         return;
     }
 
-    SiteWorldAccess<SiteFlowSystem> world {*site_run};
     const auto move_direction = access.template read<RuntimeMoveDirectionTag>();
     const SiteMoveDirectionInput move_direction_input {
         move_direction.world_move_x,

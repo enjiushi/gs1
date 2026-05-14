@@ -21,11 +21,7 @@ namespace gs1
 template <>
 struct system_state_tags<CraftSystem>
 {
-    using type = type_list<
-        RuntimeCampaignTag,
-        RuntimeActiveSiteRunTag,
-        RuntimeFixedStepSecondsTag,
-        RuntimeMoveDirectionTag>;
+    using type = type_list<RuntimeCampaignTag>;
 };
 
 namespace
@@ -39,19 +35,14 @@ void refresh_phone_cache(
     RuntimeInvocation& invocation,
     std::uint64_t membership_revision)
 {
-    auto access = make_game_state_access<CraftSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return;
-    }
-
-    auto& phone_cache = SiteWorldAccess<CraftSystem> {*site_run}.own_craft().phone_cache;
+    SiteWorldAccess<CraftSystem> world {invocation};
+    auto& phone_cache = world.own_craft().phone_cache;
     phone_cache.source_membership_revision = membership_revision;
     phone_cache.item_instance_ids =
         inventory_storage::collect_item_instance_ids_in_containers(
-            *site_run,
-            inventory_storage::collect_all_storage_containers(*site_run, true));
+            world.read_inventory(),
+            world.ecs_world_ptr(),
+            inventory_storage::collect_all_storage_containers(world.read_inventory(), world.ecs_world_ptr(), true));
 }
 
 void refresh_device_caches(
@@ -59,18 +50,17 @@ void refresh_device_caches(
     std::uint64_t membership_revision,
     TileCoord worker_tile)
 {
-    auto access = make_game_state_access<CraftSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
+    SiteWorldAccess<CraftSystem> world {invocation};
+    auto& craft = world.own_craft();
+    craft.device_caches.clear();
+
+    auto* ecs_world_ptr = world.ecs_world_ptr();
+    if (ecs_world_ptr == nullptr)
     {
         return;
     }
 
-    SiteWorldAccess<CraftSystem> world {*site_run};
-    auto& craft = world.own_craft();
-    craft.device_caches.clear();
-
-    auto& ecs_world = site_run->site_world->ecs_world();
+    auto& ecs_world = *ecs_world_ptr;
     auto source_query =
         ecs_world.query_builder<
             const site_ecs::TileCoordComponent,
@@ -91,8 +81,12 @@ void refresh_device_caches(
             craft.device_caches.push_back(CraftDeviceCacheState {
                 entity.id(),
                 membership_revision,
-                craft_logic::worker_pack_included_for_device(*site_run, coord),
-                craft_logic::collect_nearby_item_instance_ids(*site_run, coord)});
+                craft_logic::worker_pack_included_for_device(world.read_worker().position.tile_coord, coord),
+                craft_logic::collect_nearby_item_instance_ids(
+                    world.read_inventory(),
+                    world.ecs_world_ptr(),
+                    world.read_worker().position.tile_coord,
+                    coord)});
         });
 
     craft.device_cache_source_membership_revision = membership_revision;
@@ -106,17 +100,16 @@ Gs1Status handle_craft_context_requested(
 {
     auto access = make_game_state_access<CraftSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    if (!campaign.has_value())
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
-    SiteWorldAccess<CraftSystem> world {*site_run};
+    SiteWorldAccess<CraftSystem> world {invocation};
     auto& context = world.own_craft().context;
     context = CraftContextState {};
 
-    if (!world.has_world() || site_run->site_world == nullptr)
+    if (!world.has_world() || world.ecs_world_ptr() == nullptr)
     {
         return GS1_STATUS_OK;
     }
@@ -136,18 +129,31 @@ Gs1Status handle_craft_context_requested(
         return GS1_STATUS_OK;
     }
 
-    const auto device_entity_id = site_run->site_world->device_entity_id(target_tile);
+    const auto device_entity_id = world.device_entity_id(target_tile);
     const auto output_container =
-        inventory_storage::find_device_storage_container(*site_run, device_entity_id);
+        inventory_storage::find_device_storage_container(
+            world.read_inventory(),
+            world.ecs_world_ptr(),
+            device_entity_id);
     if (device_entity_id == 0U || !output_container.is_valid())
     {
         return GS1_STATUS_OK;
     }
 
     const auto nearby_items =
-        craft_logic::nearby_item_instance_ids_for_device(*site_run, world.read_craft(), device_entity_id, target_tile);
+        craft_logic::nearby_item_instance_ids_for_device(
+            world.read_inventory(),
+            world.ecs_world_ptr(),
+            world.read_worker().position.tile_coord,
+            world.read_craft(),
+            device_entity_id,
+            target_tile);
     const auto source_containers =
-        craft_logic::collect_nearby_source_containers(*site_run, target_tile);
+        craft_logic::collect_nearby_source_containers(
+            world.read_inventory(),
+            world.ecs_world_ptr(),
+            world.read_worker().position.tile_coord,
+            target_tile);
     for (const auto* recipe_def : recipes)
     {
         if (recipe_def == nullptr)
@@ -156,7 +162,8 @@ Gs1Status handle_craft_context_requested(
         }
 
         if (!craft_logic::can_satisfy_recipe_requirements(
-                *site_run,
+                world.read_inventory(),
+                world.ecs_world_ptr(),
                 nearby_items,
                 *recipe_def))
         {
@@ -164,7 +171,8 @@ Gs1Status handle_craft_context_requested(
         }
 
         if (!craft_logic::can_store_output_after_recipe_consumption(
-                *site_run,
+                world.read_inventory(),
+                world.ecs_world_ptr(),
                 output_container,
                 source_containers,
                 *recipe_def))
@@ -219,13 +227,12 @@ Gs1Status CraftSystem::process_game_message(
 {
     auto access = make_game_state_access<CraftSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    if (!campaign.has_value())
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
-    SiteWorldAccess<CraftSystem> world {*site_run};
+    SiteWorldAccess<CraftSystem> world {invocation};
 
     switch (message.type)
     {
@@ -254,14 +261,13 @@ Gs1Status CraftSystem::process_host_message(
 {
     auto access = make_game_state_access<CraftSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    if (!campaign.has_value())
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
     if (message.type != GS1_HOST_EVENT_SITE_CONTEXT_REQUEST ||
-        site_run->site_action.placement_mode.active)
+        SiteWorldAccess<CraftSystem> {invocation}.read_action().placement_mode.active)
     {
         return GS1_STATUS_OK;
     }
@@ -278,14 +284,13 @@ void CraftSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<CraftSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    if (!campaign.has_value())
     {
         return;
     }
 
-    SiteWorldAccess<CraftSystem> world {*site_run};
-    if (!world.has_world() || site_run->site_world == nullptr)
+    SiteWorldAccess<CraftSystem> world {invocation};
+    if (!world.has_world() || world.ecs_world_ptr() == nullptr)
     {
         return;
     }
@@ -297,7 +302,7 @@ void CraftSystem::run(RuntimeInvocation& invocation)
         refresh_phone_cache(invocation, membership_revision);
     }
 
-    const TileCoord worker_tile = site_world_access::worker_position(*site_run).tile_coord;
+    const TileCoord worker_tile = world.read_worker().position.tile_coord;
     if (!craft.device_caches_dirty &&
         craft.device_cache_source_membership_revision == membership_revision &&
         same_tile_coord(craft.device_cache_worker_tile, worker_tile))

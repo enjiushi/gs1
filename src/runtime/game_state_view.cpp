@@ -3,6 +3,7 @@
 #include "content/defs/technology_defs.h"
 #include "campaign/systems/technology_system.h"
 #include "runtime/game_runtime.h"
+#include "runtime/state_manager.h"
 #include "site/site_world.h"
 
 #include <algorithm>
@@ -561,19 +562,56 @@ void rebuild_game_state_view_cache(
     RuntimeGameStateViewCache& cache)
 {
     const GameState& state = runtime.state();
+    const auto& state_manager = runtime.state_manager();
 
     cache.revision += 1U;
     cache.root = {};
     cache.root.struct_size = sizeof(Gs1GameStateView);
     cache.root.revision = cache.revision;
     cache.root.app_state = state.app_state;
-    cache.root.has_campaign = state.campaign.has_value() ? 1U : 0U;
-    cache.root.has_active_site = state.active_site_run.has_value() ? 1U : 0U;
+    cache.root.has_campaign = state.campaign_core.has_value() ? 1U : 0U;
+    cache.root.has_active_site = state.site_run_meta.has_value() ? 1U : 0U;
     cache.root.reserved0 = 0U;
 
-    if (state.campaign.has_value())
+    if (state.campaign_core.has_value())
     {
-        rebuild_campaign_view(*state.campaign, cache);
+        CampaignState campaign {};
+        campaign.campaign_id = state_manager.query<StateSetId::CampaignCore>(state)->campaign_id;
+        campaign.campaign_seed = state_manager.query<StateSetId::CampaignCore>(state)->campaign_seed;
+        campaign.campaign_clock_minutes_elapsed =
+            state_manager.query<StateSetId::CampaignCore>(state)->campaign_clock_minutes_elapsed;
+        campaign.campaign_days_total = state_manager.query<StateSetId::CampaignCore>(state)->campaign_days_total;
+        campaign.campaign_days_remaining =
+            state_manager.query<StateSetId::CampaignCore>(state)->campaign_days_remaining;
+        campaign.app_state = state_manager.query<StateSetId::CampaignCore>(state)->app_state;
+        campaign.active_site_id = state_manager.query<StateSetId::CampaignCore>(state)->active_site_id;
+        if (const auto& regional_map = state_manager.query<StateSetId::CampaignRegionalMap>(state);
+            regional_map.has_value())
+        {
+            campaign.regional_map_state = *regional_map;
+        }
+        if (const auto& faction_progress = state_manager.query<StateSetId::CampaignFactionProgress>(state);
+            faction_progress.has_value())
+        {
+            campaign.faction_progress = *faction_progress;
+        }
+        if (const auto& technology = state_manager.query<StateSetId::CampaignTechnology>(state);
+            technology.has_value())
+        {
+            campaign.technology_state = *technology;
+        }
+        if (const auto& loadout = state_manager.query<StateSetId::CampaignLoadoutPlanner>(state);
+            loadout.has_value())
+        {
+            campaign.loadout_planner_state = *loadout;
+        }
+        if (const auto& sites = state_manager.query<StateSetId::CampaignSites>(state);
+            sites.has_value())
+        {
+            campaign.sites = *sites;
+        }
+
+        rebuild_campaign_view(campaign, cache);
         cache.root.campaign = &cache.campaign;
     }
     else
@@ -582,9 +620,98 @@ void rebuild_game_state_view_cache(
         cache.root.campaign = nullptr;
     }
 
-    if (state.active_site_run.has_value())
+    if (state.site_run_meta.has_value())
     {
-        rebuild_site_view(*state.active_site_run, cache);
+        SiteRunState site_run {};
+        const auto& meta = state_manager.query<StateSetId::SiteRunMeta>(state);
+        site_run.site_run_id = meta->site_run_id;
+        site_run.site_id = meta->site_id;
+        site_run.site_archetype_id = meta->site_archetype_id;
+        site_run.attempt_index = meta->attempt_index;
+        site_run.site_attempt_seed = meta->site_attempt_seed;
+        site_run.run_status = meta->run_status;
+        site_run.result_newly_revealed_site_count = meta->result_newly_revealed_site_count;
+        if (const auto& world = state_manager.query<StateSetId::SiteWorld>(state); world.has_value())
+        {
+            site_run.site_world = world->site_world;
+        }
+        if (const auto& clock = state_manager.query<StateSetId::SiteClock>(state); clock.has_value())
+        {
+            site_run.clock = *clock;
+        }
+        if (const auto& camp = state_manager.query<StateSetId::SiteCamp>(state); camp.has_value())
+        {
+            site_run.camp = *camp;
+        }
+        if (const auto& inventory = state_manager.query<StateSetId::SiteInventory>(state);
+            inventory.has_value())
+        {
+            site_run.inventory = *inventory;
+        }
+        if (const auto& contractor = state_manager.query<StateSetId::SiteContractor>(state);
+            contractor.has_value())
+        {
+            site_run.contractor = *contractor;
+        }
+        if (const auto& weather = state_manager.query<StateSetId::SiteWeather>(state); weather.has_value())
+        {
+            site_run.weather = *weather;
+        }
+        if (const auto& event = state_manager.query<StateSetId::SiteEvent>(state); event.has_value())
+        {
+            site_run.event = *event;
+        }
+        if (const auto& task_board = state_manager.query<StateSetId::SiteTaskBoard>(state);
+            task_board.has_value())
+        {
+            site_run.task_board = *task_board;
+        }
+        if (const auto& modifier = state_manager.query<StateSetId::SiteModifier>(state);
+            modifier.has_value())
+        {
+            site_run.modifier = *modifier;
+        }
+        if (const auto& economy = state_manager.query<StateSetId::SiteEconomy>(state); economy.has_value())
+        {
+            site_run.economy = *economy;
+        }
+        if (const auto& craft = state_manager.query<StateSetId::SiteCraft>(state); craft.has_value())
+        {
+            site_run.craft = *craft;
+        }
+        if (const auto& action = state_manager.query<StateSetId::SiteAction>(state); action.has_value())
+        {
+            site_run.site_action = *action;
+        }
+        if (const auto& counters = state_manager.query<StateSetId::SiteCounters>(state);
+            counters.has_value())
+        {
+            site_run.counters = *counters;
+        }
+        if (const auto& objective = state_manager.query<StateSetId::SiteObjective>(state);
+            objective.has_value())
+        {
+            site_run.objective = *objective;
+        }
+        if (const auto& local_weather = state_manager.query<StateSetId::SiteLocalWeatherResolve>(state);
+            local_weather.has_value())
+        {
+            site_run.local_weather_resolve = *local_weather;
+        }
+        if (const auto& plant_weather =
+                state_manager.query<StateSetId::SitePlantWeatherContribution>(state);
+            plant_weather.has_value())
+        {
+            site_run.plant_weather_contribution = *plant_weather;
+        }
+        if (const auto& device_weather =
+                state_manager.query<StateSetId::SiteDeviceWeatherContribution>(state);
+            device_weather.has_value())
+        {
+            site_run.device_weather_contribution = *device_weather;
+        }
+
+        rebuild_site_view(site_run, cache);
         cache.root.active_site = &cache.site;
     }
     else

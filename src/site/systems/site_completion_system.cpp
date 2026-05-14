@@ -299,14 +299,12 @@ Gs1Status SiteCompletionSystem::process_host_message(
 
 void SiteCompletionSystem::run(RuntimeInvocation& invocation)
 {
-    auto access = make_game_state_access<SiteCompletionSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
+    SiteWorldAccess<SiteCompletionSystem> world {invocation};
+    if (!world.has_world())
     {
         return;
     }
 
-    SiteWorldAccess<SiteCompletionSystem> world {*site_run};
     auto& message_queue = invocation.game_message_queue();
     const auto& counters = world.read_counters();
     const auto& objective = world.read_objective();

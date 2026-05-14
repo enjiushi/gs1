@@ -1,6 +1,7 @@
 #include "campaign/systems/loadout_planner_system.h"
 
 #include "campaign/campaign_state.h"
+#include "campaign/systems/campaign_system_context.h"
 #include "content/defs/item_defs.h"
 #include "content/prototype_content.h"
 #include "runtime/game_runtime.h"
@@ -32,10 +33,10 @@ namespace
 }
 
 [[nodiscard]] const SiteMetaState* find_site(
-    const CampaignState& campaign,
+    const std::vector<SiteMetaState>& sites,
     SiteId site_id) noexcept
 {
-    for (const auto& site : campaign.sites)
+    for (const auto& site : sites)
     {
         if (site.site_id == site_id)
         {
@@ -71,9 +72,10 @@ void merge_loadout_slot(
         true});
 }
 
-void rebuild_selected_loadout(CampaignState& campaign)
+void rebuild_selected_loadout(
+    LoadoutPlannerState& planner,
+    const std::vector<SiteMetaState>& sites)
 {
-    auto& planner = campaign.loadout_planner_state;
     planner.available_exported_support_items.clear();
     planner.active_nearby_aura_modifier_ids.clear();
     planner.support_quota = 0U;
@@ -84,7 +86,7 @@ void rebuild_selected_loadout(CampaignState& campaign)
         return;
     }
 
-    const auto* selected_site = find_site(campaign, planner.selected_target_site_id.value());
+    const auto* selected_site = find_site(sites, planner.selected_target_site_id.value());
     if (selected_site == nullptr)
     {
         planner.selected_target_site_id.reset();
@@ -93,7 +95,7 @@ void rebuild_selected_loadout(CampaignState& campaign)
 
     for (const auto contributor_site_id : selected_site->adjacent_site_ids)
     {
-        const auto* contributor = find_site(campaign, contributor_site_id);
+        const auto* contributor = find_site(sites, contributor_site_id);
         if (contributor == nullptr || contributor->site_state != GS1_SITE_STATE_COMPLETED)
         {
             continue;
@@ -128,7 +130,7 @@ Gs1Status process_loadout_planner_message(
 template <>
 struct system_state_tags<LoadoutPlannerSystem>
 {
-    using type = type_list<RuntimeCampaignTag>;
+    using type = type_list<RuntimeCampaignLoadoutPlannerTag, RuntimeCampaignSitesTag>;
 };
 
 void LoadoutPlannerSystem::initialize_campaign_state(CampaignState& campaign)
@@ -142,7 +144,7 @@ void LoadoutPlannerSystem::initialize_campaign_state(CampaignState& campaign)
     planner.active_nearby_aura_modifier_ids.clear();
     planner.support_quota_per_contributor = content.support_quota_per_contributor;
     planner.support_quota = 0U;
-    rebuild_selected_loadout(campaign);
+    rebuild_selected_loadout(planner, campaign.sites);
 }
 
 const char* LoadoutPlannerSystem::name() const noexcept
@@ -179,9 +181,8 @@ Gs1Status LoadoutPlannerSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<LoadoutPlannerSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    if (!campaign.has_value())
+    auto campaign = make_campaign_state_access(invocation);
+    if (!campaign.has_campaign())
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -207,9 +208,8 @@ Gs1Status process_loadout_planner_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<LoadoutPlannerSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    if (!campaign.has_value())
+    auto campaign = make_campaign_state_access(invocation);
+    if (!campaign.has_campaign())
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -235,14 +235,14 @@ Gs1Status process_loadout_planner_message(
 
     if (selected_site_id == 0U)
     {
-        campaign->loadout_planner_state.selected_target_site_id.reset();
+        campaign.loadout_planner().selected_target_site_id.reset();
     }
     else
     {
-        campaign->loadout_planner_state.selected_target_site_id = SiteId {selected_site_id};
+        campaign.loadout_planner().selected_target_site_id = SiteId {selected_site_id};
     }
 
-    rebuild_selected_loadout(*campaign);
+    rebuild_selected_loadout(campaign.loadout_planner(), campaign.sites());
     return GS1_STATUS_OK;
 }
 }  // namespace gs1

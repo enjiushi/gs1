@@ -130,7 +130,6 @@ set(GS1_GAMEPLAY_CORE_SOURCES
     src/site/systems/ecology_system.cpp
     src/site/systems/economy_phone_system.cpp
     src/site/systems/failure_recovery_system.cpp
-    src/site/systems/host_ui_action_router_system.cpp
     src/site/systems/inventory_system.cpp
     src/site/systems/craft_system.cpp
     src/site/systems/local_weather_resolve_system.cpp
@@ -146,6 +145,7 @@ set(GS1_GAMEPLAY_CORE_SOURCES
     src/site/craft_logic.cpp
     src/site/inventory_storage.cpp
     src/site/site_world.cpp
+    src/runtime/state_manager.cpp
     src/runtime/game_state_view.cpp
     src/runtime/game_runtime.cpp)
 

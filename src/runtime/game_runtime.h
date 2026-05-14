@@ -4,6 +4,7 @@
 #include "campaign/systems/campaign_time_system.h"
 #include "messages/game_message.h"
 #include "runtime/game_state.h"
+#include "runtime/state_manager.h"
 #include "runtime/game_state_view.h"
 #include "runtime/runtime_clock.h"
 #include "runtime/system_interface.h"
@@ -44,6 +45,8 @@ public:
 
     [[nodiscard]] GameState& state() noexcept { return state_; }
     [[nodiscard]] const GameState& state() const noexcept { return state_; }
+    [[nodiscard]] StateManager& state_manager() noexcept { return state_manager_; }
+    [[nodiscard]] const StateManager& state_manager() const noexcept { return state_manager_; }
     [[nodiscard]] GameMessageQueue& message_queue() noexcept { return state_.message_queue; }
     [[nodiscard]] const GameMessageQueue& message_queue() const noexcept { return state_.message_queue; }
     [[nodiscard]] std::deque<Gs1RuntimeMessage>& runtime_messages() noexcept { return state_.runtime_messages; }
@@ -85,6 +88,7 @@ private:
     Gs1RuntimeCreateDesc create_desc_ {};
     std::string adapter_config_json_utf8_ {};
     GameState state_ {};
+    StateManager state_manager_ {};
     RuntimeGameStateViewCache state_view_cache_ {};
     std::deque<Gs1HostMessage> host_messages_ {};
     std::vector<std::unique_ptr<IRuntimeSystem>> systems_ {};

@@ -918,13 +918,12 @@ void resolve_modifier_totals(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<ModifierSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    if (!campaign.has_value())
     {
         return;
     }
 
-    SiteWorldAccess<ModifierSystem> world {*site_run};
+    SiteWorldAccess<ModifierSystem> world {invocation};
     const auto next_outputs =
         resolve_owned_modifiers(*campaign, world.read_modifier(), world.read_camp());
     auto& current_totals = world.own_modifier().resolved_channel_totals;
@@ -965,13 +964,12 @@ void handle_site_run_started(
 {
     auto access = make_game_state_access<ModifierSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    if (!campaign.has_value())
     {
         return;
     }
 
-    SiteWorldAccess<ModifierSystem> world {*site_run};
+    SiteWorldAccess<ModifierSystem> world {invocation};
     auto& modifier_state = world.own_modifier();
     modifier_state.active_nearby_aura_modifier_ids.clear();
     modifier_state.active_site_modifiers.clear();
@@ -998,13 +996,12 @@ void handle_inventory_item_use_completed(
 {
     auto access = make_game_state_access<ModifierSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    if (!campaign.has_value())
     {
         return;
     }
 
-    SiteWorldAccess<ModifierSystem> world {*site_run};
+    SiteWorldAccess<ModifierSystem> world {invocation};
     const ItemId item_id {payload.item_id};
     const auto* item_def = find_item_def(item_id);
     if (item_def == nullptr)
@@ -1049,14 +1046,7 @@ void handle_run_modifier_award_requested(
     RuntimeInvocation& invocation,
     const RunModifierAwardRequestedMessage& payload) noexcept
 {
-    auto access = make_game_state_access<ModifierSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return;
-    }
-
-    SiteWorldAccess<ModifierSystem> world {*site_run};
+    SiteWorldAccess<ModifierSystem> world {invocation};
     if (payload.modifier_id == 0U)
     {
         return;
@@ -1082,14 +1072,7 @@ void handle_site_modifier_end_requested(
     RuntimeInvocation& invocation,
     const SiteModifierEndRequestedMessage& payload) noexcept
 {
-    auto access = make_game_state_access<ModifierSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return;
-    }
-
-    SiteWorldAccess<ModifierSystem> world {*site_run};
+    SiteWorldAccess<ModifierSystem> world {invocation};
     if (payload.modifier_id == 0U)
     {
         return;
@@ -1142,8 +1125,7 @@ Gs1Status ModifierSystem::process_game_message(
 {
     auto access = make_game_state_access<ModifierSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    if (!campaign.has_value())
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -1205,14 +1187,13 @@ void ModifierSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<ModifierSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
     const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    if (!campaign.has_value())
     {
         return;
     }
 
-    SiteWorldAccess<ModifierSystem> world {*site_run};
+    SiteWorldAccess<ModifierSystem> world {invocation};
     const auto tick_result = tick_timed_modifiers(
         world.own_modifier(),
         runtime_minutes_from_real_seconds(fixed_step_seconds));

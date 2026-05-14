@@ -69,14 +69,7 @@ Gs1Status FailureRecoverySystem::process_host_message(
 
 void FailureRecoverySystem::run(RuntimeInvocation& invocation)
 {
-    auto access = make_game_state_access<FailureRecoverySystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return;
-    }
-
-    SiteWorldAccess<FailureRecoverySystem> world {*site_run};
+    SiteWorldAccess<FailureRecoverySystem> world {invocation};
     auto& message_queue = invocation.game_message_queue();
     if (!world.has_world())
     {
@@ -85,10 +78,9 @@ void FailureRecoverySystem::run(RuntimeInvocation& invocation)
 
     const auto worker = world.read_worker();
     const float worker_health = worker.conditions.health;
-    const auto& site_run_state = *site_run;
-    if (site_run_state.run_status != SiteRunStatus::Active ||
+    if (world.run_status() != SiteRunStatus::Active ||
         worker_health > 0.0f ||
-        has_pending_site_transition_message(message_queue, site_run_state.site_id.value))
+        has_pending_site_transition_message(message_queue, world.site_id_value()))
     {
         return;
     }

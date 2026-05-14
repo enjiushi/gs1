@@ -9,6 +9,11 @@ namespace gs1
 class ActionExecutionSystem final : public IRuntimeSystem
 {
 public:
+    [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
+    {
+        return site_access_owned_state_sets<ActionExecutionSystem>();
+    }
+
     [[nodiscard]] const char* name() const noexcept override;
     [[nodiscard]] GameMessageSubscriptionSpan subscribed_game_messages() const noexcept override;
     [[nodiscard]] HostMessageSubscriptionSpan subscribed_host_messages() const noexcept override;

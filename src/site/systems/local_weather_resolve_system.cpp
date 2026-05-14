@@ -1,7 +1,6 @@
 #include "site/systems/local_weather_resolve_system.h"
 
 #include "runtime/game_runtime.h"
-#include "site/site_run_state.h"
 #include "site/site_world_components.h"
 #include "site/weather_contribution_logic.h"
 
@@ -185,17 +184,10 @@ Gs1Status process_message(
     gs1::RuntimeInvocation& invocation,
     const gs1::GameMessage& message)
 {
-    auto access = gs1::make_game_state_access<gs1::LocalWeatherResolveSystem>(invocation);
-    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    gs1::SiteWorldAccess<gs1::LocalWeatherResolveSystem> world {*site_run};
+    gs1::SiteWorldAccess<gs1::LocalWeatherResolveSystem> world {invocation};
     if (!world.has_world())
     {
-        return GS1_STATUS_OK;
+        return GS1_STATUS_INVALID_STATE;
     }
 
     if (message.type == gs1::GameMessageType::SiteRunStarted)
@@ -208,14 +200,7 @@ Gs1Status process_message(
 
 void run_system(gs1::RuntimeInvocation& invocation)
 {
-    auto access = gs1::make_game_state_access<gs1::LocalWeatherResolveSystem>(invocation);
-    auto& site_run = access.template read<gs1::RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return;
-    }
-
-    gs1::SiteWorldAccess<gs1::LocalWeatherResolveSystem> world {*site_run};
+    gs1::SiteWorldAccess<gs1::LocalWeatherResolveSystem> world {invocation};
     if (!world.has_world())
     {
         return;
@@ -228,7 +213,13 @@ void run_system(gs1::RuntimeInvocation& invocation)
     runtime.emit_full_snapshot_on_next_run = false;
 
     const auto base_weather = compute_base_local_weather(world);
-    auto& ecs_world = site_run->site_world->ecs_world();
+    auto* ecs_world_ptr = world.ecs_world_ptr();
+    if (ecs_world_ptr == nullptr)
+    {
+        return;
+    }
+
+    auto& ecs_world = *ecs_world_ptr;
     auto& message_queue = invocation.game_message_queue();
     auto tile_query =
         ecs_world.query_builder<
@@ -363,13 +354,6 @@ Gs1Status LocalWeatherResolveSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<LocalWeatherResolveSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
     return process_message(invocation, message);
 }
 
@@ -384,13 +368,6 @@ Gs1Status LocalWeatherResolveSystem::process_host_message(
 
 void LocalWeatherResolveSystem::run(RuntimeInvocation& invocation)
 {
-    auto access = make_game_state_access<LocalWeatherResolveSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
-    {
-        return;
-    }
-
     run_system(invocation);
 }
 }  // namespace gs1

@@ -46,14 +46,12 @@ float compute_event_pressure_ratio(const EventState& event) noexcept
 
 void refresh_memory_with_current_state(RuntimeInvocation& invocation)
 {
-    auto access = make_game_state_access<CampDurabilitySystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
+    SiteWorldAccess<CampDurabilitySystem> world {invocation};
+    if (!world.has_world())
     {
         return;
     }
 
-    SiteWorldAccess<CampDurabilitySystem> world {*site_run};
     auto& memory = g_camp_durability_memory;
     const auto& camp = world.read_camp();
     memory.site_run_id = world.site_run_id();
@@ -65,14 +63,12 @@ void refresh_memory_with_current_state(RuntimeInvocation& invocation)
 
 void ensure_memory_for_run(RuntimeInvocation& invocation)
 {
-    auto access = make_game_state_access<CampDurabilitySystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
+    SiteWorldAccess<CampDurabilitySystem> world {invocation};
+    if (!world.has_world())
     {
         return;
     }
 
-    SiteWorldAccess<CampDurabilitySystem> world {*site_run};
     auto& memory = g_camp_durability_memory;
     if (!memory.site_run_id.has_value() ||
         memory.site_run_id->value != world.site_run_id().value)
@@ -88,14 +84,12 @@ void apply_projection_if_needed(
     bool delivery_operational,
     bool shared_storage_access_enabled)
 {
-    auto access = make_game_state_access<CampDurabilitySystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
+    SiteWorldAccess<CampDurabilitySystem> world {invocation};
+    if (!world.has_world())
     {
         return;
     }
 
-    SiteWorldAccess<CampDurabilitySystem> world {*site_run};
     auto& memory = g_camp_durability_memory;
     const bool durability_changed =
         std::fabs(memory.last_reported_durability - durability) >= k_durability_dirty_threshold;
@@ -152,14 +146,13 @@ Gs1Status CampDurabilitySystem::process_game_message(
     }
 
     auto access = make_game_state_access<CampDurabilitySystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
     const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    if (!site_run.has_value())
+    SiteWorldAccess<CampDurabilitySystem> world {invocation};
+    if (!world.has_world())
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
-    SiteWorldAccess<CampDurabilitySystem> world {*site_run};
     auto& camp = world.own_camp();
     camp.camp_durability = camp_durability_tuning().durability_max;
     camp.camp_protection_resolved = true;
@@ -181,14 +174,13 @@ Gs1Status CampDurabilitySystem::process_host_message(
 void CampDurabilitySystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<CampDurabilitySystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
     const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    if (!site_run.has_value())
+    SiteWorldAccess<CampDurabilitySystem> world {invocation};
+    if (!world.has_world())
     {
         return;
     }
 
-    SiteWorldAccess<CampDurabilitySystem> world {*site_run};
     ensure_memory_for_run(invocation);
     if (fixed_step_seconds <= 0.0)
     {

@@ -417,18 +417,17 @@ Gs1Status WeatherEventSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<WeatherEventSystem>(invocation);
     if (message.type != GameMessageType::SiteRunStarted)
     {
         return GS1_STATUS_OK;
     }
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
+
+    SiteWorldAccess<WeatherEventSystem> world {invocation};
+    if (!world.has_world())
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
-    SiteWorldAccess<WeatherEventSystem> world {*site_run};
     auto& message_queue = invocation.game_message_queue();
     auto& weather = world.own_weather();
     auto& event = world.own_event();
@@ -499,13 +498,12 @@ Gs1Status WeatherEventSystem::process_host_message(
 void WeatherEventSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<WeatherEventSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
+    SiteWorldAccess<WeatherEventSystem> world {invocation};
+    if (!world.has_world())
     {
         return;
     }
 
-    SiteWorldAccess<WeatherEventSystem> world {*site_run};
     auto& message_queue = invocation.game_message_queue();
     const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
     const double step_minutes =

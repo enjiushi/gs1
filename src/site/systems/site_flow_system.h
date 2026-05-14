@@ -9,6 +9,11 @@ namespace gs1
 class SiteFlowSystem final : public IRuntimeSystem
 {
 public:
+    [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
+    {
+        return site_access_owned_state_sets<SiteFlowSystem>();
+    }
+
     [[nodiscard]] const char* name() const noexcept override;
     [[nodiscard]] GameMessageSubscriptionSpan subscribed_game_messages() const noexcept override;
     [[nodiscard]] HostMessageSubscriptionSpan subscribed_host_messages() const noexcept override;
@@ -40,10 +45,6 @@ public:
 template <>
 struct system_state_tags<SiteFlowSystem>
 {
-    using type = type_list<
-        RuntimeCampaignTag,
-        RuntimeActiveSiteRunTag,
-        RuntimeFixedStepSecondsTag,
-        RuntimeMoveDirectionTag>;
+    using type = type_list<RuntimeFixedStepSecondsTag, RuntimeMoveDirectionTag>;
 };
 }  // namespace gs1

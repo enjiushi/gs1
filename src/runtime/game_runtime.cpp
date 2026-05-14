@@ -41,6 +41,258 @@ namespace gs1
 {
 namespace
 {
+CampaignState assemble_campaign_state_from_sets(GameState& state, StateManager& state_manager)
+{
+    CampaignState campaign {};
+
+    const auto& core = state_manager.state<StateSetId::CampaignCore>(state);
+    const auto& regional_map = state_manager.state<StateSetId::CampaignRegionalMap>(state);
+    const auto& faction_progress = state_manager.state<StateSetId::CampaignFactionProgress>(state);
+    const auto& technology = state_manager.state<StateSetId::CampaignTechnology>(state);
+    const auto& loadout = state_manager.state<StateSetId::CampaignLoadoutPlanner>(state);
+    const auto& sites = state_manager.state<StateSetId::CampaignSites>(state);
+
+    if (!core.has_value())
+    {
+        return campaign;
+    }
+
+    campaign.campaign_id = core->campaign_id;
+    campaign.campaign_seed = core->campaign_seed;
+    campaign.campaign_clock_minutes_elapsed = core->campaign_clock_minutes_elapsed;
+    campaign.campaign_days_total = core->campaign_days_total;
+    campaign.campaign_days_remaining = core->campaign_days_remaining;
+    campaign.app_state = core->app_state;
+    campaign.active_site_id = core->active_site_id;
+    if (regional_map.has_value())
+    {
+        campaign.regional_map_state = *regional_map;
+    }
+    if (faction_progress.has_value())
+    {
+        campaign.faction_progress = *faction_progress;
+    }
+    if (technology.has_value())
+    {
+        campaign.technology_state = *technology;
+    }
+    if (loadout.has_value())
+    {
+        campaign.loadout_planner_state = *loadout;
+    }
+    if (sites.has_value())
+    {
+        campaign.sites = *sites;
+    }
+
+    return campaign;
+}
+
+void write_campaign_state_to_sets(
+    const std::optional<CampaignState>& campaign,
+    GameState& state,
+    StateManager& state_manager)
+{
+    if (!campaign.has_value())
+    {
+        state_manager.state<StateSetId::CampaignCore>(state).reset();
+        state_manager.state<StateSetId::CampaignRegionalMap>(state).reset();
+        state_manager.state<StateSetId::CampaignFactionProgress>(state).reset();
+        state_manager.state<StateSetId::CampaignTechnology>(state).reset();
+        state_manager.state<StateSetId::CampaignLoadoutPlanner>(state).reset();
+        state_manager.state<StateSetId::CampaignSites>(state).reset();
+        return;
+    }
+
+    state_manager.state<StateSetId::CampaignCore>(state) = CampaignCoreState {
+        campaign->campaign_id,
+        campaign->campaign_seed,
+        campaign->campaign_clock_minutes_elapsed,
+        campaign->campaign_days_total,
+        campaign->campaign_days_remaining,
+        campaign->app_state,
+        campaign->active_site_id};
+    state_manager.state<StateSetId::CampaignRegionalMap>(state) = campaign->regional_map_state;
+    state_manager.state<StateSetId::CampaignFactionProgress>(state) = campaign->faction_progress;
+    state_manager.state<StateSetId::CampaignTechnology>(state) = campaign->technology_state;
+    state_manager.state<StateSetId::CampaignLoadoutPlanner>(state) = campaign->loadout_planner_state;
+    state_manager.state<StateSetId::CampaignSites>(state) = campaign->sites;
+}
+
+SiteRunState assemble_site_run_state_from_sets(const GameState& state, const StateManager& state_manager)
+{
+    SiteRunState site_run {};
+
+    const auto& meta = state_manager.query<StateSetId::SiteRunMeta>(state);
+    const auto& world = state_manager.query<StateSetId::SiteWorld>(state);
+    const auto& clock = state_manager.query<StateSetId::SiteClock>(state);
+    const auto& camp = state_manager.query<StateSetId::SiteCamp>(state);
+    const auto& inventory = state_manager.query<StateSetId::SiteInventory>(state);
+    const auto& contractor = state_manager.query<StateSetId::SiteContractor>(state);
+    const auto& weather = state_manager.query<StateSetId::SiteWeather>(state);
+    const auto& event = state_manager.query<StateSetId::SiteEvent>(state);
+    const auto& task_board = state_manager.query<StateSetId::SiteTaskBoard>(state);
+    const auto& modifier = state_manager.query<StateSetId::SiteModifier>(state);
+    const auto& economy = state_manager.query<StateSetId::SiteEconomy>(state);
+    const auto& craft = state_manager.query<StateSetId::SiteCraft>(state);
+    const auto& action = state_manager.query<StateSetId::SiteAction>(state);
+    const auto& counters = state_manager.query<StateSetId::SiteCounters>(state);
+    const auto& objective = state_manager.query<StateSetId::SiteObjective>(state);
+    const auto& local_weather = state_manager.query<StateSetId::SiteLocalWeatherResolve>(state);
+    const auto& plant_weather = state_manager.query<StateSetId::SitePlantWeatherContribution>(state);
+    const auto& device_weather = state_manager.query<StateSetId::SiteDeviceWeatherContribution>(state);
+    const auto& move_direction = state_manager.query<StateSetId::MoveDirection>(state);
+
+    if (!meta.has_value())
+    {
+        return site_run;
+    }
+
+    site_run.site_run_id = meta->site_run_id;
+    site_run.site_id = meta->site_id;
+    site_run.site_archetype_id = meta->site_archetype_id;
+    site_run.attempt_index = meta->attempt_index;
+    site_run.site_attempt_seed = meta->site_attempt_seed;
+    site_run.run_status = meta->run_status;
+    site_run.result_newly_revealed_site_count = meta->result_newly_revealed_site_count;
+    if (world.has_value())
+    {
+        site_run.site_world = world->site_world;
+    }
+    if (clock.has_value())
+    {
+        site_run.clock = *clock;
+    }
+    if (camp.has_value())
+    {
+        site_run.camp = *camp;
+    }
+    if (inventory.has_value())
+    {
+        site_run.inventory = *inventory;
+    }
+    if (contractor.has_value())
+    {
+        site_run.contractor = *contractor;
+    }
+    if (weather.has_value())
+    {
+        site_run.weather = *weather;
+    }
+    if (event.has_value())
+    {
+        site_run.event = *event;
+    }
+    if (task_board.has_value())
+    {
+        site_run.task_board = *task_board;
+    }
+    if (modifier.has_value())
+    {
+        site_run.modifier = *modifier;
+    }
+    if (economy.has_value())
+    {
+        site_run.economy = *economy;
+    }
+    if (craft.has_value())
+    {
+        site_run.craft = *craft;
+    }
+    if (action.has_value())
+    {
+        site_run.site_action = *action;
+    }
+    if (counters.has_value())
+    {
+        site_run.counters = *counters;
+    }
+    if (objective.has_value())
+    {
+        site_run.objective = *objective;
+    }
+    if (local_weather.has_value())
+    {
+        site_run.local_weather_resolve = *local_weather;
+    }
+    if (plant_weather.has_value())
+    {
+        site_run.plant_weather_contribution = *plant_weather;
+    }
+    if (device_weather.has_value())
+    {
+        site_run.device_weather_contribution = *device_weather;
+    }
+
+    site_run.host_move_direction = SiteHostMoveDirectionState {
+        move_direction.world_move_x,
+        move_direction.world_move_y,
+        move_direction.world_move_z,
+        move_direction.present};
+    return site_run;
+}
+
+void write_site_run_state_to_sets(
+    const std::optional<SiteRunState>& site_run,
+    GameState& state,
+    StateManager& state_manager)
+{
+    if (!site_run.has_value())
+    {
+        state_manager.state<StateSetId::SiteRunMeta>(state).reset();
+        state_manager.state<StateSetId::SiteWorld>(state).reset();
+        state_manager.state<StateSetId::SiteClock>(state).reset();
+        state_manager.state<StateSetId::SiteCamp>(state).reset();
+        state_manager.state<StateSetId::SiteInventory>(state).reset();
+        state_manager.state<StateSetId::SiteContractor>(state).reset();
+        state_manager.state<StateSetId::SiteWeather>(state).reset();
+        state_manager.state<StateSetId::SiteEvent>(state).reset();
+        state_manager.state<StateSetId::SiteTaskBoard>(state).reset();
+        state_manager.state<StateSetId::SiteModifier>(state).reset();
+        state_manager.state<StateSetId::SiteEconomy>(state).reset();
+        state_manager.state<StateSetId::SiteCraft>(state).reset();
+        state_manager.state<StateSetId::SiteAction>(state).reset();
+        state_manager.state<StateSetId::SiteCounters>(state).reset();
+        state_manager.state<StateSetId::SiteObjective>(state).reset();
+        state_manager.state<StateSetId::SiteLocalWeatherResolve>(state).reset();
+        state_manager.state<StateSetId::SitePlantWeatherContribution>(state).reset();
+        state_manager.state<StateSetId::SiteDeviceWeatherContribution>(state).reset();
+        return;
+    }
+
+    state_manager.state<StateSetId::SiteRunMeta>(state) = SiteRunMetaState {
+        site_run->site_run_id,
+        site_run->site_id,
+        site_run->site_archetype_id,
+        site_run->attempt_index,
+        site_run->site_attempt_seed,
+        site_run->run_status,
+        site_run->result_newly_revealed_site_count};
+    state_manager.state<StateSetId::SiteWorld>(state) = SiteWorldState {site_run->site_world};
+    state_manager.state<StateSetId::SiteClock>(state) = site_run->clock;
+    state_manager.state<StateSetId::SiteCamp>(state) = site_run->camp;
+    state_manager.state<StateSetId::SiteInventory>(state) = site_run->inventory;
+    state_manager.state<StateSetId::SiteContractor>(state) = site_run->contractor;
+    state_manager.state<StateSetId::SiteWeather>(state) = site_run->weather;
+    state_manager.state<StateSetId::SiteEvent>(state) = site_run->event;
+    state_manager.state<StateSetId::SiteTaskBoard>(state) = site_run->task_board;
+    state_manager.state<StateSetId::SiteModifier>(state) = site_run->modifier;
+    state_manager.state<StateSetId::SiteEconomy>(state) = site_run->economy;
+    state_manager.state<StateSetId::SiteCraft>(state) = site_run->craft;
+    state_manager.state<StateSetId::SiteAction>(state) = site_run->site_action;
+    state_manager.state<StateSetId::SiteCounters>(state) = site_run->counters;
+    state_manager.state<StateSetId::SiteObjective>(state) = site_run->objective;
+    state_manager.state<StateSetId::SiteLocalWeatherResolve>(state) = site_run->local_weather_resolve;
+    state_manager.state<StateSetId::SitePlantWeatherContribution>(state) = site_run->plant_weather_contribution;
+    state_manager.state<StateSetId::SiteDeviceWeatherContribution>(state) =
+        site_run->device_weather_contribution;
+    state_manager.state<StateSetId::MoveDirection>(state) = RuntimeMoveDirectionSnapshot {
+        site_run->host_move_direction.world_move_x,
+        site_run->host_move_direction.world_move_y,
+        site_run->host_move_direction.world_move_z,
+        site_run->host_move_direction.present};
+}
+
 [[nodiscard]] std::string unescape_json_string(std::string_view value)
 {
     std::string result;
@@ -219,45 +471,53 @@ constexpr auto record_timing_sample = [](auto& accumulator, double elapsed_ms) n
 RuntimeInvocation::RuntimeInvocation(GameRuntime& runtime) noexcept
     : runtime_(&runtime)
     , owned_state_(&runtime.state_)
-    , app_state_(&runtime.state_.app_state)
-    , campaign_(&runtime.state_.campaign)
-    , active_site_run_(&runtime.state_.active_site_run)
+    , state_manager_(&runtime.state_manager_)
+    , app_state_(&runtime.state_.app_state.get())
+    , fixed_step_seconds_(&runtime.state_.fixed_step_seconds.get())
     , runtime_messages_(&runtime.state_.runtime_messages)
     , game_messages_(&runtime.state_.message_queue)
-    , fixed_step_seconds_(&runtime.state_.fixed_step_seconds)
 {
 }
 
 RuntimeInvocation::RuntimeInvocation(GameState& state) noexcept
     : owned_state_(&state)
-    , app_state_(&state.app_state)
-    , campaign_(&state.campaign)
-    , active_site_run_(&state.active_site_run)
+    , app_state_(&state.app_state.get())
+    , fixed_step_seconds_(&state.fixed_step_seconds.get())
     , runtime_messages_(&state.runtime_messages)
     , game_messages_(&state.message_queue)
-    , fixed_step_seconds_(&state.fixed_step_seconds)
+{
+}
+
+RuntimeInvocation::RuntimeInvocation(GameState& state, StateManager& state_manager) noexcept
+    : owned_state_(&state)
+    , state_manager_(&state_manager)
+    , app_state_(&state.app_state.get())
+    , fixed_step_seconds_(&state.fixed_step_seconds.get())
+    , runtime_messages_(&state.runtime_messages)
+    , game_messages_(&state.message_queue)
 {
 }
 
 RuntimeInvocation::RuntimeInvocation(
     GameState& state,
+    StateManager& state_manager,
     float move_direction_x,
     float move_direction_y,
     float move_direction_z,
     bool move_direction_present) noexcept
     : owned_state_(&state)
-    , app_state_(&state.app_state)
-    , campaign_(&state.campaign)
-    , active_site_run_(&state.active_site_run)
+    , state_manager_(&state_manager)
+    , app_state_(&state.app_state.get())
+    , fixed_step_seconds_(&state.fixed_step_seconds.get())
     , runtime_messages_(&state.runtime_messages)
     , game_messages_(&state.message_queue)
-    , fixed_step_seconds_(&state.fixed_step_seconds)
-    , move_direction_ {
-          move_direction_x,
-          move_direction_y,
-          move_direction_z,
-          move_direction_present}
 {
+    move_direction_ = RuntimeMoveDirectionSnapshot {
+        move_direction_x,
+        move_direction_y,
+        move_direction_z,
+        move_direction_present};
+    state_manager_->state<StateSetId::MoveDirection>(state) = move_direction_;
 }
 
 RuntimeInvocation::RuntimeInvocation(
@@ -265,24 +525,115 @@ RuntimeInvocation::RuntimeInvocation(
     std::optional<CampaignState>& campaign,
     std::optional<SiteRunState>& active_site_run,
     std::deque<Gs1RuntimeMessage>& runtime_messages,
-        GameMessageQueue& game_messages,
-        double fixed_step_seconds,
-        float move_direction_x,
-        float move_direction_y,
-        float move_direction_z,
+    GameMessageQueue& game_messages,
+    double fixed_step_seconds,
+    float move_direction_x,
+    float move_direction_y,
+    float move_direction_z,
     bool move_direction_present) noexcept
     : app_state_(&app_state)
     , campaign_(&campaign)
     , active_site_run_(&active_site_run)
+    , fixed_step_seconds_(&fixed_step_seconds)
     , runtime_messages_(&runtime_messages)
     , game_messages_(&game_messages)
-    , fixed_step_seconds_(&fixed_step_seconds)
-    , move_direction_ {
-          move_direction_x,
-          move_direction_y,
-          move_direction_z,
-          move_direction_present}
 {
+    move_direction_ = RuntimeMoveDirectionSnapshot {
+        move_direction_x,
+        move_direction_y,
+        move_direction_z,
+        move_direction_present};
+}
+
+RuntimeInvocation::RuntimeInvocation(
+    Gs1AppState& app_state,
+    std::optional<CampaignState>& campaign,
+    std::optional<SiteRunState>& active_site_run,
+    std::deque<Gs1RuntimeMessage>& runtime_messages,
+    GameMessageQueue& game_messages,
+    StateManager& state_manager,
+    double fixed_step_seconds,
+    float move_direction_x,
+    float move_direction_y,
+    float move_direction_z,
+    bool move_direction_present) noexcept
+    : state_manager_(&state_manager)
+    , app_state_(&app_state)
+    , campaign_(&campaign)
+    , active_site_run_(&active_site_run)
+    , fixed_step_seconds_(&fixed_step_seconds)
+    , runtime_messages_(&runtime_messages)
+    , game_messages_(&game_messages)
+{
+    move_direction_ = RuntimeMoveDirectionSnapshot {
+        move_direction_x,
+        move_direction_y,
+        move_direction_z,
+        move_direction_present};
+}
+
+RuntimeInvocation::~RuntimeInvocation()
+{
+    flush_site_cache_to_owned_state();
+    flush_campaign_cache_to_owned_state();
+}
+
+void RuntimeInvocation::hydrate_campaign_cache_from_owned_state()
+{
+    if (campaign_ != nullptr || owned_state_ == nullptr || state_manager_ == nullptr)
+    {
+        return;
+    }
+
+    owns_campaign_cache_ = true;
+    const auto& core = state_manager_->state<StateSetId::CampaignCore>(*owned_state_);
+    if (!core.has_value())
+    {
+        campaign_cache_.reset();
+        return;
+    }
+
+    campaign_cache_ = assemble_campaign_state_from_sets(*owned_state_, *state_manager_);
+}
+
+void RuntimeInvocation::flush_campaign_cache_to_owned_state()
+{
+    if (!owns_campaign_cache_ || owned_state_ == nullptr || state_manager_ == nullptr)
+    {
+        return;
+    }
+
+    write_campaign_state_to_sets(campaign_cache_, *owned_state_, *state_manager_);
+    owns_campaign_cache_ = false;
+}
+
+void RuntimeInvocation::hydrate_site_cache_from_owned_state()
+{
+    if (active_site_run_ != nullptr || owned_state_ == nullptr || state_manager_ == nullptr)
+    {
+        return;
+    }
+
+    owns_site_cache_ = true;
+    const auto& meta = state_manager_->state<StateSetId::SiteRunMeta>(*owned_state_);
+    if (!meta.has_value())
+    {
+        site_run_cache_.reset();
+        return;
+    }
+
+    site_run_cache_ = assemble_site_run_state_from_sets(*owned_state_, *state_manager_);
+}
+
+void RuntimeInvocation::flush_site_cache_to_owned_state()
+{
+    if (!owns_site_cache_ || owned_state_ == nullptr || state_manager_ == nullptr)
+    {
+        return;
+    }
+
+    write_site_run_state_to_sets(site_run_cache_, *owned_state_, *state_manager_);
+    owns_site_cache_ = false;
 }
 
 void RuntimeInvocation::push_game_message(const GameMessage& message)
@@ -478,6 +829,7 @@ void GameRuntime::initialize_system_registry()
     systems_.push_back(std::make_unique<SiteCompletionSystem>());
     for (const auto& system : systems_)
     {
+        state_manager_.register_resolver(*system);
         append_runtime_subscribers(message_subscribers_, system->subscribed_game_messages(), *system);
         append_runtime_subscribers(host_message_subscribers_, system->subscribed_host_messages(), *system);
         if (system->fixed_step_order().has_value())
@@ -531,7 +883,7 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
     auto status = GS1_STATUS_OK;
     if (!boot_initialized_)
     {
-        if (!state_.campaign.has_value() && !state_.active_site_run.has_value())
+        if (!state_.campaign_core.has_value() && !state_.site_run_meta.has_value())
         {
             GameMessage boot_message {};
             boot_message.type = GameMessageType::OpenMainMenu;
@@ -556,31 +908,38 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
         return status;
     }
 
-    if (!state_.active_site_run.has_value())
+    if (!state_.site_run_meta.has_value())
     {
         out_result.runtime_messages_queued = static_cast<std::uint32_t>(state_.runtime_messages.size());
         finish_phase();
         return GS1_STATUS_OK;
     }
 
-    if (state_.app_state == GS1_APP_STATE_SITE_LOADING)
+    if (state_.app_state.get() == GS1_APP_STATE_SITE_LOADING)
     {
         out_result.runtime_messages_queued = static_cast<std::uint32_t>(state_.runtime_messages.size());
         finish_phase();
         return GS1_STATUS_OK;
     }
 
-    state_.active_site_run->clock.accumulator_real_seconds += request.real_delta_seconds;
-
-    while (state_.active_site_run->clock.accumulator_real_seconds >= state_.fixed_step_seconds)
+    if (!state_.site_clock.has_value())
     {
-        state_.active_site_run->clock.accumulator_real_seconds -= state_.fixed_step_seconds;
+        out_result.runtime_messages_queued = static_cast<std::uint32_t>(state_.runtime_messages.size());
+        finish_phase();
+        return GS1_STATUS_OK;
+    }
+
+    state_.site_clock->accumulator_real_seconds += request.real_delta_seconds;
+
+    while (state_.site_clock->accumulator_real_seconds >= state_.fixed_step_seconds)
+    {
+        state_.site_clock->accumulator_real_seconds -= state_.fixed_step_seconds;
         run_fixed_step();
         out_result.fixed_steps_executed += 1U;
     }
 
     status = dispatch_queued_messages();
-    state_.active_site_run->host_move_direction = {};
+    state_.move_direction = RuntimeMoveDirectionSnapshot {};
     out_result.runtime_messages_queued = static_cast<std::uint32_t>(state_.runtime_messages.size());
     finish_phase();
     return status;
@@ -646,12 +1005,13 @@ Gs1Status GameRuntime::get_game_state_view(Gs1GameStateView& out_view)
 
 Gs1Status GameRuntime::query_site_tile_view(std::uint32_t tile_index, Gs1SiteTileView& out_tile) const
 {
-    if (!state_.active_site_run.has_value())
+    if (!state_.site_run_meta.has_value())
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
-    return build_site_tile_view(*state_.active_site_run, tile_index, out_tile)
+    SiteRunState site_run = assemble_site_run_state_from_sets(state_, state_manager_);
+    return build_site_tile_view(site_run, tile_index, out_tile)
         ? GS1_STATUS_OK
         : GS1_STATUS_INVALID_ARGUMENT;
 }
@@ -784,7 +1144,7 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
 
 void GameRuntime::run_fixed_step()
 {
-    if (!state_.campaign.has_value() || !state_.active_site_run.has_value())
+    if (!state_.campaign_core.has_value() || !state_.site_run_meta.has_value())
     {
         return;
     }

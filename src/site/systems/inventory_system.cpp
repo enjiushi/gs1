@@ -32,10 +32,7 @@ namespace gs1
 template <>
 struct system_state_tags<InventorySystem>
 {
-    using type = type_list<
-        RuntimeCampaignTag,
-        RuntimeActiveSiteRunTag,
-        RuntimeFixedStepSecondsTag>;
+    using type = type_list<RuntimeCampaignTag>;
 };
 
 namespace
@@ -57,16 +54,9 @@ constexpr std::uint32_t k_delivery_box_storage_flags =
     return *campaign;
 }
 
-[[nodiscard]] SiteRunState& inventory_site_run(RuntimeInvocation& invocation)
-{
-    auto access = inventory_access(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    return *site_run;
-}
-
 [[nodiscard]] SiteWorldAccess<InventorySystem> inventory_world(RuntimeInvocation& invocation)
 {
-    return SiteWorldAccess<InventorySystem> {inventory_site_run(invocation)};
+    return SiteWorldAccess<InventorySystem> {invocation};
 }
 
 [[nodiscard]] GameMessageQueue& inventory_message_queue(RuntimeInvocation& invocation)
@@ -94,27 +84,9 @@ bool transfer_resolves_destination_in_dll(const InventoryTransferRequestedMessag
     return (payload.flags & k_inventory_transfer_flag_resolve_destination_in_dll) != 0U;
 }
 
-const StorageContainerState* storage_state_for_transfer(
-    const SiteRunState& site_run,
-    std::uint32_t storage_id) noexcept
+[[nodiscard]] flecs::world* inventory_ecs_world(RuntimeInvocation& invocation) noexcept
 {
-    return inventory_storage::storage_container_state_for_storage_id(site_run, storage_id);
-}
-
-std::vector<InventorySlot> capture_storage_projection_slots(
-    SiteRunState& site_run,
-    std::uint32_t storage_id)
-{
-    std::vector<InventorySlot> slots {};
-    const auto container = inventory_storage::container_for_storage_id(site_run, storage_id);
-    if (!container.is_valid())
-    {
-        return slots;
-    }
-
-    slots.resize(inventory_storage::slot_count_in_container(site_run, container));
-    inventory_storage::sync_projection_slots_for_container(site_run, container, slots);
-    return slots;
+    return inventory_world(invocation).ecs_world_ptr();
 }
 
 bool inventory_has_any_item(const InventoryState& inventory) noexcept
@@ -126,17 +98,28 @@ bool inventory_has_any_item(const InventoryState& inventory) noexcept
         has_item);
 }
 
-bool storage_has_any_item(SiteRunState& site_run) noexcept
+bool storage_has_any_item(
+    InventoryState& inventory,
+    const flecs::world* world) noexcept
 {
-    const auto containers = inventory_storage::collect_all_storage_containers(site_run, true);
+    const auto containers = inventory_storage::collect_all_storage_containers(
+        inventory,
+        const_cast<flecs::world*>(world),
+        true);
     for (const auto& container : containers)
     {
-        const auto slot_count = inventory_storage::slot_count_in_container(site_run, container);
+        const auto slot_count = inventory_storage::slot_count_in_container(
+            inventory,
+            const_cast<flecs::world*>(world),
+            container);
         for (std::uint32_t slot_index = 0U; slot_index < slot_count; ++slot_index)
         {
-            const auto item =
-                inventory_storage::item_entity_for_slot(site_run, container, slot_index);
-            const auto* stack = inventory_storage::stack_data(site_run, item);
+            const auto item = inventory_storage::item_entity_for_slot(
+                inventory,
+                world,
+                container,
+                slot_index);
+            const auto* stack = inventory_storage::stack_data(inventory, item);
             if (stack != nullptr && stack->quantity > 0U)
             {
                 return true;
@@ -149,6 +132,13 @@ bool storage_has_any_item(SiteRunState& site_run) noexcept
 
 bool ensure_device_storage_containers(RuntimeInvocation& invocation) noexcept;
 
+bool inventory_runtime_ready(RuntimeInvocation& invocation) noexcept
+{
+    auto access = inventory_access(invocation);
+    auto& campaign = access.template read<RuntimeCampaignTag>();
+    return campaign.has_value() && inventory_world(invocation).has_world();
+}
+
 bool storage_is_retrieval_only(const StorageContainerState& storage_state) noexcept
 {
     return (storage_state.flags & inventory_storage::k_inventory_storage_flag_retrieval_only) != 0U;
@@ -156,27 +146,31 @@ bool storage_is_retrieval_only(const StorageContainerState& storage_state) noexc
 
 bool ensure_inventory_storage_initialized(RuntimeInvocation& invocation) noexcept
 {
-    auto& inventory = inventory_world(invocation).own_inventory();
+    auto world = inventory_world(invocation);
+    auto& inventory = world.own_inventory();
+    auto* ecs_world = world.ecs_world_ptr();
     const bool resized =
         inventory.worker_pack_slots.size() != inventory.worker_pack_slot_count ||
-        !inventory_storage::storage_initialized(inventory_site_run(invocation));
+        !inventory_storage::storage_initialized(inventory);
 
-    inventory_storage::import_projection_views_into_storage_if_needed(inventory_site_run(invocation));
+    inventory_storage::import_projection_views_into_storage_if_needed(inventory, ecs_world);
     (void)ensure_device_storage_containers(invocation);
     return resized;
 }
 
 bool ensure_device_storage_containers(RuntimeInvocation& invocation) noexcept
 {
-    if (!inventory_world(invocation).has_world() || inventory_site_run(invocation).site_world == nullptr)
+    auto world = inventory_world(invocation);
+    auto* ecs_world = world.ecs_world_ptr();
+    auto& inventory = world.own_inventory();
+    if (!world.has_world() || ecs_world == nullptr)
     {
         return false;
     }
 
     bool created_any = false;
     auto source_query =
-        inventory_site_run(invocation).site_world->ecs_world()
-            .query_builder<
+        ecs_world->query_builder<
                 const site_ecs::TileCoordComponent,
                 const site_ecs::DeviceStructureId>()
             .with<site_ecs::DeviceTag>()
@@ -197,15 +191,17 @@ bool ensure_device_storage_containers(RuntimeInvocation& invocation) noexcept
             const auto coord = coord_component.value;
             const auto existing =
                 inventory_storage::find_device_storage_container(
-                    inventory_site_run(invocation),
+                    inventory,
+                    ecs_world,
                     device_entity.id());
             const std::uint32_t storage_flags =
-                (coord.x == inventory_world(invocation).read_camp().delivery_box_tile.x &&
-                    coord.y == inventory_world(invocation).read_camp().delivery_box_tile.y)
+                (coord.x == world.read_camp().delivery_box_tile.x &&
+                    coord.y == world.read_camp().delivery_box_tile.y)
                     ? k_delivery_box_storage_flags
                     : 0U;
             (void)inventory_storage::ensure_device_storage_container(
-                inventory_site_run(invocation),
+                inventory,
+                *ecs_world,
                 device_entity.id(),
                 coord,
                 structure_def->storage_slot_count,
@@ -226,32 +222,34 @@ bool ensure_device_storage_containers(RuntimeInvocation& invocation) noexcept
 
 flecs::entity resolve_delivery_box_container(RuntimeInvocation& invocation) noexcept
 {
-    if (!inventory_world(invocation).has_world() || inventory_site_run(invocation).site_world == nullptr)
+    auto world = inventory_world(invocation);
+    if (!world.has_world() || world.ecs_world_ptr() == nullptr)
     {
         return {};
     }
 
-    const auto tile = inventory_world(invocation).read_camp().delivery_box_tile;
-    if (!inventory_world(invocation).tile_coord_in_bounds(tile))
+    const auto tile = world.read_camp().delivery_box_tile;
+    if (!world.tile_coord_in_bounds(tile))
     {
         return {};
     }
 
-    const auto tile_data = inventory_world(invocation).read_tile(tile);
+    const auto tile_data = world.read_tile(tile);
     const auto* structure_def = find_structure_def(tile_data.device.structure_id);
     if (structure_def == nullptr || !structure_def->grants_storage || structure_def->storage_slot_count == 0U)
     {
         return {};
     }
 
-    const auto device_entity_id = inventory_site_run(invocation).site_world->device_entity_id(tile);
+    const auto device_entity_id = world.device_entity_id(tile);
     if (device_entity_id == 0U)
     {
         return {};
     }
 
     return inventory_storage::ensure_device_storage_container(
-        inventory_site_run(invocation),
+        world.own_inventory(),
+        *world.ecs_world_ptr(),
         device_entity_id,
         tile,
         structure_def->storage_slot_count,
@@ -340,13 +338,15 @@ std::uint32_t reserved_item_quantity_in_container(
 }
 
 std::uint32_t available_unreserved_item_quantity_in_container_kind(
-    SiteRunState& site_run,
+    InventoryState& inventory,
+    const flecs::world* world,
     const ActionState& action_state,
     Gs1InventoryContainerKind container_kind,
     ItemId item_id) noexcept
 {
     const auto available = inventory_storage::available_item_quantity_in_container_kind(
-        site_run,
+        inventory,
+        world,
         container_kind,
         item_id);
     const auto reserved = reserved_item_quantity_in_container(action_state, container_kind, item_id);
@@ -458,6 +458,8 @@ void try_add_delivery_to_crate(
     RuntimeInvocation& invocation,
     PendingDelivery& delivery) noexcept
 {
+    auto& inventory = inventory_world(invocation).own_inventory();
+    auto* ecs_world = inventory_ecs_world(invocation);
     const auto delivery_box = resolve_delivery_box_container(invocation);
     if (!delivery_box.is_valid())
     {
@@ -472,7 +474,8 @@ void try_add_delivery_to_crate(
         }
 
         const auto remaining_quantity = inventory_storage::add_item_to_container(
-            inventory_site_run(invocation),
+            inventory,
+            ecs_world,
             delivery_box,
             stack.item_id,
             stack.item_quantity,
@@ -493,7 +496,11 @@ void try_add_delivery_to_crate(
 void seed_inventory_from_loadout(RuntimeInvocation& invocation) noexcept
 {
     ensure_inventory_storage_initialized(invocation);
-    if (inventory_has_any_item(inventory_world(invocation).read_inventory()) || storage_has_any_item(inventory_site_run(invocation)))
+    auto world = inventory_world(invocation);
+    auto& inventory = world.own_inventory();
+    auto* ecs_world = world.ecs_world_ptr();
+    if (inventory_has_any_item(world.read_inventory()) ||
+        storage_has_any_item(inventory, ecs_world))
     {
         return;
     }
@@ -522,7 +529,8 @@ void seed_inventory_from_loadout(RuntimeInvocation& invocation) noexcept
         }
 
         (void)inventory_storage::add_item_to_container(
-            inventory_site_run(invocation),
+            inventory,
+            ecs_world,
             delivery_box,
             slot.item_id,
             slot.quantity);
@@ -534,13 +542,16 @@ Gs1Status handle_inventory_item_use(
     const InventoryItemUseRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(invocation, [&]() -> Gs1Status {
+        auto& inventory = inventory_world(invocation).own_inventory();
+        auto* ecs_world = inventory_ecs_world(invocation);
         const auto container =
-            inventory_storage::container_for_storage_id(inventory_site_run(invocation), payload.storage_id);
+            inventory_storage::container_for_storage_id(inventory, ecs_world, payload.storage_id);
         const auto item_entity = inventory_storage::item_entity_for_slot(
-            inventory_site_run(invocation),
+            inventory,
+            ecs_world,
             container,
             static_cast<std::uint32_t>(payload.slot_index));
-        const auto* stack = inventory_storage::stack_data(inventory_site_run(invocation), item_entity);
+        const auto* stack = inventory_storage::stack_data(inventory, item_entity);
         if (stack == nullptr || stack->quantity == 0U)
         {
             return GS1_STATUS_INVALID_ARGUMENT;
@@ -562,7 +573,8 @@ Gs1Status resolve_inventory_item_use(
     flecs::entity item_entity,
     std::uint32_t quantity) noexcept
 {
-    const auto* stack = inventory_storage::stack_data(inventory_site_run(invocation), item_entity);
+    auto& inventory = inventory_world(invocation).own_inventory();
+    const auto* stack = inventory_storage::stack_data(inventory, item_entity);
     if (stack == nullptr || stack->quantity == 0U)
     {
         return GS1_STATUS_INVALID_ARGUMENT;
@@ -597,7 +609,8 @@ Gs1Status resolve_inventory_item_use(
     }
 
     if (!inventory_storage::consume_quantity_from_item_entity(
-            inventory_site_run(invocation),
+            inventory,
+            inventory_ecs_world(invocation),
             item_entity,
             requested_quantity))
     {
@@ -613,6 +626,8 @@ Gs1Status handle_inventory_item_consume(
     const InventoryItemConsumeRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(invocation, [&]() -> Gs1Status {
+        auto& inventory = inventory_world(invocation).own_inventory();
+        auto* ecs_world = inventory_ecs_world(invocation);
         const ItemId item_id {payload.item_id};
         const auto quantity = normalize_quantity(payload.quantity);
         if (find_item_def(item_id) == nullptr)
@@ -623,11 +638,13 @@ Gs1Status handle_inventory_item_consume(
         const auto available_quantity =
             (payload.flags & k_inventory_item_consume_flag_ignore_action_reservations) != 0U
             ? inventory_storage::available_item_quantity_in_container_kind(
-                  inventory_site_run(invocation),
+                  inventory,
+                  ecs_world,
                   payload.container_kind,
                   item_id)
             : available_unreserved_item_quantity_in_container_kind(
-                  inventory_site_run(invocation),
+                  inventory,
+                  ecs_world,
                   inventory_world(invocation).read_action(),
                   payload.container_kind,
                   item_id);
@@ -637,8 +654,9 @@ Gs1Status handle_inventory_item_consume(
         }
 
         const auto remaining = inventory_storage::consume_item_type_from_container(
-            inventory_site_run(invocation),
-            inventory_storage::container_for_kind(inventory_site_run(invocation), payload.container_kind),
+            inventory,
+            ecs_world,
+            inventory_storage::container_for_kind(inventory, ecs_world, payload.container_kind),
             item_id,
             quantity);
         if (remaining != 0U)
@@ -660,6 +678,8 @@ Gs1Status handle_inventory_global_item_consume(
     const InventoryGlobalItemConsumeRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(invocation, [&]() -> Gs1Status {
+        auto& inventory = inventory_world(invocation).own_inventory();
+        auto* ecs_world = inventory_ecs_world(invocation);
         const ItemId item_id {payload.item_id};
         const auto quantity = normalize_quantity(payload.quantity);
         if (find_item_def(item_id) == nullptr)
@@ -668,13 +688,14 @@ Gs1Status handle_inventory_global_item_consume(
         }
 
         const auto containers =
-            inventory_storage::collect_all_storage_containers(inventory_site_run(invocation), true);
+            inventory_storage::collect_all_storage_containers(inventory, ecs_world, true);
         const auto reserved_quantity =
             (payload.flags & k_inventory_item_consume_flag_ignore_action_reservations) != 0U
             ? 0U
             : total_reserved_item_quantity(inventory_world(invocation).read_action(), item_id);
         const auto available_quantity = inventory_storage::available_item_quantity_in_containers(
-            inventory_site_run(invocation),
+            inventory,
+            ecs_world,
             containers,
             item_id);
         if (available_quantity < quantity || available_quantity - quantity < reserved_quantity)
@@ -685,7 +706,7 @@ Gs1Status handle_inventory_global_item_consume(
         auto ordered_containers = containers;
         if (reserved_quantity > 0U)
         {
-            const auto worker_pack = inventory_storage::worker_pack_container(inventory_site_run(invocation));
+            const auto worker_pack = inventory_storage::worker_pack_container(inventory, ecs_world);
             std::stable_partition(
                 ordered_containers.begin(),
                 ordered_containers.end(),
@@ -695,7 +716,8 @@ Gs1Status handle_inventory_global_item_consume(
         }
 
         const auto remaining = inventory_storage::consume_item_type_from_containers(
-            inventory_site_run(invocation),
+            inventory,
+            ecs_world,
             ordered_containers,
             item_id,
             quantity);
@@ -708,6 +730,9 @@ Gs1Status handle_inventory_craft_commit(
     const InventoryCraftCommitRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(invocation, [&]() -> Gs1Status {
+        auto& inventory = inventory_world(invocation).own_inventory();
+        auto* ecs_world = inventory_ecs_world(invocation);
+        auto world = inventory_world(invocation);
         const auto* recipe_def = find_craft_recipe_def(RecipeId {payload.recipe_id});
         if (recipe_def == nullptr)
         {
@@ -720,12 +745,12 @@ Gs1Status handle_inventory_craft_commit(
         }
 
         const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
-        if (!inventory_world(invocation).tile_coord_in_bounds(target_tile))
+        if (!world.tile_coord_in_bounds(target_tile))
         {
             return GS1_STATUS_INVALID_ARGUMENT;
         }
 
-        const auto tile = inventory_world(invocation).read_tile(target_tile);
+        const auto tile = world.read_tile(target_tile);
         if (tile.device.structure_id != recipe_def->station_structure_id)
         {
             return GS1_STATUS_INVALID_STATE;
@@ -737,30 +762,37 @@ Gs1Status handle_inventory_craft_commit(
             return GS1_STATUS_INVALID_STATE;
         }
 
-        if (inventory_site_run(invocation).site_world == nullptr)
+        if (ecs_world == nullptr)
         {
             return GS1_STATUS_INVALID_STATE;
         }
 
-        const auto device_entity_id = inventory_site_run(invocation).site_world->device_entity_id(target_tile);
+        const auto device_entity_id = world.device_entity_id(target_tile);
         if (device_entity_id == 0U)
         {
             return GS1_STATUS_INVALID_STATE;
         }
 
         const auto output_container = inventory_storage::ensure_device_storage_container(
-            inventory_site_run(invocation),
+            inventory,
+            *ecs_world,
             device_entity_id,
             target_tile,
             structure_def->storage_slot_count);
         const auto source_containers =
-            craft_logic::collect_nearby_source_containers(inventory_site_run(invocation), target_tile);
+            craft_logic::collect_nearby_source_containers(
+                inventory,
+                ecs_world,
+                world.read_worker().position.tile_coord,
+                target_tile);
         const auto nearby_item_instance_ids =
             inventory_storage::collect_item_instance_ids_in_containers(
-                inventory_site_run(invocation),
+                inventory,
+                ecs_world,
                 source_containers);
         if (!craft_logic::can_store_output_after_recipe_consumption(
-                inventory_site_run(invocation),
+                inventory,
+                ecs_world,
                 output_container,
                 source_containers,
                 *recipe_def))
@@ -768,7 +800,8 @@ Gs1Status handle_inventory_craft_commit(
             return GS1_STATUS_INVALID_STATE;
         }
         if (!craft_logic::can_satisfy_recipe_requirements(
-                inventory_site_run(invocation),
+                inventory,
+                ecs_world,
                 nearby_item_instance_ids,
                 *recipe_def))
         {
@@ -779,7 +812,8 @@ Gs1Status handle_inventory_craft_commit(
         {
             const auto& ingredient = recipe_def->ingredients[index];
             const auto remaining = inventory_storage::consume_item_type_from_containers(
-                inventory_site_run(invocation),
+                inventory,
+                ecs_world,
                 source_containers,
                 ingredient.item_id,
                 ingredient.quantity);
@@ -790,7 +824,8 @@ Gs1Status handle_inventory_craft_commit(
         }
 
         const auto remaining_output = inventory_storage::add_item_to_container(
-            inventory_site_run(invocation),
+            inventory,
+            ecs_world,
             output_container,
             recipe_def->output_item_id,
             recipe_def->output_quantity);
@@ -806,7 +841,7 @@ Gs1Status handle_inventory_craft_commit(
             recipe_def->output_item_id.value,
             recipe_def->output_quantity,
             0U,
-            inventory_storage::storage_id_for_container(inventory_site_run(invocation), output_container)});
+            inventory_storage::storage_id_for_container(inventory, output_container)});
         inventory_message_queue(invocation).push_back(completed_message);
         return GS1_STATUS_OK;
     });
@@ -817,16 +852,19 @@ Gs1Status handle_site_device_broken(
     const SiteDeviceBrokenMessage& payload) noexcept
 {
     return mutate_inventory_storage(invocation, [&]() -> Gs1Status {
+        auto& inventory = inventory_world(invocation).own_inventory();
+        auto* ecs_world = inventory_ecs_world(invocation);
         const auto container =
-            inventory_storage::find_device_storage_container(inventory_site_run(invocation), payload.device_entity_id);
+            inventory_storage::find_device_storage_container(inventory, ecs_world, payload.device_entity_id);
         if (!container.is_valid())
         {
             return GS1_STATUS_OK;
         }
 
         const auto storage_id =
-            inventory_storage::storage_id_for_container(inventory_site_run(invocation), container);
-        (void)inventory_storage::destroy_storage_container(inventory_site_run(invocation), container);
+            inventory_storage::storage_id_for_container(inventory, container);
+        (void)storage_id;
+        (void)inventory_storage::destroy_storage_container(inventory, ecs_world, container);
         return GS1_STATUS_OK;
     });
 }
@@ -835,6 +873,8 @@ Gs1Status resolve_inventory_transfer(
     RuntimeInvocation& invocation,
     const InventoryTransferRequestedMessage& payload) noexcept
 {
+    auto& inventory = inventory_world(invocation).own_inventory();
+    auto* ecs_world = inventory_ecs_world(invocation);
     const bool auto_resolve_destination = transfer_resolves_destination_in_dll(payload);
     const bool same_container = payload.source_storage_id == payload.destination_storage_id;
 
@@ -850,9 +890,13 @@ Gs1Status resolve_inventory_transfer(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    const auto* source_storage = storage_state_for_transfer(inventory_site_run(invocation), payload.source_storage_id);
+    const auto* source_storage = inventory_storage::storage_container_state_for_storage_id(
+        inventory,
+        payload.source_storage_id);
     const auto* destination_storage =
-        storage_state_for_transfer(inventory_site_run(invocation), payload.destination_storage_id);
+        inventory_storage::storage_container_state_for_storage_id(
+            inventory,
+            payload.destination_storage_id);
     if (source_storage == nullptr || destination_storage == nullptr)
     {
         return GS1_STATUS_INVALID_STATE;
@@ -887,19 +931,20 @@ Gs1Status resolve_inventory_transfer(
         }
 
         const auto source_container =
-            inventory_storage::container_for_storage_id(inventory_site_run(invocation), payload.source_storage_id);
+            inventory_storage::container_for_storage_id(inventory, ecs_world, payload.source_storage_id);
         const auto destination_container =
-            inventory_storage::container_for_storage_id(inventory_site_run(invocation), payload.destination_storage_id);
+            inventory_storage::container_for_storage_id(inventory, ecs_world, payload.destination_storage_id);
         if (!source_container.is_valid() || !destination_container.is_valid())
         {
             return GS1_STATUS_INVALID_STATE;
         }
 
         const auto source_item = inventory_storage::item_entity_for_slot(
-            inventory_site_run(invocation),
+            inventory,
+            ecs_world,
             source_container,
             payload.source_slot_index);
-        const auto* source_stack = inventory_storage::stack_data(inventory_site_run(invocation), source_item);
+        const auto* source_stack = inventory_storage::stack_data(inventory, source_item);
         if (source_stack == nullptr || source_stack->quantity == 0U)
         {
             return GS1_STATUS_INVALID_STATE;
@@ -916,7 +961,8 @@ Gs1Status resolve_inventory_transfer(
         if (source_reserved > 0U)
         {
             const auto source_available = inventory_storage::available_item_quantity_in_container_kind(
-                inventory_site_run(invocation),
+                inventory,
+                ecs_world,
                 source_storage->container_kind,
                 source_stack->item_id);
             if (source_available < requested_quantity ||
@@ -926,7 +972,8 @@ Gs1Status resolve_inventory_transfer(
             }
         }
         const auto remaining_quantity = inventory_storage::add_item_to_container(
-            inventory_site_run(invocation),
+            inventory,
+            ecs_world,
             destination_container,
             source_stack->item_id,
             requested_quantity,
@@ -939,7 +986,8 @@ Gs1Status resolve_inventory_transfer(
 
         const auto transferred_quantity = requested_quantity - remaining_quantity;
         if (!inventory_storage::consume_quantity_from_item_entity(
-                inventory_site_run(invocation),
+                inventory,
+                ecs_world,
                 source_item,
                 transferred_quantity))
         {
@@ -959,12 +1007,13 @@ Gs1Status resolve_inventory_transfer(
     }
 
     const auto source_container =
-        inventory_storage::container_for_storage_id(inventory_site_run(invocation), payload.source_storage_id);
+        inventory_storage::container_for_storage_id(inventory, ecs_world, payload.source_storage_id);
     const auto source_item = inventory_storage::item_entity_for_slot(
-        inventory_site_run(invocation),
+        inventory,
+        ecs_world,
         source_container,
         payload.source_slot_index);
-    const auto* source_stack = inventory_storage::stack_data(inventory_site_run(invocation), source_item);
+    const auto* source_stack = inventory_storage::stack_data(inventory, source_item);
     if (source_stack == nullptr || source_stack->quantity == 0U)
     {
         return GS1_STATUS_INVALID_STATE;
@@ -979,7 +1028,8 @@ Gs1Status resolve_inventory_transfer(
         const auto transfer_quantity =
             std::min<std::uint32_t>(normalize_quantity(payload.quantity), source_stack->quantity);
         const auto source_available = inventory_storage::available_item_quantity_in_container_kind(
-            inventory_site_run(invocation),
+            inventory,
+            ecs_world,
             source_storage->container_kind,
             source_stack->item_id);
         if (source_available < transfer_quantity ||
@@ -993,7 +1043,8 @@ Gs1Status resolve_inventory_transfer(
         std::min<std::uint32_t>(normalize_quantity(payload.quantity), source_stack->quantity);
 
     const bool transferred = inventory_storage::transfer_between_slots(
-        inventory_site_run(invocation),
+        inventory,
+        ecs_world,
         source_storage->container_kind,
         payload.source_slot_index,
         destination_storage->container_kind,
@@ -1039,9 +1090,11 @@ Gs1Status handle_inventory_slot_tapped(
     }
 
     return mutate_inventory_storage(invocation, [&]() -> Gs1Status {
+        auto& inventory = inventory_world(invocation).own_inventory();
+        auto* ecs_world = inventory_ecs_world(invocation);
         const auto* source_storage =
             inventory_storage::storage_container_state_for_storage_id(
-                inventory_site_run(invocation),
+                inventory,
                 payload.storage_id);
         if (source_storage == nullptr ||
             source_storage->container_kind != payload.container_kind)
@@ -1050,12 +1103,13 @@ Gs1Status handle_inventory_slot_tapped(
         }
 
         const auto source_container =
-            inventory_storage::container_for_storage_id(inventory_site_run(invocation), payload.storage_id);
+            inventory_storage::container_for_storage_id(inventory, ecs_world, payload.storage_id);
         const auto source_item = inventory_storage::item_entity_for_slot(
-            inventory_site_run(invocation),
+            inventory,
+            ecs_world,
             source_container,
             payload.slot_index);
-        const auto* source_stack = inventory_storage::stack_data(inventory_site_run(invocation), source_item);
+        const auto* source_stack = inventory_storage::stack_data(inventory, source_item);
         if (source_stack == nullptr || source_stack->quantity == 0U)
         {
             return GS1_STATUS_OK;
@@ -1096,7 +1150,7 @@ Gs1Status handle_inventory_slot_tapped(
         {
             const auto* destination_storage =
                 inventory_storage::storage_container_state_for_storage_id(
-                    inventory_site_run(invocation),
+                    inventory,
                     payload.companion_storage_id);
             if (destination_storage != nullptr &&
                 destination_storage->container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE &&
@@ -1131,7 +1185,11 @@ Gs1Status handle_inventory_item_submit(
     const InventoryItemSubmitRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(invocation, [&]() -> Gs1Status {
-        const auto* source_storage = storage_state_for_transfer(inventory_site_run(invocation), payload.source_storage_id);
+        auto& inventory = inventory_world(invocation).own_inventory();
+        auto* ecs_world = inventory_ecs_world(invocation);
+        const auto* source_storage = inventory_storage::storage_container_state_for_storage_id(
+            inventory,
+            payload.source_storage_id);
         if (source_storage == nullptr)
         {
             return GS1_STATUS_INVALID_STATE;
@@ -1147,12 +1205,13 @@ Gs1Status handle_inventory_item_submit(
         }
 
         const auto source_container =
-            inventory_storage::container_for_storage_id(inventory_site_run(invocation), payload.source_storage_id);
+            inventory_storage::container_for_storage_id(inventory, ecs_world, payload.source_storage_id);
         const auto source_item = inventory_storage::item_entity_for_slot(
-            inventory_site_run(invocation),
+            inventory,
+            ecs_world,
             source_container,
             payload.source_slot_index);
-        const auto* source_stack = inventory_storage::stack_data(inventory_site_run(invocation), source_item);
+        const auto* source_stack = inventory_storage::stack_data(inventory, source_item);
         if (source_stack == nullptr || source_stack->quantity == 0U)
         {
             return GS1_STATUS_INVALID_ARGUMENT;
@@ -1167,7 +1226,8 @@ Gs1Status handle_inventory_item_submit(
         if (source_reserved > 0U)
         {
             const auto source_available = inventory_storage::available_item_quantity_in_container_kind(
-                inventory_site_run(invocation),
+                inventory,
+                ecs_world,
                 source_storage->container_kind,
                 source_stack->item_id);
             if (source_available < requested_quantity ||
@@ -1178,7 +1238,8 @@ Gs1Status handle_inventory_item_submit(
         }
 
         if (!inventory_storage::consume_quantity_from_item_entity(
-                inventory_site_run(invocation),
+                inventory,
+                ecs_world,
                 source_item,
                 requested_quantity))
         {
@@ -1271,6 +1332,8 @@ Gs1Status handle_inventory_worker_pack_insert_requested(
     const InventoryWorkerPackInsertRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(invocation, [&]() -> Gs1Status {
+        auto& inventory = inventory_world(invocation).own_inventory();
+        auto* ecs_world = inventory_ecs_world(invocation);
         const ItemId item_id {payload.item_id};
         const std::uint32_t quantity = normalize_quantity(payload.quantity);
         if (item_id.value == 0U || find_item_def(item_id) == nullptr)
@@ -1278,10 +1341,11 @@ Gs1Status handle_inventory_worker_pack_insert_requested(
             return GS1_STATUS_NOT_FOUND;
         }
 
-        const auto worker_pack = inventory_storage::worker_pack_container(inventory_site_run(invocation));
+        const auto worker_pack = inventory_storage::worker_pack_container(inventory, ecs_world);
         if (!worker_pack.is_valid() ||
             !inventory_storage::can_fit_item_in_container(
-                inventory_site_run(invocation),
+                inventory,
+                ecs_world,
                 worker_pack,
                 item_id,
                 quantity))
@@ -1290,7 +1354,8 @@ Gs1Status handle_inventory_worker_pack_insert_requested(
         }
 
         return inventory_storage::add_item_to_container(
-                   inventory_site_run(invocation),
+                   inventory,
+                   ecs_world,
                    worker_pack,
                    item_id,
                    quantity) == 0U
@@ -1376,10 +1441,7 @@ Gs1Status InventorySystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<InventorySystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    if (!inventory_runtime_ready(invocation))
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -1459,10 +1521,7 @@ Gs1Status InventorySystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto access = make_game_state_access<InventorySystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    if (!inventory_runtime_ready(invocation))
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -1487,10 +1546,7 @@ Gs1Status InventorySystem::process_host_message(
 
 void InventorySystem::run(RuntimeInvocation& invocation)
 {
-    auto access = make_game_state_access<InventorySystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    if (!inventory_runtime_ready(invocation))
     {
         return;
     }

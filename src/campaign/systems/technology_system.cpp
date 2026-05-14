@@ -1,5 +1,6 @@
 #include "campaign/systems/technology_system.h"
 
+#include "campaign/systems/campaign_system_context.h"
 #include "runtime/game_runtime.h"
 #include "support/currency.h"
 
@@ -133,7 +134,7 @@ Gs1Status process_technology_message(
 template <>
 struct system_state_tags<TechnologySystem>
 {
-    using type = type_list<RuntimeCampaignTag>;
+    using type = type_list<RuntimeCampaignTechnologyTag>;
 };
 
 const char* TechnologySystem::name() const noexcept
@@ -167,9 +168,8 @@ Gs1Status TechnologySystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<TechnologySystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    if (!campaign.has_value())
+    auto campaign = make_campaign_state_access(invocation);
+    if (!campaign.has_campaign())
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -462,9 +462,8 @@ Gs1Status process_technology_message(
     {
     case GameMessageType::CampaignReputationAwardRequested:
     {
-        auto access = make_game_state_access<TechnologySystem>(invocation);
-        auto& campaign = access.template read<RuntimeCampaignTag>();
-        if (!campaign.has_value())
+        auto campaign = make_campaign_state_access(invocation);
+        if (!campaign.has_campaign())
         {
             return GS1_STATUS_INVALID_STATE;
         }
@@ -475,7 +474,7 @@ Gs1Status process_technology_message(
             return GS1_STATUS_OK;
         }
 
-        campaign->technology_state.total_reputation += payload.delta;
+        campaign.technology().total_reputation += payload.delta;
         return GS1_STATUS_OK;
     }
 

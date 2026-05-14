@@ -14,6 +14,12 @@ namespace gs1
 class TechnologySystem final : public IRuntimeSystem
 {
 public:
+    static constexpr std::array<StateSetId, 1> k_owned_state_sets {StateSetId::CampaignTechnology};
+    [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
+    {
+        return k_owned_state_sets;
+    }
+
     [[nodiscard]] const char* name() const noexcept override;
     [[nodiscard]] GameMessageSubscriptionSpan subscribed_game_messages() const noexcept override;
     [[nodiscard]] HostMessageSubscriptionSpan subscribed_host_messages() const noexcept override;

@@ -20,11 +20,7 @@ namespace gs1
 template <>
 struct system_state_tags<EconomyPhoneSystem>
 {
-    using type = type_list<
-        RuntimeCampaignTag,
-        RuntimeActiveSiteRunTag,
-        RuntimeFixedStepSecondsTag,
-        RuntimeMoveDirectionTag>;
+    using type = type_list<RuntimeCampaignTag>;
 };
 
 namespace
@@ -44,16 +40,9 @@ constexpr std::uint32_t k_sell_listing_id_base = 1000U;
     return *campaign;
 }
 
-[[nodiscard]] SiteRunState& economy_phone_site_run(RuntimeInvocation& invocation)
-{
-    auto access = economy_phone_access(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    return *site_run;
-}
-
 [[nodiscard]] SiteWorldAccess<EconomyPhoneSystem> economy_phone_world(RuntimeInvocation& invocation)
 {
-    return SiteWorldAccess<EconomyPhoneSystem> {economy_phone_site_run(invocation)};
+    return SiteWorldAccess<EconomyPhoneSystem> {invocation};
 }
 
 [[nodiscard]] GameMessageQueue& economy_phone_message_queue(RuntimeInvocation& invocation)
@@ -73,13 +62,10 @@ bool money_delta_fits(std::int64_t amount) noexcept
 }
 
 bool can_apply_site_cash_delta(
-    const RuntimeInvocation& invocation,
+    RuntimeInvocation& invocation,
     std::int32_t delta) noexcept
 {
-    auto& mutable_invocation = const_cast<RuntimeInvocation&>(invocation);
-    auto access = make_game_state_access<EconomyPhoneSystem>(mutable_invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<EconomyPhoneSystem> {*site_run};
+    auto world = SiteWorldAccess<EconomyPhoneSystem> {invocation};
     const auto updated = static_cast<std::int64_t>(world.read_economy().current_cash) + delta;
     if (updated < 0 || updated > std::numeric_limits<std::int32_t>::max())
     {
@@ -195,12 +181,9 @@ std::uint64_t mix_seed(
     return value;
 }
 
-bool onboarding_chain_effective(const RuntimeInvocation& invocation) noexcept
+bool onboarding_chain_effective(RuntimeInvocation& invocation) noexcept
 {
-    auto& mutable_invocation = const_cast<RuntimeInvocation&>(invocation);
-    auto access = make_game_state_access<EconomyPhoneSystem>(mutable_invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<EconomyPhoneSystem> {*site_run};
+    auto world = SiteWorldAccess<EconomyPhoneSystem> {invocation};
     for (const auto& task : world.read_task_board().visible_tasks)
     {
         if (task.runtime_list_kind == TaskRuntimeListKind::Claimed)
@@ -210,7 +193,7 @@ bool onboarding_chain_effective(const RuntimeInvocation& invocation) noexcept
 
         for (const auto& seed_def : all_site_onboarding_task_seed_defs())
         {
-            if (seed_def.site_id == site_run->site_id &&
+            if (seed_def.site_id == world.site_id() &&
                 seed_def.task_template_id == task.task_template_id)
             {
                 return true;
@@ -222,11 +205,10 @@ bool onboarding_chain_effective(const RuntimeInvocation& invocation) noexcept
 }
 
 bool phone_buy_stock_item_available(
-    const RuntimeInvocation& invocation,
+    RuntimeInvocation& invocation,
     ItemId item_id) noexcept
 {
-    auto& mutable_invocation = const_cast<RuntimeInvocation&>(invocation);
-    auto access = make_game_state_access<EconomyPhoneSystem>(mutable_invocation);
+    auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
     const auto* item_def = find_item_def(item_id);
     if (item_def == nullptr)
@@ -260,16 +242,21 @@ PhoneListingState* find_generated_stock_listing(
 std::vector<std::uint64_t> phone_item_instance_ids(
     RuntimeInvocation& invocation)
 {
-    const auto& craft = economy_phone_world(invocation).read_craft();
-    const auto& inventory = economy_phone_world(invocation).read_inventory();
+    const auto world = economy_phone_world(invocation);
+    const auto& craft = world.read_craft();
+    const auto& inventory = world.read_inventory();
     if (craft.phone_cache.source_membership_revision == inventory.item_membership_revision)
     {
         return craft.phone_cache.item_instance_ids;
     }
 
     return inventory_storage::collect_item_instance_ids_in_containers(
-        economy_phone_site_run(invocation),
-        inventory_storage::collect_all_storage_containers(economy_phone_site_run(invocation), true));
+        const_cast<InventoryState&>(inventory),
+        world.ecs_world_ptr(),
+        inventory_storage::collect_all_storage_containers(
+            const_cast<InventoryState&>(inventory),
+            world.ecs_world_ptr(),
+            true));
 }
 
 std::uint32_t available_global_item_quantity(
@@ -277,7 +264,8 @@ std::uint32_t available_global_item_quantity(
     ItemId item_id)
 {
     const auto available_quantity = craft_logic::available_cached_item_quantity(
-        economy_phone_site_run(invocation),
+        economy_phone_world(invocation).read_inventory(),
+        economy_phone_world(invocation).ecs_world_ptr(),
         phone_item_instance_ids(invocation),
         item_id);
     std::uint32_t reserved_quantity = 0U;
@@ -425,14 +413,11 @@ void queue_sale_completed_message(
 }
 
 std::uint32_t resolved_stock_cash_points(
-    const RuntimeInvocation& invocation,
+    RuntimeInvocation& invocation,
     const PrototypePhoneBuyStockContent& stock_entry,
     std::uint32_t refresh_generation) noexcept
 {
-    auto& mutable_invocation = const_cast<RuntimeInvocation&>(invocation);
-    auto access = make_game_state_access<EconomyPhoneSystem>(mutable_invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    auto world = SiteWorldAccess<EconomyPhoneSystem> {*site_run};
+    auto world = SiteWorldAccess<EconomyPhoneSystem> {invocation};
     const auto span = stock_entry.stock_cash_points_variance * 2U + 1U;
     const auto roll = static_cast<std::uint32_t>(
         mix_seed(
@@ -447,7 +432,7 @@ std::uint32_t resolved_stock_cash_points(
 }
 
 std::uint32_t resolved_stock_quantity(
-    const RuntimeInvocation& invocation,
+    RuntimeInvocation& invocation,
     const PrototypePhoneBuyStockContent& stock_entry,
     std::uint32_t refresh_generation) noexcept
 {
@@ -472,7 +457,7 @@ void refresh_generated_buy_stock_listings(
     bool force_dirty = false)
 {
     auto& economy = economy_phone_world(invocation).own_economy();
-    const auto* site_content = find_prototype_site_content(economy_phone_site_run(invocation).site_id);
+    const auto* site_content = find_prototype_site_content(economy_phone_world(invocation).site_id());
     const auto next_generation = economy.phone_buy_stock_refresh_generation + 1U;
 
     std::vector<PhoneListingState> refreshed {};
@@ -882,8 +867,7 @@ Gs1Status EconomyPhoneSystem::process_game_message(
 {
     auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    if (!campaign.has_value())
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -1059,8 +1043,7 @@ void EconomyPhoneSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
     auto& campaign = access.template read<RuntimeCampaignTag>();
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!campaign.has_value() || !site_run.has_value())
+    if (!campaign.has_value())
     {
         return;
     }

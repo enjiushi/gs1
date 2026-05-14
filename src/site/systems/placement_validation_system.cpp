@@ -146,28 +146,25 @@ PlacementReservationRejectionReason validate_request(
 
 void handle_site_run_started(RuntimeInvocation& invocation) noexcept
 {
-    auto access = make_game_state_access<PlacementValidationSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
+    auto world = SiteWorldAccess<PlacementValidationSystem> {invocation};
+    if (!world.has_world())
     {
         return;
     }
 
-    prune_reservations_for_run(SiteWorldAccess<PlacementValidationSystem> {*site_run}.site_run_id());
+    prune_reservations_for_run(world.site_run_id());
 }
 
 void handle_reservation_requested(
     RuntimeInvocation& invocation,
     const PlacementReservationRequestedMessage& payload)
 {
-    auto access = make_game_state_access<PlacementValidationSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
+    SiteWorldAccess<PlacementValidationSystem> world {invocation};
+    if (!world.has_world())
     {
         return;
     }
 
-    SiteWorldAccess<PlacementValidationSystem> world {*site_run};
     auto& message_queue = invocation.game_message_queue();
     const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
     const TileFootprint footprint = resolve_placement_reservation_footprint(
@@ -270,9 +267,8 @@ Gs1Status PlacementValidationSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<PlacementValidationSystem>(invocation);
-    auto& site_run = access.template read<RuntimeActiveSiteRunTag>();
-    if (!site_run.has_value())
+    SiteWorldAccess<PlacementValidationSystem> world {invocation};
+    if (!world.has_world())
     {
         return GS1_STATUS_INVALID_STATE;
     }
