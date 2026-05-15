@@ -11,6 +11,32 @@
 
 namespace gs1
 {
+struct RegionalMapMetaState final
+{
+    SiteId selected_site_id {};
+    bool has_selected_site_id {false};
+};
+
+struct SiteMetaEntryState final
+{
+    SiteId site_id {};
+    Gs1SiteState site_state {GS1_SITE_STATE_LOCKED};
+    TileCoord regional_map_tile {};
+    std::uint32_t site_archetype_id {0};
+    FactionId featured_faction_id {};
+    std::uint32_t attempt_count {0};
+    std::uint32_t support_package_id {0};
+    std::uint32_t adjacent_site_offset {0};
+    std::uint32_t adjacent_site_count {0};
+    std::uint32_t exported_support_item_offset {0};
+    std::uint32_t exported_support_item_count {0};
+    std::uint32_t nearby_aura_modifier_offset {0};
+    std::uint32_t nearby_aura_modifier_count {0};
+    std::int32_t completion_reputation_reward {0};
+    std::int32_t completion_faction_reputation_reward {0};
+    bool has_support_package_id {false};
+};
+
 struct SiteMetaState final
 {
     SiteId site_id {};

@@ -17,11 +17,189 @@
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
+#include <utility>
+#include <unordered_map>
 #include <vector>
 
 namespace gs1
 {
 class SiteWorld;
+
+namespace detail
+{
+class SiteWorldHandleRegistry final
+{
+public:
+    static SiteWorldHandleRegistry& instance() noexcept
+    {
+        static SiteWorldHandleRegistry registry {};
+        return registry;
+    }
+
+    std::uint64_t acquire(std::shared_ptr<SiteWorld> world)
+    {
+        if (world == nullptr)
+        {
+            return 0U;
+        }
+
+        std::lock_guard<std::mutex> guard {mutex_};
+        const std::uint64_t token = next_token_++;
+        entries_.emplace(token, Entry {std::move(world), 1U});
+        return token;
+    }
+
+    void retain(std::uint64_t token) noexcept
+    {
+        if (token == 0U)
+        {
+            return;
+        }
+
+        std::lock_guard<std::mutex> guard {mutex_};
+        const auto it = entries_.find(token);
+        if (it != entries_.end())
+        {
+            ++it->second.ref_count;
+        }
+    }
+
+    void release(std::uint64_t token) noexcept
+    {
+        if (token == 0U)
+        {
+            return;
+        }
+
+        std::lock_guard<std::mutex> guard {mutex_};
+        const auto it = entries_.find(token);
+        if (it == entries_.end())
+        {
+            return;
+        }
+
+        if (it->second.ref_count > 0U)
+        {
+            --it->second.ref_count;
+        }
+
+        if (it->second.ref_count == 0U)
+        {
+            entries_.erase(it);
+        }
+    }
+
+    [[nodiscard]] SiteWorld* get(std::uint64_t token) const noexcept
+    {
+        if (token == 0U)
+        {
+            return nullptr;
+        }
+
+        std::lock_guard<std::mutex> guard {mutex_};
+        const auto it = entries_.find(token);
+        return it != entries_.end() ? it->second.world.get() : nullptr;
+    }
+
+private:
+    struct Entry final
+    {
+        std::shared_ptr<SiteWorld> world {};
+        std::uint32_t ref_count {0U};
+    };
+
+    mutable std::mutex mutex_ {};
+    std::uint64_t next_token_ {1U};
+    std::unordered_map<std::uint64_t, Entry> entries_ {};
+};
+}  // namespace detail
+
+struct SiteWorldHandle final
+{
+    std::uint64_t token {0U};
+
+    SiteWorldHandle() = default;
+    SiteWorldHandle(std::nullptr_t) noexcept {}
+    explicit SiteWorldHandle(SiteWorld* world)
+    {
+        *this = world;
+    }
+    explicit SiteWorldHandle(std::shared_ptr<SiteWorld> world)
+    {
+        *this = std::move(world);
+    }
+    SiteWorldHandle(const SiteWorldHandle& other) noexcept
+        : token(other.token)
+    {
+        detail::SiteWorldHandleRegistry::instance().retain(token);
+    }
+    SiteWorldHandle(SiteWorldHandle&& other) noexcept
+        : token(std::exchange(other.token, 0U))
+    {
+    }
+    ~SiteWorldHandle()
+    {
+        reset();
+    }
+
+    SiteWorldHandle& operator=(const SiteWorldHandle& other) noexcept
+    {
+        if (this != &other)
+        {
+            reset();
+            token = other.token;
+            detail::SiteWorldHandleRegistry::instance().retain(token);
+        }
+        return *this;
+    }
+
+    SiteWorldHandle& operator=(SiteWorldHandle&& other) noexcept
+    {
+        if (this != &other)
+        {
+            reset();
+            token = std::exchange(other.token, 0U);
+        }
+        return *this;
+    }
+
+    SiteWorldHandle& operator=(std::nullptr_t) noexcept
+    {
+        reset();
+        return *this;
+    }
+
+    SiteWorldHandle& operator=(SiteWorld* world)
+    {
+        return *this = std::shared_ptr<SiteWorld>(world, [](SiteWorld*) {});
+    }
+
+    SiteWorldHandle& operator=(std::shared_ptr<SiteWorld> world)
+    {
+        reset();
+        token = detail::SiteWorldHandleRegistry::instance().acquire(std::move(world));
+        return *this;
+    }
+
+    [[nodiscard]] SiteWorld* get() const noexcept
+    {
+        return detail::SiteWorldHandleRegistry::instance().get(token);
+    }
+
+    [[nodiscard]] SiteWorld* operator->() const noexcept { return get(); }
+    [[nodiscard]] SiteWorld& operator*() const noexcept { return *get(); }
+    [[nodiscard]] explicit operator bool() const noexcept { return get() != nullptr; }
+
+    [[nodiscard]] bool operator==(std::nullptr_t) const noexcept { return get() == nullptr; }
+    [[nodiscard]] bool operator!=(std::nullptr_t) const noexcept { return get() != nullptr; }
+
+    void reset() noexcept
+    {
+        detail::SiteWorldHandleRegistry::instance().release(token);
+        token = 0U;
+    }
+};
 
 enum class SiteRunStatus : std::uint32_t
 {
@@ -86,7 +264,7 @@ struct SiteRunState final
     std::uint32_t attempt_index {0};
     std::uint64_t site_attempt_seed {0};
     SiteRunStatus run_status {SiteRunStatus::Active};
-    std::shared_ptr<SiteWorld> site_world {};
+    SiteWorldHandle site_world {};
     SiteClockState clock {};
     CampState camp {};
     InventoryState inventory {};

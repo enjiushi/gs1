@@ -48,6 +48,77 @@ using RuntimeGameMessageSubscribers = std::array<std::vector<IRuntimeSystem*>, k
 using RuntimeHostMessageSubscribers =
     std::array<std::vector<IRuntimeSystem*>, k_runtime_host_message_type_count>;
 
+inline constexpr StateSetId k_site_component_run_meta_state_sets[] = {
+    StateSetId::SiteRunMeta};
+inline constexpr StateSetId k_site_component_time_state_sets[] = {
+    StateSetId::SiteClock};
+inline constexpr StateSetId k_site_component_camp_state_sets[] = {
+    StateSetId::SiteCamp};
+inline constexpr StateSetId k_site_component_inventory_state_sets[] = {
+    StateSetId::SiteInventoryMeta,
+    StateSetId::SiteInventoryStorageContainers,
+    StateSetId::SiteInventoryStorageSlotItemIds,
+    StateSetId::SiteInventoryWorkerPackSlots,
+    StateSetId::SiteInventoryPendingDeliveries,
+    StateSetId::SiteInventoryPendingDeliveryItemStacks};
+inline constexpr StateSetId k_site_component_contractor_state_sets[] = {
+    StateSetId::SiteContractorMeta,
+    StateSetId::SiteContractorWorkOrders};
+inline constexpr StateSetId k_site_component_weather_state_sets[] = {
+    StateSetId::SiteWeather};
+inline constexpr StateSetId k_site_component_local_weather_state_sets[] = {
+    StateSetId::SiteLocalWeatherResolveMeta,
+    StateSetId::SiteLocalWeatherResolveLastTotalContributions};
+inline constexpr StateSetId k_site_component_event_state_sets[] = {
+    StateSetId::SiteEvent};
+inline constexpr StateSetId k_site_component_task_board_state_sets[] = {
+    StateSetId::SiteTaskBoardMeta,
+    StateSetId::SiteTaskBoardVisibleTasks,
+    StateSetId::SiteTaskBoardRewardDraftOptions,
+    StateSetId::SiteTaskBoardTrackedTiles,
+    StateSetId::SiteTaskBoardAcceptedTaskIds,
+    StateSetId::SiteTaskBoardCompletedTaskIds,
+    StateSetId::SiteTaskBoardClaimedTaskIds};
+inline constexpr StateSetId k_site_component_modifier_state_sets[] = {
+    StateSetId::SiteModifierMeta,
+    StateSetId::SiteModifierNearbyAuraIds,
+    StateSetId::SiteModifierActiveSiteModifiers};
+inline constexpr StateSetId k_site_component_economy_state_sets[] = {
+    StateSetId::SiteEconomyMeta,
+    StateSetId::SiteEconomyRevealedUnlockableIds,
+    StateSetId::SiteEconomyDirectPurchaseUnlockableIds,
+    StateSetId::SiteEconomyPhoneListings};
+inline constexpr StateSetId k_site_component_craft_state_sets[] = {
+    StateSetId::SiteCraftDeviceCacheRuntime,
+    StateSetId::SiteCraftDeviceCaches,
+    StateSetId::SiteCraftNearbyItems,
+    StateSetId::SiteCraftPhoneCacheMeta,
+    StateSetId::SiteCraftPhoneItems,
+    StateSetId::SiteCraftContextMeta,
+    StateSetId::SiteCraftContextOptions};
+inline constexpr StateSetId k_site_component_action_state_sets[] = {
+    StateSetId::SiteActionMeta,
+    StateSetId::SiteActionReservedInputItemStacks,
+    StateSetId::SiteActionResolvedHarvestOutputs};
+inline constexpr StateSetId k_site_component_counters_state_sets[] = {
+    StateSetId::SiteCounters};
+inline constexpr StateSetId k_site_component_objective_state_sets[] = {
+    StateSetId::SiteObjectiveMeta,
+    StateSetId::SiteObjectiveTargetTileIndices,
+    StateSetId::SiteObjectiveTargetTileMask,
+    StateSetId::SiteObjectiveConnectionStartTileIndices,
+    StateSetId::SiteObjectiveConnectionStartTileMask,
+    StateSetId::SiteObjectiveConnectionGoalTileIndices,
+    StateSetId::SiteObjectiveConnectionGoalTileMask};
+inline constexpr StateSetId k_site_component_plant_weather_state_sets[] = {
+    StateSetId::SitePlantWeatherContributionMeta,
+    StateSetId::SitePlantWeatherContributionDirtyTileIndices,
+    StateSetId::SitePlantWeatherContributionDirtyTileMask};
+inline constexpr StateSetId k_site_component_device_weather_state_sets[] = {
+    StateSetId::SiteDeviceWeatherContributionMeta,
+    StateSetId::SiteDeviceWeatherContributionDirtyTileIndices,
+    StateSetId::SiteDeviceWeatherContributionDirtyTileMask};
+
 template <typename EnumType>
 [[nodiscard]] constexpr bool runtime_subscription_contains(
     std::span<const EnumType> subscriptions,
@@ -77,47 +148,47 @@ template <typename System>
     }
 }
 
-[[nodiscard]] constexpr std::optional<StateSetId> site_component_owner_state_set(
+[[nodiscard]] constexpr std::span<const StateSetId> site_component_owner_state_sets(
     SiteComponent component) noexcept
 {
     switch (component)
     {
     case SiteComponent::RunMeta:
-        return StateSetId::SiteRunMeta;
+        return k_site_component_run_meta_state_sets;
     case SiteComponent::Time:
-        return StateSetId::SiteClock;
+        return k_site_component_time_state_sets;
     case SiteComponent::Camp:
-        return StateSetId::SiteCamp;
+        return k_site_component_camp_state_sets;
     case SiteComponent::Inventory:
-        return StateSetId::SiteInventory;
+        return k_site_component_inventory_state_sets;
     case SiteComponent::Contractor:
-        return StateSetId::SiteContractor;
+        return k_site_component_contractor_state_sets;
     case SiteComponent::Weather:
-        return StateSetId::SiteWeather;
+        return k_site_component_weather_state_sets;
     case SiteComponent::LocalWeatherRuntime:
-        return StateSetId::SiteLocalWeatherResolve;
+        return k_site_component_local_weather_state_sets;
     case SiteComponent::Event:
-        return StateSetId::SiteEvent;
+        return k_site_component_event_state_sets;
     case SiteComponent::TaskBoard:
-        return StateSetId::SiteTaskBoard;
+        return k_site_component_task_board_state_sets;
     case SiteComponent::Modifier:
-        return StateSetId::SiteModifier;
+        return k_site_component_modifier_state_sets;
     case SiteComponent::Economy:
-        return StateSetId::SiteEconomy;
+        return k_site_component_economy_state_sets;
     case SiteComponent::Craft:
-        return StateSetId::SiteCraft;
+        return k_site_component_craft_state_sets;
     case SiteComponent::Action:
-        return StateSetId::SiteAction;
+        return k_site_component_action_state_sets;
     case SiteComponent::Counters:
-        return StateSetId::SiteCounters;
+        return k_site_component_counters_state_sets;
     case SiteComponent::Objective:
-        return StateSetId::SiteObjective;
+        return k_site_component_objective_state_sets;
     case SiteComponent::PlantWeatherRuntime:
-        return StateSetId::SitePlantWeatherContribution;
+        return k_site_component_plant_weather_state_sets;
     case SiteComponent::DeviceWeatherRuntime:
-        return StateSetId::SiteDeviceWeatherContribution;
+        return k_site_component_device_weather_state_sets;
     default:
-        return std::nullopt;
+        return {};
     }
 }
 
@@ -139,25 +210,22 @@ template <typename System>
                     continue;
                 }
 
-                const auto mapped = site_component_owner_state_set(component);
-                if (!mapped.has_value())
+                for (const auto mapped : site_component_owner_state_sets(component))
                 {
-                    continue;
-                }
-
-                bool already_present = false;
-                for (std::size_t existing = 0; existing < count; ++existing)
-                {
-                    if (values[existing] == *mapped)
+                    bool already_present = false;
+                    for (std::size_t existing = 0; existing < count; ++existing)
                     {
-                        already_present = true;
-                        break;
+                        if (values[existing] == mapped)
+                        {
+                            already_present = true;
+                            break;
+                        }
                     }
-                }
 
-                if (!already_present)
-                {
-                    values[count++] = *mapped;
+                    if (!already_present)
+                    {
+                        values[count++] = mapped;
+                    }
                 }
             }
 

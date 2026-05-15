@@ -393,8 +393,8 @@ SiteRunState SiteRunFactory::create_site_run(
     const auto worker_tile_coord = run.camp.camp_anchor_tile;
     const auto worker_tile_x = static_cast<float>(run.camp.camp_anchor_tile.x);
     const auto worker_tile_y = static_cast<float>(run.camp.camp_anchor_tile.y);
-    run.site_world = std::make_shared<SiteWorld>();
-    run.site_world->initialize(
+    auto site_world = std::make_shared<SiteWorld>();
+    site_world->initialize(
         SiteWorld::CreateDesc {
             k_site_width,
             k_site_height,
@@ -410,6 +410,7 @@ SiteRunState SiteRunFactory::create_site_run(
             100.0f,
             1.0f,
             false});
+    run.site_world = std::move(site_world);
     seed_site_fertility(run, site_content);
     if (site_content != nullptr)
     {

@@ -378,6 +378,10 @@ Gs1Status process_campaign_flow_message(
         site->attempt_count += 1U;
         SiteRunState active_site_run =
             SiteRunFactory::create_site_run(campaign_seed(invocation), faction_progress, *site);
+        if (invocation.runtime() != nullptr)
+        {
+            invocation.runtime()->set_site_world(active_site_run.site_world.get());
+        }
         write_site_run_state_to_state_sets(
             std::optional<SiteRunState> {active_site_run},
             *invocation.owned_state(),
@@ -411,6 +415,10 @@ Gs1Status process_campaign_flow_message(
             std::nullopt,
             *invocation.owned_state(),
             *invocation.state_manager());
+        if (invocation.runtime() != nullptr)
+        {
+            invocation.runtime()->set_site_world(nullptr);
+        }
         set_campaign_active_site_id(invocation, std::nullopt);
         app_state = GS1_APP_STATE_REGIONAL_MAP;
         set_campaign_app_state(invocation, app_state);
@@ -435,8 +443,10 @@ Gs1Status process_campaign_flow_message(
             return GS1_STATUS_NOT_FOUND;
         }
 
-        SiteRunState active_site_run =
-            assemble_site_run_state_from_state_sets(*invocation.owned_state(), *invocation.state_manager());
+        SiteRunState active_site_run = assemble_site_run_state_from_state_sets(
+            *invocation.owned_state(),
+            *invocation.state_manager(),
+            invocation.runtime() != nullptr ? invocation.runtime()->site_world() : nullptr);
         active_site_run.run_status =
             payload.result == GS1_SITE_ATTEMPT_RESULT_COMPLETED
                 ? SiteRunStatus::Completed

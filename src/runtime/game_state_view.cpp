@@ -260,7 +260,8 @@ void rebuild_site_view(
     const TaskBoardState& task_board,
     const ModifierState& modifier,
     const EconomyState& economy,
-    const CraftState& craft,
+    const CraftContextMetaState& craft_context,
+    std::span<const CraftContextOptionState> craft_context_options,
     const ActionState& site_action,
     const SiteCounters& counters,
     const SiteObjectiveState& objective,
@@ -399,11 +400,10 @@ void rebuild_site_view(
             0U});
     }
 
-    const auto& craft_context = craft.context;
     if (craft_context.occupied)
     {
-        cache.craft_context_options.reserve(craft_context.options.size());
-        for (const auto& option : craft_context.options)
+        cache.craft_context_options.reserve(craft_context_options.size());
+        for (const auto& option : craft_context_options)
         {
             cache.craft_context_options.push_back(Gs1CraftContextOptionView {
                 option.recipe_id,
@@ -594,13 +594,17 @@ void rebuild_game_state_view_cache(
 
     if (state.campaign_core.has_value())
     {
+        const auto regional_map = assemble_regional_map_state_from_state_sets(state, state_manager);
+        const auto loadout =
+            assemble_loadout_planner_state_from_state_sets(state, state_manager);
+        const auto sites = assemble_sites_state_from_state_sets(state, state_manager);
         rebuild_campaign_view(
             *state_manager.query<StateSetId::CampaignCore>(state),
-            *state_manager.query<StateSetId::CampaignRegionalMap>(state),
+            regional_map,
             *state_manager.query<StateSetId::CampaignFactionProgress>(state),
             *state_manager.query<StateSetId::CampaignTechnology>(state),
-            *state_manager.query<StateSetId::CampaignLoadoutPlanner>(state),
-            *state_manager.query<StateSetId::CampaignSites>(state),
+            loadout,
+            sites,
             cache);
         cache.root.campaign = &cache.campaign;
     }
@@ -612,21 +616,28 @@ void rebuild_game_state_view_cache(
 
     if (state.site_run_meta.has_value())
     {
+        const auto inventory = assemble_inventory_state_from_state_sets(state, state_manager);
+        const auto task_board = assemble_task_board_state_from_state_sets(state, state_manager);
+        const auto modifier = assemble_modifier_state_from_state_sets(state, state_manager);
+        const auto economy = assemble_economy_state_from_state_sets(state, state_manager);
+        const auto action = assemble_action_state_from_state_sets(state, state_manager);
+        const auto objective = assemble_site_objective_state_from_state_sets(state, state_manager);
         rebuild_site_view(
             *state_manager.query<StateSetId::SiteRunMeta>(state),
-            state_manager.query<StateSetId::SiteWorld>(state)->site_world.get(),
+            runtime.site_world(),
             *state_manager.query<StateSetId::SiteClock>(state),
             *state_manager.query<StateSetId::SiteCamp>(state),
-            *state_manager.query<StateSetId::SiteInventory>(state),
+            inventory,
             *state_manager.query<StateSetId::SiteWeather>(state),
             *state_manager.query<StateSetId::SiteEvent>(state),
-            *state_manager.query<StateSetId::SiteTaskBoard>(state),
-            *state_manager.query<StateSetId::SiteModifier>(state),
-            *state_manager.query<StateSetId::SiteEconomy>(state),
-            *state_manager.query<StateSetId::SiteCraft>(state),
-            *state_manager.query<StateSetId::SiteAction>(state),
+            task_board,
+            modifier,
+            economy,
+            *state_manager.query<StateSetId::SiteCraftContextMeta>(state),
+            *state_manager.query<StateSetId::SiteCraftContextOptions>(state),
+            action,
             *state_manager.query<StateSetId::SiteCounters>(state),
-            *state_manager.query<StateSetId::SiteObjective>(state),
+            objective,
             cache);
         cache.root.active_site = &cache.site;
     }

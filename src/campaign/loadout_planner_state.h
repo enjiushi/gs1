@@ -15,6 +15,14 @@ struct LoadoutSlot final
     bool occupied {false};
 };
 
+struct LoadoutPlannerMetaState final
+{
+    SiteId selected_target_site_id {};
+    std::uint32_t support_quota_per_contributor {0};
+    std::uint32_t support_quota {0};
+    bool has_selected_target_site_id {false};
+};
+
 struct LoadoutPlannerState final
 {
     std::optional<SiteId> selected_target_site_id {};

@@ -9,7 +9,12 @@ namespace gs1
 class LoadoutPlannerSystem final : public IRuntimeSystem
 {
 public:
-    static constexpr std::array<StateSetId, 1> k_owned_state_sets {StateSetId::CampaignLoadoutPlanner};
+    static constexpr std::array<StateSetId, 5> k_owned_state_sets {
+        StateSetId::CampaignLoadoutPlannerMeta,
+        StateSetId::CampaignLoadoutPlannerBaselineItems,
+        StateSetId::CampaignLoadoutPlannerAvailableSupportItems,
+        StateSetId::CampaignLoadoutPlannerSelectedSlots,
+        StateSetId::CampaignLoadoutPlannerNearbyAuraModifiers};
     [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
     {
         return k_owned_state_sets;

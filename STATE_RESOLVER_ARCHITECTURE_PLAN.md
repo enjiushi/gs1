@@ -130,7 +130,8 @@ Rule:
 
 - if a state set is a non-container state, its storage wrapper must be `alignas(64)`
 - the runtime should validate that contract with compile-time checks
-- container-backed state sets may still use their natural container alignment, but the state-set wrapper itself may still be aligned when practical
+- container-backed state sets are intentionally exempt from the 64-byte wrapper rule because the wrapper is just a handle around dynamic storage
+- neither a state-set payload nor a container element payload should store raw or smart pointers; keep those payloads pointer-free and use ids, handles, or external services instead
 
 This rule exists so the runtime-owned authoritative storage for scalar or aggregate non-container state sets follows a predictable cache-line layout instead of leaving that to compiler-default packing.
 
@@ -386,12 +387,15 @@ consteval bool state_contract_is_valid()
 
     if constexpr (state_traits<Id>::k_is_container)
     {
-        return std::is_trivially_copyable_v<element_type> && std::is_standard_layout_v<element_type>;
+        return std::is_trivially_copyable_v<element_type> &&
+            std::is_standard_layout_v<element_type> &&
+            !std::is_pointer_v<element_type>;
     }
 
     return
         std::is_standard_layout_v<state_type> &&
-        alignof(wrapper_type) >= 64U;
+        alignof(wrapper_type) >= 64U &&
+        !std::is_pointer_v<state_type>;
 }
 
 static_assert(state_contract_is_valid<StateSetId::RawWeather>());
@@ -680,7 +684,7 @@ The important pattern here is:
 - internal readers use `StateManager::query<StateSetId::X>()`
 - mutation stays inside the owning resolver through `StateManager::state<System, StateSetId::X>()`
 - a non-owner system such as `PlacementValidationSystem` is not a resolver
-- container-backed state sets still map to exactly one container
+- container-backed state sets still map to exactly one container and do not need the 64-byte wrapper rule
 
 ## Container Example
 

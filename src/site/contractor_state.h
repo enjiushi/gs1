@@ -16,6 +16,20 @@ enum class WorkTaskKind : std::uint32_t
     ClearBurial = 3
 };
 
+struct WorkOrderEntryState final
+{
+    WorkOrderId work_order_id {};
+    WorkTaskKind task_kind {WorkTaskKind::None};
+    TileCoord target_tile {};
+    std::uint32_t remaining_work_units {0};
+    bool has_target_tile {false};
+};
+
+struct ContractorMetaState final
+{
+    std::uint32_t available_work_units {0};
+};
+
 struct WorkOrderState final
 {
     WorkOrderId work_order_id {};

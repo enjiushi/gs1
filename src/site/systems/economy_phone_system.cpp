@@ -240,11 +240,10 @@ std::vector<std::uint64_t> phone_item_instance_ids(
     RuntimeInvocation& invocation)
 {
     const auto world = economy_phone_world(invocation);
-    const auto& craft = world.read_craft();
     const auto& inventory = world.read_inventory();
-    if (craft.phone_cache.source_membership_revision == inventory.item_membership_revision)
+    if (world.read_craft_phone_cache_meta().source_membership_revision == inventory.item_membership_revision)
     {
-        return craft.phone_cache.item_instance_ids;
+        return world.read_craft_phone_items();
     }
 
     return inventory_storage::collect_item_instance_ids_in_containers(

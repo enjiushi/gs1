@@ -36,9 +36,8 @@ void refresh_phone_cache(
     std::uint64_t membership_revision)
 {
     SiteWorldAccess<CraftSystem> world {invocation};
-    auto& phone_cache = world.own_craft().phone_cache;
-    phone_cache.source_membership_revision = membership_revision;
-    phone_cache.item_instance_ids =
+    world.own_craft_phone_cache_meta().source_membership_revision = membership_revision;
+    world.own_craft_phone_items() =
         inventory_storage::collect_item_instance_ids_in_containers(
             world.read_inventory(),
             world.ecs_world_ptr(),
@@ -51,8 +50,11 @@ void refresh_device_caches(
     TileCoord worker_tile)
 {
     SiteWorldAccess<CraftSystem> world {invocation};
-    auto& craft = world.own_craft();
-    craft.device_caches.clear();
+    auto& device_cache_runtime = world.own_craft_device_cache_runtime();
+    auto& device_caches = world.own_craft_device_caches();
+    auto& nearby_items = world.own_craft_nearby_items();
+    device_caches.clear();
+    nearby_items.clear();
 
     auto* ecs_world_ptr = world.ecs_world_ptr();
     if (ecs_world_ptr == nullptr)
@@ -78,20 +80,24 @@ void refresh_device_caches(
             }
 
             const TileCoord coord = coord_component.value;
-            craft.device_caches.push_back(CraftDeviceCacheState {
-                entity.id(),
-                membership_revision,
-                craft_logic::worker_pack_included_for_device(world.read_worker().position.tile_coord, coord),
-                craft_logic::collect_nearby_item_instance_ids(
+            const auto cached_items = craft_logic::collect_nearby_item_instance_ids(
                     world.read_inventory(),
                     world.ecs_world_ptr(),
                     world.read_worker().position.tile_coord,
-                    coord)});
+                    coord);
+            const auto nearby_item_offset = static_cast<std::uint32_t>(nearby_items.size());
+            nearby_items.insert(nearby_items.end(), cached_items.begin(), cached_items.end());
+            device_caches.push_back(CraftDeviceCacheEntryState {
+                entity.id(),
+                membership_revision,
+                craft_logic::worker_pack_included_for_device(world.read_worker().position.tile_coord, coord),
+                nearby_item_offset,
+                static_cast<std::uint32_t>(cached_items.size())});
         });
 
-    craft.device_cache_source_membership_revision = membership_revision;
-    craft.device_cache_worker_tile = worker_tile;
-    craft.device_caches_dirty = false;
+    device_cache_runtime.device_cache_source_membership_revision = membership_revision;
+    device_cache_runtime.device_cache_worker_tile = worker_tile;
+    device_cache_runtime.device_caches_dirty = false;
 }
 
 Gs1Status handle_craft_context_requested(
@@ -103,8 +109,10 @@ Gs1Status handle_craft_context_requested(
     auto& technology = access.template read<RuntimeCampaignTechnologyTag>();
 
     SiteWorldAccess<CraftSystem> world {invocation};
-    auto& context = world.own_craft().context;
-    context = CraftContextState {};
+    auto& context_meta = world.own_craft_context_meta();
+    auto& context_options = world.own_craft_context_options();
+    context_meta = CraftContextMetaState {};
+    context_options.clear();
 
     if (!world.has_world() || world.ecs_world_ptr() == nullptr)
     {
@@ -122,8 +130,8 @@ Gs1Status handle_craft_context_requested(
         std::span<const FactionProgressState> {faction_progress},
         technology,
         tile.device.structure_id);
-    context.occupied = true;
-    context.tile_coord = target_tile;
+    context_meta.occupied = true;
+    context_meta.tile_coord = target_tile;
     if (recipes.empty())
     {
         return GS1_STATUS_OK;
@@ -145,7 +153,8 @@ Gs1Status handle_craft_context_requested(
             world.read_inventory(),
             world.ecs_world_ptr(),
             world.read_worker().position.tile_coord,
-            world.read_craft(),
+            world.read_craft_device_caches(),
+            world.read_craft_nearby_items(),
             device_entity_id,
             target_tile);
     const auto source_containers =
@@ -180,7 +189,7 @@ Gs1Status handle_craft_context_requested(
             continue;
         }
 
-        context.options.push_back(CraftContextOptionState {
+        context_options.push_back(CraftContextOptionState {
             recipe_def->recipe_id.value,
             recipe_def->output_item_id.value});
     }
@@ -230,12 +239,18 @@ Gs1Status CraftSystem::process_game_message(
     switch (message.type)
     {
     case GameMessageType::SiteRunStarted:
-        world.own_craft() = CraftState {};
+        world.own_craft_device_cache_runtime() = CraftDeviceCacheRuntimeState {};
+        world.own_craft_device_caches().clear();
+        world.own_craft_nearby_items().clear();
+        world.own_craft_phone_cache_meta() = PhoneInventoryCacheMetaState {};
+        world.own_craft_phone_items().clear();
+        world.own_craft_context_meta() = CraftContextMetaState {};
+        world.own_craft_context_options().clear();
         return GS1_STATUS_OK;
 
     case GameMessageType::SiteDevicePlaced:
     case GameMessageType::SiteDeviceBroken:
-        world.own_craft().device_caches_dirty = true;
+        world.own_craft_device_cache_runtime().device_caches_dirty = true;
         return GS1_STATUS_OK;
 
     case GameMessageType::InventoryCraftContextRequested:
@@ -275,16 +290,16 @@ void CraftSystem::run(RuntimeInvocation& invocation)
     }
 
     const auto membership_revision = world.read_inventory().item_membership_revision;
-    auto& craft = world.own_craft();
-    if (craft.phone_cache.source_membership_revision != membership_revision)
+    auto& device_cache_runtime = world.own_craft_device_cache_runtime();
+    if (world.read_craft_phone_cache_meta().source_membership_revision != membership_revision)
     {
         refresh_phone_cache(invocation, membership_revision);
     }
 
     const TileCoord worker_tile = world.read_worker().position.tile_coord;
-    if (!craft.device_caches_dirty &&
-        craft.device_cache_source_membership_revision == membership_revision &&
-        same_tile_coord(craft.device_cache_worker_tile, worker_tile))
+    if (!device_cache_runtime.device_caches_dirty &&
+        device_cache_runtime.device_cache_source_membership_revision == membership_revision &&
+        same_tile_coord(device_cache_runtime.device_cache_worker_tile, worker_tile))
     {
         return;
     }

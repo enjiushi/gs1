@@ -143,6 +143,36 @@ std::vector<std::uint64_t> collect_nearby_item_instance_ids(
         collect_nearby_source_containers(site_run, device_tile));
 }
 
+CraftDeviceCacheEntryState* find_device_cache(
+    std::vector<CraftDeviceCacheEntryState>& device_caches,
+    std::uint64_t device_entity_id) noexcept
+{
+    for (auto& cache : device_caches)
+    {
+        if (cache.device_entity_id == device_entity_id)
+        {
+            return &cache;
+        }
+    }
+
+    return nullptr;
+}
+
+const CraftDeviceCacheEntryState* find_device_cache(
+    const std::vector<CraftDeviceCacheEntryState>& device_caches,
+    std::uint64_t device_entity_id) noexcept
+{
+    for (const auto& cache : device_caches)
+    {
+        if (cache.device_entity_id == device_entity_id)
+        {
+            return &cache;
+        }
+    }
+
+    return nullptr;
+}
+
 CraftDeviceCacheState* find_device_cache(
     CraftState& craft_state,
     std::uint64_t device_entity_id) noexcept
@@ -173,22 +203,43 @@ const CraftDeviceCacheState* find_device_cache(
     return nullptr;
 }
 
+namespace
+{
+std::vector<std::uint64_t> slice_cached_nearby_items(
+    const std::vector<std::uint64_t>& nearby_items,
+    const CraftDeviceCacheEntryState& cache)
+{
+    const auto offset = static_cast<std::size_t>(cache.nearby_item_offset);
+    const auto count = static_cast<std::size_t>(cache.nearby_item_count);
+    if (offset > nearby_items.size())
+    {
+        return {};
+    }
+
+    const auto safe_count = std::min(count, nearby_items.size() - offset);
+    return std::vector<std::uint64_t> {
+        nearby_items.begin() + static_cast<std::ptrdiff_t>(offset),
+        nearby_items.begin() + static_cast<std::ptrdiff_t>(offset + safe_count)};
+}
+}  // namespace
+
 std::vector<std::uint64_t> nearby_item_instance_ids_for_device(
     const InventoryState& inventory,
     flecs::world* world,
     TileCoord worker_tile,
-    const CraftState& craft_state,
+    const std::vector<CraftDeviceCacheEntryState>& device_caches,
+    const std::vector<std::uint64_t>& nearby_items,
     std::uint64_t device_entity_id,
     TileCoord device_tile)
 {
-    const auto* cache = find_device_cache(craft_state, device_entity_id);
+    const auto* cache = find_device_cache(device_caches, device_entity_id);
     const bool include_worker_pack = worker_pack_included_for_device(worker_tile, device_tile);
     const auto membership_revision = inventory.item_membership_revision;
     if (cache != nullptr &&
         cache->source_membership_revision == membership_revision &&
         cache->worker_pack_included == include_worker_pack)
     {
-        return cache->nearby_item_instance_ids;
+        return slice_cached_nearby_items(nearby_items, *cache);
     }
 
     return collect_nearby_item_instance_ids(
@@ -200,18 +251,19 @@ std::vector<std::uint64_t> nearby_item_instance_ids_for_device(
 
 std::vector<std::uint64_t> nearby_item_instance_ids_for_device(
     SiteRunState& site_run,
-    const CraftState& craft_state,
+    const std::vector<CraftDeviceCacheEntryState>& device_caches,
+    const std::vector<std::uint64_t>& nearby_items,
     std::uint64_t device_entity_id,
     TileCoord device_tile)
 {
-    const auto* cache = find_device_cache(craft_state, device_entity_id);
+    const auto* cache = find_device_cache(device_caches, device_entity_id);
     const bool include_worker_pack = worker_pack_included_for_device(site_run, device_tile);
     const auto membership_revision = site_run.inventory.item_membership_revision;
     if (cache != nullptr &&
         cache->source_membership_revision == membership_revision &&
         cache->worker_pack_included == include_worker_pack)
     {
-        return cache->nearby_item_instance_ids;
+        return slice_cached_nearby_items(nearby_items, *cache);
     }
 
     return collect_nearby_item_instance_ids(site_run, device_tile);

@@ -86,7 +86,10 @@ Gs1Status invoke_system_message(
         ? std::optional<CampaignState> {gs1::assemble_campaign_state_from_state_sets(state, state_manager)}
         : std::nullopt;
     active_site_run = state.site_run_meta.has_value()
-        ? std::optional<SiteRunState> {gs1::assemble_site_run_state_from_state_sets(state, state_manager)}
+        ? std::optional<SiteRunState> {gs1::assemble_site_run_state_from_state_sets(
+              state,
+              state_manager,
+              nullptr)}
         : std::nullopt;
     return status;
 }
@@ -130,7 +133,10 @@ void run_system(
         ? std::optional<CampaignState> {gs1::assemble_campaign_state_from_state_sets(state, state_manager)}
         : std::nullopt;
     active_site_run = state.site_run_meta.has_value()
-        ? std::optional<SiteRunState> {gs1::assemble_site_run_state_from_state_sets(state, state_manager)}
+        ? std::optional<SiteRunState> {gs1::assemble_site_run_state_from_state_sets(
+              state,
+              state_manager,
+              nullptr)}
         : std::nullopt;
 }
 

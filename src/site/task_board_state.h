@@ -86,12 +86,71 @@ struct TaskInstanceState final
     bool has_follow_up_task_template {false};
 };
 
+struct TaskInstanceEntryState final
+{
+    TaskInstanceId task_instance_id {};
+    TaskTemplateId task_template_id {};
+    FactionId publisher_faction_id {};
+    std::uint32_t task_tier_id {0};
+    std::uint32_t target_amount {0};
+    std::uint32_t required_count {0};
+    std::uint32_t current_progress_amount {0};
+    ItemId item_id {};
+    PlantId plant_id {};
+    RecipeId recipe_id {};
+    StructureId structure_id {};
+    StructureId secondary_structure_id {};
+    StructureId tertiary_structure_id {};
+    ActionKind action_kind {ActionKind::None};
+    float threshold_value {0.0f};
+    float expected_task_hours_in_game {0.0f};
+    float risk_multiplier {0.0f};
+    std::uint32_t direct_cost_cash_points {0U};
+    std::uint32_t time_cost_cash_points {0U};
+    std::uint32_t risk_cost_cash_points {0U};
+    std::uint32_t difficulty_cash_points {0U};
+    std::uint32_t reward_budget_cash_points {0U};
+    std::uint32_t reward_draft_option_offset {0U};
+    std::uint32_t reward_draft_option_count {0U};
+    TaskRuntimeListKind runtime_list_kind {TaskRuntimeListKind::Visible};
+    std::uint32_t chain_id {0};
+    std::uint32_t chain_step_index {0};
+    TaskTemplateId follow_up_task_template_id {};
+    double progress_accumulator {0.0};
+    std::uint8_t requirement_mask {0U};
+    std::uint8_t reserved0[3] {};
+    bool has_chain {false};
+    bool has_follow_up_task_template {false};
+};
+
 struct TaskChainState final
 {
     std::uint32_t task_chain_id {0};
     std::optional<std::uint32_t> current_accepted_step_index {};
     std::optional<TaskInstanceId> surfaced_follow_up_task_instance_id {};
     bool is_broken {false};
+};
+
+struct TaskBoardMetaState final
+{
+    std::uint32_t task_pool_size {0};
+    std::uint32_t accepted_task_cap {0};
+    std::uint32_t tracked_tile_width {0};
+    std::uint32_t tracked_tile_height {0};
+    std::uint32_t fully_grown_tile_count {0};
+    std::uint32_t site_completion_tile_threshold {0};
+    std::uint32_t tracked_living_plant_count {0};
+    std::uint32_t refresh_generation {0U};
+    double minutes_until_next_refresh {0.0};
+    TaskTrackedWorkerState worker {};
+    std::uint32_t active_chain_task_chain_id {0};
+    std::uint32_t active_chain_current_accepted_step_index {0};
+    TaskInstanceId active_chain_surfaced_follow_up_task_instance_id {};
+    bool all_tracked_living_plants_stable {false};
+    bool has_active_chain_state {false};
+    bool active_chain_has_current_accepted_step_index {false};
+    bool active_chain_has_surfaced_follow_up_task_instance_id {false};
+    bool active_chain_is_broken {false};
 };
 
 struct TaskBoardState final

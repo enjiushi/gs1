@@ -13,11 +13,17 @@ namespace gs1
 class CampaignFlowSystem final : public IRuntimeSystem
 {
 public:
-    static constexpr std::array<StateSetId, 4> k_owned_state_sets {
+    static constexpr std::array<StateSetId, 10> k_owned_state_sets {
         StateSetId::AppState,
         StateSetId::CampaignCore,
-        StateSetId::CampaignRegionalMap,
-        StateSetId::CampaignSites};
+        StateSetId::CampaignRegionalMapMeta,
+        StateSetId::CampaignRegionalMapRevealedSites,
+        StateSetId::CampaignRegionalMapAvailableSites,
+        StateSetId::CampaignRegionalMapCompletedSites,
+        StateSetId::CampaignSiteMetaEntries,
+        StateSetId::CampaignSiteAdjacentIds,
+        StateSetId::CampaignSiteExportedSupportItems,
+        StateSetId::CampaignSiteNearbyAuraModifierIds};
     [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
     {
         return k_owned_state_sets;

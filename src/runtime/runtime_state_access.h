@@ -1,6 +1,7 @@
 #pragma once
 
 #include "runtime/game_state.h"
+#include "runtime/runtime_split_state_compat.h"
 #include "runtime/state_manager.h"
 #include "gs1/status.h"
 
@@ -106,6 +107,23 @@ public:
         return *runtime_messages_;
     }
 
+    [[nodiscard]] RegionalMapState& compat_campaign_regional_map_state();
+    [[nodiscard]] LoadoutPlannerState& compat_campaign_loadout_planner_state();
+    [[nodiscard]] std::vector<SiteMetaState>& compat_campaign_sites_state();
+
+    [[nodiscard]] InventoryState& compat_inventory_state();
+    [[nodiscard]] ContractorState& compat_contractor_state();
+    [[nodiscard]] TaskBoardState& compat_task_board_state();
+    [[nodiscard]] ModifierState& compat_modifier_state();
+    [[nodiscard]] EconomyState& compat_economy_state();
+    [[nodiscard]] ActionState& compat_action_state();
+    [[nodiscard]] SiteObjectiveState& compat_objective_state();
+    [[nodiscard]] LocalWeatherResolveState& compat_local_weather_resolve_state();
+    [[nodiscard]] PlantWeatherContributionState& compat_plant_weather_contribution_state();
+    [[nodiscard]] DeviceWeatherContributionState& compat_device_weather_contribution_state();
+
+    void flush_compatibility_state();
+
     void push_game_message(const GameMessage& message);
     void push_runtime_message(const Gs1RuntimeMessage& message);
 
@@ -121,6 +139,19 @@ private:
     RuntimeMoveDirectionSnapshot move_direction_ {};
     std::deque<Gs1RuntimeMessage>* runtime_messages_ {nullptr};
     GameMessageQueue* game_messages_ {nullptr};
+    std::optional<RegionalMapState> compat_campaign_regional_map_ {};
+    std::optional<LoadoutPlannerState> compat_campaign_loadout_planner_ {};
+    std::optional<std::vector<SiteMetaState>> compat_campaign_sites_ {};
+    std::optional<InventoryState> compat_inventory_ {};
+    std::optional<ContractorState> compat_contractor_ {};
+    std::optional<TaskBoardState> compat_task_board_ {};
+    std::optional<ModifierState> compat_modifier_ {};
+    std::optional<EconomyState> compat_economy_ {};
+    std::optional<ActionState> compat_action_ {};
+    std::optional<SiteObjectiveState> compat_objective_ {};
+    std::optional<LocalWeatherResolveState> compat_local_weather_resolve_ {};
+    std::optional<PlantWeatherContributionState> compat_plant_weather_contribution_ {};
+    std::optional<DeviceWeatherContributionState> compat_device_weather_contribution_ {};
 };
 
 template <class Tag>
@@ -140,7 +171,7 @@ inline decltype(auto) runtime_invocation_state_ref<RuntimeAppStateTag>(RuntimeIn
 template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeCampaignRegionalMapTag>(RuntimeInvocation& invocation)
 {
-    return invocation.state_manager_->state<StateSetId::CampaignRegionalMap>(*invocation.owned_state_).value();
+    return invocation.compat_campaign_regional_map_state();
 }
 
 template <>
@@ -160,13 +191,13 @@ template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeCampaignLoadoutPlannerTag>(
     RuntimeInvocation& invocation)
 {
-    return invocation.state_manager_->state<StateSetId::CampaignLoadoutPlanner>(*invocation.owned_state_).value();
+    return invocation.compat_campaign_loadout_planner_state();
 }
 
 template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeCampaignSitesTag>(RuntimeInvocation& invocation)
 {
-    return invocation.state_manager_->state<StateSetId::CampaignSites>(*invocation.owned_state_).value();
+    return invocation.compat_campaign_sites_state();
 }
 
 template <>
@@ -190,8 +221,8 @@ inline decltype(auto) runtime_invocation_state_ref<RuntimeMoveDirectionTag>(Runt
 
     if (invocation.state_manager_ != nullptr && invocation.owned_state_ != nullptr)
     {
-        return invocation.state_manager_->state<StateSetId::MoveDirection>(*invocation.owned_state_);
-    }
+    return invocation.state_manager_->state<StateSetId::MoveDirection>(*invocation.owned_state_);
+}
 
     return (invocation.move_direction_);
 }

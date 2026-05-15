@@ -1891,7 +1891,8 @@ bool craft_ingredients_available_for_action(
         world.read_inventory(),
         world.ecs_world_ptr(),
         world.read_worker().position.tile_coord,
-        world.read_craft(),
+        world.read_craft_device_caches(),
+        world.read_craft_nearby_items(),
         device_entity_id,
         target_tile);
     return craft_logic::can_satisfy_recipe_requirements(

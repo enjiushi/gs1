@@ -8,6 +8,7 @@
 #include "runtime/game_state_view.h"
 #include "runtime/runtime_clock.h"
 #include "runtime/system_interface.h"
+#include "site/site_world.h"
 #include "gs1/status.h"
 #include "gs1/types.h"
 
@@ -15,6 +16,7 @@
 #include <cstdint>
 #include <deque>
 #include <memory>
+#include <utility>
 #include <optional>
 #include <string>
 #include <vector>
@@ -54,6 +56,9 @@ public:
     {
         return state().runtime_messages;
     }
+    void set_site_world(SiteWorld* site_world) noexcept { site_world_ = site_world; }
+    [[nodiscard]] SiteWorld* site_world() noexcept { return site_world_; }
+    [[nodiscard]] const SiteWorld* site_world() const noexcept { return site_world_; }
     [[nodiscard]] Gs1Status handle_message(const GameMessage& message);
     friend struct GameRuntimeProjectionTestAccess;
     friend class RuntimeInvocation;
@@ -87,6 +92,7 @@ private:
 private:
     Gs1RuntimeCreateDesc create_desc_ {};
     std::string adapter_config_json_utf8_ {};
+    SiteWorld* site_world_ {nullptr};
     StateManager state_manager_ {};
     GameState& state_;
     RuntimeGameStateViewCache state_view_cache_ {};

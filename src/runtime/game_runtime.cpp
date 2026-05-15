@@ -26,6 +26,7 @@
 #include "site/systems/task_board_system.h"
 #include "site/systems/weather_event_system.h"
 #include "site/systems/worker_condition_system.h"
+#include "site/site_world.h"
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -265,6 +266,204 @@ RuntimeInvocation::RuntimeInvocation(
         move_direction_z,
         move_direction_present};
     state_manager_->state<StateSetId::MoveDirection>(state) = move_direction_;
+}
+
+RegionalMapState& RuntimeInvocation::compat_campaign_regional_map_state()
+{
+    if (!compat_campaign_regional_map_.has_value())
+    {
+        compat_campaign_regional_map_ =
+            assemble_regional_map_state_from_state_sets(*owned_state_, *state_manager_);
+    }
+    return *compat_campaign_regional_map_;
+}
+
+LoadoutPlannerState& RuntimeInvocation::compat_campaign_loadout_planner_state()
+{
+    if (!compat_campaign_loadout_planner_.has_value())
+    {
+        compat_campaign_loadout_planner_ =
+            assemble_loadout_planner_state_from_state_sets(*owned_state_, *state_manager_);
+    }
+    return *compat_campaign_loadout_planner_;
+}
+
+std::vector<SiteMetaState>& RuntimeInvocation::compat_campaign_sites_state()
+{
+    if (!compat_campaign_sites_.has_value())
+    {
+        compat_campaign_sites_ = assemble_sites_state_from_state_sets(*owned_state_, *state_manager_);
+    }
+    return *compat_campaign_sites_;
+}
+
+InventoryState& RuntimeInvocation::compat_inventory_state()
+{
+    if (!compat_inventory_.has_value())
+    {
+        compat_inventory_ = assemble_inventory_state_from_state_sets(*owned_state_, *state_manager_);
+    }
+    return *compat_inventory_;
+}
+
+ContractorState& RuntimeInvocation::compat_contractor_state()
+{
+    if (!compat_contractor_.has_value())
+    {
+        compat_contractor_ = assemble_contractor_state_from_state_sets(*owned_state_, *state_manager_);
+    }
+    return *compat_contractor_;
+}
+
+TaskBoardState& RuntimeInvocation::compat_task_board_state()
+{
+    if (!compat_task_board_.has_value())
+    {
+        compat_task_board_ = assemble_task_board_state_from_state_sets(*owned_state_, *state_manager_);
+    }
+    return *compat_task_board_;
+}
+
+ModifierState& RuntimeInvocation::compat_modifier_state()
+{
+    if (!compat_modifier_.has_value())
+    {
+        compat_modifier_ = assemble_modifier_state_from_state_sets(*owned_state_, *state_manager_);
+    }
+    return *compat_modifier_;
+}
+
+EconomyState& RuntimeInvocation::compat_economy_state()
+{
+    if (!compat_economy_.has_value())
+    {
+        compat_economy_ = assemble_economy_state_from_state_sets(*owned_state_, *state_manager_);
+    }
+    return *compat_economy_;
+}
+
+ActionState& RuntimeInvocation::compat_action_state()
+{
+    if (!compat_action_.has_value())
+    {
+        compat_action_ = assemble_action_state_from_state_sets(*owned_state_, *state_manager_);
+    }
+    return *compat_action_;
+}
+
+SiteObjectiveState& RuntimeInvocation::compat_objective_state()
+{
+    if (!compat_objective_.has_value())
+    {
+        compat_objective_ = assemble_site_objective_state_from_state_sets(*owned_state_, *state_manager_);
+    }
+    return *compat_objective_;
+}
+
+LocalWeatherResolveState& RuntimeInvocation::compat_local_weather_resolve_state()
+{
+    if (!compat_local_weather_resolve_.has_value())
+    {
+        compat_local_weather_resolve_ =
+            assemble_local_weather_resolve_state_from_state_sets(*owned_state_, *state_manager_);
+    }
+    return *compat_local_weather_resolve_;
+}
+
+PlantWeatherContributionState& RuntimeInvocation::compat_plant_weather_contribution_state()
+{
+    if (!compat_plant_weather_contribution_.has_value())
+    {
+        compat_plant_weather_contribution_ =
+            assemble_plant_weather_contribution_state_from_state_sets(*owned_state_, *state_manager_);
+    }
+    return *compat_plant_weather_contribution_;
+}
+
+DeviceWeatherContributionState& RuntimeInvocation::compat_device_weather_contribution_state()
+{
+    if (!compat_device_weather_contribution_.has_value())
+    {
+        compat_device_weather_contribution_ =
+            assemble_device_weather_contribution_state_from_state_sets(*owned_state_, *state_manager_);
+    }
+    return *compat_device_weather_contribution_;
+}
+
+void RuntimeInvocation::flush_compatibility_state()
+{
+    if (owned_state_ == nullptr || state_manager_ == nullptr)
+    {
+        return;
+    }
+
+    if (compat_campaign_regional_map_.has_value())
+    {
+        write_regional_map_state_to_state_sets(
+            *compat_campaign_regional_map_,
+            *owned_state_,
+            *state_manager_);
+    }
+    if (compat_campaign_loadout_planner_.has_value())
+    {
+        write_loadout_planner_state_to_state_sets(
+            *compat_campaign_loadout_planner_,
+            *owned_state_,
+            *state_manager_);
+    }
+    if (compat_campaign_sites_.has_value())
+    {
+        write_sites_state_to_state_sets(*compat_campaign_sites_, *owned_state_, *state_manager_);
+    }
+    if (compat_inventory_.has_value())
+    {
+        write_inventory_state_to_state_sets(*compat_inventory_, *owned_state_, *state_manager_);
+    }
+    if (compat_contractor_.has_value())
+    {
+        write_contractor_state_to_state_sets(*compat_contractor_, *owned_state_, *state_manager_);
+    }
+    if (compat_task_board_.has_value())
+    {
+        write_task_board_state_to_state_sets(*compat_task_board_, *owned_state_, *state_manager_);
+    }
+    if (compat_modifier_.has_value())
+    {
+        write_modifier_state_to_state_sets(*compat_modifier_, *owned_state_, *state_manager_);
+    }
+    if (compat_economy_.has_value())
+    {
+        write_economy_state_to_state_sets(*compat_economy_, *owned_state_, *state_manager_);
+    }
+    if (compat_action_.has_value())
+    {
+        write_action_state_to_state_sets(*compat_action_, *owned_state_, *state_manager_);
+    }
+    if (compat_objective_.has_value())
+    {
+        write_site_objective_state_to_state_sets(*compat_objective_, *owned_state_, *state_manager_);
+    }
+    if (compat_local_weather_resolve_.has_value())
+    {
+        write_local_weather_resolve_state_to_state_sets(
+            *compat_local_weather_resolve_,
+            *owned_state_,
+            *state_manager_);
+    }
+    if (compat_plant_weather_contribution_.has_value())
+    {
+        write_plant_weather_contribution_state_to_state_sets(
+            *compat_plant_weather_contribution_,
+            *owned_state_,
+            *state_manager_);
+    }
+    if (compat_device_weather_contribution_.has_value())
+    {
+        write_device_weather_contribution_state_to_state_sets(
+            *compat_device_weather_contribution_,
+            *owned_state_,
+            *state_manager_);
+    }
 }
 
 void RuntimeInvocation::push_game_message(const GameMessage& message)
@@ -642,8 +841,7 @@ Gs1Status GameRuntime::query_site_tile_view(std::uint32_t tile_index, Gs1SiteTil
         return GS1_STATUS_INVALID_STATE;
     }
 
-    const auto& world = state_manager_.query<StateSetId::SiteWorld>(state());
-    return build_site_tile_view(world->site_world.get(), tile_index, out_tile)
+    return build_site_tile_view(site_world(), tile_index, out_tile)
         ? GS1_STATUS_OK
         : GS1_STATUS_INVALID_ARGUMENT;
 }
@@ -713,6 +911,7 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
                     return system->process_game_message(invocation, message);
                 })
             : system->process_game_message(invocation, message);
+        invocation.flush_compatibility_state();
         if (status != GS1_STATUS_OK)
         {
             return status;
@@ -765,6 +964,7 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
         }
 
         const auto status = system->process_host_message(invocation, message);
+        invocation.flush_compatibility_state();
         if (status != GS1_STATUS_OK)
         {
             return status;
@@ -808,6 +1008,7 @@ void GameRuntime::run_fixed_step()
         if (!profile_id.has_value())
         {
             system->run(invocation);
+            invocation.flush_compatibility_state();
             continue;
         }
 
@@ -816,6 +1017,7 @@ void GameRuntime::run_fixed_step()
             [&]()
             {
                 system->run(invocation);
+                invocation.flush_compatibility_state();
             });
     }
 

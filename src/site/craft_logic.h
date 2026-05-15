@@ -39,6 +39,14 @@ std::vector<std::uint64_t> collect_nearby_item_instance_ids(
     SiteRunState& site_run,
     TileCoord device_tile);
 
+CraftDeviceCacheEntryState* find_device_cache(
+    std::vector<CraftDeviceCacheEntryState>& device_caches,
+    std::uint64_t device_entity_id) noexcept;
+
+const CraftDeviceCacheEntryState* find_device_cache(
+    const std::vector<CraftDeviceCacheEntryState>& device_caches,
+    std::uint64_t device_entity_id) noexcept;
+
 CraftDeviceCacheState* find_device_cache(
     CraftState& craft_state,
     std::uint64_t device_entity_id) noexcept;
@@ -51,13 +59,15 @@ std::vector<std::uint64_t> nearby_item_instance_ids_for_device(
     const InventoryState& inventory,
     flecs::world* world,
     TileCoord worker_tile,
-    const CraftState& craft_state,
+    const std::vector<CraftDeviceCacheEntryState>& device_caches,
+    const std::vector<std::uint64_t>& nearby_items,
     std::uint64_t device_entity_id,
     TileCoord device_tile);
 
 std::vector<std::uint64_t> nearby_item_instance_ids_for_device(
     SiteRunState& site_run,
-    const CraftState& craft_state,
+    const std::vector<CraftDeviceCacheEntryState>& device_caches,
+    const std::vector<std::uint64_t>& nearby_items,
     std::uint64_t device_entity_id,
     TileCoord device_tile);
 

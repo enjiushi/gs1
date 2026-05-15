@@ -24,7 +24,6 @@
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <optional>
 #include <type_traits>
 #include <utility>
@@ -64,40 +63,80 @@ struct SiteRunMetaState final
     std::uint32_t result_newly_revealed_site_count {0};
 };
 
-struct SiteWorldState final
-{
-    std::shared_ptr<SiteWorld> site_world {};
-};
-
 enum class StateSetId : std::uint8_t
 {
     AppState = 0,
     FixedStepSeconds,
     MoveDirection,
     CampaignCore,
-    CampaignRegionalMap,
+    CampaignRegionalMapMeta,
+    CampaignRegionalMapRevealedSites,
+    CampaignRegionalMapAvailableSites,
+    CampaignRegionalMapCompletedSites,
     CampaignFactionProgress,
     CampaignTechnology,
-    CampaignLoadoutPlanner,
-    CampaignSites,
+    CampaignLoadoutPlannerMeta,
+    CampaignLoadoutPlannerBaselineItems,
+    CampaignLoadoutPlannerAvailableSupportItems,
+    CampaignLoadoutPlannerSelectedSlots,
+    CampaignLoadoutPlannerNearbyAuraModifiers,
+    CampaignSiteMetaEntries,
+    CampaignSiteAdjacentIds,
+    CampaignSiteExportedSupportItems,
+    CampaignSiteNearbyAuraModifierIds,
     SiteRunMeta,
-    SiteWorld,
     SiteClock,
     SiteCamp,
-    SiteInventory,
-    SiteContractor,
+    SiteInventoryMeta,
+    SiteInventoryStorageContainers,
+    SiteInventoryStorageSlotItemIds,
+    SiteInventoryWorkerPackSlots,
+    SiteInventoryPendingDeliveries,
+    SiteInventoryPendingDeliveryItemStacks,
+    SiteContractorMeta,
+    SiteContractorWorkOrders,
     SiteWeather,
     SiteEvent,
-    SiteTaskBoard,
-    SiteModifier,
-    SiteEconomy,
-    SiteCraft,
-    SiteAction,
+    SiteTaskBoardMeta,
+    SiteTaskBoardVisibleTasks,
+    SiteTaskBoardRewardDraftOptions,
+    SiteTaskBoardTrackedTiles,
+    SiteTaskBoardAcceptedTaskIds,
+    SiteTaskBoardCompletedTaskIds,
+    SiteTaskBoardClaimedTaskIds,
+    SiteModifierMeta,
+    SiteModifierNearbyAuraIds,
+    SiteModifierActiveSiteModifiers,
+    SiteEconomyMeta,
+    SiteEconomyRevealedUnlockableIds,
+    SiteEconomyDirectPurchaseUnlockableIds,
+    SiteEconomyPhoneListings,
+    SiteCraftDeviceCacheRuntime,
+    SiteCraftDeviceCaches,
+    SiteCraftNearbyItems,
+    SiteCraftPhoneCacheMeta,
+    SiteCraftPhoneItems,
+    SiteCraftContextMeta,
+    SiteCraftContextOptions,
+    SiteActionMeta,
+    SiteActionReservedInputItemStacks,
+    SiteActionResolvedHarvestOutputs,
     SiteCounters,
-    SiteObjective,
-    SiteLocalWeatherResolve,
-    SitePlantWeatherContribution,
-    SiteDeviceWeatherContribution,
+    SiteObjectiveMeta,
+    SiteObjectiveTargetTileIndices,
+    SiteObjectiveTargetTileMask,
+    SiteObjectiveConnectionStartTileIndices,
+    SiteObjectiveConnectionStartTileMask,
+    SiteObjectiveConnectionGoalTileIndices,
+    SiteObjectiveConnectionGoalTileMask,
+    SiteLocalWeatherResolveMeta,
+    SiteLocalWeatherResolveLastTotalContributions,
+    SitePlantWeatherContributionMeta,
+    SitePlantWeatherContributionDirtyTileIndices,
+    SitePlantWeatherContributionDirtyTileMask,
+    SiteDeviceWeatherContributionMeta,
+    SiteDeviceWeatherContributionDirtyTileIndices,
+    SiteDeviceWeatherContributionDirtyTileMask,
     Count
 };
 
@@ -184,39 +223,226 @@ struct alignas(64) CacheAlignedStateSet<std::optional<T>> final
     [[nodiscard]] const T& operator*() const noexcept { return value.operator*(); }
 };
 
+template <class T>
+struct ContainerStateSet final
+{
+    std::optional<T> value {};
+
+    ContainerStateSet() = default;
+    explicit ContainerStateSet(const std::optional<T>& initial_value)
+        : value(initial_value)
+    {
+    }
+    explicit ContainerStateSet(std::optional<T>&& initial_value)
+        : value(std::move(initial_value))
+    {
+    }
+    ContainerStateSet(const ContainerStateSet&) = default;
+    ContainerStateSet(ContainerStateSet&&) noexcept = default;
+    ContainerStateSet& operator=(const ContainerStateSet&) = default;
+    ContainerStateSet& operator=(ContainerStateSet&&) noexcept = default;
+
+    template <class U>
+        requires std::assignable_from<std::optional<T>&, U&&>
+    ContainerStateSet& operator=(U&& next_value)
+    {
+        value = std::forward<U>(next_value);
+        return *this;
+    }
+
+    [[nodiscard]] std::optional<T>& get() noexcept { return value; }
+    [[nodiscard]] const std::optional<T>& get() const noexcept { return value; }
+
+    [[nodiscard]] operator std::optional<T>&() noexcept { return value; }
+    [[nodiscard]] operator const std::optional<T>&() const noexcept { return value; }
+
+    [[nodiscard]] bool has_value() const noexcept { return value.has_value(); }
+    [[nodiscard]] T& value_ref() { return value.value(); }
+    [[nodiscard]] const T& value_ref() const { return value.value(); }
+    [[nodiscard]] T& value_or_die() { return value.value(); }
+    [[nodiscard]] const T& value_or_die() const { return value.value(); }
+    void reset() noexcept { value.reset(); }
+
+    [[nodiscard]] T* operator->() noexcept { return value.operator->(); }
+    [[nodiscard]] const T* operator->() const noexcept { return value.operator->(); }
+    [[nodiscard]] T& operator*() noexcept { return value.operator*(); }
+    [[nodiscard]] const T& operator*() const noexcept { return value.operator*(); }
+};
+
+template <class T>
+struct ContainerStateSet<std::optional<T>> final
+{
+    std::optional<T> value {};
+
+    ContainerStateSet() = default;
+    explicit ContainerStateSet(const std::optional<T>& initial_value)
+        : value(initial_value)
+    {
+    }
+    explicit ContainerStateSet(std::optional<T>&& initial_value)
+        : value(std::move(initial_value))
+    {
+    }
+    ContainerStateSet(const ContainerStateSet&) = default;
+    ContainerStateSet(ContainerStateSet&&) noexcept = default;
+    ContainerStateSet& operator=(const ContainerStateSet&) = default;
+    ContainerStateSet& operator=(ContainerStateSet&&) noexcept = default;
+
+    template <class U>
+        requires std::assignable_from<std::optional<T>&, U&&>
+    ContainerStateSet& operator=(U&& next_value)
+    {
+        value = std::forward<U>(next_value);
+        return *this;
+    }
+
+    [[nodiscard]] std::optional<T>& get() noexcept { return value; }
+    [[nodiscard]] const std::optional<T>& get() const noexcept { return value; }
+
+    [[nodiscard]] operator std::optional<T>&() noexcept { return value; }
+    [[nodiscard]] operator const std::optional<T>&() const noexcept { return value; }
+
+    [[nodiscard]] bool has_value() const noexcept { return value.has_value(); }
+    [[nodiscard]] T& value_ref() { return value.value(); }
+    [[nodiscard]] const T& value_ref() const { return value.value(); }
+    [[nodiscard]] T& value_or_die() { return value.value(); }
+    [[nodiscard]] const T& value_or_die() const { return value.value(); }
+    void reset() noexcept { value.reset(); }
+
+    [[nodiscard]] T* operator->() noexcept { return value.operator->(); }
+    [[nodiscard]] const T* operator->() const noexcept { return value.operator->(); }
+    [[nodiscard]] T& operator*() noexcept { return value.operator*(); }
+    [[nodiscard]] const T& operator*() const noexcept { return value.operator*(); }
+};
+
 using RuntimeAppStateSet = CacheAlignedStateSet<Gs1AppState>;
 using RuntimeFixedStepSecondsStateSet = CacheAlignedStateSet<double>;
 using RuntimeMoveDirectionStateSet = CacheAlignedStateSet<RuntimeMoveDirectionSnapshot>;
 
 using RuntimeCampaignCoreStateSet = CacheAlignedStateSet<std::optional<CampaignCoreState>>;
-using RuntimeCampaignRegionalMapStateSet = CacheAlignedStateSet<std::optional<RegionalMapState>>;
+using RuntimeCampaignRegionalMapMetaStateSet =
+    CacheAlignedStateSet<std::optional<RegionalMapMetaState>>;
+using RuntimeCampaignRegionalMapRevealedSitesStateSet =
+    ContainerStateSet<std::optional<std::vector<SiteId>>>;
+using RuntimeCampaignRegionalMapAvailableSitesStateSet =
+    ContainerStateSet<std::optional<std::vector<SiteId>>>;
+using RuntimeCampaignRegionalMapCompletedSitesStateSet =
+    ContainerStateSet<std::optional<std::vector<SiteId>>>;
 using RuntimeCampaignFactionProgressStateSet =
-    CacheAlignedStateSet<std::optional<std::vector<FactionProgressState>>>;
+    ContainerStateSet<std::optional<std::vector<FactionProgressState>>>;
 using RuntimeCampaignTechnologyStateSet = CacheAlignedStateSet<std::optional<TechnologyState>>;
-using RuntimeCampaignLoadoutPlannerStateSet = CacheAlignedStateSet<std::optional<LoadoutPlannerState>>;
-using RuntimeCampaignSitesStateSet = CacheAlignedStateSet<std::optional<std::vector<SiteMetaState>>>;
+using RuntimeCampaignLoadoutPlannerMetaStateSet =
+    CacheAlignedStateSet<std::optional<LoadoutPlannerMetaState>>;
+using RuntimeCampaignLoadoutPlannerBaselineItemsStateSet =
+    ContainerStateSet<std::optional<std::vector<LoadoutSlot>>>;
+using RuntimeCampaignLoadoutPlannerAvailableSupportItemsStateSet =
+    ContainerStateSet<std::optional<std::vector<LoadoutSlot>>>;
+using RuntimeCampaignLoadoutPlannerSelectedSlotsStateSet =
+    ContainerStateSet<std::optional<std::vector<LoadoutSlot>>>;
+using RuntimeCampaignLoadoutPlannerNearbyAuraModifiersStateSet =
+    ContainerStateSet<std::optional<std::vector<ModifierId>>>;
+using RuntimeCampaignSiteMetaEntriesStateSet =
+    ContainerStateSet<std::optional<std::vector<SiteMetaEntryState>>>;
+using RuntimeCampaignSiteAdjacentIdsStateSet =
+    ContainerStateSet<std::optional<std::vector<SiteId>>>;
+using RuntimeCampaignSiteExportedSupportItemsStateSet =
+    ContainerStateSet<std::optional<std::vector<LoadoutSlot>>>;
+using RuntimeCampaignSiteNearbyAuraModifierIdsStateSet =
+    ContainerStateSet<std::optional<std::vector<ModifierId>>>;
 
 using RuntimeSiteRunMetaStateSet = CacheAlignedStateSet<std::optional<SiteRunMetaState>>;
-using RuntimeSiteWorldStateSet = CacheAlignedStateSet<std::optional<SiteWorldState>>;
 using RuntimeSiteClockStateSet = CacheAlignedStateSet<std::optional<SiteClockState>>;
 using RuntimeSiteCampStateSet = CacheAlignedStateSet<std::optional<CampState>>;
-using RuntimeSiteInventoryStateSet = CacheAlignedStateSet<std::optional<InventoryState>>;
-using RuntimeSiteContractorStateSet = CacheAlignedStateSet<std::optional<ContractorState>>;
+using RuntimeSiteInventoryMetaStateSet = CacheAlignedStateSet<std::optional<InventoryMetaState>>;
+using RuntimeSiteInventoryStorageContainersStateSet =
+    ContainerStateSet<std::optional<std::vector<StorageContainerEntryState>>>;
+using RuntimeSiteInventoryStorageSlotItemIdsStateSet =
+    ContainerStateSet<std::optional<std::vector<std::uint64_t>>>;
+using RuntimeSiteInventoryWorkerPackSlotsStateSet =
+    ContainerStateSet<std::optional<std::vector<InventorySlot>>>;
+using RuntimeSiteInventoryPendingDeliveriesStateSet =
+    ContainerStateSet<std::optional<std::vector<PendingDeliveryEntryState>>>;
+using RuntimeSiteInventoryPendingDeliveryItemStacksStateSet =
+    ContainerStateSet<std::optional<std::vector<InventorySlot>>>;
+using RuntimeSiteContractorMetaStateSet = CacheAlignedStateSet<std::optional<ContractorMetaState>>;
+using RuntimeSiteContractorWorkOrdersStateSet =
+    ContainerStateSet<std::optional<std::vector<WorkOrderEntryState>>>;
 using RuntimeSiteWeatherStateSet = CacheAlignedStateSet<std::optional<WeatherState>>;
 using RuntimeSiteEventStateSet = CacheAlignedStateSet<std::optional<EventState>>;
-using RuntimeSiteTaskBoardStateSet = CacheAlignedStateSet<std::optional<TaskBoardState>>;
-using RuntimeSiteModifierStateSet = CacheAlignedStateSet<std::optional<ModifierState>>;
-using RuntimeSiteEconomyStateSet = CacheAlignedStateSet<std::optional<EconomyState>>;
-using RuntimeSiteCraftStateSet = CacheAlignedStateSet<std::optional<CraftState>>;
-using RuntimeSiteActionStateSet = CacheAlignedStateSet<std::optional<ActionState>>;
+using RuntimeSiteTaskBoardMetaStateSet = CacheAlignedStateSet<std::optional<TaskBoardMetaState>>;
+using RuntimeSiteTaskBoardVisibleTasksStateSet =
+    ContainerStateSet<std::optional<std::vector<TaskInstanceEntryState>>>;
+using RuntimeSiteTaskBoardRewardDraftOptionsStateSet =
+    ContainerStateSet<std::optional<std::vector<TaskRewardDraftOption>>>;
+using RuntimeSiteTaskBoardTrackedTilesStateSet =
+    ContainerStateSet<std::optional<std::vector<TaskTrackedTileState>>>;
+using RuntimeSiteTaskBoardAcceptedTaskIdsStateSet =
+    ContainerStateSet<std::optional<std::vector<TaskInstanceId>>>;
+using RuntimeSiteTaskBoardCompletedTaskIdsStateSet =
+    ContainerStateSet<std::optional<std::vector<TaskInstanceId>>>;
+using RuntimeSiteTaskBoardClaimedTaskIdsStateSet =
+    ContainerStateSet<std::optional<std::vector<TaskInstanceId>>>;
+using RuntimeSiteModifierMetaStateSet = CacheAlignedStateSet<std::optional<ModifierMetaState>>;
+using RuntimeSiteModifierNearbyAuraIdsStateSet =
+    ContainerStateSet<std::optional<std::vector<ModifierId>>>;
+using RuntimeSiteModifierActiveSiteModifiersStateSet =
+    ContainerStateSet<std::optional<std::vector<ActiveSiteModifierState>>>;
+using RuntimeSiteEconomyMetaStateSet = CacheAlignedStateSet<std::optional<EconomyMetaState>>;
+using RuntimeSiteEconomyRevealedUnlockableIdsStateSet =
+    ContainerStateSet<std::optional<std::vector<std::uint32_t>>>;
+using RuntimeSiteEconomyDirectPurchaseUnlockableIdsStateSet =
+    ContainerStateSet<std::optional<std::vector<std::uint32_t>>>;
+using RuntimeSiteEconomyPhoneListingsStateSet =
+    ContainerStateSet<std::optional<std::vector<PhoneListingState>>>;
+using RuntimeSiteCraftDeviceCacheRuntimeStateSet =
+    CacheAlignedStateSet<std::optional<CraftDeviceCacheRuntimeState>>;
+using RuntimeSiteCraftDeviceCachesStateSet =
+    ContainerStateSet<std::optional<std::vector<CraftDeviceCacheEntryState>>>;
+using RuntimeSiteCraftNearbyItemsStateSet =
+    ContainerStateSet<std::optional<std::vector<std::uint64_t>>>;
+using RuntimeSiteCraftPhoneCacheMetaStateSet =
+    CacheAlignedStateSet<std::optional<PhoneInventoryCacheMetaState>>;
+using RuntimeSiteCraftPhoneItemsStateSet =
+    ContainerStateSet<std::optional<std::vector<std::uint64_t>>>;
+using RuntimeSiteCraftContextMetaStateSet =
+    CacheAlignedStateSet<std::optional<CraftContextMetaState>>;
+using RuntimeSiteCraftContextOptionsStateSet =
+    ContainerStateSet<std::optional<std::vector<CraftContextOptionState>>>;
+using RuntimeSiteActionMetaStateSet = CacheAlignedStateSet<std::optional<ActionMetaState>>;
+using RuntimeSiteActionReservedInputItemStacksStateSet =
+    ContainerStateSet<std::optional<std::vector<ReservedItemStack>>>;
+using RuntimeSiteActionResolvedHarvestOutputsStateSet =
+    ContainerStateSet<std::optional<std::vector<ResolvedHarvestOutputStack>>>;
 using RuntimeSiteCountersStateSet = CacheAlignedStateSet<std::optional<SiteCounters>>;
-using RuntimeSiteObjectiveStateSet = CacheAlignedStateSet<std::optional<SiteObjectiveState>>;
-using RuntimeSiteLocalWeatherResolveStateSet =
-    CacheAlignedStateSet<std::optional<LocalWeatherResolveState>>;
-using RuntimeSitePlantWeatherContributionStateSet =
-    CacheAlignedStateSet<std::optional<PlantWeatherContributionState>>;
-using RuntimeSiteDeviceWeatherContributionStateSet =
-    CacheAlignedStateSet<std::optional<DeviceWeatherContributionState>>;
+using RuntimeSiteObjectiveMetaStateSet = CacheAlignedStateSet<std::optional<SiteObjectiveMetaState>>;
+using RuntimeSiteObjectiveTargetTileIndicesStateSet =
+    ContainerStateSet<std::optional<std::vector<std::uint32_t>>>;
+using RuntimeSiteObjectiveTargetTileMaskStateSet =
+    ContainerStateSet<std::optional<std::vector<std::uint8_t>>>;
+using RuntimeSiteObjectiveConnectionStartTileIndicesStateSet =
+    ContainerStateSet<std::optional<std::vector<std::uint32_t>>>;
+using RuntimeSiteObjectiveConnectionStartTileMaskStateSet =
+    ContainerStateSet<std::optional<std::vector<std::uint8_t>>>;
+using RuntimeSiteObjectiveConnectionGoalTileIndicesStateSet =
+    ContainerStateSet<std::optional<std::vector<std::uint32_t>>>;
+using RuntimeSiteObjectiveConnectionGoalTileMaskStateSet =
+    ContainerStateSet<std::optional<std::vector<std::uint8_t>>>;
+using RuntimeSiteLocalWeatherResolveMetaStateSet =
+    CacheAlignedStateSet<std::optional<LocalWeatherResolveMetaState>>;
+using RuntimeSiteLocalWeatherResolveLastTotalContributionsStateSet =
+    ContainerStateSet<std::optional<std::vector<SiteWorld::TileWeatherContributionData>>>;
+using RuntimeSitePlantWeatherContributionMetaStateSet =
+    CacheAlignedStateSet<std::optional<PlantWeatherContributionMetaState>>;
+using RuntimeSitePlantWeatherContributionDirtyTileIndicesStateSet =
+    ContainerStateSet<std::optional<std::vector<std::uint32_t>>>;
+using RuntimeSitePlantWeatherContributionDirtyTileMaskStateSet =
+    ContainerStateSet<std::optional<std::vector<std::uint8_t>>>;
+using RuntimeSiteDeviceWeatherContributionMetaStateSet =
+    CacheAlignedStateSet<std::optional<DeviceWeatherContributionMetaState>>;
+using RuntimeSiteDeviceWeatherContributionDirtyTileIndicesStateSet =
+    ContainerStateSet<std::optional<std::vector<std::uint32_t>>>;
+using RuntimeSiteDeviceWeatherContributionDirtyTileMaskStateSet =
+    ContainerStateSet<std::optional<std::vector<std::uint8_t>>>;
 
 template <StateSetId>
 struct state_traits;
@@ -247,10 +473,25 @@ GS1_DEFINE_STATE_TRAITS(
     RuntimeCampaignCoreStateSet,
     false);
 GS1_DEFINE_STATE_TRAITS(
-    StateSetId::CampaignRegionalMap,
-    std::optional<RegionalMapState>,
-    RuntimeCampaignRegionalMapStateSet,
+    StateSetId::CampaignRegionalMapMeta,
+    std::optional<RegionalMapMetaState>,
+    RuntimeCampaignRegionalMapMetaStateSet,
     false);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::CampaignRegionalMapRevealedSites,
+    std::optional<std::vector<SiteId>>,
+    RuntimeCampaignRegionalMapRevealedSitesStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::CampaignRegionalMapAvailableSites,
+    std::optional<std::vector<SiteId>>,
+    RuntimeCampaignRegionalMapAvailableSitesStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::CampaignRegionalMapCompletedSites,
+    std::optional<std::vector<SiteId>>,
+    RuntimeCampaignRegionalMapCompletedSitesStateSet,
+    true);
 GS1_DEFINE_STATE_TRAITS(
     StateSetId::CampaignFactionProgress,
     std::optional<std::vector<FactionProgressState>>,
@@ -262,24 +503,54 @@ GS1_DEFINE_STATE_TRAITS(
     RuntimeCampaignTechnologyStateSet,
     false);
 GS1_DEFINE_STATE_TRAITS(
-    StateSetId::CampaignLoadoutPlanner,
-    std::optional<LoadoutPlannerState>,
-    RuntimeCampaignLoadoutPlannerStateSet,
+    StateSetId::CampaignLoadoutPlannerMeta,
+    std::optional<LoadoutPlannerMetaState>,
+    RuntimeCampaignLoadoutPlannerMetaStateSet,
     false);
 GS1_DEFINE_STATE_TRAITS(
-    StateSetId::CampaignSites,
-    std::optional<std::vector<SiteMetaState>>,
-    RuntimeCampaignSitesStateSet,
+    StateSetId::CampaignLoadoutPlannerBaselineItems,
+    std::optional<std::vector<LoadoutSlot>>,
+    RuntimeCampaignLoadoutPlannerBaselineItemsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::CampaignLoadoutPlannerAvailableSupportItems,
+    std::optional<std::vector<LoadoutSlot>>,
+    RuntimeCampaignLoadoutPlannerAvailableSupportItemsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::CampaignLoadoutPlannerSelectedSlots,
+    std::optional<std::vector<LoadoutSlot>>,
+    RuntimeCampaignLoadoutPlannerSelectedSlotsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::CampaignLoadoutPlannerNearbyAuraModifiers,
+    std::optional<std::vector<ModifierId>>,
+    RuntimeCampaignLoadoutPlannerNearbyAuraModifiersStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::CampaignSiteMetaEntries,
+    std::optional<std::vector<SiteMetaEntryState>>,
+    RuntimeCampaignSiteMetaEntriesStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::CampaignSiteAdjacentIds,
+    std::optional<std::vector<SiteId>>,
+    RuntimeCampaignSiteAdjacentIdsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::CampaignSiteExportedSupportItems,
+    std::optional<std::vector<LoadoutSlot>>,
+    RuntimeCampaignSiteExportedSupportItemsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::CampaignSiteNearbyAuraModifierIds,
+    std::optional<std::vector<ModifierId>>,
+    RuntimeCampaignSiteNearbyAuraModifierIdsStateSet,
     true);
 GS1_DEFINE_STATE_TRAITS(
     StateSetId::SiteRunMeta,
     std::optional<SiteRunMetaState>,
     RuntimeSiteRunMetaStateSet,
-    false);
-GS1_DEFINE_STATE_TRAITS(
-    StateSetId::SiteWorld,
-    std::optional<SiteWorldState>,
-    RuntimeSiteWorldStateSet,
     false);
 GS1_DEFINE_STATE_TRAITS(
     StateSetId::SiteClock,
@@ -292,15 +563,45 @@ GS1_DEFINE_STATE_TRAITS(
     RuntimeSiteCampStateSet,
     false);
 GS1_DEFINE_STATE_TRAITS(
-    StateSetId::SiteInventory,
-    std::optional<InventoryState>,
-    RuntimeSiteInventoryStateSet,
+    StateSetId::SiteInventoryMeta,
+    std::optional<InventoryMetaState>,
+    RuntimeSiteInventoryMetaStateSet,
     false);
 GS1_DEFINE_STATE_TRAITS(
-    StateSetId::SiteContractor,
-    std::optional<ContractorState>,
-    RuntimeSiteContractorStateSet,
+    StateSetId::SiteInventoryStorageContainers,
+    std::optional<std::vector<StorageContainerEntryState>>,
+    RuntimeSiteInventoryStorageContainersStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteInventoryStorageSlotItemIds,
+    std::optional<std::vector<std::uint64_t>>,
+    RuntimeSiteInventoryStorageSlotItemIdsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteInventoryWorkerPackSlots,
+    std::optional<std::vector<InventorySlot>>,
+    RuntimeSiteInventoryWorkerPackSlotsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteInventoryPendingDeliveries,
+    std::optional<std::vector<PendingDeliveryEntryState>>,
+    RuntimeSiteInventoryPendingDeliveriesStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteInventoryPendingDeliveryItemStacks,
+    std::optional<std::vector<InventorySlot>>,
+    RuntimeSiteInventoryPendingDeliveryItemStacksStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteContractorMeta,
+    std::optional<ContractorMetaState>,
+    RuntimeSiteContractorMetaStateSet,
     false);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteContractorWorkOrders,
+    std::optional<std::vector<WorkOrderEntryState>>,
+    RuntimeSiteContractorWorkOrdersStateSet,
+    true);
 GS1_DEFINE_STATE_TRAITS(
     StateSetId::SiteWeather,
     std::optional<WeatherState>,
@@ -312,93 +613,324 @@ GS1_DEFINE_STATE_TRAITS(
     RuntimeSiteEventStateSet,
     false);
 GS1_DEFINE_STATE_TRAITS(
-    StateSetId::SiteTaskBoard,
-    std::optional<TaskBoardState>,
-    RuntimeSiteTaskBoardStateSet,
+    StateSetId::SiteTaskBoardMeta,
+    std::optional<TaskBoardMetaState>,
+    RuntimeSiteTaskBoardMetaStateSet,
     false);
 GS1_DEFINE_STATE_TRAITS(
-    StateSetId::SiteModifier,
-    std::optional<ModifierState>,
-    RuntimeSiteModifierStateSet,
+    StateSetId::SiteTaskBoardVisibleTasks,
+    std::optional<std::vector<TaskInstanceEntryState>>,
+    RuntimeSiteTaskBoardVisibleTasksStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteTaskBoardRewardDraftOptions,
+    std::optional<std::vector<TaskRewardDraftOption>>,
+    RuntimeSiteTaskBoardRewardDraftOptionsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteTaskBoardTrackedTiles,
+    std::optional<std::vector<TaskTrackedTileState>>,
+    RuntimeSiteTaskBoardTrackedTilesStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteTaskBoardAcceptedTaskIds,
+    std::optional<std::vector<TaskInstanceId>>,
+    RuntimeSiteTaskBoardAcceptedTaskIdsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteTaskBoardCompletedTaskIds,
+    std::optional<std::vector<TaskInstanceId>>,
+    RuntimeSiteTaskBoardCompletedTaskIdsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteTaskBoardClaimedTaskIds,
+    std::optional<std::vector<TaskInstanceId>>,
+    RuntimeSiteTaskBoardClaimedTaskIdsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteModifierMeta,
+    std::optional<ModifierMetaState>,
+    RuntimeSiteModifierMetaStateSet,
     false);
 GS1_DEFINE_STATE_TRAITS(
-    StateSetId::SiteEconomy,
-    std::optional<EconomyState>,
-    RuntimeSiteEconomyStateSet,
+    StateSetId::SiteModifierNearbyAuraIds,
+    std::optional<std::vector<ModifierId>>,
+    RuntimeSiteModifierNearbyAuraIdsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteModifierActiveSiteModifiers,
+    std::optional<std::vector<ActiveSiteModifierState>>,
+    RuntimeSiteModifierActiveSiteModifiersStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteEconomyMeta,
+    std::optional<EconomyMetaState>,
+    RuntimeSiteEconomyMetaStateSet,
     false);
 GS1_DEFINE_STATE_TRAITS(
-    StateSetId::SiteCraft,
-    std::optional<CraftState>,
-    RuntimeSiteCraftStateSet,
+    StateSetId::SiteEconomyRevealedUnlockableIds,
+    std::optional<std::vector<std::uint32_t>>,
+    RuntimeSiteEconomyRevealedUnlockableIdsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteEconomyDirectPurchaseUnlockableIds,
+    std::optional<std::vector<std::uint32_t>>,
+    RuntimeSiteEconomyDirectPurchaseUnlockableIdsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteEconomyPhoneListings,
+    std::optional<std::vector<PhoneListingState>>,
+    RuntimeSiteEconomyPhoneListingsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteCraftDeviceCacheRuntime,
+    std::optional<CraftDeviceCacheRuntimeState>,
+    RuntimeSiteCraftDeviceCacheRuntimeStateSet,
     false);
 GS1_DEFINE_STATE_TRAITS(
-    StateSetId::SiteAction,
-    std::optional<ActionState>,
-    RuntimeSiteActionStateSet,
+    StateSetId::SiteCraftDeviceCaches,
+    std::optional<std::vector<CraftDeviceCacheEntryState>>,
+    RuntimeSiteCraftDeviceCachesStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteCraftNearbyItems,
+    std::optional<std::vector<std::uint64_t>>,
+    RuntimeSiteCraftNearbyItemsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteCraftPhoneCacheMeta,
+    std::optional<PhoneInventoryCacheMetaState>,
+    RuntimeSiteCraftPhoneCacheMetaStateSet,
     false);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteCraftPhoneItems,
+    std::optional<std::vector<std::uint64_t>>,
+    RuntimeSiteCraftPhoneItemsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteCraftContextMeta,
+    std::optional<CraftContextMetaState>,
+    RuntimeSiteCraftContextMetaStateSet,
+    false);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteCraftContextOptions,
+    std::optional<std::vector<CraftContextOptionState>>,
+    RuntimeSiteCraftContextOptionsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteActionMeta,
+    std::optional<ActionMetaState>,
+    RuntimeSiteActionMetaStateSet,
+    false);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteActionReservedInputItemStacks,
+    std::optional<std::vector<ReservedItemStack>>,
+    RuntimeSiteActionReservedInputItemStacksStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteActionResolvedHarvestOutputs,
+    std::optional<std::vector<ResolvedHarvestOutputStack>>,
+    RuntimeSiteActionResolvedHarvestOutputsStateSet,
+    true);
 GS1_DEFINE_STATE_TRAITS(
     StateSetId::SiteCounters,
     std::optional<SiteCounters>,
     RuntimeSiteCountersStateSet,
     false);
 GS1_DEFINE_STATE_TRAITS(
-    StateSetId::SiteObjective,
-    std::optional<SiteObjectiveState>,
-    RuntimeSiteObjectiveStateSet,
+    StateSetId::SiteObjectiveMeta,
+    std::optional<SiteObjectiveMetaState>,
+    RuntimeSiteObjectiveMetaStateSet,
     false);
 GS1_DEFINE_STATE_TRAITS(
-    StateSetId::SiteLocalWeatherResolve,
-    std::optional<LocalWeatherResolveState>,
-    RuntimeSiteLocalWeatherResolveStateSet,
+    StateSetId::SiteObjectiveTargetTileIndices,
+    std::optional<std::vector<std::uint32_t>>,
+    RuntimeSiteObjectiveTargetTileIndicesStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteObjectiveTargetTileMask,
+    std::optional<std::vector<std::uint8_t>>,
+    RuntimeSiteObjectiveTargetTileMaskStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteObjectiveConnectionStartTileIndices,
+    std::optional<std::vector<std::uint32_t>>,
+    RuntimeSiteObjectiveConnectionStartTileIndicesStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteObjectiveConnectionStartTileMask,
+    std::optional<std::vector<std::uint8_t>>,
+    RuntimeSiteObjectiveConnectionStartTileMaskStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteObjectiveConnectionGoalTileIndices,
+    std::optional<std::vector<std::uint32_t>>,
+    RuntimeSiteObjectiveConnectionGoalTileIndicesStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteObjectiveConnectionGoalTileMask,
+    std::optional<std::vector<std::uint8_t>>,
+    RuntimeSiteObjectiveConnectionGoalTileMaskStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteLocalWeatherResolveMeta,
+    std::optional<LocalWeatherResolveMetaState>,
+    RuntimeSiteLocalWeatherResolveMetaStateSet,
     false);
 GS1_DEFINE_STATE_TRAITS(
-    StateSetId::SitePlantWeatherContribution,
-    std::optional<PlantWeatherContributionState>,
-    RuntimeSitePlantWeatherContributionStateSet,
+    StateSetId::SiteLocalWeatherResolveLastTotalContributions,
+    std::optional<std::vector<SiteWorld::TileWeatherContributionData>>,
+    RuntimeSiteLocalWeatherResolveLastTotalContributionsStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SitePlantWeatherContributionMeta,
+    std::optional<PlantWeatherContributionMetaState>,
+    RuntimeSitePlantWeatherContributionMetaStateSet,
     false);
 GS1_DEFINE_STATE_TRAITS(
-    StateSetId::SiteDeviceWeatherContribution,
-    std::optional<DeviceWeatherContributionState>,
-    RuntimeSiteDeviceWeatherContributionStateSet,
+    StateSetId::SitePlantWeatherContributionDirtyTileIndices,
+    std::optional<std::vector<std::uint32_t>>,
+    RuntimeSitePlantWeatherContributionDirtyTileIndicesStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SitePlantWeatherContributionDirtyTileMask,
+    std::optional<std::vector<std::uint8_t>>,
+    RuntimeSitePlantWeatherContributionDirtyTileMaskStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteDeviceWeatherContributionMeta,
+    std::optional<DeviceWeatherContributionMetaState>,
+    RuntimeSiteDeviceWeatherContributionMetaStateSet,
     false);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteDeviceWeatherContributionDirtyTileIndices,
+    std::optional<std::vector<std::uint32_t>>,
+    RuntimeSiteDeviceWeatherContributionDirtyTileIndicesStateSet,
+    true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::SiteDeviceWeatherContributionDirtyTileMask,
+    std::optional<std::vector<std::uint8_t>>,
+    RuntimeSiteDeviceWeatherContributionDirtyTileMaskStateSet,
+    true);
 
 #undef GS1_DEFINE_STATE_TRAITS
+
+template <class T>
+struct state_optional_payload
+{
+    using type = T;
+};
+
+template <class T>
+struct state_optional_payload<std::optional<T>>
+{
+    using type = T;
+};
+
+template <class T>
+consteval bool state_payload_is_pointer_free() noexcept
+{
+    return !std::is_pointer_v<T> && !std::is_member_pointer_v<T>;
+}
 
 template <StateSetId Id>
 consteval bool state_contract_is_valid()
 {
+    using state_type = typename state_traits<Id>::type;
     using wrapper_type = typename state_traits<Id>::wrapper_type;
     if constexpr (!state_traits<Id>::k_is_container)
     {
-        return alignof(wrapper_type) >= 64U;
+        using payload_type = typename state_optional_payload<state_type>::type;
+        return
+            alignof(wrapper_type) >= 64U &&
+            std::is_standard_layout_v<payload_type> &&
+            std::is_trivially_copyable_v<payload_type> &&
+            state_payload_is_pointer_free<payload_type>();
     }
+    else
+    {
+        using container_type = typename state_optional_payload<state_type>::type;
+        using element_type = typename container_type::value_type;
 
-    return true;
+        // Container-backed state sets are wrapper handles around dynamic storage,
+        // so they intentionally do not participate in the 64-byte alignment rule.
+        // Their element payloads must still stay POD-like and pointer-free.
+        return std::is_standard_layout_v<element_type> &&
+            std::is_trivially_copyable_v<element_type> &&
+            state_payload_is_pointer_free<element_type>();
+    }
 }
 
 static_assert(state_contract_is_valid<StateSetId::AppState>());
 static_assert(state_contract_is_valid<StateSetId::FixedStepSeconds>());
 static_assert(state_contract_is_valid<StateSetId::MoveDirection>());
 static_assert(state_contract_is_valid<StateSetId::CampaignCore>());
-static_assert(state_contract_is_valid<StateSetId::CampaignRegionalMap>());
+static_assert(state_contract_is_valid<StateSetId::CampaignRegionalMapMeta>());
+static_assert(state_contract_is_valid<StateSetId::CampaignRegionalMapRevealedSites>());
+static_assert(state_contract_is_valid<StateSetId::CampaignRegionalMapAvailableSites>());
+static_assert(state_contract_is_valid<StateSetId::CampaignRegionalMapCompletedSites>());
+static_assert(state_contract_is_valid<StateSetId::CampaignFactionProgress>());
 static_assert(state_contract_is_valid<StateSetId::CampaignTechnology>());
-static_assert(state_contract_is_valid<StateSetId::CampaignLoadoutPlanner>());
+static_assert(state_contract_is_valid<StateSetId::CampaignLoadoutPlannerMeta>());
+static_assert(state_contract_is_valid<StateSetId::CampaignLoadoutPlannerBaselineItems>());
+static_assert(state_contract_is_valid<StateSetId::CampaignLoadoutPlannerAvailableSupportItems>());
+static_assert(state_contract_is_valid<StateSetId::CampaignLoadoutPlannerSelectedSlots>());
+static_assert(state_contract_is_valid<StateSetId::CampaignLoadoutPlannerNearbyAuraModifiers>());
+static_assert(state_contract_is_valid<StateSetId::CampaignSiteMetaEntries>());
+static_assert(state_contract_is_valid<StateSetId::CampaignSiteAdjacentIds>());
+static_assert(state_contract_is_valid<StateSetId::CampaignSiteExportedSupportItems>());
+static_assert(state_contract_is_valid<StateSetId::CampaignSiteNearbyAuraModifierIds>());
 static_assert(state_contract_is_valid<StateSetId::SiteRunMeta>());
-static_assert(state_contract_is_valid<StateSetId::SiteWorld>());
 static_assert(state_contract_is_valid<StateSetId::SiteClock>());
 static_assert(state_contract_is_valid<StateSetId::SiteCamp>());
-static_assert(state_contract_is_valid<StateSetId::SiteInventory>());
-static_assert(state_contract_is_valid<StateSetId::SiteContractor>());
+static_assert(state_contract_is_valid<StateSetId::SiteInventoryMeta>());
+static_assert(state_contract_is_valid<StateSetId::SiteInventoryStorageContainers>());
+static_assert(state_contract_is_valid<StateSetId::SiteInventoryStorageSlotItemIds>());
+static_assert(state_contract_is_valid<StateSetId::SiteInventoryWorkerPackSlots>());
+static_assert(state_contract_is_valid<StateSetId::SiteInventoryPendingDeliveries>());
+static_assert(state_contract_is_valid<StateSetId::SiteInventoryPendingDeliveryItemStacks>());
+static_assert(state_contract_is_valid<StateSetId::SiteContractorMeta>());
+static_assert(state_contract_is_valid<StateSetId::SiteContractorWorkOrders>());
 static_assert(state_contract_is_valid<StateSetId::SiteWeather>());
 static_assert(state_contract_is_valid<StateSetId::SiteEvent>());
-static_assert(state_contract_is_valid<StateSetId::SiteTaskBoard>());
-static_assert(state_contract_is_valid<StateSetId::SiteModifier>());
-static_assert(state_contract_is_valid<StateSetId::SiteEconomy>());
-static_assert(state_contract_is_valid<StateSetId::SiteCraft>());
-static_assert(state_contract_is_valid<StateSetId::SiteAction>());
+static_assert(state_contract_is_valid<StateSetId::SiteTaskBoardMeta>());
+static_assert(state_contract_is_valid<StateSetId::SiteTaskBoardVisibleTasks>());
+static_assert(state_contract_is_valid<StateSetId::SiteTaskBoardRewardDraftOptions>());
+static_assert(state_contract_is_valid<StateSetId::SiteTaskBoardTrackedTiles>());
+static_assert(state_contract_is_valid<StateSetId::SiteTaskBoardAcceptedTaskIds>());
+static_assert(state_contract_is_valid<StateSetId::SiteTaskBoardCompletedTaskIds>());
+static_assert(state_contract_is_valid<StateSetId::SiteTaskBoardClaimedTaskIds>());
+static_assert(state_contract_is_valid<StateSetId::SiteModifierMeta>());
+static_assert(state_contract_is_valid<StateSetId::SiteModifierNearbyAuraIds>());
+static_assert(state_contract_is_valid<StateSetId::SiteModifierActiveSiteModifiers>());
+static_assert(state_contract_is_valid<StateSetId::SiteEconomyMeta>());
+static_assert(state_contract_is_valid<StateSetId::SiteEconomyRevealedUnlockableIds>());
+static_assert(state_contract_is_valid<StateSetId::SiteEconomyDirectPurchaseUnlockableIds>());
+static_assert(state_contract_is_valid<StateSetId::SiteEconomyPhoneListings>());
+static_assert(state_contract_is_valid<StateSetId::SiteCraftDeviceCacheRuntime>());
+static_assert(state_contract_is_valid<StateSetId::SiteCraftDeviceCaches>());
+static_assert(state_contract_is_valid<StateSetId::SiteCraftNearbyItems>());
+static_assert(state_contract_is_valid<StateSetId::SiteCraftPhoneCacheMeta>());
+static_assert(state_contract_is_valid<StateSetId::SiteCraftPhoneItems>());
+static_assert(state_contract_is_valid<StateSetId::SiteCraftContextMeta>());
+static_assert(state_contract_is_valid<StateSetId::SiteCraftContextOptions>());
+static_assert(state_contract_is_valid<StateSetId::SiteActionMeta>());
+static_assert(state_contract_is_valid<StateSetId::SiteActionReservedInputItemStacks>());
+static_assert(state_contract_is_valid<StateSetId::SiteActionResolvedHarvestOutputs>());
 static_assert(state_contract_is_valid<StateSetId::SiteCounters>());
-static_assert(state_contract_is_valid<StateSetId::SiteObjective>());
-static_assert(state_contract_is_valid<StateSetId::SiteLocalWeatherResolve>());
-static_assert(state_contract_is_valid<StateSetId::SitePlantWeatherContribution>());
-static_assert(state_contract_is_valid<StateSetId::SiteDeviceWeatherContribution>());
+static_assert(state_contract_is_valid<StateSetId::SiteObjectiveMeta>());
+static_assert(state_contract_is_valid<StateSetId::SiteObjectiveTargetTileIndices>());
+static_assert(state_contract_is_valid<StateSetId::SiteObjectiveTargetTileMask>());
+static_assert(state_contract_is_valid<StateSetId::SiteObjectiveConnectionStartTileIndices>());
+static_assert(state_contract_is_valid<StateSetId::SiteObjectiveConnectionStartTileMask>());
+static_assert(state_contract_is_valid<StateSetId::SiteObjectiveConnectionGoalTileIndices>());
+static_assert(state_contract_is_valid<StateSetId::SiteObjectiveConnectionGoalTileMask>());
+static_assert(state_contract_is_valid<StateSetId::SiteLocalWeatherResolveMeta>());
+static_assert(state_contract_is_valid<StateSetId::SiteLocalWeatherResolveLastTotalContributions>());
+static_assert(state_contract_is_valid<StateSetId::SitePlantWeatherContributionMeta>());
+static_assert(state_contract_is_valid<StateSetId::SitePlantWeatherContributionDirtyTileIndices>());
+static_assert(state_contract_is_valid<StateSetId::SitePlantWeatherContributionDirtyTileMask>());
+static_assert(state_contract_is_valid<StateSetId::SiteDeviceWeatherContributionMeta>());
+static_assert(state_contract_is_valid<StateSetId::SiteDeviceWeatherContributionDirtyTileIndices>());
+static_assert(state_contract_is_valid<StateSetId::SiteDeviceWeatherContributionDirtyTileMask>());
 }  // namespace gs1

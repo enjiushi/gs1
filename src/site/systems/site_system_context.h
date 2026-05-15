@@ -6,6 +6,7 @@
 #include "site/site_run_state.h"
 #include "site/site_world_access.h"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -766,8 +767,68 @@ public:
     [[nodiscard]] const EconomyState& read_economy() const noexcept { return economy_state(); }
     [[nodiscard]] EconomyState& own_economy() noexcept { return economy_state(); }
 
-    [[nodiscard]] const CraftState& read_craft() const noexcept { return craft_state(); }
-    [[nodiscard]] CraftState& own_craft() noexcept { return craft_state(); }
+    [[nodiscard]] const CraftDeviceCacheRuntimeState& read_craft_device_cache_runtime() const noexcept
+    {
+        return craft_device_cache_runtime_state();
+    }
+    [[nodiscard]] CraftDeviceCacheRuntimeState& own_craft_device_cache_runtime() noexcept
+    {
+        return craft_device_cache_runtime_state();
+    }
+
+    [[nodiscard]] const std::vector<CraftDeviceCacheEntryState>& read_craft_device_caches() const noexcept
+    {
+        return craft_device_caches_state();
+    }
+    [[nodiscard]] std::vector<CraftDeviceCacheEntryState>& own_craft_device_caches() noexcept
+    {
+        return craft_device_caches_state();
+    }
+
+    [[nodiscard]] const std::vector<std::uint64_t>& read_craft_nearby_items() const noexcept
+    {
+        return craft_nearby_items_state();
+    }
+    [[nodiscard]] std::vector<std::uint64_t>& own_craft_nearby_items() noexcept
+    {
+        return craft_nearby_items_state();
+    }
+
+    [[nodiscard]] const PhoneInventoryCacheMetaState& read_craft_phone_cache_meta() const noexcept
+    {
+        return craft_phone_cache_meta_state();
+    }
+    [[nodiscard]] PhoneInventoryCacheMetaState& own_craft_phone_cache_meta() noexcept
+    {
+        return craft_phone_cache_meta_state();
+    }
+
+    [[nodiscard]] const std::vector<std::uint64_t>& read_craft_phone_items() const noexcept
+    {
+        return craft_phone_items_state();
+    }
+    [[nodiscard]] std::vector<std::uint64_t>& own_craft_phone_items() noexcept
+    {
+        return craft_phone_items_state();
+    }
+
+    [[nodiscard]] const CraftContextMetaState& read_craft_context_meta() const noexcept
+    {
+        return craft_context_meta_state();
+    }
+    [[nodiscard]] CraftContextMetaState& own_craft_context_meta() noexcept
+    {
+        return craft_context_meta_state();
+    }
+
+    [[nodiscard]] const std::vector<CraftContextOptionState>& read_craft_context_options() const noexcept
+    {
+        return craft_context_options_state();
+    }
+    [[nodiscard]] std::vector<CraftContextOptionState>& own_craft_context_options() noexcept
+    {
+        return craft_context_options_state();
+    }
 
     [[nodiscard]] const ActionState& read_action() const noexcept { return action_state(); }
     [[nodiscard]] ActionState& own_action() noexcept { return action_state(); }
@@ -808,7 +869,7 @@ private:
     {
         if (invocation_ != nullptr)
         {
-            return invocation_->state_manager()->state<StateSetId::SiteInventory>(*invocation_->owned_state()).value();
+            return invocation_->compat_inventory_state();
         }
 
         return aggregate_site_run().inventory;
@@ -818,8 +879,7 @@ private:
     {
         if (invocation_ != nullptr)
         {
-            return invocation_->state_manager()->state<StateSetId::SiteContractor>(*invocation_->owned_state())
-                .value();
+            return invocation_->compat_contractor_state();
         }
 
         return aggregate_site_run().contractor;
@@ -839,9 +899,7 @@ private:
     {
         if (invocation_ != nullptr)
         {
-            return invocation_->state_manager()
-                ->state<StateSetId::SiteLocalWeatherResolve>(*invocation_->owned_state())
-                .value();
+            return invocation_->compat_local_weather_resolve_state();
         }
 
         return aggregate_site_run().local_weather_resolve;
@@ -851,9 +909,7 @@ private:
     {
         if (invocation_ != nullptr)
         {
-            return invocation_->state_manager()
-                ->state<StateSetId::SitePlantWeatherContribution>(*invocation_->owned_state())
-                .value();
+            return invocation_->compat_plant_weather_contribution_state();
         }
 
         return aggregate_site_run().plant_weather_contribution;
@@ -863,9 +919,7 @@ private:
     {
         if (invocation_ != nullptr)
         {
-            return invocation_->state_manager()
-                ->state<StateSetId::SiteDeviceWeatherContribution>(*invocation_->owned_state())
-                .value();
+            return invocation_->compat_device_weather_contribution_state();
         }
 
         return aggregate_site_run().device_weather_contribution;
@@ -885,8 +939,7 @@ private:
     {
         if (invocation_ != nullptr)
         {
-            return invocation_->state_manager()->state<StateSetId::SiteTaskBoard>(*invocation_->owned_state())
-                .value();
+            return invocation_->compat_task_board_state();
         }
 
         return aggregate_site_run().task_board;
@@ -896,8 +949,7 @@ private:
     {
         if (invocation_ != nullptr)
         {
-            return invocation_->state_manager()->state<StateSetId::SiteModifier>(*invocation_->owned_state())
-                .value();
+            return invocation_->compat_modifier_state();
         }
 
         return aggregate_site_run().modifier;
@@ -907,28 +959,121 @@ private:
     {
         if (invocation_ != nullptr)
         {
-            return invocation_->state_manager()->state<StateSetId::SiteEconomy>(*invocation_->owned_state())
-                .value();
+            return invocation_->compat_economy_state();
         }
 
         return aggregate_site_run().economy;
     }
 
-    [[nodiscard]] CraftState& craft_state() const
+    [[nodiscard]] CraftDeviceCacheRuntimeState& craft_device_cache_runtime_state() const
     {
         if (invocation_ != nullptr)
         {
-            return invocation_->state_manager()->state<StateSetId::SiteCraft>(*invocation_->owned_state()).value();
+            return invocation_->state_manager()
+                ->state<StateSetId::SiteCraftDeviceCacheRuntime>(*invocation_->owned_state())
+                .value();
         }
 
         return aggregate_site_run().craft;
+    }
+
+    [[nodiscard]] std::vector<CraftDeviceCacheEntryState>& craft_device_caches_state() const
+    {
+        if (invocation_ != nullptr)
+        {
+            return invocation_->state_manager()
+                ->state<StateSetId::SiteCraftDeviceCaches>(*invocation_->owned_state())
+                .value();
+        }
+
+        craft_device_cache_compatibility_.clear();
+        craft_device_cache_compatibility_.reserve(aggregate_site_run().craft.device_caches.size());
+        for (const auto& cache : aggregate_site_run().craft.device_caches)
+        {
+            craft_device_cache_compatibility_.push_back(CraftDeviceCacheEntryState {
+                cache.device_entity_id,
+                cache.source_membership_revision,
+                cache.worker_pack_included,
+                0U,
+                static_cast<std::uint32_t>(cache.nearby_item_instance_ids.size())});
+        }
+        return craft_device_cache_compatibility_;
+    }
+
+    [[nodiscard]] std::vector<std::uint64_t>& craft_nearby_items_state() const
+    {
+        if (invocation_ != nullptr)
+        {
+            return invocation_->state_manager()
+                ->state<StateSetId::SiteCraftNearbyItems>(*invocation_->owned_state())
+                .value();
+        }
+
+        static thread_local std::vector<std::uint64_t> compatibility_items {};
+        compatibility_items.clear();
+        for (const auto& cache : aggregate_site_run().craft.device_caches)
+        {
+            compatibility_items.insert(
+                compatibility_items.end(),
+                cache.nearby_item_instance_ids.begin(),
+                cache.nearby_item_instance_ids.end());
+        }
+        return compatibility_items;
+    }
+
+    [[nodiscard]] PhoneInventoryCacheMetaState& craft_phone_cache_meta_state() const
+    {
+        if (invocation_ != nullptr)
+        {
+            return invocation_->state_manager()
+                ->state<StateSetId::SiteCraftPhoneCacheMeta>(*invocation_->owned_state())
+                .value();
+        }
+
+        return aggregate_site_run().craft.phone_cache;
+    }
+
+    [[nodiscard]] std::vector<std::uint64_t>& craft_phone_items_state() const
+    {
+        if (invocation_ != nullptr)
+        {
+            return invocation_->state_manager()
+                ->state<StateSetId::SiteCraftPhoneItems>(*invocation_->owned_state())
+                .value();
+        }
+
+        return aggregate_site_run().craft.phone_cache.item_instance_ids;
+    }
+
+    [[nodiscard]] CraftContextMetaState& craft_context_meta_state() const
+    {
+        if (invocation_ != nullptr)
+        {
+            return invocation_->state_manager()
+                ->state<StateSetId::SiteCraftContextMeta>(*invocation_->owned_state())
+                .value();
+        }
+
+        return aggregate_site_run().craft.context;
+    }
+
+    [[nodiscard]] std::vector<CraftContextOptionState>& craft_context_options_state() const
+    {
+        if (invocation_ != nullptr)
+        {
+            return invocation_->state_manager()
+                ->state<StateSetId::SiteCraftContextOptions>(*invocation_->owned_state())
+                .value();
+        }
+
+        return aggregate_site_run().craft.context.options;
     }
 
     [[nodiscard]] ActionState& action_state() const
     {
         if (invocation_ != nullptr)
         {
-            return invocation_->state_manager()->state<StateSetId::SiteAction>(*invocation_->owned_state()).value();
+            return invocation_->compat_action_state();
         }
 
         return aggregate_site_run().site_action;
@@ -949,8 +1094,7 @@ private:
     {
         if (invocation_ != nullptr)
         {
-            return invocation_->state_manager()->state<StateSetId::SiteObjective>(*invocation_->owned_state())
-                .value();
+            return invocation_->compat_objective_state();
         }
 
         return aggregate_site_run().objective;
@@ -960,9 +1104,7 @@ private:
     {
         if (invocation_ != nullptr)
         {
-            const auto& world_state =
-                invocation_->state_manager()->query<StateSetId::SiteWorld>(*invocation_->owned_state());
-            return world_state.has_value() ? world_state->site_world.get() : nullptr;
+            return invocation_->runtime() != nullptr ? invocation_->runtime()->site_world() : nullptr;
         }
 
         return site_run_ != nullptr ? site_run_->site_world.get() : nullptr;
@@ -975,6 +1117,7 @@ private:
 
     RuntimeInvocation* invocation_ {nullptr};
     SiteRunState* site_run_ {nullptr};
+    mutable std::vector<CraftDeviceCacheEntryState> craft_device_cache_compatibility_ {};
 };
 
 }  // namespace gs1

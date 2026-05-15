@@ -27,6 +27,17 @@ struct PhoneListingState final
     bool generated_from_stock {false};
 };
 
+struct EconomyMetaState final
+{
+    std::int32_t current_cash {0};
+    std::int32_t phone_delivery_fee {0};
+    std::uint16_t phone_delivery_minutes {0U};
+    std::uint64_t phone_listing_source_membership_revision {0U};
+    std::uint64_t phone_listing_source_quantity_revision {0U};
+    std::uint64_t phone_listing_source_action_reservation_signature {0U};
+    std::uint32_t phone_buy_stock_refresh_generation {0U};
+};
+
 struct EconomyState final
 {
     std::int32_t current_cash {0};

@@ -66,6 +66,50 @@ struct ResolvedHarvestOutputStack final
     std::uint8_t reserved0[2] {};
 };
 
+struct PlacementModeMetaState final
+{
+    bool active {false};
+    ActionKind action_kind {ActionKind::None};
+    TileCoord target_tile {};
+    std::uint32_t primary_subject_id {0};
+    std::uint32_t secondary_subject_id {0};
+    std::uint32_t item_id {0};
+    std::uint16_t quantity {0};
+    std::uint8_t request_flags {0};
+    std::uint8_t footprint_width {1U};
+    std::uint8_t footprint_height {1U};
+    std::uint8_t reserved0[2] {};
+    std::uint64_t blocked_mask {0ULL};
+    bool has_target_tile {false};
+};
+
+struct ActionMetaState final
+{
+    RuntimeActionId current_action_id {};
+    ActionKind action_kind {ActionKind::None};
+    TileCoord target_tile {};
+    TileCoord approach_tile {};
+    std::uint32_t primary_subject_id {0};
+    std::uint32_t secondary_subject_id {0};
+    std::uint32_t item_id {0};
+    std::uint32_t placement_reservation_token {0};
+    std::uint16_t quantity {0};
+    std::uint8_t request_flags {0};
+    bool awaiting_placement_reservation {false};
+    bool reactivate_placement_mode_on_completion {false};
+    double total_action_minutes {0.0};
+    double remaining_action_minutes {0.0};
+    DeferredWorkerMeterDelta deferred_meter_delta {};
+    float resolved_harvest_density {0.0f};
+    bool resolved_harvest_outputs_valid {false};
+    double started_at_world_minute {0.0};
+    PlacementModeMetaState placement_mode {};
+    bool has_current_action_id {false};
+    bool has_target_tile {false};
+    bool has_approach_tile {false};
+    bool has_started_at_world_minute {false};
+};
+
 struct ActionState final
 {
     std::optional<RuntimeActionId> current_action_id {};

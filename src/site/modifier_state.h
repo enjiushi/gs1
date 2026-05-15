@@ -116,6 +116,16 @@ struct ActiveSiteModifierState final
     HarvestOutputModifierState harvest_output_modifiers {};
 };
 
+struct ModifierMetaState final
+{
+    ModifierChannelTotals resolved_channel_totals {};
+    TerrainFactorModifierState resolved_terrain_factor_modifiers {};
+    ActionCostModifierState resolved_action_cost_modifiers {};
+    HarvestOutputModifierState resolved_harvest_output_modifiers {};
+    VillageTechnologyEffectState resolved_village_technology_effects {};
+    BureauTechnologyEffectState resolved_bureau_technology_effects {};
+};
+
 struct ModifierState final
 {
     std::vector<ModifierId> active_nearby_aura_modifier_ids {};
