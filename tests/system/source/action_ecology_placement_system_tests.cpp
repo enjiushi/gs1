@@ -5,7 +5,6 @@
 #include "content/defs/plant_defs.h"
 #include "content/defs/technology_defs.h"
 #include "site/inventory_storage.h"
-#include "site/site_projection_update_flags.h"
 #include "site/site_world_access.h"
 #include "site/systems/action_execution_system.h"
 #include "site/systems/ecology_system.h"
@@ -1874,14 +1873,6 @@ void action_execution_excavate_completion_marks_tile_projection_dirty(
             make_start_action_message(GS1_SITE_ACTION_EXCAVATE, TileCoord {3, 3}, 1U, 0U, 0U)) == GS1_STATUS_OK);
     queue.clear();
 
-    site_run.pending_projection_update_flags = 0U;
-    site_run.pending_full_tile_projection_update = false;
-    std::fill(
-        site_run.pending_tile_projection_update_mask.begin(),
-        site_run.pending_tile_projection_update_mask.end(),
-        static_cast<std::uint8_t>(0U));
-    site_run.pending_tile_projection_updates.clear();
-
     for (int step = 0; step < 4 && site_run.site_action.current_action_id.has_value(); ++step)
     {
         invoke_system_run<SiteFlowSystem>(flow_context);
@@ -1892,15 +1883,6 @@ void action_execution_excavate_completion_marks_tile_projection_dirty(
     GS1_SYSTEM_TEST_CHECK(
         context,
         site_run.site_world->tile_excavation(TileCoord {3, 3}).depth == gs1::ExcavationDepth::Rough);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        (site_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_TILES) != 0U);
-    GS1_SYSTEM_TEST_CHECK(context, !site_run.pending_full_tile_projection_update);
-    GS1_SYSTEM_TEST_REQUIRE(context, site_run.pending_tile_projection_updates.size() == 1U);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        site_run.pending_tile_projection_updates[0].x == 3 &&
-            site_run.pending_tile_projection_updates[0].y == 3);
 }
 
 void action_execution_excavate_cannot_repeat_rough_depth_by_default(

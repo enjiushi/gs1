@@ -398,7 +398,7 @@ void craft_commit_crafts_chemistry_station_kit_from_workbench_when_unlocked(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
-    campaign.technology_state.total_reputation = reputation_for_progress_tier(5U);
+    campaign.faction_progress[1].faction_reputation = reputation_for_progress_tier(1U);
     auto site_run = make_test_site_run(1U, 1510U);
     GameMessageQueue queue {};
     auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
@@ -505,20 +505,20 @@ void craft_context_omits_hammer_gated_device_recipe_without_hammer(
                     workbench_tile.x,
                     workbench_tile.y,
                     0U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.craft.context_presentation.occupied);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.craft.context.occupied);
     GS1_SYSTEM_TEST_CHECK(
         context,
         std::any_of(
-            site_run.craft.context_presentation.options.begin(),
-            site_run.craft.context_presentation.options.end(),
+            site_run.craft.context.options.begin(),
+            site_run.craft.context.options.end(),
             [](const gs1::CraftContextOptionState& option) {
                 return option.recipe_id == gs1::k_recipe_craft_hammer;
             }));
     GS1_SYSTEM_TEST_CHECK(
         context,
         !std::any_of(
-            site_run.craft.context_presentation.options.begin(),
-            site_run.craft.context_presentation.options.end(),
+            site_run.craft.context.options.begin(),
+            site_run.craft.context.options.end(),
             [](const gs1::CraftContextOptionState& option) {
                 return option.recipe_id == gs1::k_recipe_craft_storage_crate;
             }));
@@ -541,8 +541,8 @@ void craft_context_omits_hammer_gated_device_recipe_without_hammer(
     GS1_SYSTEM_TEST_CHECK(
         context,
         std::any_of(
-            site_run.craft.context_presentation.options.begin(),
-            site_run.craft.context_presentation.options.end(),
+            site_run.craft.context.options.begin(),
+            site_run.craft.context.options.end(),
             [](const gs1::CraftContextOptionState& option) {
                 return option.recipe_id == gs1::k_recipe_craft_storage_crate;
             }));
@@ -766,12 +766,12 @@ void craft_context_recognizes_nearby_inputs_with_64bit_item_entity_ids(
                     workbench_tile.x,
                     workbench_tile.y,
                     0U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.craft.context_presentation.occupied);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.craft.context.occupied);
     GS1_SYSTEM_TEST_CHECK(
         context,
         std::any_of(
-            site_run.craft.context_presentation.options.begin(),
-            site_run.craft.context_presentation.options.end(),
+            site_run.craft.context.options.begin(),
+            site_run.craft.context.options.end(),
             [](const gs1::CraftContextOptionState& option) {
                 return option.recipe_id == gs1::k_recipe_craft_hammer;
             }));
@@ -986,8 +986,6 @@ void storage_device_breakage_destroys_owned_storage_and_items(
             1U) == 0U);
     const auto storage_id =
         gs1::inventory_storage::storage_id_for_container(site_run, storage_container);
-    site_run.inventory.opened_device_storage_id = storage_id;
-
     auto tile = site_run.site_world->tile_at(storage_tile);
     tile.ecology.sand_burial = 100.0f;
     tile.device.device_integrity = 0.01f;
@@ -1008,7 +1006,6 @@ void storage_device_breakage_destroys_owned_storage_and_items(
     GS1_SYSTEM_TEST_CHECK(
         context,
         !gs1::inventory_storage::find_device_storage_container(site_run, broken_device_entity_id).is_valid());
-    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.opened_device_storage_id == 0U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         gs1::inventory_storage::storage_container_state_for_storage_id(site_run, storage_id) == nullptr);

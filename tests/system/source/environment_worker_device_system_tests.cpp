@@ -6,9 +6,9 @@
 #include "content/defs/modifier_defs.h"
 #include "content/prototype_content.h"
 #include "content/defs/technology_defs.h"
+#include "campaign/systems/technology_system.h"
 #include "messages/game_message.h"
 #include "runtime/system_interface.h"
-#include "site/site_projection_update_flags.h"
 #include "site/site_world_access.h"
 #include "site/systems/camp_durability_system.h"
 #include "site/systems/device_maintenance_system.h"
@@ -42,6 +42,7 @@ using gs1::PlantWeatherContributionSystem;
 using gs1::SiteFlowSystem;
 using gs1::SiteRunStartedMessage;
 using gs1::SiteTimeSystem;
+using gs1::TechnologySystem;
 using gs1::TileCoord;
 using gs1::WeatherEventSystem;
 using gs1::WorkerConditionSystem;
@@ -247,10 +248,6 @@ void weather_event_site_run_started_applies_site_one_background_conditions(
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.event.event_wind_pressure, 0.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.event.event_dust_pressure, 0.0f));
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_one_run.weather.weather_wind_direction_degrees, 0.0f));
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        (site_one_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_WEATHER) != 0U);
-
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         invoke_system_message<WeatherEventSystem>(site_two_context, started_two) == GS1_STATUS_OK);
@@ -294,9 +291,6 @@ void site_one_starting_weather_keeps_starter_plant_density_stable(
         GS1_SYSTEM_TEST_CHECK(context, tile.ecology.plant_density >= site_one_content.starting_plants.front().initial_density * 0.8f);
     }
 
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        (site_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_TILES) != 0U);
 }
 
 void site_one_small_fixed_steps_keep_density_stable_without_density_reports(
@@ -1084,19 +1078,15 @@ void local_weather_resolve_marks_projected_plant_tiles_dirty_when_wind_changes(
     site_run.weather.weather_wind_direction_degrees = 0.0f;
     run_local_weather_pipeline(campaign, site_run, queue);
 
-    site_run.pending_projection_update_flags = 0U;
-    site_run.pending_tile_projection_updates.clear();
-    site_run.pending_tile_projection_update_mask.assign(site_run.site_world->tile_count(), 0U);
-
+    const auto baseline_local_wind = site_run.site_world->tile_local_weather(TileCoord {2, 2}).wind;
     site_run.weather.weather_wind = 18.0f;
     run_local_weather_pipeline(campaign, site_run, queue);
 
     GS1_SYSTEM_TEST_CHECK(
         context,
-        (site_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_TILES) != 0U);
-    GS1_SYSTEM_TEST_REQUIRE(context, site_run.pending_tile_projection_updates.size() == 1U);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.pending_tile_projection_updates.front().x == 2);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.pending_tile_projection_updates.front().y == 2);
+        !approx_equal(
+            site_run.site_world->tile_local_weather(TileCoord {2, 2}).wind,
+            baseline_local_wind));
 }
 
 void local_weather_resolve_marks_support_only_neighbor_tiles_dirty_when_wind_protection_changes(
@@ -1115,27 +1105,23 @@ void local_weather_resolve_marks_support_only_neighbor_tiles_dirty_when_wind_pro
     site_run.weather.weather_wind_direction_degrees = 0.0f;
     run_local_weather_pipeline(campaign, site_run, queue);
 
-    site_run.pending_projection_update_flags = 0U;
-    site_run.pending_tile_projection_updates.clear();
-    site_run.pending_tile_projection_update_mask.assign(site_run.site_world->tile_count(), 0U);
-
+    const auto baseline_east_wind_protection =
+        site_run.site_world->tile_total_weather_contribution(TileCoord {3, 2}).wind_protection;
+    const auto baseline_west_wind_protection =
+        site_run.site_world->tile_total_weather_contribution(TileCoord {0, 2}).wind_protection;
     site_run.weather.weather_wind_direction_degrees = 180.0f;
     run_local_weather_pipeline(campaign, site_run, queue);
 
-    const auto has_dirty_coord = [&](std::int32_t x, std::int32_t y) {
-        return std::find_if(
-                   site_run.pending_tile_projection_updates.begin(),
-                   site_run.pending_tile_projection_updates.end(),
-                   [&](const TileCoord& coord) {
-                       return coord.x == x && coord.y == y;
-                   }) != site_run.pending_tile_projection_updates.end();
-    };
-
     GS1_SYSTEM_TEST_CHECK(
         context,
-        (site_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_TILES) != 0U);
-    GS1_SYSTEM_TEST_CHECK(context, has_dirty_coord(3, 2));
-    GS1_SYSTEM_TEST_CHECK(context, has_dirty_coord(0, 2));
+        !approx_equal(
+            site_run.site_world->tile_total_weather_contribution(TileCoord {3, 2}).wind_protection,
+            baseline_east_wind_protection));
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        !approx_equal(
+            site_run.site_world->tile_total_weather_contribution(TileCoord {0, 2}).wind_protection,
+            baseline_west_wind_protection));
 }
 
 void local_weather_resolve_applies_device_wind_protection_value_and_range(
@@ -1869,9 +1855,6 @@ void camp_durability_resets_and_crosses_service_thresholds(gs1::testing::SystemT
     GS1_SYSTEM_TEST_CHECK(context, !site_run.camp.camp_protection_resolved);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.camp.delivery_point_operational);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.camp.shared_storage_access_enabled);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        (site_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_CAMP) != 0U);
 }
 
 void modifier_imports_campaign_aura_and_reacts_to_camp_changes(
@@ -1895,7 +1878,6 @@ void modifier_imports_campaign_aura_and_reacts_to_camp_changes(
     GS1_SYSTEM_TEST_CHECK(context, site_run.modifier.active_nearby_aura_modifier_ids.size() == 2U);
     const auto initial_morale = site_run.modifier.resolved_channel_totals.morale;
 
-    site_run.pending_projection_update_flags = 0U;
     site_run.camp.camp_durability = 0.0f;
     invoke_system_run<ModifierSystem>(site_context);
 
@@ -1928,7 +1910,7 @@ void modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_wit
     auto campaign = make_campaign();
     campaign.faction_progress[0].has_unlocked_assistant_package = true;
     campaign.faction_progress[0].unlocked_assistant_package_id = 1001U;
-    campaign.faction_progress[2].faction_reputation = reputation_for_progress_tier(1U) + 20;
+    campaign.faction_progress[2].faction_reputation = reputation_for_progress_tier(2U) + 20;
     auto site_run = make_test_site_run(1U, 1602U);
     GameMessageQueue queue {};
     auto site_context = make_site_context<ModifierSystem>(campaign, site_run, queue);
@@ -1944,24 +1926,21 @@ void modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_wit
     const auto* imported_modifier = gs1::find_technology_node_def(
         gs1::TechNodeId {gs1::base_technology_node_id(
             gs1::FactionId {gs1::k_faction_agricultural_university},
-            1U)});
+            2U)});
     GS1_SYSTEM_TEST_REQUIRE(context, imported_modifier != nullptr);
     GS1_SYSTEM_TEST_CHECK(
         context,
         find_active_run_modifier(site_run, gs1::ModifierId {1001U}) != nullptr);
-    const auto initial_hydration = site_run.modifier.resolved_channel_totals.hydration;
-    const auto initial_work_efficiency = site_run.modifier.resolved_channel_totals.work_efficiency;
+    const auto initial_effect_parameter =
+        gs1::TechnologySystem::current_effect_parameter(campaign, *imported_modifier);
 
-    campaign.faction_progress[2].faction_reputation = reputation_for_progress_tier(1U) + 40;
+    campaign.faction_progress[2].faction_reputation = reputation_for_progress_tier(2U) + 40;
     invoke_system_run<ModifierSystem>(site_context);
 
-    GS1_SYSTEM_TEST_CHECK(context, site_run.modifier.resolved_channel_totals.hydration > initial_hydration);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        std::fabs(site_run.modifier.resolved_channel_totals.nourishment) > 0.0001f ||
-        std::fabs(site_run.modifier.resolved_channel_totals.morale) > 0.0001f ||
-            std::fabs(site_run.modifier.resolved_channel_totals.work_efficiency - initial_work_efficiency) >
-                0.0001f);
+        gs1::TechnologySystem::current_effect_parameter(campaign, *imported_modifier) >
+            initial_effect_parameter);
 }
 }  // namespace
 

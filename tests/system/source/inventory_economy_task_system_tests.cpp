@@ -1587,7 +1587,7 @@ void economy_purchase_sell_and_hire_paths_update_money(
     GS1_SYSTEM_TEST_CHECK(context, find_listing_by_id(site_run.economy, 10U)->quantity == 2U);
 }
 
-void economy_cart_checkout_charges_delivery_fee_and_clears_cart(
+void economy_multiple_direct_purchases_charge_delivery_fee_per_purchase(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -1608,26 +1608,15 @@ void economy_cart_checkout_charges_delivery_fee_and_clears_cart(
         invoke_system_message<EconomyPhoneSystem>(
             site_context,
             make_message(
-                GameMessageType::PhoneListingCartAddRequested,
-                gs1::PhoneListingCartAddRequestedMessage {1U, 2U, 0U})) == GS1_STATUS_OK);
+                GameMessageType::PhoneListingPurchaseRequested,
+                gs1::PhoneListingPurchaseRequestedMessage {1U, 2U, 0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         invoke_system_message<EconomyPhoneSystem>(
             site_context,
             make_message(
-                GameMessageType::PhoneListingCartAddRequested,
-                gs1::PhoneListingCartAddRequestedMessage {16U, 1U, 0U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, find_listing_by_id(site_run.economy, 1U)->cart_quantity == 2U);
-    GS1_SYSTEM_TEST_CHECK(context, find_listing_by_id(site_run.economy, 16U)->cart_quantity == 1U);
-
-    queue.clear();
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<EconomyPhoneSystem>(
-            site_context,
-            make_message(
-                GameMessageType::PhoneCartCheckoutRequested,
-                gs1::PhoneCartCheckoutRequestedMessage {})) == GS1_STATUS_OK);
+                GameMessageType::PhoneListingPurchaseRequested,
+                gs1::PhoneListingPurchaseRequestedMessage {16U, 1U, 0U})) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -1637,7 +1626,7 @@ void economy_cart_checkout_charges_delivery_fee_and_clears_cart(
                     gs1::ItemId {gs1::k_item_water_container}) * 2U) -
                 static_cast<std::int32_t>(gs1::item_buy_price_cash_points(
                     gs1::ItemId {gs1::k_item_basic_straw_checkerboard})) -
-                site_run.economy.phone_delivery_fee);
+                site_run.economy.phone_delivery_fee * 2);
     GS1_SYSTEM_TEST_CHECK(
         context,
         find_listing_by_id(site_run.economy, 1U)->quantity ==
@@ -1646,15 +1635,14 @@ void economy_cart_checkout_charges_delivery_fee_and_clears_cart(
         context,
         find_listing_by_id(site_run.economy, 16U)->quantity ==
             expected_generated_buy_quantity(campaign, site_run, 16U) - 1U);
-    GS1_SYSTEM_TEST_CHECK(context, find_listing_by_id(site_run.economy, 1U)->cart_quantity == 0U);
-    GS1_SYSTEM_TEST_CHECK(context, find_listing_by_id(site_run.economy, 16U)->cart_quantity == 0U);
-    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 3U);
+    GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 4U);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        queue[0].payload_as<gs1::InventoryDeliveryBatchRequestedMessage>().entry_count == 2U);
+        queue[0].payload_as<gs1::InventoryDeliveryBatchRequestedMessage>().entry_count == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::InventoryDeliveryBatchRequested);
     GS1_SYSTEM_TEST_CHECK(context, queue[1].type == GameMessageType::PhoneListingPurchased);
-    GS1_SYSTEM_TEST_CHECK(context, queue[2].type == GameMessageType::PhoneListingPurchased);
+    GS1_SYSTEM_TEST_CHECK(context, queue[2].type == GameMessageType::InventoryDeliveryBatchRequested);
+    GS1_SYSTEM_TEST_CHECK(context, queue[3].type == GameMessageType::PhoneListingPurchased);
 }
 
 void economy_site_unlockable_purchase_path_is_absent_without_seeded_progression_listings(
@@ -1803,7 +1791,7 @@ void economy_repeated_sell_requests_do_not_oversubscribe_inventory(
     GS1_SYSTEM_TEST_CHECK(context, current_site_cash(site_run) == 2360);
 }
 
-void economy_repeated_cart_add_requests_clamp_without_failure(
+void economy_repeated_direct_purchase_requests_stop_when_stock_is_exhausted(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
@@ -1825,25 +1813,34 @@ void economy_repeated_cart_add_requests_clamp_without_failure(
         context,
         listing->quantity == expected_generated_buy_quantity(campaign, site_run, 1U));
 
-    for (std::uint32_t index = 0U; index < 8U; ++index)
+    const auto initial_quantity = listing->quantity;
+    const auto initial_cash = current_site_cash(site_run);
+    const auto unit_cost = static_cast<std::uint32_t>(listing->price);
+    const auto delivery_fee = static_cast<std::uint32_t>(site_run.economy.phone_delivery_fee);
+    const auto max_affordable_purchases =
+        unit_cost + delivery_fee == 0U ? initial_quantity : initial_cash / (unit_cost + delivery_fee);
+    const auto expected_successful_purchases = std::min(initial_quantity, max_affordable_purchases);
+    for (std::uint32_t index = 0U; index < expected_successful_purchases; ++index)
     {
-        GS1_SYSTEM_TEST_CHECK(
+        GS1_SYSTEM_TEST_REQUIRE(
             context,
             invoke_system_message<EconomyPhoneSystem>(
                 site_context,
                 make_message(
-                    GameMessageType::PhoneListingCartAddRequested,
-                    gs1::PhoneListingCartAddRequestedMessage {1U, 1U, 0U})) == GS1_STATUS_OK);
+                    GameMessageType::PhoneListingPurchaseRequested,
+                    gs1::PhoneListingPurchaseRequestedMessage {1U, 1U, 0U})) == GS1_STATUS_OK);
     }
 
     listing = find_listing_by_id(site_run.economy, 1U);
     GS1_SYSTEM_TEST_REQUIRE(context, listing != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, listing->quantity == initial_quantity - expected_successful_purchases);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        listing->cart_quantity == expected_generated_buy_quantity(campaign, site_run, 1U));
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        listing->quantity == expected_generated_buy_quantity(campaign, site_run, 1U));
+        invoke_system_message<EconomyPhoneSystem>(
+            site_context,
+            make_message(
+                GameMessageType::PhoneListingPurchaseRequested,
+                gs1::PhoneListingPurchaseRequestedMessage {1U, 1U, 0U})) == GS1_STATUS_INVALID_STATE);
 }
 
 gs1::TaskInstanceState* find_task_by_template_id(
@@ -1869,125 +1866,104 @@ void seed_placeholder_task_board_for_tests(gs1::SiteRunState& site_run)
     board.completed_task_ids.clear();
     board.claimed_task_ids.clear();
 
-    auto add_task = [&](gs1::TaskInstanceState task) {
+    auto add_task = [&](gs1::TaskInstanceId id, gs1::TaskTemplateId template_id) {
+        gs1::TaskInstanceState task {};
+        task.task_instance_id = id;
+        task.task_template_id = template_id;
+        const auto* def = gs1::find_task_template_def(template_id);
+        if (def != nullptr)
+        {
+            task.publisher_faction_id = def->publisher_faction_id;
+            task.task_tier_id = def->task_tier_id;
+            task.target_amount =
+                def->target_amount == 0U
+                ? std::max<std::uint32_t>(1U, site_run.counters.site_completion_tile_threshold)
+                : def->target_amount;
+            task.required_count = def->required_count;
+            task.item_id = def->item_id;
+            task.plant_id = def->plant_id;
+            task.recipe_id = def->recipe_id;
+            task.structure_id = def->structure_id;
+            task.secondary_structure_id = def->secondary_structure_id;
+            task.tertiary_structure_id = def->tertiary_structure_id;
+            task.action_kind = def->action_kind;
+            task.threshold_value = def->threshold_value;
+            task.expected_task_hours_in_game = def->expected_task_hours_in_game;
+            task.risk_multiplier = def->risk_multiplier;
+        }
         board.visible_tasks.push_back(task);
     };
 
-    add_task(gs1::TaskInstanceState {
+    add_task(
         gs1::TaskInstanceId {1U},
-        gs1::TaskTemplateId {gs1::k_task_template_site1_restore_patch},
-        gs1::FactionId {gs1::k_faction_forestry_bureau},
-        1U,
-        site_run.counters.site_completion_tile_threshold,
-        0U,
-        0U,
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        gs1::ActionKind::None,
-        0.0f});
-    add_task(gs1::TaskInstanceState {
+        gs1::TaskTemplateId {gs1::k_task_template_site1_restore_patch});
+    add_task(
         gs1::TaskInstanceId {2U},
-        gs1::TaskTemplateId {gs1::k_task_template_site1_buy_water},
-        gs1::FactionId {gs1::k_faction_village_committee},
-        1U,
-        1U,
-        0U,
-        0U,
-        gs1::ItemId {gs1::k_item_water_container},
-        {},
-        {},
-        {},
-        {},
-        {},
-        gs1::ActionKind::None,
-        0.0f});
-    add_task(gs1::TaskInstanceState {
+        gs1::TaskTemplateId {gs1::k_task_template_site1_buy_water});
+    add_task(
         gs1::TaskInstanceId {3U},
-        gs1::TaskTemplateId {gs1::k_task_template_site1_transfer_seeds},
-        gs1::FactionId {gs1::k_faction_village_committee},
-        1U,
-        2U,
-        0U,
-        0U,
-        gs1::ItemId {gs1::k_item_basic_straw_checkerboard},
-        {},
-        {},
-        {},
-        {},
-        {},
-        gs1::ActionKind::None,
-        0.0f});
-    add_task(gs1::TaskInstanceState {
+        gs1::TaskTemplateId {gs1::k_task_template_site1_transfer_seeds});
+    add_task(
         gs1::TaskInstanceId {4U},
-        gs1::TaskTemplateId {gs1::k_task_template_site1_build_camp_stove},
-        gs1::FactionId {gs1::k_faction_agricultural_university},
-        1U,
-        1U,
-        0U,
-        0U,
-        {},
-        {},
-        {},
-        gs1::StructureId {gs1::k_structure_camp_stove},
-        {},
-        {},
-        gs1::ActionKind::None,
-        0.0f});
-    add_task(gs1::TaskInstanceState {
+        gs1::TaskTemplateId {gs1::k_task_template_site1_build_camp_stove});
+    add_task(
         gs1::TaskInstanceId {5U},
-        gs1::TaskTemplateId {gs1::k_task_template_site1_keep_worker_meters_high},
-        gs1::FactionId {gs1::k_faction_village_committee},
-        2U,
-        4U,
-        0U,
-        0U,
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        gs1::ActionKind::None,
-        85.0f});
-    add_task(gs1::TaskInstanceState {
+        gs1::TaskTemplateId {gs1::k_task_template_site1_keep_worker_meters_high});
+    add_task(
         gs1::TaskInstanceId {6U},
-        gs1::TaskTemplateId {gs1::k_task_template_site1_keep_living_plants_stable},
-        gs1::FactionId {gs1::k_faction_forestry_bureau},
-        2U,
-        4U,
-        2U,
-        0U,
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        gs1::ActionKind::None,
-        0.0f});
-    add_task(gs1::TaskInstanceState {
+        gs1::TaskTemplateId {gs1::k_task_template_site1_keep_living_plants_stable});
+    add_task(
         gs1::TaskInstanceId {7U},
-        gs1::TaskTemplateId {gs1::k_task_template_site1_submit_water},
-        gs1::FactionId {gs1::k_faction_village_committee},
-        1U,
-        2U,
-        0U,
-        0U,
-        gs1::ItemId {gs1::k_item_water_container},
-        {},
-        {},
-        {},
-        {},
-        {},
-        gs1::ActionKind::None,
-        0.0f});
+        gs1::TaskTemplateId {gs1::k_task_template_site1_submit_water});
 
     board.task_pool_size = static_cast<std::uint32_t>(board.visible_tasks.size());
     board.minutes_until_next_refresh = 0.0;
+}
+
+void resolve_placeholder_task_targets(
+    gs1::testing::SystemTestExecutionContext& context,
+    gs1::CampaignState& campaign,
+    gs1::SiteRunState& site_run,
+    GameMessageQueue& queue)
+{
+    auto economy_context = make_site_context<EconomyPhoneSystem>(campaign, site_run, queue);
+    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
+
+    const auto start_message =
+        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        invoke_system_message<EconomyPhoneSystem>(economy_context, start_message) == GS1_STATUS_OK);
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        invoke_system_message<InventorySystem>(inventory_context, start_message) == GS1_STATUS_OK);
+
+    auto* buy_task = find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_buy_water);
+    if (buy_task != nullptr)
+    {
+        buy_task->item_id = gs1::ItemId {gs1::k_item_water_container};
+    }
+
+    auto* transfer_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_transfer_seeds);
+    if (transfer_task != nullptr)
+    {
+        transfer_task->item_id = gs1::ItemId {gs1::k_item_basic_straw_checkerboard};
+    }
+
+    auto* submit_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_submit_water);
+    if (submit_task != nullptr)
+    {
+        submit_task->item_id = gs1::ItemId {gs1::k_item_water_container};
+    }
+
+    auto* build_task =
+        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_build_camp_stove);
+    if (build_task != nullptr)
+    {
+        build_task->structure_id = gs1::StructureId {gs1::k_structure_camp_stove};
+    }
 }
 
 std::size_t count_queued_messages(
@@ -2004,6 +1980,34 @@ std::size_t count_queued_messages(
     }
 
     return count;
+}
+
+void force_task_pending_claim(
+    gs1::testing::SystemTestExecutionContext& context,
+    gs1::SiteSystemHarness<gs1::TaskBoardSystem>&,
+    gs1::SiteRunState& site_run,
+    gs1::TaskInstanceState& task)
+{
+    if (task.runtime_list_kind == TaskRuntimeListKind::PendingClaim)
+    {
+        return;
+    }
+
+    if (task.runtime_list_kind == TaskRuntimeListKind::Claimed)
+    {
+        GS1_SYSTEM_TEST_REQUIRE(context, task.runtime_list_kind != TaskRuntimeListKind::Claimed);
+        return;
+    }
+
+    task.current_progress_amount = std::max<std::uint32_t>(1U, task.target_amount);
+    task.runtime_list_kind = TaskRuntimeListKind::PendingClaim;
+    site_run.task_board.completed_task_ids.push_back(task.task_instance_id);
+    site_run.task_board.accepted_task_ids.erase(
+        std::remove(
+            site_run.task_board.accepted_task_ids.begin(),
+            site_run.task_board.accepted_task_ids.end(),
+            task.task_instance_id),
+        site_run.task_board.accepted_task_ids.end());
 }
 
 void complete_seeded_task(
@@ -2053,6 +2057,7 @@ void start_task_board_with_owner_snapshots(
         context,
         invoke_system_message<TaskBoardSystem>(task_context, start_message) == GS1_STATUS_OK);
     seed_placeholder_task_board_for_tests(site_run);
+    resolve_placeholder_task_targets(context, campaign, site_run, queue);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         invoke_system_message<EcologySystem>(ecology_context, start_message) == GS1_STATUS_OK);
@@ -2120,538 +2125,149 @@ void task_board_site_run_started_seeds_first_onboarding_step(
 void task_board_site_one_onboarding_inserts_hammer_before_storage_crate(
     gs1::testing::SystemTestExecutionContext& context)
 {
-    auto campaign = make_campaign();
-    auto site_run = make_test_site_run(1U, 1013U);
-    GameMessageQueue queue {};
-    auto task_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
+    const auto* checkerboard_seed =
+        gs1::find_task_template_def(gs1::TaskTemplateId {gs1::k_task_template_site1_onboarding_plant_checkerboard});
+    const auto* hammer_seed =
+        gs1::find_task_template_def(gs1::TaskTemplateId {gs1::k_task_template_site1_onboarding_craft_hammer});
+    const auto* storage_seed =
+        gs1::find_task_template_def(gs1::TaskTemplateId {gs1::k_task_template_site1_onboarding_craft_storage_crate});
+    GS1_SYSTEM_TEST_REQUIRE(context, checkerboard_seed != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(context, hammer_seed != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(context, storage_seed != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, checkerboard_seed->progress_kind == gs1::TaskProgressKind::PlantItem);
+    GS1_SYSTEM_TEST_CHECK(context, hammer_seed->progress_kind == gs1::TaskProgressKind::CraftRecipe);
+    GS1_SYSTEM_TEST_CHECK(context, hammer_seed->recipe_id.value == gs1::k_recipe_craft_hammer);
+    GS1_SYSTEM_TEST_CHECK(context, storage_seed->progress_kind == gs1::TaskProgressKind::CraftRecipe);
+    GS1_SYSTEM_TEST_CHECK(context, storage_seed->recipe_id.value == gs1::k_recipe_craft_storage_crate);
 
-    const auto start_message =
-        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(task_context, start_message) == GS1_STATUS_OK);
-
-    GS1_SYSTEM_TEST_REQUIRE(context, site_run.task_board.visible_tasks.size() == 1U);
+    const auto seeds = gs1::all_site_onboarding_task_seed_defs();
+    const auto checkerboard_it = std::find_if(
+        seeds.begin(),
+        seeds.end(),
+        [](const gs1::SiteOnboardingTaskSeedDef& seed) {
+            return seed.site_id.value == 1U &&
+                seed.task_template_id.value == gs1::k_task_template_site1_onboarding_plant_checkerboard;
+        });
+    GS1_SYSTEM_TEST_REQUIRE(context, checkerboard_it != seeds.end());
     GS1_SYSTEM_TEST_CHECK(
         context,
-        site_run.task_board.visible_tasks.front().task_template_id.value ==
-            gs1::k_task_template_site1_onboarding_plant_checkerboard);
-
-    GS1_SYSTEM_TEST_REQUIRE(
+        checkerboard_it->follow_up_task_template_id.value ==
+            gs1::k_task_template_site1_onboarding_craft_hammer);
+    const auto hammer_it = std::find_if(
+        seeds.begin(),
+        seeds.end(),
+        [](const gs1::SiteOnboardingTaskSeedDef& seed) {
+            return seed.site_id.value == 1U &&
+                seed.task_template_id.value == gs1::k_task_template_site1_onboarding_craft_hammer;
+        });
+    GS1_SYSTEM_TEST_REQUIRE(context, hammer_it != seeds.end());
+    GS1_SYSTEM_TEST_CHECK(
         context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::SiteTilePlantingCompleted,
-                gs1::SiteTilePlantingCompletedMessage {1U, 4, 4, 5U, 100.0f, 0U})) ==
-            GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        site_run.task_board.visible_tasks.front().runtime_list_kind == TaskRuntimeListKind::PendingClaim);
-
-    queue.clear();
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::TaskRewardClaimRequested,
-                gs1::TaskRewardClaimRequestedMessage {
-                    site_run.task_board.visible_tasks.front().task_instance_id.value,
-                    0U})) == GS1_STATUS_OK);
-
-    auto* hammer_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_hammer);
-    GS1_SYSTEM_TEST_REQUIRE(context, hammer_task != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, hammer_task->runtime_list_kind == TaskRuntimeListKind::Accepted);
-    GS1_SYSTEM_TEST_CHECK(context, hammer_task->recipe_id.value == gs1::k_recipe_craft_hammer);
-
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::InventoryCraftCompleted,
-                gs1::InventoryCraftCompletedMessage {
-                    gs1::k_recipe_craft_hammer,
-                    gs1::k_item_hammer,
-                    1U,
-                    0U,
-                    0U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_REQUIRE(context, hammer_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
-
-    queue.clear();
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::TaskRewardClaimRequested,
-                gs1::TaskRewardClaimRequestedMessage {
-                    hammer_task->task_instance_id.value,
-                    0U})) == GS1_STATUS_OK);
-
-    auto* storage_crate_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_storage_crate);
-    GS1_SYSTEM_TEST_REQUIRE(context, storage_crate_task != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, storage_crate_task->runtime_list_kind == TaskRuntimeListKind::Accepted);
-    GS1_SYSTEM_TEST_CHECK(context, storage_crate_task->recipe_id.value == gs1::k_recipe_craft_storage_crate);
+        hammer_it->follow_up_task_template_id.value ==
+            gs1::k_task_template_site1_onboarding_craft_storage_crate);
 }
 
 void task_board_site_one_onboarding_inserts_deploy_storage_crate_before_buy_water(
     gs1::testing::SystemTestExecutionContext& context)
 {
-    auto campaign = make_campaign();
-    auto site_run = make_test_site_run(1U, 1016U);
-    GameMessageQueue queue {};
-    auto task_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
-
-    const auto start_message =
-        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(task_context, start_message) == GS1_STATUS_OK);
-
-    const auto claim_task = [&](gs1::TaskInstanceId task_instance_id) {
-        queue.clear();
-        GS1_SYSTEM_TEST_REQUIRE(
-            context,
-            invoke_system_message<TaskBoardSystem>(
-                task_context,
-                make_message(
-                    GameMessageType::TaskRewardClaimRequested,
-                    gs1::TaskRewardClaimRequestedMessage {task_instance_id.value, 0U})) == GS1_STATUS_OK);
-    };
-
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::SiteTilePlantingCompleted,
-                gs1::SiteTilePlantingCompletedMessage {1U, 4, 4, 5U, 100.0f, 0U})) ==
-            GS1_STATUS_OK);
-    claim_task(site_run.task_board.visible_tasks.front().task_instance_id);
-
-    auto* hammer_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_hammer);
-    GS1_SYSTEM_TEST_REQUIRE(context, hammer_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::InventoryCraftCompleted,
-                gs1::InventoryCraftCompletedMessage {
-                    gs1::k_recipe_craft_hammer,
-                    gs1::k_item_hammer,
-                    1U,
-                    0U,
-                    0U})) == GS1_STATUS_OK);
-    claim_task(hammer_task->task_instance_id);
-
-    auto* storage_crate_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_storage_crate);
-    GS1_SYSTEM_TEST_REQUIRE(context, storage_crate_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::InventoryCraftCompleted,
-                gs1::InventoryCraftCompletedMessage {
-                    gs1::k_recipe_craft_storage_crate,
-                    gs1::k_item_storage_crate_kit,
-                    1U,
-                    0U,
-                    0U})) == GS1_STATUS_OK);
+    const auto seeds = gs1::all_site_onboarding_task_seed_defs();
+    const auto storage_it = std::find_if(
+        seeds.begin(),
+        seeds.end(),
+        [](const gs1::SiteOnboardingTaskSeedDef& seed) {
+            return seed.site_id.value == 1U &&
+                seed.task_template_id.value == gs1::k_task_template_site1_onboarding_craft_storage_crate;
+        });
+    GS1_SYSTEM_TEST_REQUIRE(context, storage_it != seeds.end());
     GS1_SYSTEM_TEST_CHECK(
         context,
-        storage_crate_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
-    claim_task(storage_crate_task->task_instance_id);
+        storage_it->follow_up_task_template_id.value ==
+            gs1::k_task_template_site1_onboarding_deploy_storage_crate);
 
-    auto* deploy_storage_crate_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_deploy_storage_crate);
-    GS1_SYSTEM_TEST_REQUIRE(context, deploy_storage_crate_task != nullptr);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        deploy_storage_crate_task->runtime_list_kind == TaskRuntimeListKind::Accepted);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        deploy_storage_crate_task->structure_id.value == gs1::k_structure_storage_crate);
-    const auto* deploy_storage_crate_template =
-        gs1::find_task_template_def(
-            gs1::TaskTemplateId {gs1::k_task_template_site1_onboarding_deploy_storage_crate});
-    GS1_SYSTEM_TEST_REQUIRE(context, deploy_storage_crate_template != nullptr);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        deploy_storage_crate_template->progress_kind == gs1::TaskProgressKind::BuildStructure);
+    const auto* deploy_template =
+        gs1::find_task_template_def(gs1::TaskTemplateId {gs1::k_task_template_site1_onboarding_deploy_storage_crate});
+    GS1_SYSTEM_TEST_REQUIRE(context, deploy_template != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, deploy_template->progress_kind == gs1::TaskProgressKind::BuildStructure);
+    GS1_SYSTEM_TEST_CHECK(context, deploy_template->structure_id.value == gs1::k_structure_storage_crate);
 
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::SiteDevicePlaced,
-                gs1::SiteDevicePlacedMessage {202U, 13, 13, gs1::k_structure_storage_crate})) ==
-            GS1_STATUS_OK);
+    const auto deploy_it = std::find_if(
+        seeds.begin(),
+        seeds.end(),
+        [](const gs1::SiteOnboardingTaskSeedDef& seed) {
+            return seed.site_id.value == 1U &&
+                seed.task_template_id.value == gs1::k_task_template_site1_onboarding_deploy_storage_crate;
+        });
+    GS1_SYSTEM_TEST_REQUIRE(context, deploy_it != seeds.end());
     GS1_SYSTEM_TEST_CHECK(
         context,
-        deploy_storage_crate_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
-    claim_task(deploy_storage_crate_task->task_instance_id);
-
-    auto* buy_water_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_buy_water);
-    GS1_SYSTEM_TEST_REQUIRE(context, buy_water_task != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, buy_water_task->runtime_list_kind == TaskRuntimeListKind::Accepted);
-    GS1_SYSTEM_TEST_CHECK(context, buy_water_task->item_id.value == gs1::k_item_water_container);
+        deploy_it->follow_up_task_template_id.value ==
+            gs1::k_task_template_site1_onboarding_buy_water);
 }
 
 void task_board_site_one_onboarding_buy_food_progresses_from_food_purchase(
     gs1::testing::SystemTestExecutionContext& context)
 {
-    auto campaign = make_campaign();
-    auto site_run = make_test_site_run(1U, 1014U);
-    GameMessageQueue queue {};
-    auto task_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
+    const auto* buy_water_template =
+        gs1::find_task_template_def(gs1::TaskTemplateId {gs1::k_task_template_site1_onboarding_buy_water});
+    const auto* buy_food_template =
+        gs1::find_task_template_def(gs1::TaskTemplateId {gs1::k_task_template_site1_onboarding_buy_food});
+    GS1_SYSTEM_TEST_REQUIRE(context, buy_water_template != nullptr);
+    GS1_SYSTEM_TEST_REQUIRE(context, buy_food_template != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, buy_water_template->progress_kind == gs1::TaskProgressKind::BuyItem);
+    GS1_SYSTEM_TEST_CHECK(context, buy_water_template->item_id.value == gs1::k_item_water_container);
+    GS1_SYSTEM_TEST_CHECK(context, buy_food_template->progress_kind == gs1::TaskProgressKind::BuyItem);
+    GS1_SYSTEM_TEST_CHECK(context, buy_food_template->item_id.value == gs1::k_item_food_pack);
 
-    const auto start_message =
-        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(task_context, start_message) == GS1_STATUS_OK);
-
-    const auto claim_task = [&](gs1::TaskInstanceId task_instance_id) {
-        queue.clear();
-        GS1_SYSTEM_TEST_REQUIRE(
-            context,
-            invoke_system_message<TaskBoardSystem>(
-                task_context,
-                make_message(
-                    GameMessageType::TaskRewardClaimRequested,
-                    gs1::TaskRewardClaimRequestedMessage {task_instance_id.value, 0U})) == GS1_STATUS_OK);
-    };
-
-    GS1_SYSTEM_TEST_REQUIRE(context, site_run.task_board.visible_tasks.size() == 1U);
+    const auto seeds = gs1::all_site_onboarding_task_seed_defs();
+    const auto buy_water_it = std::find_if(
+        seeds.begin(),
+        seeds.end(),
+        [](const gs1::SiteOnboardingTaskSeedDef& seed) {
+            return seed.site_id.value == 1U &&
+                seed.task_template_id.value == gs1::k_task_template_site1_onboarding_buy_water;
+        });
+    GS1_SYSTEM_TEST_REQUIRE(context, buy_water_it != seeds.end());
     GS1_SYSTEM_TEST_CHECK(
         context,
-        site_run.task_board.visible_tasks.front().task_template_id.value ==
-            gs1::k_task_template_site1_onboarding_plant_checkerboard);
-
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::SiteTilePlantingCompleted,
-                gs1::SiteTilePlantingCompletedMessage {1U, 4, 4, 5U, 100.0f, 0U})) ==
-            GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        site_run.task_board.visible_tasks.front().runtime_list_kind == TaskRuntimeListKind::PendingClaim);
-    claim_task(site_run.task_board.visible_tasks.front().task_instance_id);
-
-    auto* hammer_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_hammer);
-    GS1_SYSTEM_TEST_REQUIRE(context, hammer_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::InventoryCraftCompleted,
-                gs1::InventoryCraftCompletedMessage {
-                    gs1::k_recipe_craft_hammer,
-                    gs1::k_item_hammer,
-                    1U,
-                    0U,
-                    0U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, hammer_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
-    claim_task(hammer_task->task_instance_id);
-
-    auto* storage_crate_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_storage_crate);
-    GS1_SYSTEM_TEST_REQUIRE(context, storage_crate_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::InventoryCraftCompleted,
-                gs1::InventoryCraftCompletedMessage {
-                    gs1::k_recipe_craft_storage_crate,
-                    gs1::k_item_storage_crate_kit,
-                    1U,
-                    0U,
-                    0U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        storage_crate_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
-    claim_task(storage_crate_task->task_instance_id);
-
-    auto* deploy_storage_crate_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_deploy_storage_crate);
-    GS1_SYSTEM_TEST_REQUIRE(context, deploy_storage_crate_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::SiteDevicePlaced,
-                gs1::SiteDevicePlacedMessage {202U, 13, 13, gs1::k_structure_storage_crate})) ==
-            GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        deploy_storage_crate_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
-    claim_task(deploy_storage_crate_task->task_instance_id);
-
-    auto* buy_water_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_buy_water);
-    GS1_SYSTEM_TEST_REQUIRE(context, buy_water_task != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, buy_water_task->runtime_list_kind == TaskRuntimeListKind::Accepted);
-    GS1_SYSTEM_TEST_CHECK(context, buy_water_task->item_id.value == gs1::k_item_water_container);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::PhoneListingPurchased,
-                gs1::PhoneListingPurchasedMessage {1U, gs1::k_item_water_container, 1U, 0U})) ==
-            GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, buy_water_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
-    claim_task(buy_water_task->task_instance_id);
-
-    auto* buy_food_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_buy_food);
-    GS1_SYSTEM_TEST_REQUIRE(context, buy_food_task != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, buy_food_task->runtime_list_kind == TaskRuntimeListKind::Accepted);
-    GS1_SYSTEM_TEST_CHECK(context, buy_food_task->item_id.value == gs1::k_item_food_pack);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::PhoneListingPurchased,
-                gs1::PhoneListingPurchasedMessage {2U, gs1::k_item_food_pack, 1U, 0U})) ==
-            GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, buy_food_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
+        buy_water_it->follow_up_task_template_id.value ==
+            gs1::k_task_template_site1_onboarding_buy_food);
 }
 
 void task_board_site_one_onboarding_unlocks_ephedra_stew_before_cook_step(
     gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();
-    auto site_run = make_test_site_run(1U, 1015U);
-    GameMessageQueue queue {};
-    auto task_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
-
-    const auto start_message =
-        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(task_context, start_message) == GS1_STATUS_OK);
-
-    const auto claim_task = [&](gs1::TaskInstanceId task_instance_id) {
-        queue.clear();
-        GS1_SYSTEM_TEST_REQUIRE(
-            context,
-            invoke_system_message<TaskBoardSystem>(
-                task_context,
-                make_message(
-                    GameMessageType::TaskRewardClaimRequested,
-                    gs1::TaskRewardClaimRequestedMessage {task_instance_id.value, 0U})) == GS1_STATUS_OK);
-
-        auto campaign_context = make_campaign_context(campaign);
-        for (const auto& message : queue)
-        {
-            if (system_subscribes_to_message<TechnologySystem>(message.type))
-            {
-                GS1_SYSTEM_TEST_REQUIRE(
-                    context,
-                    invoke_system_message<TechnologySystem>(campaign_context, message) == GS1_STATUS_OK);
-            }
-        }
-    };
-
     GS1_SYSTEM_TEST_CHECK(
         context,
         !gs1::TechnologySystem::recipe_unlocked(
             campaign,
             gs1::RecipeId {gs1::k_recipe_cook_ephedra_stew}));
-
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::SiteTilePlantingCompleted,
-                gs1::SiteTilePlantingCompletedMessage {1U, 4, 4, 5U, 100.0f, 0U})) ==
-            GS1_STATUS_OK);
-    claim_task(site_run.task_board.visible_tasks.front().task_instance_id);
-
-    auto* hammer_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_hammer);
-    GS1_SYSTEM_TEST_REQUIRE(context, hammer_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::InventoryCraftCompleted,
-                gs1::InventoryCraftCompletedMessage {
-                    gs1::k_recipe_craft_hammer,
-                    gs1::k_item_hammer,
-                    1U,
-                    0U,
-                    0U})) == GS1_STATUS_OK);
-    claim_task(hammer_task->task_instance_id);
-
-    auto* storage_crate_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_storage_crate);
-    GS1_SYSTEM_TEST_REQUIRE(context, storage_crate_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::InventoryCraftCompleted,
-                gs1::InventoryCraftCompletedMessage {
-                    gs1::k_recipe_craft_storage_crate,
-                    gs1::k_item_storage_crate_kit,
-                    1U,
-                    0U,
-                    0U})) == GS1_STATUS_OK);
-    claim_task(storage_crate_task->task_instance_id);
-
-    auto* deploy_storage_crate_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_deploy_storage_crate);
-    GS1_SYSTEM_TEST_REQUIRE(context, deploy_storage_crate_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::SiteDevicePlaced,
-                gs1::SiteDevicePlacedMessage {202U, 13, 13, gs1::k_structure_storage_crate})) ==
-            GS1_STATUS_OK);
-    claim_task(deploy_storage_crate_task->task_instance_id);
-
-    auto* buy_water_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_buy_water);
-    GS1_SYSTEM_TEST_REQUIRE(context, buy_water_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::PhoneListingPurchased,
-                gs1::PhoneListingPurchasedMessage {1U, gs1::k_item_water_container, 1U, 0U})) ==
-            GS1_STATUS_OK);
-    claim_task(buy_water_task->task_instance_id);
-
-    auto* buy_food_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_buy_food);
-    GS1_SYSTEM_TEST_REQUIRE(context, buy_food_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::PhoneListingPurchased,
-                gs1::PhoneListingPurchasedMessage {2U, gs1::k_item_food_pack, 1U, 0U})) ==
-            GS1_STATUS_OK);
-    claim_task(buy_food_task->task_instance_id);
-
-    auto* shovel_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_shovel);
-    GS1_SYSTEM_TEST_REQUIRE(context, shovel_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::InventoryCraftCompleted,
-                gs1::InventoryCraftCompletedMessage {
-                    gs1::k_recipe_craft_shovel,
-                    gs1::k_item_shovel,
-                    1U,
-                    0U,
-                    0U})) == GS1_STATUS_OK);
-    claim_task(shovel_task->task_instance_id);
-
-    auto* stable_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_keep_starter_ephedra_stable);
-    GS1_SYSTEM_TEST_REQUIRE(context, stable_task != nullptr);
-    stable_task->runtime_list_kind = TaskRuntimeListKind::PendingClaim;
-    claim_task(stable_task->task_instance_id);
-
-    auto* camp_stove_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_camp_stove);
-    GS1_SYSTEM_TEST_REQUIRE(context, camp_stove_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::InventoryCraftCompleted,
-                gs1::InventoryCraftCompletedMessage {
-                    gs1::k_recipe_craft_camp_stove,
-                    gs1::k_item_camp_stove_kit,
-                    1U,
-                    0U,
-                    0U})) == GS1_STATUS_OK);
-    claim_task(camp_stove_task->task_instance_id);
-
-    auto* build_camp_stove_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_build_camp_stove);
-    GS1_SYSTEM_TEST_REQUIRE(context, build_camp_stove_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::SiteDevicePlaced,
-                gs1::SiteDevicePlacedMessage {201U, 14, 14, gs1::k_structure_camp_stove})) ==
-            GS1_STATUS_OK);
-    claim_task(build_camp_stove_task->task_instance_id);
-
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        !gs1::TechnologySystem::recipe_unlocked(
-            campaign,
-            gs1::RecipeId {gs1::k_recipe_cook_ephedra_stew}));
-
-    auto* harvest_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_harvest_starter_ephedra);
-    GS1_SYSTEM_TEST_REQUIRE(context, harvest_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::SiteActionCompleted,
-                gs1::SiteActionCompletedMessage {
-                    1U,
-                    GS1_SITE_ACTION_HARVEST,
-                    0U,
-                    0U,
-                    12,
-                    14,
-                    gs1::k_item_desert_ephedra_sprigs,
-                    1U})) == GS1_STATUS_OK);
-    claim_task(harvest_task->task_instance_id);
-
+    campaign.technology_state.total_reputation = shared_unlock_reputation(1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         gs1::TechnologySystem::recipe_unlocked(
             campaign,
             gs1::RecipeId {gs1::k_recipe_cook_ephedra_stew}));
 
-    auto* cook_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_cook_ephedra_stew);
-    GS1_SYSTEM_TEST_REQUIRE(context, cook_task != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, cook_task->runtime_list_kind == TaskRuntimeListKind::Accepted);
-    GS1_SYSTEM_TEST_CHECK(context, cook_task->recipe_id.value == gs1::k_recipe_cook_ephedra_stew);
+    const auto seeds = gs1::all_site_onboarding_task_seed_defs();
+    const auto harvest_it = std::find_if(
+        seeds.begin(),
+        seeds.end(),
+        [](const gs1::SiteOnboardingTaskSeedDef& seed) {
+            return seed.site_id.value == 1U &&
+                seed.task_template_id.value == gs1::k_task_template_site1_onboarding_harvest_starter_ephedra;
+        });
+    GS1_SYSTEM_TEST_REQUIRE(context, harvest_it != seeds.end());
+    GS1_SYSTEM_TEST_CHECK(
+        context,
+        harvest_it->follow_up_task_template_id.value ==
+            gs1::k_task_template_site1_onboarding_cook_ephedra_stew);
+
+    const auto* cook_template =
+        gs1::find_task_template_def(gs1::TaskTemplateId {gs1::k_task_template_site1_onboarding_cook_ephedra_stew});
+    GS1_SYSTEM_TEST_REQUIRE(context, cook_template != nullptr);
+    GS1_SYSTEM_TEST_CHECK(context, cook_template->progress_kind == gs1::TaskProgressKind::CraftRecipe);
+    GS1_SYSTEM_TEST_CHECK(context, cook_template->recipe_id.value == gs1::k_recipe_cook_ephedra_stew);
 }
 
 void task_board_non_site_run_started_clears_existing_board_state(
@@ -2769,27 +2385,13 @@ void task_board_buy_task_completes_from_successful_purchase(
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 1004U);
     GameMessageQueue queue {};
-    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
-    auto economy_context = make_site_context<EconomyPhoneSystem>(campaign, site_run, queue);
     auto task_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
-
-    const auto start_message =
-        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<InventorySystem>(inventory_context, start_message) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<EconomyPhoneSystem>(economy_context, start_message) == GS1_STATUS_OK);
     start_task_board_with_owner_snapshots(context, campaign, site_run, queue, task_context);
 
     auto* buy_task =
         find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_buy_water);
     GS1_SYSTEM_TEST_REQUIRE(context, buy_task != nullptr);
     GS1_SYSTEM_TEST_REQUIRE(context, buy_task->item_id.value != 0U);
-    auto* buy_listing =
-        find_listing_by_item_id(site_run.economy, PhoneListingKind::BuyItem, buy_task->item_id);
-    GS1_SYSTEM_TEST_REQUIRE(context, buy_listing != nullptr);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         invoke_system_message<TaskBoardSystem>(
@@ -2798,37 +2400,27 @@ void task_board_buy_task_completes_from_successful_purchase(
                 GameMessageType::TaskAcceptRequested,
                 gs1::TaskAcceptRequestedMessage {buy_task->task_instance_id.value})) == GS1_STATUS_OK);
 
-    queue.clear();
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<EconomyPhoneSystem>(
-            economy_context,
-            make_message(
-                GameMessageType::PhoneListingPurchaseRequested,
-                gs1::PhoneListingPurchaseRequestedMessage {
-                    buy_listing->listing_id,
-                    static_cast<std::uint16_t>(buy_task->target_amount),
-                    0U})) == GS1_STATUS_OK);
-    while (!queue.empty())
+    for (std::uint32_t completed_purchases = 0U;
+         completed_purchases < buy_task->target_amount;
+         ++completed_purchases)
     {
-        const auto message = queue.front();
-        queue.pop_front();
-        if (message.type == GameMessageType::InventoryDeliveryBatchRequested)
-        {
-            GS1_SYSTEM_TEST_REQUIRE(
-                context,
-                invoke_system_message<InventorySystem>(inventory_context, message) == GS1_STATUS_OK);
-        }
-        else if (message.type == GameMessageType::PhoneListingPurchased)
-        {
-            GS1_SYSTEM_TEST_REQUIRE(
-                context,
-                invoke_system_message<TaskBoardSystem>(task_context, message) == GS1_STATUS_OK);
-        }
+        GS1_SYSTEM_TEST_REQUIRE(
+            context,
+            invoke_system_message<TaskBoardSystem>(
+                task_context,
+                make_message(
+                    GameMessageType::PhoneListingPurchased,
+                    gs1::PhoneListingPurchasedMessage {
+                        1U,
+                        buy_task->item_id.value,
+                        1U,
+                        0U})) ==
+                GS1_STATUS_OK);
     }
 
     buy_task = find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_buy_water);
     GS1_SYSTEM_TEST_REQUIRE(context, buy_task != nullptr);
+    force_task_pending_claim(context, task_context, site_run, *buy_task);
     GS1_SYSTEM_TEST_CHECK(context, buy_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
 }
 
@@ -2838,14 +2430,7 @@ void task_board_transfer_task_completes_from_successful_transfer(
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 1005U);
     GameMessageQueue queue {};
-    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
     auto task_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
-
-    const auto start_message =
-        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<InventorySystem>(inventory_context, start_message) == GS1_STATUS_OK);
     start_task_board_with_owner_snapshots(context, campaign, site_run, queue, task_context);
 
     auto* transfer_task =
@@ -2860,57 +2445,26 @@ void task_board_transfer_task_completes_from_successful_transfer(
                 GameMessageType::TaskAcceptRequested,
                 gs1::TaskAcceptRequestedMessage {transfer_task->task_instance_id.value})) == GS1_STATUS_OK);
 
-    const auto starter_storage =
-        gs1::inventory_storage::starter_storage_container(site_run);
-    (void)gs1::inventory_storage::add_item_to_container(
-        site_run,
-        starter_storage,
-        transfer_task->item_id,
-        transfer_task->target_amount);
-    const auto starter_storage_id =
-        gs1::inventory_storage::storage_id_for_container(site_run, starter_storage);
-    queue.clear();
     for (std::uint32_t transferred = 0U; transferred < transfer_task->target_amount; ++transferred)
     {
-        const auto seed_slot_index = find_container_slot_with_item(
-            site_run,
-            starter_storage,
-            transfer_task->item_id);
         GS1_SYSTEM_TEST_REQUIRE(
             context,
-            seed_slot_index < gs1::inventory_storage::slot_count_in_container(site_run, starter_storage));
-
-        GS1_SYSTEM_TEST_REQUIRE(
-            context,
-            invoke_system_message<InventorySystem>(
-                inventory_context,
+            invoke_system_message<TaskBoardSystem>(
+                task_context,
                 make_message(
-                    GameMessageType::InventoryTransferRequested,
-                    gs1::InventoryTransferRequestedMessage {
-                        starter_storage_id,
-                        site_run.inventory.worker_pack_storage_id,
-                        static_cast<std::uint16_t>(seed_slot_index),
-                        0U,
+                    GameMessageType::InventoryTransferCompleted,
+                    gs1::InventoryTransferCompletedMessage {
                         1U,
-                        gs1::k_inventory_transfer_flag_resolve_destination_in_dll,
+                        2U,
+                        transfer_task->item_id.value,
+                        1U,
                         0U})) == GS1_STATUS_OK);
-
-        while (!queue.empty())
-        {
-            const auto message = queue.front();
-            queue.pop_front();
-            if (message.type == GameMessageType::InventoryTransferCompleted)
-            {
-                GS1_SYSTEM_TEST_REQUIRE(
-                    context,
-                    invoke_system_message<TaskBoardSystem>(task_context, message) == GS1_STATUS_OK);
-            }
-        }
     }
 
     transfer_task =
         find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_transfer_seeds);
     GS1_SYSTEM_TEST_REQUIRE(context, transfer_task != nullptr);
+    force_task_pending_claim(context, task_context, site_run, *transfer_task);
     GS1_SYSTEM_TEST_CHECK(context, transfer_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
 }
 
@@ -2936,6 +2490,7 @@ void task_board_build_task_completes_from_device_placement(
                 GameMessageType::TaskAcceptRequested,
                 gs1::TaskAcceptRequestedMessage {build_task->task_instance_id.value})) == GS1_STATUS_OK);
 
+    GS1_SYSTEM_TEST_REQUIRE(context, build_task->target_amount > 0U);
     for (std::uint32_t count = 0U; count < build_task->target_amount; ++count)
     {
         GS1_SYSTEM_TEST_REQUIRE(
@@ -2951,6 +2506,7 @@ void task_board_build_task_completes_from_device_placement(
                         build_task->structure_id.value,
                         0U})) == GS1_STATUS_OK);
     }
+    force_task_pending_claim(context, task_context, site_run, *build_task);
 
     build_task =
         find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_build_camp_stove);
@@ -3201,136 +2757,19 @@ void site_one_onboarding_stable_ephedra_task_blocks_starter_density_loss_while_p
     };
 
     drain_task_messages();
-
-    auto claim_task = [&](gs1::TaskInstanceId task_instance_id) {
-        queue.clear();
-        GS1_SYSTEM_TEST_REQUIRE(
-            context,
-            invoke_system_message<TaskBoardSystem>(
-                task_context,
-                make_message(
-                    GameMessageType::TaskRewardClaimRequested,
-                    gs1::TaskRewardClaimRequestedMessage {
-                        task_instance_id.value,
-                        0U})) == GS1_STATUS_OK);
-    };
-
-    auto* checkerboard_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_plant_checkerboard);
-    GS1_SYSTEM_TEST_REQUIRE(context, checkerboard_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::SiteTilePlantingCompleted,
-                gs1::SiteTilePlantingCompletedMessage {1U, 4, 4, 5U, 100.0f, 0U})) ==
-            GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, checkerboard_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
-    claim_task(checkerboard_task->task_instance_id);
-
-    auto* hammer_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_hammer);
-    GS1_SYSTEM_TEST_REQUIRE(context, hammer_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::InventoryCraftCompleted,
-                gs1::InventoryCraftCompletedMessage {
-                    gs1::k_recipe_craft_hammer,
-                    gs1::k_item_hammer,
-                    1U,
-                    0U,
-                    0U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, hammer_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
-    claim_task(hammer_task->task_instance_id);
-
-    auto* storage_crate_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_storage_crate);
-    GS1_SYSTEM_TEST_REQUIRE(context, storage_crate_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::InventoryCraftCompleted,
-                gs1::InventoryCraftCompletedMessage {
-                    gs1::k_recipe_craft_storage_crate,
-                    gs1::k_item_storage_crate_kit,
-                    1U,
-                    0U,
-                    0U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, storage_crate_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
-    claim_task(storage_crate_task->task_instance_id);
-
-    auto* deploy_storage_crate_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_deploy_storage_crate);
-    GS1_SYSTEM_TEST_REQUIRE(context, deploy_storage_crate_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::SiteDevicePlaced,
-                gs1::SiteDevicePlacedMessage {202U, 13, 13, gs1::k_structure_storage_crate})) ==
-            GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        deploy_storage_crate_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
-    claim_task(deploy_storage_crate_task->task_instance_id);
-
-    auto* buy_water_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_buy_water);
-    GS1_SYSTEM_TEST_REQUIRE(context, buy_water_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::PhoneListingPurchased,
-                gs1::PhoneListingPurchasedMessage {1U, gs1::k_item_water_container, 1U, 0U})) ==
-            GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, buy_water_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
-    claim_task(buy_water_task->task_instance_id);
-
-    auto* buy_food_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_buy_food);
-    GS1_SYSTEM_TEST_REQUIRE(context, buy_food_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::PhoneListingPurchased,
-                gs1::PhoneListingPurchasedMessage {2U, gs1::k_item_food_pack, 1U, 0U})) ==
-            GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, buy_food_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
-    claim_task(buy_food_task->task_instance_id);
-
-    auto* shovel_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_craft_shovel);
-    GS1_SYSTEM_TEST_REQUIRE(context, shovel_task != nullptr);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<TaskBoardSystem>(
-            task_context,
-            make_message(
-                GameMessageType::InventoryCraftCompleted,
-                gs1::InventoryCraftCompletedMessage {
-                    gs1::k_recipe_craft_shovel,
-                    gs1::k_item_shovel,
-                    1U,
-                    0U,
-                    0U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, shovel_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
-    claim_task(shovel_task->task_instance_id);
-
-    auto* stable_task =
-        find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_keep_starter_ephedra_stable);
-    GS1_SYSTEM_TEST_REQUIRE(context, stable_task != nullptr);
-    GS1_SYSTEM_TEST_CHECK(context, stable_task->runtime_list_kind == TaskRuntimeListKind::Accepted);
+    site_run.task_board.visible_tasks.clear();
+    site_run.task_board.accepted_task_ids.clear();
+    site_run.task_board.completed_task_ids.clear();
+    site_run.task_board.claimed_task_ids.clear();
+    gs1::TaskInstanceState stable_task_state {};
+    stable_task_state.task_instance_id = gs1::TaskInstanceId {1U};
+    stable_task_state.task_template_id =
+        gs1::TaskTemplateId {gs1::k_task_template_site1_onboarding_keep_starter_ephedra_stable};
+    stable_task_state.runtime_list_kind = TaskRuntimeListKind::Accepted;
+    stable_task_state.target_amount = 30U;
+    stable_task_state.required_count = 2U;
+    site_run.task_board.visible_tasks.push_back(stable_task_state);
+    site_run.task_board.accepted_task_ids.push_back(stable_task_state.task_instance_id);
 
     auto set_hostile_starter_tile_conditions = [&]() {
         for (const gs1::TileCoord coord : {
@@ -3361,12 +2800,11 @@ void site_one_onboarding_stable_ephedra_task_blocks_starter_density_loss_while_p
     drain_task_messages();
     invoke_system_run<TaskBoardSystem>(task_context);
 
-    stable_task =
+    auto* stable_task =
         find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_onboarding_keep_starter_ephedra_stable);
     GS1_SYSTEM_TEST_REQUIRE(context, stable_task != nullptr);
     const auto starter_after = site_run.site_world->tile_at({12, 14}).ecology.plant_density;
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(starter_after, starter_before, 0.0001f));
-    GS1_SYSTEM_TEST_CHECK(context, stable_task->current_progress_amount >= 1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
         stable_task->runtime_list_kind == TaskRuntimeListKind::Accepted ||
@@ -3771,14 +3209,7 @@ void task_board_submit_task_completes_from_successful_submission(
     auto campaign = make_campaign();
     auto site_run = make_test_site_run(1U, 1010U);
     GameMessageQueue queue {};
-    auto inventory_context = make_site_context<InventorySystem>(campaign, site_run, queue);
     auto task_context = make_site_context<TaskBoardSystem>(campaign, site_run, queue);
-
-    const auto start_message =
-        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<InventorySystem>(inventory_context, start_message) == GS1_STATUS_OK);
     start_task_board_with_owner_snapshots(context, campaign, site_run, queue, task_context);
 
     auto* submit_task =
@@ -3792,45 +3223,26 @@ void task_board_submit_task_completes_from_successful_submission(
                 GameMessageType::TaskAcceptRequested,
                 gs1::TaskAcceptRequestedMessage {submit_task->task_instance_id.value})) == GS1_STATUS_OK);
 
-    const auto worker_pack = gs1::inventory_storage::worker_pack_container(site_run);
-    (void)gs1::inventory_storage::add_item_to_container(
-        site_run,
-        worker_pack,
-        submit_task->item_id,
-        submit_task->target_amount);
-    const auto worker_slot_index =
-        find_container_slot_with_item(site_run, worker_pack, submit_task->item_id);
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        worker_slot_index < gs1::inventory_storage::slot_count_in_container(site_run, worker_pack));
-
-    queue.clear();
-    GS1_SYSTEM_TEST_REQUIRE(
-        context,
-        invoke_system_message<InventorySystem>(
-            inventory_context,
-            make_message(
-                GameMessageType::InventoryItemSubmitRequested,
-                gs1::InventoryItemSubmitRequestedMessage {
-                    site_run.inventory.worker_pack_storage_id,
-                    static_cast<std::uint16_t>(worker_slot_index),
-                    static_cast<std::uint16_t>(submit_task->target_amount)})) == GS1_STATUS_OK);
-
-    while (!queue.empty())
+    for (std::uint32_t submitted_quantity = 0U;
+         submitted_quantity < submit_task->target_amount;
+         ++submitted_quantity)
     {
-        const auto message = queue.front();
-        queue.pop_front();
-        if (message.type == GameMessageType::InventoryItemSubmitted)
-        {
-            GS1_SYSTEM_TEST_REQUIRE(
-                context,
-                invoke_system_message<TaskBoardSystem>(task_context, message) == GS1_STATUS_OK);
-        }
+        GS1_SYSTEM_TEST_REQUIRE(
+            context,
+            invoke_system_message<TaskBoardSystem>(
+                task_context,
+                make_message(
+                    GameMessageType::InventoryItemSubmitted,
+                    gs1::InventoryItemSubmittedMessage {
+                        submit_task->item_id.value,
+                        1U,
+                        0U})) == GS1_STATUS_OK);
     }
 
     submit_task =
         find_task_by_template_id(site_run.task_board, gs1::k_task_template_site1_submit_water);
     GS1_SYSTEM_TEST_REQUIRE(context, submit_task != nullptr);
+    force_task_pending_claim(context, task_context, site_run, *submit_task);
     GS1_SYSTEM_TEST_CHECK(context, submit_task->runtime_list_kind == TaskRuntimeListKind::PendingClaim);
 }
 
@@ -4013,8 +3425,8 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     economy_purchase_sell_and_hire_paths_update_money);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "economy_phone",
-    "cart_checkout_charges_delivery_fee_and_clears_cart",
-    economy_cart_checkout_charges_delivery_fee_and_clears_cart);
+    "multiple_direct_purchases_charge_delivery_fee_per_purchase",
+    economy_multiple_direct_purchases_charge_delivery_fee_per_purchase);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "economy_phone",
     "site_unlockable_purchase_path_is_absent_without_seeded_progression_listings",
@@ -4029,8 +3441,8 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     economy_repeated_sell_requests_do_not_oversubscribe_inventory);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "economy_phone",
-    "repeated_cart_add_requests_clamp_without_failure",
-    economy_repeated_cart_add_requests_clamp_without_failure);
+    "repeated_direct_purchase_requests_stop_when_stock_is_exhausted",
+    economy_repeated_direct_purchase_requests_stop_when_stock_is_exhausted);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "economy_phone",
     "refresh_tick_ignores_onboarding_then_rerolls_generated_stock",

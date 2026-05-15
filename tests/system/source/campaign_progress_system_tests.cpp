@@ -138,10 +138,6 @@ void campaign_flow_start_new_campaign_initializes_state(gs1::testing::SystemTest
     GS1_SYSTEM_TEST_CHECK(context, campaign->faction_progress[0].faction_id.value == gs1::k_faction_village_committee);
     GS1_SYSTEM_TEST_CHECK(context, campaign->faction_progress[1].faction_id.value == gs1::k_faction_forestry_bureau);
     GS1_SYSTEM_TEST_CHECK(context, campaign->faction_progress[2].faction_id.value == gs1::k_faction_agricultural_university);
-    GS1_SYSTEM_TEST_CHECK(context, !campaign->regional_map_state.tech_tree_open);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        campaign->regional_map_state.selected_tech_tree_faction_id.value == gs1::k_faction_village_committee);
     GS1_SYSTEM_TEST_CHECK(context, campaign->technology_state.total_reputation == 0);
     GS1_SYSTEM_TEST_CHECK(context, campaign->loadout_planner_state.baseline_deployment_items.size() == 2U);
     GS1_SYSTEM_TEST_CHECK(context, campaign->loadout_planner_state.selected_loadout_slots.size() == 2U);
@@ -272,8 +268,6 @@ void campaign_flow_start_attempt_and_return_to_map(gs1::testing::SystemTestExecu
     GameMessageQueue queue {};
 
 
-    campaign->regional_map_state.tech_tree_open = true;
-
     const auto start_message = make_message(
         GameMessageType::StartSiteAttempt,
         StartSiteAttemptMessage {1U});
@@ -284,11 +278,10 @@ void campaign_flow_start_attempt_and_return_to_map(gs1::testing::SystemTestExecu
     GS1_SYSTEM_TEST_REQUIRE(context, active_site_run.has_value());
     GS1_SYSTEM_TEST_CHECK(context, active_site_run->site_id.value == 1U);
     GS1_SYSTEM_TEST_CHECK(context, active_site_run->site_run_id.value == 1U);
-    GS1_SYSTEM_TEST_CHECK(context, app_state == GS1_APP_STATE_SITE_ACTIVE);
-    GS1_SYSTEM_TEST_CHECK(context, campaign->app_state == GS1_APP_STATE_SITE_ACTIVE);
+    GS1_SYSTEM_TEST_CHECK(context, app_state == GS1_APP_STATE_SITE_LOADING);
+    GS1_SYSTEM_TEST_CHECK(context, campaign->app_state == GS1_APP_STATE_SITE_LOADING);
     GS1_SYSTEM_TEST_CHECK(context, campaign->active_site_id.has_value());
     GS1_SYSTEM_TEST_CHECK(context, campaign->active_site_id->value == 1U);
-    GS1_SYSTEM_TEST_CHECK(context, !campaign->regional_map_state.tech_tree_open);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue.front().type == GameMessageType::SiteRunStarted);
     GS1_SYSTEM_TEST_CHECK(
@@ -547,9 +540,6 @@ void site_flow_moves_worker_and_marks_projection_dirty(gs1::testing::SystemTestE
     GS1_SYSTEM_TEST_CHECK(context, worker.tile_x > 2.0f);
     GS1_SYSTEM_TEST_CHECK(context, worker.tile_coord.x > 2);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(worker.facing_degrees, 90.0f));
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        (site_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_WORKER) != 0U);
 }
 
 void site_flow_respects_traversability_and_time_system_updates_phase(
@@ -587,9 +577,6 @@ void site_flow_respects_traversability_and_time_system_updates_phase(
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(worker.tile_x, 2.0f));
     GS1_SYSTEM_TEST_CHECK(context, worker.tile_coord.x == 2);
     GS1_SYSTEM_TEST_CHECK(context, site_run.clock.day_phase == DayPhase::Day);
-    GS1_SYSTEM_TEST_CHECK(
-        context,
-        (site_run.pending_projection_update_flags & gs1::SITE_PROJECTION_UPDATE_WORKER) == 0U);
 }
 
 void site_completion_only_emits_when_threshold_is_met(gs1::testing::SystemTestExecutionContext& context)
@@ -838,68 +825,6 @@ void failure_recovery_only_emits_when_worker_health_is_zero(gs1::testing::System
     GS1_SYSTEM_TEST_CHECK(context, queue.size() == 1U);
 }
 
-void campaign_flow_tech_tree_open_and_close_toggles_regional_map_state(
-    gs1::testing::SystemTestExecutionContext& context)
-{
-    for (const auto supported_app_state : {GS1_APP_STATE_REGIONAL_MAP, GS1_APP_STATE_SITE_ACTIVE})
-    {
-        std::optional<gs1::CampaignState> campaign {make_campaign()};
-        std::optional<gs1::SiteRunState> active_site_run {};
-        Gs1AppState app_state = supported_app_state;
-        GameMessageQueue queue {};
-
-        GS1_SYSTEM_TEST_REQUIRE(
-            context,
-            invoke_system_message<CampaignFlowSystem>(
-                make_message(
-                    GameMessageType::OpenRegionalMapTechTree,
-                    gs1::OpenRegionalMapTechTreeMessage {}),
-                app_state,
-                campaign,
-                active_site_run,
-                queue) == GS1_STATUS_OK);
-        GS1_SYSTEM_TEST_CHECK(context, campaign->regional_map_state.tech_tree_open);
-
-        GS1_SYSTEM_TEST_REQUIRE(
-            context,
-            invoke_system_message<CampaignFlowSystem>(
-                make_message(
-                    GameMessageType::CloseRegionalMapTechTree,
-                    gs1::CloseRegionalMapTechTreeMessage {}),
-                app_state,
-                campaign,
-                active_site_run,
-                queue) == GS1_STATUS_OK);
-        GS1_SYSTEM_TEST_CHECK(context, !campaign->regional_map_state.tech_tree_open);
-    }
-}
-
-void campaign_flow_selects_tech_tree_faction_tab(gs1::testing::SystemTestExecutionContext& context)
-{
-    for (const auto supported_app_state : {GS1_APP_STATE_REGIONAL_MAP, GS1_APP_STATE_SITE_ACTIVE})
-    {
-        std::optional<gs1::CampaignState> campaign {make_campaign()};
-        std::optional<gs1::SiteRunState> active_site_run {};
-        Gs1AppState app_state = supported_app_state;
-        GameMessageQueue queue {};
-
-        GS1_SYSTEM_TEST_REQUIRE(
-            context,
-            invoke_system_message<CampaignFlowSystem>(
-                make_message(
-                    GameMessageType::SelectRegionalMapTechTreeFaction,
-                    gs1::SelectRegionalMapTechTreeFactionMessage {
-                        gs1::k_faction_forestry_bureau}),
-                app_state,
-                campaign,
-                active_site_run,
-                queue) == GS1_STATUS_OK);
-        GS1_SYSTEM_TEST_CHECK(
-            context,
-            campaign->regional_map_state.selected_tech_tree_faction_id.value == gs1::k_faction_forestry_bureau);
-    }
-}
-
 void faction_reputation_awards_unlock_assistant_at_threshold(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -1031,8 +956,6 @@ void technology_first_basic_tier_auto_unlocks_with_faction_requirement(
     const auto village_tier_one = gs1::base_technology_node_id(
         gs1::FactionId {gs1::k_faction_village_committee},
         1U);
-    campaign.regional_map_state.selected_tech_tree_faction_id =
-        gs1::FactionId {gs1::k_faction_village_committee};
     campaign.faction_progress[0].faction_reputation = 0;
 
     GS1_SYSTEM_TEST_CHECK(
@@ -1061,8 +984,6 @@ void technology_auto_unlock_uses_node_faction_reputation_not_selected_tab(
     const auto village_tier_one = gs1::base_technology_node_id(
         gs1::FactionId {gs1::k_faction_village_committee},
         1U);
-    campaign.regional_map_state.selected_tech_tree_faction_id =
-        gs1::FactionId {gs1::k_faction_agricultural_university};
     campaign.faction_progress[0].faction_reputation = 0;
     campaign.faction_progress[2].faction_reputation = reputation_for_progress_tier(20U);
 
@@ -1433,14 +1354,6 @@ GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "failure_recovery",
     "only_emits_when_worker_health_is_zero",
     failure_recovery_only_emits_when_worker_health_is_zero);
-GS1_REGISTER_SOURCE_SYSTEM_TEST(
-    "campaign_flow",
-    "tech_tree_open_and_close_toggles_regional_map_state",
-    campaign_flow_tech_tree_open_and_close_toggles_regional_map_state);
-GS1_REGISTER_SOURCE_SYSTEM_TEST(
-    "campaign_flow",
-    "selects_tech_tree_faction_tab",
-    campaign_flow_selects_tech_tree_faction_tab);
 GS1_REGISTER_SOURCE_SYSTEM_TEST(
     "faction_reputation",
     "awards_unlock_assistant_at_threshold",
