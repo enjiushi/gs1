@@ -562,11 +562,22 @@ std::vector<const CraftRecipeDef*> recipes_for_station(
     const CampaignState& campaign,
     StructureId structure_id)
 {
+    return recipes_for_station(
+        std::span<const FactionProgressState> {campaign.faction_progress},
+        campaign.technology_state,
+        structure_id);
+}
+
+std::vector<const CraftRecipeDef*> recipes_for_station(
+    std::span<const FactionProgressState> faction_progress,
+    const TechnologyState& technology,
+    StructureId structure_id)
+{
     std::vector<const CraftRecipeDef*> recipes {};
     for (const auto& recipe_def : all_craft_recipe_defs())
     {
         if (recipe_def.station_structure_id == structure_id &&
-            TechnologySystem::recipe_unlocked(campaign, recipe_def.recipe_id))
+            TechnologySystem::recipe_unlocked(faction_progress, technology, recipe_def.recipe_id))
         {
             recipes.push_back(&recipe_def);
         }

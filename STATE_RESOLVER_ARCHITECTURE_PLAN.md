@@ -10,6 +10,12 @@ This document proposes a refactor path from the current direct tagged-state-acce
 
 The goal is not to weaken ownership. The goal is to keep strict ownership of mutable state while removing hard wiring between peer systems.
 
+Status note:
+
+- GS1 now implements explicit `StateSetId` ownership registration, split authoritative state storage, and split-backed compatibility helpers for narrow non-production callers such as test seeding and assertion utilities.
+- The document below still contains some target-architecture material that is not fully implemented yet, especially the idea of a complete preinstalled per-state-set default-resolver baseline inside `StateManager`.
+- Unless a later status section says otherwise, treat those default-resolver-baseline sections as future design direction rather than finished GS1 behavior.
+
 ## Implementation Status
 
 This section tracks the current GS1 refactor status relative to this plan.
@@ -20,10 +26,11 @@ This section tracks the current GS1 refactor status relative to this plan.
 - Added `StateSetId` inventory and typed state-set traits/wrappers in `src/runtime/state_set.h`.
 - Added `StateManager` in `src/runtime/state_manager.h` and `src/runtime/state_manager.cpp`.
 - Registered runtime systems as owners/resolvers by explicit `StateSetId` ownership instead of implicit aggregate access.
+- Added centralized split-state compatibility helpers in `src/runtime/runtime_split_state_compat.h` so aggregate campaign/site assembly and write-back logic is shared instead of duplicated across tests and the remaining narrow compatibility surfaces.
 - Enforced the additional cache-layout rule:
   - every non-container state set wrapper is explicitly aligned to 64 bytes
   - compile-time validation checks that contract
-- Updated `RuntimeInvocation` and runtime state access so split-backed reads/writes can still hydrate and flush compatibility aggregate views where needed.
+- Updated `RuntimeInvocation` and runtime state access so production runtime paths read and write split authoritative state directly.
 - Added split-backed site-world access paths so site systems can work against their owned slices directly instead of always tunneling through assembled `SiteRunState`.
 - Migrated the main site owner systems to the split-backed ownership model, including:
   - action execution
@@ -46,49 +53,42 @@ This section tracks the current GS1 refactor status relative to this plan.
   - task board
   - weather event
   - worker condition
-- Migrated campaign flow away from direct gameplay-system dependency on `RuntimeActiveSiteRunTag` by using split-backed active-site helpers.
+- Migrated campaign flow and campaign time fully onto split authoritative campaign and active-site slices.
 - Kept cross-owner mutation on `GameMessage`.
 - Updated build wiring so the new state-manager implementation is compiled into the gameplay core.
+- Added focused runtime regression coverage for:
+  - duplicate `StateSetId` owner registration rejection and first-owner default/active tracking
+  - aggregate invocation movement flow through the existing site system runtime regression
 - Updated repo guidance docs and folder guidelines to describe the split-state runtime direction.
 
 ### Current Verified Build State
 
-Verified locally on the current refactor branch/worktree:
+Verified locally on 2026-05-15 in the main worktree:
 
 - `cmake --build build --config Debug --target gs1_gameplay_core`
-- `cmake --build build --config Debug --target gs1_game`
+- `cmake --build build --config Debug --target gs1_state_manager_test`
+- `cmake --build build --config Debug --target gs1_site_system_message_flow_test`
 
-Both builds are green.
+Verified test executables:
 
-### What Is Still Compatibility-Only
+- `build/Debug/gs1_state_manager_test.exe`
+- `build/Debug/gs1_site_system_message_flow_test.exe`
 
-The following pieces still exist mainly to support compatibility during the transition:
+### What From The Original Proposal Is Still Not Implemented
 
-- `RuntimeActiveSiteRunTag` support in `src/runtime/runtime_state_access.h`
-- fallback aggregate-site access path in `src/site/systems/site_system_context.h`
-- compatibility hydration/flush paths that assemble aggregate campaign/site views from split state sets
+The remaining gap is no longer the old runtime compatibility layer. That slice is now removed from the production runtime path. The unfinished parts now live mostly in the more ambitious original proposal:
 
-These are no longer the primary gameplay-system path for the migrated systems, but they still exist to avoid breaking older access surfaces during the transition.
-
-### What Is Next
-
-The next refactor slice should focus on reducing transitional duplication and tightening the architecture around the now-working split-state path:
-
-- consolidate duplicated split-state assembly/write-back helpers so campaign/site compatibility hydration does not reimplement the same mapping logic in multiple places
-- decide whether the compatibility aggregate-site path should remain temporarily or be removed after downstream callers are fully migrated
-- move more read-only runtime helpers and exported view builders to use split state directly where practical instead of assembling aggregate compatibility objects first
-- review whether `RuntimeActiveSiteRunTag` can be deleted entirely once no remaining compatibility callers need it
-- continue aligning follow-up plans with `COMPILE_TIME_RUNTIME_STATE_PLAN.md`
+- `StateManager` does not yet install a complete per-`StateSetId` default resolver baseline up front.
+- There is not yet a separate default-resolver ticking pipeline that runs default resolvers in `StateSetId` order.
+- The broad compatibility `CampaignState` and `SiteRunState` shapes still exist as data shapes and are still assembled/written by `src/runtime/runtime_split_state_compat.h` for tests and any remaining narrow non-runtime compatibility callers.
 
 ### TODO List
 
-- deduplicate campaign/site state-set assembly and write-back helper code
-- audit remaining compatibility-only access surfaces and remove any no longer needed
-- consider replacing broad compatibility `CampaignState` or `SiteRunState` hydration in read-only paths with narrower direct split-state reads
-- add focused tests for:
-  - duplicate `StateSetId` owner registration rejection
-  - split-state fallback/default resolver behavior
-  - compatibility hydration/write-back correctness for migrated systems
+The current site-system migration slice is functionally complete and the production runtime path is aligned with the split-state target, but a few follow-up tasks still remain if we continue pushing toward the full target:
+
+- decide whether the remaining aggregate assembly helpers in `src/runtime/runtime_split_state_compat.h` should stay as long-lived test utilities or be replaced with narrower test builders over time
+- after the split-state refactor is fully adopted, evaluate removing the need for a single broad gameplay-state aggregate shape and keep only the split authoritative state-set storage plus any narrowly scoped view/adapter surfaces that still provide value
+- decide whether GS1 should actually implement the document's stronger default-resolver-baseline model or keep the current simpler first-owner-becomes-default registration rule
 - review warning policy for the expected MSVC `C4324` alignment warnings caused by intentional `alignas(64)` state-set wrappers
 - keep future system additions aligned with:
   - explicit owned-state-set registration

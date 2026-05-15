@@ -44,7 +44,8 @@ void append_loadout_slots(
 }
 
 void rebuild_campaign_progression_entries(
-    const CampaignState& campaign,
+    const TechnologyState& technology,
+    std::span<const FactionProgressState> faction_progress,
     std::vector<Gs1ProgressionEntryView>& entries)
 {
     entries.clear();
@@ -54,7 +55,7 @@ void rebuild_campaign_progression_entries(
     for (const auto& unlock_def : all_reputation_unlock_defs())
     {
         std::uint16_t flags = 0U;
-        if (campaign.technology_state.total_reputation >= unlock_def.reputation_requirement)
+        if (technology.total_reputation >= unlock_def.reputation_requirement)
         {
             flags |= GS1_PROGRESSION_ENTRY_FLAG_UNLOCKED;
         }
@@ -77,10 +78,10 @@ void rebuild_campaign_progression_entries(
 
     for (const auto& node_def : all_technology_node_defs())
     {
-        std::uint16_t flags = TechnologySystem::node_purchased(campaign, node_def.tech_node_id)
+        std::uint16_t flags = TechnologySystem::node_purchased(faction_progress, node_def.tech_node_id)
             ? GS1_PROGRESSION_ENTRY_FLAG_UNLOCKED
             : GS1_PROGRESSION_ENTRY_FLAG_LOCKED;
-        if (TechnologySystem::node_claimable(campaign, node_def))
+        if (TechnologySystem::node_claimable(faction_progress, node_def))
         {
             flags |= GS1_PROGRESSION_ENTRY_FLAG_ACTIONABLE;
         }
@@ -102,12 +103,17 @@ void rebuild_campaign_progression_entries(
 }
 
 void rebuild_campaign_view(
-    const CampaignState& campaign,
+    const CampaignCoreState& campaign_core,
+    const RegionalMapState& regional_map,
+    std::span<const FactionProgressState> faction_progress,
+    const TechnologyState& technology,
+    const LoadoutPlannerState& loadout_planner,
+    std::span<const SiteMetaState> sites,
     RuntimeGameStateViewCache& cache)
 {
     cache.faction_progress.clear();
-    cache.faction_progress.reserve(campaign.faction_progress.size());
-    for (const auto& progress : campaign.faction_progress)
+    cache.faction_progress.reserve(faction_progress.size());
+    for (const auto& progress : faction_progress)
     {
         cache.faction_progress.push_back(Gs1FactionProgressView {
             id_value(progress.faction_id),
@@ -126,22 +132,22 @@ void rebuild_campaign_view(
     cache.site_exported_support_items.clear();
     cache.site_nearby_aura_modifier_ids.clear();
     cache.campaign_sites.clear();
-    cache.campaign_sites.reserve(campaign.sites.size());
+    cache.campaign_sites.reserve(sites.size());
 
-    for (const auto site_id : campaign.regional_map_state.revealed_site_ids)
+    for (const auto site_id : regional_map.revealed_site_ids)
     {
         cache.revealed_site_ids.push_back(id_value(site_id));
     }
-    for (const auto site_id : campaign.regional_map_state.available_site_ids)
+    for (const auto site_id : regional_map.available_site_ids)
     {
         cache.available_site_ids.push_back(id_value(site_id));
     }
-    for (const auto site_id : campaign.regional_map_state.completed_site_ids)
+    for (const auto site_id : regional_map.completed_site_ids)
     {
         cache.completed_site_ids.push_back(id_value(site_id));
     }
 
-    for (const auto& site : campaign.sites)
+    for (const auto& site : sites)
     {
         const std::uint32_t adjacency_offset = static_cast<std::uint32_t>(cache.site_adjacency_ids.size());
         for (const auto adjacent_site_id : site.adjacent_site_ids)
@@ -185,33 +191,33 @@ void rebuild_campaign_view(
     cache.selected_loadout_slots.clear();
     cache.active_nearby_aura_modifier_ids.clear();
     append_loadout_slots(
-        campaign.loadout_planner_state.baseline_deployment_items,
+        loadout_planner.baseline_deployment_items,
         cache.baseline_deployment_items);
     append_loadout_slots(
-        campaign.loadout_planner_state.available_exported_support_items,
+        loadout_planner.available_exported_support_items,
         cache.available_exported_support_items);
     append_loadout_slots(
-        campaign.loadout_planner_state.selected_loadout_slots,
+        loadout_planner.selected_loadout_slots,
         cache.selected_loadout_slots);
-    for (const auto modifier_id : campaign.loadout_planner_state.active_nearby_aura_modifier_ids)
+    for (const auto modifier_id : loadout_planner.active_nearby_aura_modifier_ids)
     {
         cache.active_nearby_aura_modifier_ids.push_back(id_value(modifier_id));
     }
 
-    rebuild_campaign_progression_entries(campaign, cache.progression_entries);
+    rebuild_campaign_progression_entries(technology, faction_progress, cache.progression_entries);
 
     cache.campaign = Gs1CampaignStateView {
-        id_value(campaign.campaign_id),
-        campaign.campaign_seed,
-        campaign.campaign_clock_minutes_elapsed,
-        campaign.campaign_days_total,
-        campaign.campaign_days_remaining,
-        static_cast<std::uint32_t>(std::max(0, campaign.technology_state.total_reputation)),
-        campaign.regional_map_state.selected_site_id.has_value()
-            ? static_cast<std::int32_t>(id_value(campaign.regional_map_state.selected_site_id.value()))
+        id_value(campaign_core.campaign_id),
+        campaign_core.campaign_seed,
+        campaign_core.campaign_clock_minutes_elapsed,
+        campaign_core.campaign_days_total,
+        campaign_core.campaign_days_remaining,
+        static_cast<std::uint32_t>(std::max(0, technology.total_reputation)),
+        regional_map.selected_site_id.has_value()
+            ? static_cast<std::int32_t>(id_value(regional_map.selected_site_id.value()))
             : -1,
-        campaign.active_site_id.has_value()
-            ? static_cast<std::int32_t>(id_value(campaign.active_site_id.value()))
+        campaign_core.active_site_id.has_value()
+            ? static_cast<std::int32_t>(id_value(campaign_core.active_site_id.value()))
             : -1,
         cache.faction_progress.empty() ? nullptr : cache.faction_progress.data(),
         static_cast<std::uint32_t>(cache.faction_progress.size()),
@@ -237,14 +243,27 @@ void rebuild_campaign_view(
         static_cast<std::uint32_t>(cache.selected_loadout_slots.size()),
         cache.active_nearby_aura_modifier_ids.empty() ? nullptr : cache.active_nearby_aura_modifier_ids.data(),
         static_cast<std::uint32_t>(cache.active_nearby_aura_modifier_ids.size()),
-        campaign.loadout_planner_state.support_quota_per_contributor,
-        campaign.loadout_planner_state.support_quota,
+        loadout_planner.support_quota_per_contributor,
+        loadout_planner.support_quota,
         cache.progression_entries.empty() ? nullptr : cache.progression_entries.data(),
         static_cast<std::uint32_t>(cache.progression_entries.size())};
 }
 
 void rebuild_site_view(
-    const SiteRunState& site_run,
+    const SiteRunMetaState& meta,
+    const SiteWorld* site_world,
+    const SiteClockState& clock,
+    const CampState& camp,
+    const InventoryState& inventory,
+    const WeatherState& weather,
+    const EventState& event,
+    const TaskBoardState& task_board,
+    const ModifierState& modifier,
+    const EconomyState& economy,
+    const CraftState& craft,
+    const ActionState& site_action,
+    const SiteCounters& counters,
+    const SiteObjectiveState& objective,
     RuntimeGameStateViewCache& cache)
 {
     cache.inventory_storages.clear();
@@ -255,15 +274,15 @@ void rebuild_site_view(
     cache.phone_listings.clear();
     cache.craft_context_options.clear();
 
-    for (const auto& storage : site_run.inventory.storage_containers)
+    for (const auto& storage : inventory.storage_containers)
     {
         const std::uint32_t slot_offset = static_cast<std::uint32_t>(cache.inventory_slots.size());
         for (std::size_t slot_index = 0; slot_index < storage.slot_item_instance_ids.size(); ++slot_index)
         {
-            const bool worker_pack_storage = storage.storage_id == site_run.inventory.worker_pack_storage_id;
+            const bool worker_pack_storage = storage.storage_id == inventory.worker_pack_storage_id;
             const InventorySlot* source_slot =
-                worker_pack_storage && slot_index < site_run.inventory.worker_pack_slots.size()
-                ? &site_run.inventory.worker_pack_slots[slot_index]
+                worker_pack_storage && slot_index < inventory.worker_pack_slots.size()
+                ? &inventory.worker_pack_slots[slot_index]
                 : nullptr;
             Gs1InventorySlotView slot_view {
                 storage.storage_id,
@@ -307,7 +326,7 @@ void rebuild_site_view(
             static_cast<std::uint32_t>(storage.slot_item_instance_ids.size())});
     }
 
-    for (const auto& task : site_run.task_board.visible_tasks)
+    for (const auto& task : task_board.visible_tasks)
     {
         const std::uint32_t reward_offset = static_cast<std::uint32_t>(cache.task_reward_draft_options.size());
         for (const auto& reward : task.reward_draft_options)
@@ -355,18 +374,18 @@ void rebuild_site_view(
             {0U, 0U}});
     }
 
-    for (const auto& modifier : site_run.modifier.active_site_modifiers)
+    for (const auto& active_modifier : modifier.active_site_modifiers)
     {
         cache.active_modifiers.push_back(Gs1SiteModifierView {
-            id_value(modifier.modifier_id),
-            id_value(modifier.source_item_id),
-            modifier.duration_world_minutes,
-            modifier.remaining_world_minutes,
-            modifier.duration_world_minutes > 0.0 ? 1U : 0U,
+            id_value(active_modifier.modifier_id),
+            id_value(active_modifier.source_item_id),
+            active_modifier.duration_world_minutes,
+            active_modifier.remaining_world_minutes,
+            active_modifier.duration_world_minutes > 0.0 ? 1U : 0U,
             {0U, 0U, 0U, 0U, 0U, 0U, 0U}});
     }
 
-    for (const auto& listing : site_run.economy.available_phone_listings)
+    for (const auto& listing : economy.available_phone_listings)
     {
         cache.phone_listings.push_back(Gs1PhoneListingView {
             listing.listing_id,
@@ -380,7 +399,7 @@ void rebuild_site_view(
             0U});
     }
 
-    const auto& craft_context = site_run.craft.context;
+    const auto& craft_context = craft.context;
     if (craft_context.occupied)
     {
         cache.craft_context_options.reserve(craft_context.options.size());
@@ -393,94 +412,94 @@ void rebuild_site_view(
     }
 
     const SiteWorld::WorkerData worker =
-        site_run.site_world != nullptr ? site_run.site_world->worker() : SiteWorld::WorkerData {};
-    const auto event_template_id = site_run.event.active_event_template_id.has_value()
-        ? id_value(site_run.event.active_event_template_id.value())
+        site_world != nullptr ? site_world->worker() : SiteWorld::WorkerData {};
+    const auto event_template_id = event.active_event_template_id.has_value()
+        ? id_value(event.active_event_template_id.value())
         : 0U;
-    const auto current_action_id = site_run.site_action.current_action_id.has_value()
-        ? id_value(site_run.site_action.current_action_id.value())
+    const auto current_action_id = site_action.current_action_id.has_value()
+        ? id_value(site_action.current_action_id.value())
         : 0U;
-    const auto& placement_mode = site_run.site_action.placement_mode;
+    const auto& placement_mode = site_action.placement_mode;
 
     cache.site = Gs1SiteStateView {
-        id_value(site_run.site_run_id),
-        id_value(site_run.site_id),
-        site_run.site_archetype_id,
-        site_run.attempt_index,
-        site_run.site_attempt_seed,
-        static_cast<std::uint32_t>(site_run.run_status),
-        site_run.clock.world_time_minutes,
-        site_run.clock.day_index,
-        static_cast<std::uint32_t>(site_run.clock.day_phase),
-        site_run.clock.ecology_pulse_accumulator,
-        site_run.clock.task_refresh_accumulator,
-        site_run.clock.delivery_accumulator,
-        site_run.clock.accumulator_real_seconds,
+        id_value(meta.site_run_id),
+        id_value(meta.site_id),
+        meta.site_archetype_id,
+        meta.attempt_index,
+        meta.site_attempt_seed,
+        static_cast<std::uint32_t>(meta.run_status),
+        clock.world_time_minutes,
+        clock.day_index,
+        static_cast<std::uint32_t>(clock.day_phase),
+        clock.ecology_pulse_accumulator,
+        clock.task_refresh_accumulator,
+        clock.delivery_accumulator,
+        clock.accumulator_real_seconds,
         Gs1CampStateView {
-            site_run.camp.camp_anchor_tile.x,
-            site_run.camp.camp_anchor_tile.y,
-            site_run.camp.starter_storage_tile.x,
-            site_run.camp.starter_storage_tile.y,
-            site_run.camp.delivery_box_tile.x,
-            site_run.camp.delivery_box_tile.y,
-            site_run.camp.camp_durability,
-            site_run.camp.camp_protection_resolved ? 1U : 0U,
-            site_run.camp.delivery_point_operational ? 1U : 0U,
-            site_run.camp.shared_storage_access_enabled ? 1U : 0U,
+            camp.camp_anchor_tile.x,
+            camp.camp_anchor_tile.y,
+            camp.starter_storage_tile.x,
+            camp.starter_storage_tile.y,
+            camp.delivery_box_tile.x,
+            camp.delivery_box_tile.y,
+            camp.camp_durability,
+            camp.camp_protection_resolved ? 1U : 0U,
+            camp.delivery_point_operational ? 1U : 0U,
+            camp.shared_storage_access_enabled ? 1U : 0U,
             0U},
         Gs1SiteCountersView {
-            site_run.counters.fully_grown_tile_count,
-            site_run.counters.site_completion_tile_threshold,
-            site_run.counters.tracked_living_plant_count,
-            site_run.counters.objective_progress_normalized,
-            site_run.counters.highway_average_sand_cover,
-            site_run.counters.all_tracked_living_plants_stable ? 1U : 0U,
+            counters.fully_grown_tile_count,
+            counters.site_completion_tile_threshold,
+            counters.tracked_living_plant_count,
+            counters.objective_progress_normalized,
+            counters.highway_average_sand_cover,
+            counters.all_tracked_living_plants_stable ? 1U : 0U,
             {0U, 0U, 0U}},
         Gs1WeatherStateView {
-            site_run.weather.weather_heat,
-            site_run.weather.weather_wind,
-            site_run.weather.weather_dust,
-            site_run.weather.weather_wind_direction_degrees,
-            site_run.weather.forecast_profile_state.forecast_profile_id,
-            site_run.weather.site_weather_bias},
+            weather.weather_heat,
+            weather.weather_wind,
+            weather.weather_dust,
+            weather.weather_wind_direction_degrees,
+            weather.forecast_profile_state.forecast_profile_id,
+            weather.site_weather_bias},
         Gs1SiteEventView {
             event_template_id,
-            site_run.event.active_event_template_id.has_value() ? 1U : 0U,
+            event.active_event_template_id.has_value() ? 1U : 0U,
             {0U, 0U, 0U},
-            site_run.event.start_time_minutes,
-            site_run.event.peak_time_minutes,
-            site_run.event.peak_duration_minutes,
-            site_run.event.end_time_minutes,
-            site_run.event.minutes_until_next_wave,
-            site_run.event.event_heat_pressure,
-            site_run.event.event_wind_pressure,
-            site_run.event.event_dust_pressure,
-            site_run.event.wave_sequence_index},
+            event.start_time_minutes,
+            event.peak_time_minutes,
+            event.peak_duration_minutes,
+            event.end_time_minutes,
+            event.minutes_until_next_wave,
+            event.event_heat_pressure,
+            event.event_wind_pressure,
+            event.event_dust_pressure,
+            event.wave_sequence_index},
         Gs1SiteActionView {
             current_action_id,
-            site_run.site_action.current_action_id.has_value() ? 1U : 0U,
-            static_cast<Gs1SiteActionKind>(site_run.site_action.action_kind),
-            site_run.site_action.quantity,
-            site_run.site_action.target_tile.has_value() ? site_run.site_action.target_tile->x : 0,
-            site_run.site_action.target_tile.has_value() ? site_run.site_action.target_tile->y : 0,
-            site_run.site_action.target_tile.has_value() ? 1U : 0U,
+            site_action.current_action_id.has_value() ? 1U : 0U,
+            static_cast<Gs1SiteActionKind>(site_action.action_kind),
+            site_action.quantity,
+            site_action.target_tile.has_value() ? site_action.target_tile->x : 0,
+            site_action.target_tile.has_value() ? site_action.target_tile->y : 0,
+            site_action.target_tile.has_value() ? 1U : 0U,
             {0U, 0U, 0U},
-            site_run.site_action.approach_tile.has_value() ? site_run.site_action.approach_tile->x : 0,
-            site_run.site_action.approach_tile.has_value() ? site_run.site_action.approach_tile->y : 0,
-            site_run.site_action.approach_tile.has_value() ? 1U : 0U,
+            site_action.approach_tile.has_value() ? site_action.approach_tile->x : 0,
+            site_action.approach_tile.has_value() ? site_action.approach_tile->y : 0,
+            site_action.approach_tile.has_value() ? 1U : 0U,
             {0U, 0U, 0U},
-            site_run.site_action.primary_subject_id,
-            site_run.site_action.secondary_subject_id,
-            site_run.site_action.item_id,
-            site_run.site_action.placement_reservation_token,
-            site_run.site_action.request_flags,
-            site_run.site_action.awaiting_placement_reservation ? 1U : 0U,
-            site_run.site_action.reactivate_placement_mode_on_completion ? 1U : 0U,
+            site_action.primary_subject_id,
+            site_action.secondary_subject_id,
+            site_action.item_id,
+            site_action.placement_reservation_token,
+            site_action.request_flags,
+            site_action.awaiting_placement_reservation ? 1U : 0U,
+            site_action.reactivate_placement_mode_on_completion ? 1U : 0U,
             0U,
-            site_run.site_action.total_action_minutes,
-            site_run.site_action.remaining_action_minutes,
-            site_run.site_action.started_at_world_minute.value_or(0.0),
-            site_run.site_action.started_at_world_minute.has_value() ? 1U : 0U,
+            site_action.total_action_minutes,
+            site_action.remaining_action_minutes,
+            site_action.started_at_world_minute.value_or(0.0),
+            site_action.started_at_world_minute.has_value() ? 1U : 0U,
             {0U, 0U, 0U, 0U, 0U, 0U, 0U}},
         Gs1PlacementModeView {
             static_cast<Gs1SiteActionKind>(placement_mode.action_kind),
@@ -504,20 +523,20 @@ void rebuild_site_view(
             cache.craft_context_options.empty() ? nullptr : cache.craft_context_options.data(),
             static_cast<std::uint32_t>(cache.craft_context_options.size())},
         Gs1SiteObjectiveView {
-            static_cast<std::uint8_t>(site_run.objective.type),
-            static_cast<std::uint8_t>(site_run.objective.target_edge),
-            site_run.objective.target_band_width,
-            site_run.objective.has_hold_baseline ? 1U : 0U,
-            site_run.objective.time_limit_minutes,
-            site_run.objective.completion_hold_minutes,
-            site_run.objective.completion_hold_progress_minutes,
-            site_run.objective.paused_main_timer_minutes,
-            site_run.objective.last_evaluated_world_time_minutes,
-            site_run.objective.target_cash_points,
-            site_run.objective.highway_max_average_sand_cover,
-            site_run.objective.last_target_average_sand_level},
+            static_cast<std::uint8_t>(objective.type),
+            static_cast<std::uint8_t>(objective.target_edge),
+            objective.target_band_width,
+            objective.has_hold_baseline ? 1U : 0U,
+            objective.time_limit_minutes,
+            objective.completion_hold_minutes,
+            objective.completion_hold_progress_minutes,
+            objective.paused_main_timer_minutes,
+            objective.last_evaluated_world_time_minutes,
+            objective.target_cash_points,
+            objective.highway_max_average_sand_cover,
+            objective.last_target_average_sand_level},
         Gs1WorkerStateView {
-            site_run.site_world != nullptr ? site_run.site_world->worker_entity_id() : 0U,
+            site_world != nullptr ? site_world->worker_entity_id() : 0U,
             worker.position.tile_coord.x,
             worker.position.tile_coord.y,
             worker.position.tile_x,
@@ -532,12 +551,12 @@ void rebuild_site_view(
             worker.conditions.work_efficiency,
             worker.conditions.is_sheltered ? 1U : 0U,
             {0U, 0U, 0U}},
-        site_run.economy.current_cash,
-        site_run.economy.phone_delivery_fee,
-        site_run.economy.phone_delivery_minutes,
+        economy.current_cash,
+        economy.phone_delivery_fee,
+        economy.phone_delivery_minutes,
         0U,
-        site_run.inventory.worker_pack_storage_id,
-        site_run.inventory.next_storage_id,
+        inventory.worker_pack_storage_id,
+        inventory.next_storage_id,
         static_cast<std::uint32_t>(cache.inventory_storages.size()),
         cache.inventory_storages.empty() ? nullptr : cache.inventory_storages.data(),
         cache.inventory_slots.empty() ? nullptr : cache.inventory_slots.data(),
@@ -550,10 +569,10 @@ void rebuild_site_view(
         static_cast<std::uint32_t>(cache.active_modifiers.size()),
         cache.phone_listings.empty() ? nullptr : cache.phone_listings.data(),
         static_cast<std::uint32_t>(cache.phone_listings.size()),
-        site_run.result_newly_revealed_site_count,
-        site_run.site_world != nullptr ? static_cast<std::uint32_t>(site_run.site_world->tile_count()) : 0U,
-        site_run.site_world != nullptr ? site_run.site_world->width() : 0U,
-        site_run.site_world != nullptr ? site_run.site_world->height() : 0U};
+        meta.result_newly_revealed_site_count,
+        site_world != nullptr ? static_cast<std::uint32_t>(site_world->tile_count()) : 0U,
+        site_world != nullptr ? site_world->width() : 0U,
+        site_world != nullptr ? site_world->height() : 0U};
 }
 }  // namespace
 
@@ -575,43 +594,14 @@ void rebuild_game_state_view_cache(
 
     if (state.campaign_core.has_value())
     {
-        CampaignState campaign {};
-        campaign.campaign_id = state_manager.query<StateSetId::CampaignCore>(state)->campaign_id;
-        campaign.campaign_seed = state_manager.query<StateSetId::CampaignCore>(state)->campaign_seed;
-        campaign.campaign_clock_minutes_elapsed =
-            state_manager.query<StateSetId::CampaignCore>(state)->campaign_clock_minutes_elapsed;
-        campaign.campaign_days_total = state_manager.query<StateSetId::CampaignCore>(state)->campaign_days_total;
-        campaign.campaign_days_remaining =
-            state_manager.query<StateSetId::CampaignCore>(state)->campaign_days_remaining;
-        campaign.app_state = state_manager.query<StateSetId::CampaignCore>(state)->app_state;
-        campaign.active_site_id = state_manager.query<StateSetId::CampaignCore>(state)->active_site_id;
-        if (const auto& regional_map = state_manager.query<StateSetId::CampaignRegionalMap>(state);
-            regional_map.has_value())
-        {
-            campaign.regional_map_state = *regional_map;
-        }
-        if (const auto& faction_progress = state_manager.query<StateSetId::CampaignFactionProgress>(state);
-            faction_progress.has_value())
-        {
-            campaign.faction_progress = *faction_progress;
-        }
-        if (const auto& technology = state_manager.query<StateSetId::CampaignTechnology>(state);
-            technology.has_value())
-        {
-            campaign.technology_state = *technology;
-        }
-        if (const auto& loadout = state_manager.query<StateSetId::CampaignLoadoutPlanner>(state);
-            loadout.has_value())
-        {
-            campaign.loadout_planner_state = *loadout;
-        }
-        if (const auto& sites = state_manager.query<StateSetId::CampaignSites>(state);
-            sites.has_value())
-        {
-            campaign.sites = *sites;
-        }
-
-        rebuild_campaign_view(campaign, cache);
+        rebuild_campaign_view(
+            *state_manager.query<StateSetId::CampaignCore>(state),
+            *state_manager.query<StateSetId::CampaignRegionalMap>(state),
+            *state_manager.query<StateSetId::CampaignFactionProgress>(state),
+            *state_manager.query<StateSetId::CampaignTechnology>(state),
+            *state_manager.query<StateSetId::CampaignLoadoutPlanner>(state),
+            *state_manager.query<StateSetId::CampaignSites>(state),
+            cache);
         cache.root.campaign = &cache.campaign;
     }
     else
@@ -622,96 +612,22 @@ void rebuild_game_state_view_cache(
 
     if (state.site_run_meta.has_value())
     {
-        SiteRunState site_run {};
-        const auto& meta = state_manager.query<StateSetId::SiteRunMeta>(state);
-        site_run.site_run_id = meta->site_run_id;
-        site_run.site_id = meta->site_id;
-        site_run.site_archetype_id = meta->site_archetype_id;
-        site_run.attempt_index = meta->attempt_index;
-        site_run.site_attempt_seed = meta->site_attempt_seed;
-        site_run.run_status = meta->run_status;
-        site_run.result_newly_revealed_site_count = meta->result_newly_revealed_site_count;
-        if (const auto& world = state_manager.query<StateSetId::SiteWorld>(state); world.has_value())
-        {
-            site_run.site_world = world->site_world;
-        }
-        if (const auto& clock = state_manager.query<StateSetId::SiteClock>(state); clock.has_value())
-        {
-            site_run.clock = *clock;
-        }
-        if (const auto& camp = state_manager.query<StateSetId::SiteCamp>(state); camp.has_value())
-        {
-            site_run.camp = *camp;
-        }
-        if (const auto& inventory = state_manager.query<StateSetId::SiteInventory>(state);
-            inventory.has_value())
-        {
-            site_run.inventory = *inventory;
-        }
-        if (const auto& contractor = state_manager.query<StateSetId::SiteContractor>(state);
-            contractor.has_value())
-        {
-            site_run.contractor = *contractor;
-        }
-        if (const auto& weather = state_manager.query<StateSetId::SiteWeather>(state); weather.has_value())
-        {
-            site_run.weather = *weather;
-        }
-        if (const auto& event = state_manager.query<StateSetId::SiteEvent>(state); event.has_value())
-        {
-            site_run.event = *event;
-        }
-        if (const auto& task_board = state_manager.query<StateSetId::SiteTaskBoard>(state);
-            task_board.has_value())
-        {
-            site_run.task_board = *task_board;
-        }
-        if (const auto& modifier = state_manager.query<StateSetId::SiteModifier>(state);
-            modifier.has_value())
-        {
-            site_run.modifier = *modifier;
-        }
-        if (const auto& economy = state_manager.query<StateSetId::SiteEconomy>(state); economy.has_value())
-        {
-            site_run.economy = *economy;
-        }
-        if (const auto& craft = state_manager.query<StateSetId::SiteCraft>(state); craft.has_value())
-        {
-            site_run.craft = *craft;
-        }
-        if (const auto& action = state_manager.query<StateSetId::SiteAction>(state); action.has_value())
-        {
-            site_run.site_action = *action;
-        }
-        if (const auto& counters = state_manager.query<StateSetId::SiteCounters>(state);
-            counters.has_value())
-        {
-            site_run.counters = *counters;
-        }
-        if (const auto& objective = state_manager.query<StateSetId::SiteObjective>(state);
-            objective.has_value())
-        {
-            site_run.objective = *objective;
-        }
-        if (const auto& local_weather = state_manager.query<StateSetId::SiteLocalWeatherResolve>(state);
-            local_weather.has_value())
-        {
-            site_run.local_weather_resolve = *local_weather;
-        }
-        if (const auto& plant_weather =
-                state_manager.query<StateSetId::SitePlantWeatherContribution>(state);
-            plant_weather.has_value())
-        {
-            site_run.plant_weather_contribution = *plant_weather;
-        }
-        if (const auto& device_weather =
-                state_manager.query<StateSetId::SiteDeviceWeatherContribution>(state);
-            device_weather.has_value())
-        {
-            site_run.device_weather_contribution = *device_weather;
-        }
-
-        rebuild_site_view(site_run, cache);
+        rebuild_site_view(
+            *state_manager.query<StateSetId::SiteRunMeta>(state),
+            state_manager.query<StateSetId::SiteWorld>(state)->site_world.get(),
+            *state_manager.query<StateSetId::SiteClock>(state),
+            *state_manager.query<StateSetId::SiteCamp>(state),
+            *state_manager.query<StateSetId::SiteInventory>(state),
+            *state_manager.query<StateSetId::SiteWeather>(state),
+            *state_manager.query<StateSetId::SiteEvent>(state),
+            *state_manager.query<StateSetId::SiteTaskBoard>(state),
+            *state_manager.query<StateSetId::SiteModifier>(state),
+            *state_manager.query<StateSetId::SiteEconomy>(state),
+            *state_manager.query<StateSetId::SiteCraft>(state),
+            *state_manager.query<StateSetId::SiteAction>(state),
+            *state_manager.query<StateSetId::SiteCounters>(state),
+            *state_manager.query<StateSetId::SiteObjective>(state),
+            cache);
         cache.root.active_site = &cache.site;
     }
     else
@@ -722,23 +638,23 @@ void rebuild_game_state_view_cache(
 }
 
 bool build_site_tile_view(
-    const SiteRunState& site_run,
+    const SiteWorld* site_world,
     std::uint32_t tile_index,
     Gs1SiteTileView& out_tile)
 {
-    if (site_run.site_world == nullptr || tile_index >= site_run.site_world->tile_count())
+    if (site_world == nullptr || tile_index >= site_world->tile_count())
     {
         return false;
     }
 
-    const TileCoord coord = site_run.site_world->tile_coord(tile_index);
-    const auto tile = site_run.site_world->tile_at_index(tile_index);
+    const TileCoord coord = site_world->tile_coord(tile_index);
+    const auto tile = site_world->tile_at_index(tile_index);
     out_tile = Gs1SiteTileView {
         tile_index,
         coord.x,
         coord.y,
-        site_run.site_world->tile_entity_id(coord),
-        site_run.site_world->device_entity_id(coord),
+        site_world->tile_entity_id(coord),
+        site_world->device_entity_id(coord),
         tile.static_data.terrain_type_id,
         tile.ecology.ground_cover_type_id,
         id_value(tile.ecology.plant_id),

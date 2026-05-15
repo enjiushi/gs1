@@ -28,7 +28,7 @@ template <>
 struct system_state_tags<ActionExecutionSystem>
 {
     using type = type_list<
-        RuntimeCampaignTag,
+        RuntimeCampaignFactionProgressTag,
         RuntimeFixedStepSecondsTag,
         RuntimeMoveDirectionTag>;
 };
@@ -260,13 +260,17 @@ ExcavationDepth max_excavation_depth_unlocked(
     RuntimeInvocation& invocation) noexcept
 {
     auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    if (TechnologySystem::node_purchased(*campaign, k_village_t30_access))
+    const auto& faction_progress = access.template read<RuntimeCampaignFactionProgressTag>();
+    if (TechnologySystem::node_purchased(
+            std::span<const FactionProgressState> {faction_progress},
+            k_village_t30_access))
     {
         return ExcavationDepth::Thorough;
     }
 
-    if (TechnologySystem::node_purchased(*campaign, k_village_t12_access))
+    if (TechnologySystem::node_purchased(
+            std::span<const FactionProgressState> {faction_progress},
+            k_village_t12_access))
     {
         return ExcavationDepth::Careful;
     }
@@ -3158,9 +3162,8 @@ Gs1Status ActionExecutionSystem::process_game_message(
     const GameMessage& message)
 {
     auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
     auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
-    if (!campaign.has_value() || !world.has_world())
+    if (!runtime_invocation_has_campaign(invocation) || !world.has_world())
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -3239,9 +3242,8 @@ Gs1Status ActionExecutionSystem::process_host_message(
     const Gs1HostMessage& message)
 {
     auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
     auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
-    if (!campaign.has_value() || !world.has_world())
+    if (!runtime_invocation_has_campaign(invocation) || !world.has_world())
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -3301,9 +3303,8 @@ Gs1Status ActionExecutionSystem::process_host_message(
 void ActionExecutionSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
     auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
-    if (!campaign.has_value() || !world.has_world())
+    if (!runtime_invocation_has_campaign(invocation) || !world.has_world())
     {
         return;
     }

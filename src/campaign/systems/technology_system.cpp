@@ -1,6 +1,5 @@
 #include "campaign/systems/technology_system.h"
 
-#include "campaign/systems/campaign_system_context.h"
 #include "runtime/game_runtime.h"
 #include "support/currency.h"
 
@@ -11,18 +10,25 @@ namespace gs1
 namespace
 {
 const FactionProgressState* find_faction_progress(
-    const CampaignState& campaign,
+    std::span<const FactionProgressState> faction_progress,
     FactionId faction_id) noexcept
 {
-    for (const auto& faction_progress : campaign.faction_progress)
+    for (const auto& progress : faction_progress)
     {
-        if (faction_progress.faction_id == faction_id)
+        if (progress.faction_id == faction_id)
         {
-            return &faction_progress;
+            return &progress;
         }
     }
 
     return nullptr;
+}
+
+const FactionProgressState* find_faction_progress(
+    const CampaignState& campaign,
+    FactionId faction_id) noexcept
+{
+    return find_faction_progress(std::span<const FactionProgressState> {campaign.faction_progress}, faction_id);
 }
 [[nodiscard]] bool recipe_is_baseline_unlocked(RecipeId recipe_id) noexcept
 {
@@ -66,7 +72,7 @@ const FactionProgressState* find_faction_progress(
 }
 
 [[nodiscard]] bool reputation_unlock_ready(
-    const CampaignState& campaign,
+    const TechnologyState& technology,
     ReputationUnlockKind unlock_kind,
     std::uint32_t content_id) noexcept
 {
@@ -78,7 +84,7 @@ const FactionProgressState* find_faction_progress(
             continue;
         }
 
-        if (campaign.technology_state.total_reputation >= unlock_def.reputation_requirement)
+        if (technology.total_reputation >= unlock_def.reputation_requirement)
         {
             return true;
         }
@@ -104,7 +110,7 @@ const FactionProgressState* find_faction_progress(
 }
 
 [[nodiscard]] bool technology_grant_unlocked(
-    const CampaignState& campaign,
+    std::span<const FactionProgressState> faction_progress,
     TechnologyGrantedContentKind granted_content_kind,
     std::uint32_t granted_content_id) noexcept
 {
@@ -116,7 +122,7 @@ const FactionProgressState* find_faction_progress(
             continue;
         }
 
-        if (TechnologySystem::node_purchased(campaign, node_def.tech_node_id))
+        if (TechnologySystem::node_purchased(faction_progress, node_def.tech_node_id))
         {
             return true;
         }
@@ -168,8 +174,7 @@ Gs1Status TechnologySystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto campaign = make_campaign_state_access(invocation);
-    if (!campaign.has_campaign())
+    if (!runtime_invocation_has_campaign(invocation))
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -226,13 +231,20 @@ bool TechnologySystem::node_purchased(
     const CampaignState& campaign,
     TechNodeId tech_node_id) noexcept
 {
+    return node_purchased(std::span<const FactionProgressState> {campaign.faction_progress}, tech_node_id);
+}
+
+bool TechnologySystem::node_purchased(
+    std::span<const FactionProgressState> faction_progress,
+    TechNodeId tech_node_id) noexcept
+{
     const auto* node_def = find_technology_node_def(tech_node_id);
     if (node_def == nullptr)
     {
         return false;
     }
 
-    return faction_reputation(campaign, node_def->faction_id) >=
+    return faction_reputation(faction_progress, node_def->faction_id) >=
         current_reputation_requirement(*node_def);
 }
 
@@ -240,13 +252,31 @@ bool TechnologySystem::technology_tier_visible(
     const CampaignState& campaign,
     const TechnologyNodeDef& node_def) noexcept
 {
-    (void)campaign;
+    return technology_tier_visible(std::span<const FactionProgressState> {campaign.faction_progress}, node_def);
+}
+
+bool TechnologySystem::technology_tier_visible(
+    std::span<const FactionProgressState> faction_progress,
+    const TechnologyNodeDef& node_def) noexcept
+{
+    (void)faction_progress;
     (void)node_def;
     return true;
 }
 
 bool TechnologySystem::plant_unlocked(
     const CampaignState& campaign,
+    PlantId plant_id) noexcept
+{
+    return plant_unlocked(
+        std::span<const FactionProgressState> {campaign.faction_progress},
+        campaign.technology_state,
+        plant_id);
+}
+
+bool TechnologySystem::plant_unlocked(
+    std::span<const FactionProgressState> faction_progress,
+    const TechnologyState& technology,
     PlantId plant_id) noexcept
 {
     if (plant_id.value == 0U)
@@ -265,16 +295,27 @@ bool TechnologySystem::plant_unlocked(
     if (has_technology_grant(TechnologyGrantedContentKind::Plant, plant_id.value))
     {
         return technology_grant_unlocked(
-            campaign,
+            faction_progress,
             TechnologyGrantedContentKind::Plant,
             plant_id.value);
     }
 
-    return reputation_unlock_ready(campaign, ReputationUnlockKind::Plant, plant_id.value);
+    return reputation_unlock_ready(technology, ReputationUnlockKind::Plant, plant_id.value);
 }
 
 bool TechnologySystem::item_unlocked(
     const CampaignState& campaign,
+    ItemId item_id) noexcept
+{
+    return item_unlocked(
+        std::span<const FactionProgressState> {campaign.faction_progress},
+        campaign.technology_state,
+        item_id);
+}
+
+bool TechnologySystem::item_unlocked(
+    std::span<const FactionProgressState> faction_progress,
+    const TechnologyState& technology,
     ItemId item_id) noexcept
 {
     if (item_id.value == 0U)
@@ -289,13 +330,13 @@ bool TechnologySystem::item_unlocked(
     }
 
     if (item_def->linked_plant_id.value != 0U &&
-        !plant_unlocked(campaign, item_def->linked_plant_id))
+        !plant_unlocked(faction_progress, technology, item_def->linked_plant_id))
     {
         return false;
     }
 
     if (item_def->linked_structure_id.value != 0U &&
-        !structure_recipe_unlocked(campaign, item_def->linked_structure_id))
+        !structure_recipe_unlocked(faction_progress, technology, item_def->linked_structure_id))
     {
         return false;
     }
@@ -303,7 +344,7 @@ bool TechnologySystem::item_unlocked(
     if (has_technology_grant(TechnologyGrantedContentKind::Item, item_id.value))
     {
         return technology_grant_unlocked(
-            campaign,
+            faction_progress,
             TechnologyGrantedContentKind::Item,
             item_id.value);
     }
@@ -313,11 +354,22 @@ bool TechnologySystem::item_unlocked(
         return true;
     }
 
-    return reputation_unlock_ready(campaign, ReputationUnlockKind::Item, item_id.value);
+    return reputation_unlock_ready(technology, ReputationUnlockKind::Item, item_id.value);
 }
 
 bool TechnologySystem::structure_recipe_unlocked(
     const CampaignState& campaign,
+    StructureId structure_id) noexcept
+{
+    return structure_recipe_unlocked(
+        std::span<const FactionProgressState> {campaign.faction_progress},
+        campaign.technology_state,
+        structure_id);
+}
+
+bool TechnologySystem::structure_recipe_unlocked(
+    std::span<const FactionProgressState> faction_progress,
+    const TechnologyState& technology,
     StructureId structure_id) noexcept
 {
     if (structure_id.value == 0U)
@@ -333,19 +385,30 @@ bool TechnologySystem::structure_recipe_unlocked(
     if (has_technology_grant(TechnologyGrantedContentKind::Structure, structure_id.value))
     {
         return technology_grant_unlocked(
-            campaign,
+            faction_progress,
             TechnologyGrantedContentKind::Structure,
             structure_id.value);
     }
 
     return reputation_unlock_ready(
-        campaign,
+        technology,
         ReputationUnlockKind::StructureRecipe,
         structure_id.value);
 }
 
 bool TechnologySystem::recipe_unlocked(
     const CampaignState& campaign,
+    RecipeId recipe_id) noexcept
+{
+    return recipe_unlocked(
+        std::span<const FactionProgressState> {campaign.faction_progress},
+        campaign.technology_state,
+        recipe_id);
+}
+
+bool TechnologySystem::recipe_unlocked(
+    std::span<const FactionProgressState> faction_progress,
+    const TechnologyState& technology,
     RecipeId recipe_id) noexcept
 {
     if (recipe_id.value == 0U)
@@ -358,7 +421,7 @@ bool TechnologySystem::recipe_unlocked(
         return true;
     }
 
-    if (reputation_unlock_ready(campaign, ReputationUnlockKind::Recipe, recipe_id.value))
+    if (reputation_unlock_ready(technology, ReputationUnlockKind::Recipe, recipe_id.value))
     {
         return true;
     }
@@ -366,7 +429,7 @@ bool TechnologySystem::recipe_unlocked(
     if (has_technology_grant(TechnologyGrantedContentKind::Recipe, recipe_id.value))
     {
         return technology_grant_unlocked(
-            campaign,
+            faction_progress,
             TechnologyGrantedContentKind::Recipe,
             recipe_id.value);
     }
@@ -377,7 +440,7 @@ bool TechnologySystem::recipe_unlocked(
         const auto* output_item_def = find_item_def(recipe_def->output_item_id);
         if (output_item_def != nullptr &&
             output_item_def->linked_structure_id.value != 0U &&
-            structure_recipe_unlocked(campaign, output_item_def->linked_structure_id))
+            structure_recipe_unlocked(faction_progress, technology, output_item_def->linked_structure_id))
         {
             return true;
         }
@@ -390,6 +453,17 @@ bool TechnologySystem::craft_output_unlocked(
     const CampaignState& campaign,
     ItemId item_id) noexcept
 {
+    return craft_output_unlocked(
+        std::span<const FactionProgressState> {campaign.faction_progress},
+        campaign.technology_state,
+        item_id);
+}
+
+bool TechnologySystem::craft_output_unlocked(
+    std::span<const FactionProgressState> faction_progress,
+    const TechnologyState& technology,
+    ItemId item_id) noexcept
+{
     if (item_id.value == 0U)
     {
         return false;
@@ -398,7 +472,7 @@ bool TechnologySystem::craft_output_unlocked(
     for (const auto& recipe_def : all_craft_recipe_defs())
     {
         if (recipe_def.output_item_id == item_id &&
-            recipe_unlocked(campaign, recipe_def.recipe_id))
+            recipe_unlocked(faction_progress, technology, recipe_def.recipe_id))
         {
             return true;
         }
@@ -411,8 +485,15 @@ std::int32_t TechnologySystem::faction_reputation(
     const CampaignState& campaign,
     FactionId faction_id) noexcept
 {
-    const auto* faction_progress = find_faction_progress(campaign, faction_id);
-    return faction_progress == nullptr ? 0 : std::max(0, faction_progress->faction_reputation);
+    return faction_reputation(std::span<const FactionProgressState> {campaign.faction_progress}, faction_id);
+}
+
+std::int32_t TechnologySystem::faction_reputation(
+    std::span<const FactionProgressState> faction_progress,
+    FactionId faction_id) noexcept
+{
+    const auto* progress = find_faction_progress(faction_progress, faction_id);
+    return progress == nullptr ? 0 : std::max(0, progress->faction_reputation);
 }
 
 std::int32_t TechnologySystem::current_reputation_requirement(
@@ -438,9 +519,16 @@ float TechnologySystem::current_effect_parameter(
     const CampaignState& campaign,
     const TechnologyNodeDef& node_def) noexcept
 {
+    return current_effect_parameter(std::span<const FactionProgressState> {campaign.faction_progress}, node_def);
+}
+
+float TechnologySystem::current_effect_parameter(
+    std::span<const FactionProgressState> faction_progress,
+    const TechnologyNodeDef& node_def) noexcept
+{
     const auto bonus_reputation = std::max(
         0,
-        faction_reputation(campaign, node_def.faction_id) - current_reputation_requirement(node_def));
+        faction_reputation(faction_progress, node_def.faction_id) - current_reputation_requirement(node_def));
     const auto parameter =
         node_def.unlock_effect_parameter +
         static_cast<float>(bonus_reputation) * node_def.effect_parameter_per_bonus_reputation;
@@ -454,6 +542,13 @@ bool TechnologySystem::node_claimable(
     return false;
 }
 
+bool TechnologySystem::node_claimable(
+    std::span<const FactionProgressState> /*faction_progress*/,
+    const TechnologyNodeDef& /*node_def*/) noexcept
+{
+    return false;
+}
+
 Gs1Status process_technology_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
@@ -462,8 +557,7 @@ Gs1Status process_technology_message(
     {
     case GameMessageType::CampaignReputationAwardRequested:
     {
-        auto campaign = make_campaign_state_access(invocation);
-        if (!campaign.has_campaign())
+        if (!runtime_invocation_has_campaign(invocation))
         {
             return GS1_STATUS_INVALID_STATE;
         }
@@ -474,7 +568,7 @@ Gs1Status process_technology_message(
             return GS1_STATUS_OK;
         }
 
-        campaign.technology().total_reputation += payload.delta;
+        runtime_invocation_state_ref<RuntimeCampaignTechnologyTag>(invocation).total_reputation += payload.delta;
         return GS1_STATUS_OK;
     }
 

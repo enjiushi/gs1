@@ -328,6 +328,9 @@ if(GS1_BUILD_TESTS)
     add_executable(gs1_site_system_message_flow_test
         tests/runtime/site_system_message_flow_test.cpp)
 
+    add_executable(gs1_state_manager_test
+        tests/runtime/state_manager_test.cpp)
+
     add_executable(gs1_local_weather_perf_probe
         tests/runtime/local_weather_perf_probe.cpp)
 
@@ -358,6 +361,7 @@ if(GS1_BUILD_TESTS)
     target_link_libraries(gs1_runtime_message_chain_test PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_timed_modifier_projection_test PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_site_system_message_flow_test PRIVATE gs1_gameplay_core)
+    target_link_libraries(gs1_state_manager_test PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_local_weather_perf_probe PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_runtime_performance_test PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_smoke_engine_host_threading_test PRIVATE gs1_smoke_support)
@@ -379,6 +383,7 @@ if(GS1_BUILD_TESTS)
     gs1_enable_strict_warnings(gs1_runtime_message_chain_test)
     gs1_enable_strict_warnings(gs1_timed_modifier_projection_test)
     gs1_enable_strict_warnings(gs1_site_system_message_flow_test)
+    gs1_enable_strict_warnings(gs1_state_manager_test)
     gs1_enable_strict_warnings(gs1_local_weather_perf_probe)
     gs1_enable_strict_warnings(gs1_runtime_performance_test)
     gs1_enable_strict_warnings(gs1_smoke_engine_host_threading_test)
@@ -421,6 +426,10 @@ if(GS1_BUILD_TESTS)
     add_test(
         NAME gs1_site_system_message_flow_test
         COMMAND gs1_site_system_message_flow_test)
+
+    add_test(
+        NAME gs1_state_manager_test
+        COMMAND gs1_state_manager_test)
 
     add_test(
         NAME gs1_smoke_engine_host_threading_test
@@ -470,6 +479,8 @@ if(GS1_BUILD_TESTS)
     set_tests_properties(gs1_runtime_message_chain_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_site_system_message_flow_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(gs1_state_manager_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_smoke_engine_host_threading_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

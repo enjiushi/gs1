@@ -21,7 +21,7 @@ namespace gs1
 template <>
 struct system_state_tags<CraftSystem>
 {
-    using type = type_list<RuntimeCampaignTag>;
+    using type = type_list<RuntimeCampaignFactionProgressTag, RuntimeCampaignTechnologyTag>;
 };
 
 namespace
@@ -99,11 +99,8 @@ Gs1Status handle_craft_context_requested(
     const CraftContextRequestedMessage& payload) noexcept
 {
     auto access = make_game_state_access<CraftSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    if (!campaign.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
+    auto& faction_progress = access.template read<RuntimeCampaignFactionProgressTag>();
+    auto& technology = access.template read<RuntimeCampaignTechnologyTag>();
 
     SiteWorldAccess<CraftSystem> world {invocation};
     auto& context = world.own_craft().context;
@@ -121,7 +118,10 @@ Gs1Status handle_craft_context_requested(
     }
 
     const auto tile = world.read_tile(target_tile);
-    const auto recipes = craft_logic::recipes_for_station(*campaign, tile.device.structure_id);
+    const auto recipes = craft_logic::recipes_for_station(
+        std::span<const FactionProgressState> {faction_progress},
+        technology,
+        tile.device.structure_id);
     context.occupied = true;
     context.tile_coord = target_tile;
     if (recipes.empty())
@@ -225,13 +225,6 @@ Gs1Status CraftSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<CraftSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    if (!campaign.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
     SiteWorldAccess<CraftSystem> world {invocation};
 
     switch (message.type)
@@ -259,13 +252,6 @@ Gs1Status CraftSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto access = make_game_state_access<CraftSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    if (!campaign.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
     if (message.type != GS1_HOST_EVENT_SITE_CONTEXT_REQUEST ||
         SiteWorldAccess<CraftSystem> {invocation}.read_action().placement_mode.active)
     {
@@ -282,13 +268,6 @@ Gs1Status CraftSystem::process_host_message(
 
 void CraftSystem::run(RuntimeInvocation& invocation)
 {
-    auto access = make_game_state_access<CraftSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    if (!campaign.has_value())
-    {
-        return;
-    }
-
     SiteWorldAccess<CraftSystem> world {invocation};
     if (!world.has_world() || world.ecs_world_ptr() == nullptr)
     {

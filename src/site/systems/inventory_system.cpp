@@ -32,7 +32,7 @@ namespace gs1
 template <>
 struct system_state_tags<InventorySystem>
 {
-    using type = type_list<RuntimeCampaignTag>;
+    using type = type_list<RuntimeCampaignFactionProgressTag, RuntimeCampaignTechnologyTag, RuntimeCampaignLoadoutPlannerTag>;
 };
 
 namespace
@@ -45,13 +45,6 @@ constexpr std::uint32_t k_delivery_box_storage_flags =
     -> GameStateAccess<InventorySystem>
 {
     return make_game_state_access<InventorySystem>(invocation);
-}
-
-[[nodiscard]] const CampaignState& inventory_campaign(RuntimeInvocation& invocation)
-{
-    auto access = inventory_access(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    return *campaign;
 }
 
 [[nodiscard]] SiteWorldAccess<InventorySystem> inventory_world(RuntimeInvocation& invocation)
@@ -134,9 +127,7 @@ bool ensure_device_storage_containers(RuntimeInvocation& invocation) noexcept;
 
 bool inventory_runtime_ready(RuntimeInvocation& invocation) noexcept
 {
-    auto access = inventory_access(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    return campaign.has_value() && inventory_world(invocation).has_world();
+    return inventory_world(invocation).has_world();
 }
 
 bool storage_is_retrieval_only(const StorageContainerState& storage_state) noexcept
@@ -505,7 +496,8 @@ void seed_inventory_from_loadout(RuntimeInvocation& invocation) noexcept
         return;
     }
 
-    const auto& planner = inventory_campaign(invocation).loadout_planner_state;
+    auto access = inventory_access(invocation);
+    const auto& planner = access.template read<RuntimeCampaignLoadoutPlannerTag>();
     const auto& loadout_slots =
         planner.selected_loadout_slots.empty()
             ? planner.baseline_deployment_items
@@ -739,7 +731,13 @@ Gs1Status handle_inventory_craft_commit(
             return GS1_STATUS_NOT_FOUND;
         }
 
-        if (!TechnologySystem::recipe_unlocked(inventory_campaign(invocation), recipe_def->recipe_id))
+        auto access = inventory_access(invocation);
+        const auto& faction_progress = access.template read<RuntimeCampaignFactionProgressTag>();
+        const auto& technology = access.template read<RuntimeCampaignTechnologyTag>();
+        if (!TechnologySystem::recipe_unlocked(
+                std::span<const FactionProgressState> {faction_progress},
+                technology,
+                recipe_def->recipe_id))
         {
             return GS1_STATUS_INVALID_STATE;
         }

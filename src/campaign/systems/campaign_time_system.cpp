@@ -1,7 +1,5 @@
 #include "campaign/systems/campaign_time_system.h"
 
-#include "campaign/campaign_state.h"
-#include "campaign/systems/campaign_system_context.h"
 #include "runtime/game_runtime.h"
 
 namespace gs1
@@ -9,7 +7,7 @@ namespace gs1
 template <>
 struct system_state_tags<CampaignTimeSystem>
 {
-    using type = type_list<RuntimeCampaignTag, RuntimeFixedStepSecondsTag>;
+    using type = type_list<RuntimeFixedStepSecondsTag>;
 };
 
 const char* CampaignTimeSystem::name() const noexcept
@@ -57,24 +55,24 @@ Gs1Status CampaignTimeSystem::process_host_message(
 
 void CampaignTimeSystem::run(RuntimeInvocation& invocation)
 {
-    auto campaign = make_campaign_state_access(invocation);
-    if (!campaign.has_campaign())
+    if (!runtime_invocation_has_campaign(invocation))
     {
         return;
     }
 
-    auto access = make_game_state_access<CampaignTimeSystem>(invocation);
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-
-    campaign.campaign_clock_minutes_elapsed() +=
+    const double fixed_step_seconds =
+        make_game_state_access<CampaignTimeSystem>(invocation).template read<RuntimeFixedStepSecondsTag>();
+    auto& campaign_core =
+        invocation.state_manager()->state<StateSetId::CampaignCore>(*invocation.owned_state()).value();
+    campaign_core.campaign_clock_minutes_elapsed +=
         runtime_minutes_from_real_seconds(fixed_step_seconds);
 
     const auto elapsed_days =
         static_cast<std::uint32_t>(
-            campaign.campaign_clock_minutes_elapsed() / k_runtime_minutes_per_day);
-    campaign.campaign_days_remaining() =
-        (elapsed_days >= campaign.campaign_days_total())
+            campaign_core.campaign_clock_minutes_elapsed / k_runtime_minutes_per_day);
+    campaign_core.campaign_days_remaining =
+        (elapsed_days >= campaign_core.campaign_days_total)
             ? 0U
-            : (campaign.campaign_days_total() - elapsed_days);
+            : (campaign_core.campaign_days_total - elapsed_days);
 }
 }  // namespace gs1

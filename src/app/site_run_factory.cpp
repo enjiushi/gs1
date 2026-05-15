@@ -134,18 +134,19 @@ float seeded_tile_fertility(
         100.0f);
 }
 
-std::uint32_t resolved_worker_pack_slot_count(const CampaignState& campaign) noexcept
+std::uint32_t resolved_worker_pack_slot_count(
+    std::span<const FactionProgressState> faction_progress) noexcept
 {
     std::uint32_t slot_count = 8U;
     if (TechnologySystem::node_purchased(
-            campaign,
+            faction_progress,
             TechNodeId {base_technology_node_id(k_village_faction, 4U)}))
     {
         slot_count += 2U;
     }
 
     if (TechnologySystem::node_purchased(
-            campaign,
+            faction_progress,
             TechNodeId {base_technology_node_id(k_village_faction, 11U)}))
     {
         slot_count += 2U;
@@ -358,7 +359,8 @@ void seed_site_fertility(
 }
 
 SiteRunState SiteRunFactory::create_site_run(
-    const CampaignState& campaign,
+    std::uint64_t campaign_seed,
+    std::span<const FactionProgressState> faction_progress,
     const SiteMetaState& site_meta)
 {
     SiteRunState run {};
@@ -367,10 +369,10 @@ SiteRunState SiteRunFactory::create_site_run(
     run.site_run_id = SiteRunId{site_meta.attempt_count};
     run.site_id = site_meta.site_id;
     run.attempt_index = site_meta.attempt_count;
-    run.site_attempt_seed = campaign.campaign_seed + site_meta.site_id.value + site_meta.attempt_count;
+    run.site_attempt_seed = campaign_seed + site_meta.site_id.value + site_meta.attempt_count;
     run.run_status = SiteRunStatus::Active;
     run.clock.day_phase = DayPhase::Dawn;
-    run.inventory.worker_pack_slot_count = resolved_worker_pack_slot_count(campaign);
+    run.inventory.worker_pack_slot_count = resolved_worker_pack_slot_count(faction_progress);
     run.inventory.worker_pack_slots.resize(run.inventory.worker_pack_slot_count);
     run.task_board.accepted_task_cap = 3U;
 
@@ -437,5 +439,15 @@ SiteRunState SiteRunFactory::create_site_run(
     inventory_storage::initialize_site_inventory_storage(run);
 
     return run;
+}
+
+SiteRunState SiteRunFactory::create_site_run(
+    const CampaignState& campaign,
+    const SiteMetaState& site_meta)
+{
+    return create_site_run(
+        campaign.campaign_seed,
+        std::span<const FactionProgressState> {campaign.faction_progress},
+        site_meta);
 }
 }  // namespace gs1

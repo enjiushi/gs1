@@ -1,7 +1,6 @@
 #include "campaign/systems/loadout_planner_system.h"
 
 #include "campaign/campaign_state.h"
-#include "campaign/systems/campaign_system_context.h"
 #include "content/defs/item_defs.h"
 #include "content/prototype_content.h"
 #include "runtime/game_runtime.h"
@@ -181,8 +180,7 @@ Gs1Status LoadoutPlannerSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto campaign = make_campaign_state_access(invocation);
-    if (!campaign.has_campaign())
+    if (!runtime_invocation_has_campaign(invocation))
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -208,11 +206,13 @@ Gs1Status process_loadout_planner_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto campaign = make_campaign_state_access(invocation);
-    if (!campaign.has_campaign())
+    if (!runtime_invocation_has_campaign(invocation))
     {
         return GS1_STATUS_INVALID_STATE;
     }
+
+    auto& planner = runtime_invocation_state_ref<RuntimeCampaignLoadoutPlannerTag>(invocation);
+    auto& sites = runtime_invocation_state_ref<RuntimeCampaignSitesTag>(invocation);
 
     std::uint32_t selected_site_id = 0U;
     switch (message.type)
@@ -235,14 +235,14 @@ Gs1Status process_loadout_planner_message(
 
     if (selected_site_id == 0U)
     {
-        campaign.loadout_planner().selected_target_site_id.reset();
+        planner.selected_target_site_id.reset();
     }
     else
     {
-        campaign.loadout_planner().selected_target_site_id = SiteId {selected_site_id};
+        planner.selected_target_site_id = SiteId {selected_site_id};
     }
 
-    rebuild_selected_loadout(campaign.loadout_planner(), campaign.sites());
+    rebuild_selected_loadout(planner, sites);
     return GS1_STATUS_OK;
 }
 }  // namespace gs1

@@ -1,6 +1,8 @@
 #include "site/systems/task_board_system.h"
 
+#include "campaign/faction_progress_state.h"
 #include "campaign/systems/technology_system.h"
+#include "campaign/technology_state.h"
 #include "content/defs/gameplay_tuning_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/plant_defs.h"
@@ -20,12 +22,6 @@
 
 namespace gs1
 {
-template <>
-struct system_state_tags<TaskBoardSystem>
-{
-    using type = type_list<RuntimeCampaignTag, RuntimeFixedStepSecondsTag>;
-};
-
 namespace
 {
 enum class PlantProtectionChannel : std::uint8_t
@@ -41,11 +37,18 @@ enum class PlantProtectionChannel : std::uint8_t
     return make_game_state_access<TaskBoardSystem>(invocation);
 }
 
-[[nodiscard]] const CampaignState& task_board_campaign(RuntimeInvocation& invocation)
+struct TaskBoardCampaignReadSlices final
+{
+    std::span<const FactionProgressState> faction_progress;
+    const TechnologyState* technology {nullptr};
+};
+
+[[nodiscard]] TaskBoardCampaignReadSlices task_board_campaign_read_slices(RuntimeInvocation& invocation)
 {
     auto access = task_board_access(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    return *campaign;
+    const auto& faction_progress = access.template read<RuntimeCampaignFactionProgressTag>();
+    const auto& technology = access.template read<RuntimeCampaignTechnologyTag>();
+    return TaskBoardCampaignReadSlices {faction_progress, &technology};
 }
 
 [[nodiscard]] SiteWorldAccess<TaskBoardSystem> task_board_world(RuntimeInvocation& invocation)
@@ -441,7 +444,7 @@ std::uint32_t resolved_task_risk_cost_cash_points(
 }
 
 bool item_is_accessible_for_task(
-    const CampaignState& campaign,
+    const TaskBoardCampaignReadSlices& campaign,
     ItemId item_id) noexcept
 {
     if (item_id.value == 0U)
@@ -455,7 +458,7 @@ bool item_is_accessible_for_task(
         return false;
     }
 
-    if (!TechnologySystem::item_unlocked(campaign, item_id))
+    if (!TechnologySystem::item_unlocked(campaign.faction_progress, *campaign.technology, item_id))
     {
         return false;
     }
@@ -466,7 +469,10 @@ bool item_is_accessible_for_task(
     case ItemSourceRule::BuyOrCraft:
         return true;
     case ItemSourceRule::CraftOnly:
-        return TechnologySystem::craft_output_unlocked(campaign, item_id);
+        return TechnologySystem::craft_output_unlocked(
+            campaign.faction_progress,
+            *campaign.technology,
+            item_id);
     case ItemSourceRule::HarvestOnly:
         return false;
     case ItemSourceRule::None:
@@ -476,7 +482,7 @@ bool item_is_accessible_for_task(
 }
 
 bool structure_is_buildable_for_task(
-    const CampaignState& campaign,
+    const TaskBoardCampaignReadSlices& campaign,
     StructureId structure_id) noexcept
 {
     if (structure_id.value == 0U)
@@ -496,12 +502,35 @@ bool structure_is_buildable_for_task(
     return false;
 }
 
-bool any_craftable_output_available(const CampaignState& campaign) noexcept
+[[nodiscard]] bool plant_unlocked_for_task(
+    const TaskBoardCampaignReadSlices& campaign,
+    PlantId plant_id) noexcept
+{
+    return TechnologySystem::plant_unlocked(
+        campaign.faction_progress,
+        *campaign.technology,
+        plant_id);
+}
+
+[[nodiscard]] bool recipe_unlocked_for_task(
+    const TaskBoardCampaignReadSlices& campaign,
+    RecipeId recipe_id) noexcept
+{
+    return TechnologySystem::recipe_unlocked(
+        campaign.faction_progress,
+        *campaign.technology,
+        recipe_id);
+}
+
+bool any_craftable_output_available(const TaskBoardCampaignReadSlices& campaign) noexcept
 {
     for (const auto& recipe_def : all_craft_recipe_defs())
     {
         if (recipe_def.output_item_id.value != 0U &&
-            TechnologySystem::recipe_unlocked(campaign, recipe_def.recipe_id))
+            TechnologySystem::recipe_unlocked(
+                campaign.faction_progress,
+                *campaign.technology,
+                recipe_def.recipe_id))
         {
             return true;
         }
@@ -567,7 +596,9 @@ std::vector<ItemId> collect_item_candidates(
 
     if (task_template_def.item_id.value != 0U)
     {
-        return item_is_accessible_for_task(task_board_campaign(invocation), task_template_def.item_id)
+        return item_is_accessible_for_task(
+                   task_board_campaign_read_slices(invocation),
+                   task_template_def.item_id)
             ? std::vector<ItemId> {task_template_def.item_id}
             : std::vector<ItemId> {};
     }
@@ -575,7 +606,9 @@ std::vector<ItemId> collect_item_candidates(
     std::vector<ItemId> candidates {};
     for (const auto& item_def : all_item_defs())
     {
-        if (!item_is_accessible_for_task(task_board_campaign(invocation), item_def.item_id))
+        if (!item_is_accessible_for_task(
+                task_board_campaign_read_slices(invocation),
+                item_def.item_id))
         {
             continue;
         }
@@ -618,9 +651,10 @@ std::vector<PlantId> collect_plant_candidates(
     RuntimeInvocation& invocation,
     const TaskTemplateDef& task_template_def)
 {
+    const auto campaign = task_board_campaign_read_slices(invocation);
     if (task_template_def.plant_id.value != 0U)
     {
-        return TechnologySystem::plant_unlocked(task_board_campaign(invocation), task_template_def.plant_id)
+        return plant_unlocked_for_task(campaign, task_template_def.plant_id)
             ? std::vector<PlantId> {task_template_def.plant_id}
             : std::vector<PlantId> {};
     }
@@ -630,7 +664,7 @@ std::vector<PlantId> collect_plant_candidates(
         const auto* item_def = find_item_def(task_template_def.item_id);
         if (item_def != nullptr &&
             item_def->linked_plant_id.value != 0U &&
-            TechnologySystem::plant_unlocked(task_board_campaign(invocation), item_def->linked_plant_id))
+            plant_unlocked_for_task(campaign, item_def->linked_plant_id))
         {
             return {item_def->linked_plant_id};
         }
@@ -640,7 +674,7 @@ std::vector<PlantId> collect_plant_candidates(
     std::vector<PlantId> candidates {};
     for (const auto& plant_def : all_plant_defs())
     {
-        if (!TechnologySystem::plant_unlocked(task_board_campaign(invocation), plant_def.plant_id))
+        if (!plant_unlocked_for_task(campaign, plant_def.plant_id))
         {
             continue;
         }
@@ -649,7 +683,7 @@ std::vector<PlantId> collect_plant_candidates(
         for (const auto& item_def : all_item_defs())
         {
             if (item_def.linked_plant_id == plant_def.plant_id &&
-                item_is_accessible_for_task(task_board_campaign(invocation), item_def.item_id))
+                item_is_accessible_for_task(campaign, item_def.item_id))
             {
                 has_seed_item = true;
                 break;
@@ -668,10 +702,11 @@ std::vector<RecipeId> collect_recipe_candidates(
     RuntimeInvocation& invocation,
     const TaskTemplateDef& task_template_def)
 {
+    const auto campaign = task_board_campaign_read_slices(invocation);
     if (task_template_def.recipe_id.value != 0U)
     {
         return find_craft_recipe_def(task_template_def.recipe_id) != nullptr &&
-                TechnologySystem::recipe_unlocked(task_board_campaign(invocation), task_template_def.recipe_id)
+                recipe_unlocked_for_task(campaign, task_template_def.recipe_id)
             ? std::vector<RecipeId> {task_template_def.recipe_id}
             : std::vector<RecipeId> {};
     }
@@ -679,7 +714,7 @@ std::vector<RecipeId> collect_recipe_candidates(
     std::vector<RecipeId> candidates {};
     for (const auto& recipe_def : all_craft_recipe_defs())
     {
-        if (TechnologySystem::recipe_unlocked(task_board_campaign(invocation), recipe_def.recipe_id))
+        if (recipe_unlocked_for_task(campaign, recipe_def.recipe_id))
         {
             candidates.push_back(recipe_def.recipe_id);
         }
@@ -694,7 +729,9 @@ std::vector<StructureId> collect_structure_candidates(
 {
     if (fixed_structure_id.value != 0U)
     {
-        return structure_is_buildable_for_task(task_board_campaign(invocation), fixed_structure_id)
+        return structure_is_buildable_for_task(
+                   task_board_campaign_read_slices(invocation),
+                   fixed_structure_id)
             ? std::vector<StructureId> {fixed_structure_id}
             : std::vector<StructureId> {};
     }
@@ -702,7 +739,9 @@ std::vector<StructureId> collect_structure_candidates(
     std::vector<StructureId> candidates {};
     for (const auto& structure_def : all_structure_defs())
     {
-        if (structure_is_buildable_for_task(task_board_campaign(invocation), structure_def.structure_id))
+        if (structure_is_buildable_for_task(
+                task_board_campaign_read_slices(invocation),
+                structure_def.structure_id))
         {
             candidates.push_back(structure_def.structure_id);
         }
@@ -771,7 +810,7 @@ bool task_template_is_eligible(
         return !collect_structure_candidates(invocation, StructureId {}).empty();
 
     case TaskProgressKind::CraftAnyItem:
-        return any_craftable_output_available(task_board_campaign(invocation));
+        return any_craftable_output_available(task_board_campaign_read_slices(invocation));
 
     case TaskProgressKind::SellCraftedItem:
         return has_sellable_crafted_item();
@@ -975,7 +1014,9 @@ TaskInstanceState make_task_instance(
         for (const auto& item_def : all_item_defs())
         {
             if (item_def.linked_plant_id == task.plant_id &&
-                item_is_accessible_for_task(task_board_campaign(invocation), item_def.item_id))
+                item_is_accessible_for_task(
+                    task_board_campaign_read_slices(invocation),
+                    item_def.item_id))
             {
                 task.item_id = item_def.item_id;
                 break;
@@ -2092,7 +2133,9 @@ bool item_is_buyable_from_authored_phone_stock(
 
     if (item_def->linked_plant_id.value != 0U)
     {
-        return TechnologySystem::plant_unlocked(task_board_campaign(invocation), item_def->linked_plant_id);
+        return plant_unlocked_for_task(
+            task_board_campaign_read_slices(invocation),
+            item_def->linked_plant_id);
     }
 
     return true;
@@ -2737,9 +2780,7 @@ Gs1Status TaskBoardSystem::process_game_message(
     const GameMessage& message)
 {
     auto access = make_game_state_access<TaskBoardSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    if (!campaign.has_value())
+    if (!runtime_invocation_has_campaign(invocation))
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -2886,9 +2927,8 @@ Gs1Status TaskBoardSystem::process_host_message(
 void TaskBoardSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<TaskBoardSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
     const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    if (!campaign.has_value())
+    if (!runtime_invocation_has_campaign(invocation))
     {
         return;
     }

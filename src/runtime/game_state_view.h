@@ -1,13 +1,13 @@
 #pragma once
 
-#include "campaign/campaign_state.h"
 #include "gs1/state_view.h"
-#include "site/site_run_state.h"
 
 #include <vector>
 
 namespace gs1
 {
+class SiteWorld;
+
 struct RuntimeGameStateViewCache final
 {
     Gs1GameStateView root {};
@@ -46,7 +46,7 @@ void rebuild_game_state_view_cache(
     RuntimeGameStateViewCache& cache);
 
 [[nodiscard]] bool build_site_tile_view(
-    const SiteRunState& site_run,
+    const SiteWorld* site_world,
     std::uint32_t tile_index,
     Gs1SiteTileView& out_tile);
 }  // namespace gs1

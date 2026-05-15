@@ -4,6 +4,9 @@
 #include "campaign/systems/campaign_time_system.h"
 #include "campaign/systems/loadout_planner_system.h"
 #include "messages/game_message.h"
+#include "runtime/game_state.h"
+#include "runtime/runtime_split_state_compat.h"
+#include "runtime/state_manager.h"
 #include "runtime/system_interface.h"
 #include "site/site_run_state.h"
 #include "site/site_world.h"
@@ -54,19 +57,38 @@ Gs1Status invoke_system_message(
     double fixed_step_seconds = 0.25,
     SiteMoveDirectionInput move_direction = {})
 {
+    gs1::GameState state {};
+    gs1::StateManager state_manager {};
+    state.app_state = app_state;
+    state.fixed_step_seconds = fixed_step_seconds;
+    state.runtime_messages = runtime_messages;
+    state.message_queue = message_queue;
+    state.move_direction = gs1::RuntimeMoveDirectionSnapshot {
+        move_direction.world_move_x,
+        move_direction.world_move_y,
+        move_direction.world_move_z,
+        move_direction.present};
+    gs1::write_campaign_state_to_state_sets(campaign, state, state_manager);
+    gs1::write_site_run_state_to_state_sets(active_site_run, state, state_manager);
     RuntimeInvocation invocation {
-        app_state,
-        campaign,
-        active_site_run,
-        runtime_messages,
-        message_queue,
-        fixed_step_seconds,
+        state,
+        state_manager,
         move_direction.world_move_x,
         move_direction.world_move_y,
         move_direction.world_move_z,
         move_direction.present};
     System system {};
-    return system.process_game_message(invocation, message);
+    const auto status = system.process_game_message(invocation, message);
+    app_state = state.app_state.get();
+    runtime_messages = state.runtime_messages;
+    message_queue = state.message_queue;
+    campaign = state.campaign_core.has_value()
+        ? std::optional<CampaignState> {gs1::assemble_campaign_state_from_state_sets(state, state_manager)}
+        : std::nullopt;
+    active_site_run = state.site_run_meta.has_value()
+        ? std::optional<SiteRunState> {gs1::assemble_site_run_state_from_state_sets(state, state_manager)}
+        : std::nullopt;
+    return status;
 }
 
 template <typename System>
@@ -79,19 +101,37 @@ void run_system(
     double fixed_step_seconds = 0.25,
     SiteMoveDirectionInput move_direction = {})
 {
+    gs1::GameState state {};
+    gs1::StateManager state_manager {};
+    state.app_state = app_state;
+    state.fixed_step_seconds = fixed_step_seconds;
+    state.runtime_messages = runtime_messages;
+    state.message_queue = message_queue;
+    state.move_direction = gs1::RuntimeMoveDirectionSnapshot {
+        move_direction.world_move_x,
+        move_direction.world_move_y,
+        move_direction.world_move_z,
+        move_direction.present};
+    gs1::write_campaign_state_to_state_sets(campaign, state, state_manager);
+    gs1::write_site_run_state_to_state_sets(active_site_run, state, state_manager);
     RuntimeInvocation invocation {
-        app_state,
-        campaign,
-        active_site_run,
-        runtime_messages,
-        message_queue,
-        fixed_step_seconds,
+        state,
+        state_manager,
         move_direction.world_move_x,
         move_direction.world_move_y,
         move_direction.world_move_z,
         move_direction.present};
     System system {};
     system.run(invocation);
+    app_state = state.app_state.get();
+    runtime_messages = state.runtime_messages;
+    message_queue = state.message_queue;
+    campaign = state.campaign_core.has_value()
+        ? std::optional<CampaignState> {gs1::assemble_campaign_state_from_state_sets(state, state_manager)}
+        : std::nullopt;
+    active_site_run = state.site_run_meta.has_value()
+        ? std::optional<SiteRunState> {gs1::assemble_site_run_state_from_state_sets(state, state_manager)}
+        : std::nullopt;
 }
 
 void initialize_site_world(

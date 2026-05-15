@@ -1,6 +1,9 @@
 #include "campaign/campaign_state.h"
 #include "content/defs/plant_defs.h"
 #include "messages/game_message.h"
+#include "runtime/game_state.h"
+#include "runtime/runtime_split_state_compat.h"
+#include "runtime/state_manager.h"
 #include "runtime/system_interface.h"
 #include "site/site_run_state.h"
 #include "site/tile_footprint.h"
@@ -91,7 +94,6 @@ gs1::SiteRunState make_site_run()
             100.0f,
             1.0f,
             false});
-    site_run.pending_tile_projection_update_mask.assign(site_run.site_world->tile_count(), 0U);
     site_run.weather.weather_heat = 20.0f;
     site_run.weather.weather_wind = 12.0f;
     site_run.weather.weather_dust = 8.0f;
@@ -139,20 +141,18 @@ PipelineTimings run_local_weather_pipeline(
     gs1::SiteRunState& site_run,
     gs1::GameMessageQueue& message_queue)
 {
-    std::optional<gs1::CampaignState> runtime_campaign {campaign};
-    std::optional<gs1::SiteRunState> runtime_site_run {site_run};
-    std::deque<Gs1RuntimeMessage> runtime_messages {};
-    Gs1AppState app_state = GS1_APP_STATE_SITE_ACTIVE;
+    gs1::GameState state {};
+    gs1::StateManager state_manager {};
+    state.app_state = GS1_APP_STATE_SITE_ACTIVE;
+    state.fixed_step_seconds = kFixedStepSeconds;
+    gs1::write_campaign_state_to_state_sets(std::optional<gs1::CampaignState> {campaign}, state, state_manager);
+    gs1::write_site_run_state_to_state_sets(std::optional<gs1::SiteRunState> {site_run}, state, state_manager);
 
     auto make_invocation = [&]() -> gs1::RuntimeInvocation
     {
         return gs1::RuntimeInvocation {
-            app_state,
-            runtime_campaign,
-            runtime_site_run,
-            runtime_messages,
-            message_queue,
-            kFixedStepSeconds};
+            state,
+            state_manager};
     };
 
     gs1::PlantWeatherContributionSystem plant_system {};
@@ -172,7 +172,7 @@ PipelineTimings run_local_weather_pipeline(
     resolve_system.run(resolve_invocation);
     const auto total_ended = std::chrono::steady_clock::now();
 
-    site_run = std::move(runtime_site_run).value();
+    site_run = gs1::assemble_site_run_state_from_state_sets(state, state_manager);
 
     return PipelineTimings {
         std::chrono::duration<double, std::milli>(device_started - plant_started).count(),

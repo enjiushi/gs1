@@ -1,7 +1,5 @@
 #include "campaign/systems/faction_reputation_system.h"
 
-#include "campaign/campaign_state.h"
-#include "campaign/systems/campaign_system_context.h"
 #include "content/defs/faction_defs.h"
 #include "runtime/game_runtime.h"
 
@@ -68,8 +66,7 @@ Gs1Status FactionReputationSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto campaign = make_campaign_state_access(invocation);
-    if (!campaign.has_campaign())
+    if (!runtime_invocation_has_campaign(invocation))
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -100,15 +97,16 @@ Gs1Status process_faction_reputation_message(
         return GS1_STATUS_OK;
     }
 
-    auto campaign = make_campaign_state_access(invocation);
-    if (!campaign.has_campaign())
+    if (!runtime_invocation_has_campaign(invocation))
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
     const auto& payload = message.payload_as<FactionReputationAwardRequestedMessage>();
     auto* faction_progress =
-        find_faction_progress_mut(campaign.faction_progress(), FactionId {payload.faction_id});
+        find_faction_progress_mut(
+            runtime_invocation_state_ref<RuntimeCampaignFactionProgressTag>(invocation),
+            FactionId {payload.faction_id});
     if (faction_progress == nullptr)
     {
         return GS1_STATUS_NOT_FOUND;

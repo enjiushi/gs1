@@ -35,26 +35,55 @@ public:
     [[nodiscard]] static bool node_purchased(
         const CampaignState& campaign,
         TechNodeId tech_node_id) noexcept;
+    [[nodiscard]] static bool node_purchased(
+        std::span<const FactionProgressState> faction_progress,
+        TechNodeId tech_node_id) noexcept;
     [[nodiscard]] static bool technology_tier_visible(
         const CampaignState& campaign,
+        const TechnologyNodeDef& node_def) noexcept;
+    [[nodiscard]] static bool technology_tier_visible(
+        std::span<const FactionProgressState> faction_progress,
         const TechnologyNodeDef& node_def) noexcept;
     [[nodiscard]] static bool plant_unlocked(
         const CampaignState& campaign,
         PlantId plant_id) noexcept;
+    [[nodiscard]] static bool plant_unlocked(
+        std::span<const FactionProgressState> faction_progress,
+        const TechnologyState& technology,
+        PlantId plant_id) noexcept;
     [[nodiscard]] static bool item_unlocked(
         const CampaignState& campaign,
+        ItemId item_id) noexcept;
+    [[nodiscard]] static bool item_unlocked(
+        std::span<const FactionProgressState> faction_progress,
+        const TechnologyState& technology,
         ItemId item_id) noexcept;
     [[nodiscard]] static bool structure_recipe_unlocked(
         const CampaignState& campaign,
         StructureId structure_id) noexcept;
+    [[nodiscard]] static bool structure_recipe_unlocked(
+        std::span<const FactionProgressState> faction_progress,
+        const TechnologyState& technology,
+        StructureId structure_id) noexcept;
     [[nodiscard]] static bool recipe_unlocked(
         const CampaignState& campaign,
+        RecipeId recipe_id) noexcept;
+    [[nodiscard]] static bool recipe_unlocked(
+        std::span<const FactionProgressState> faction_progress,
+        const TechnologyState& technology,
         RecipeId recipe_id) noexcept;
     [[nodiscard]] static bool craft_output_unlocked(
         const CampaignState& campaign,
         ItemId item_id) noexcept;
+    [[nodiscard]] static bool craft_output_unlocked(
+        std::span<const FactionProgressState> faction_progress,
+        const TechnologyState& technology,
+        ItemId item_id) noexcept;
     [[nodiscard]] static std::int32_t faction_reputation(
         const CampaignState& campaign,
+        FactionId faction_id) noexcept;
+    [[nodiscard]] static std::int32_t faction_reputation(
+        std::span<const FactionProgressState> faction_progress,
         FactionId faction_id) noexcept;
     [[nodiscard]] static std::int32_t current_reputation_requirement(
         const TechnologyNodeDef& node_def) noexcept;
@@ -66,8 +95,14 @@ public:
     [[nodiscard]] static float current_effect_parameter(
         const CampaignState& campaign,
         const TechnologyNodeDef& node_def) noexcept;
+    [[nodiscard]] static float current_effect_parameter(
+        std::span<const FactionProgressState> faction_progress,
+        const TechnologyNodeDef& node_def) noexcept;
     [[nodiscard]] static bool node_claimable(
         const CampaignState& campaign,
+        const TechnologyNodeDef& node_def) noexcept;
+    [[nodiscard]] static bool node_claimable(
+        std::span<const FactionProgressState> faction_progress,
         const TechnologyNodeDef& node_def) noexcept;
 };
 }  // namespace gs1

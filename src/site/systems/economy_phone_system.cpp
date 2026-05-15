@@ -20,7 +20,7 @@ namespace gs1
 template <>
 struct system_state_tags<EconomyPhoneSystem>
 {
-    using type = type_list<RuntimeCampaignTag>;
+    using type = type_list<RuntimeCampaignFactionProgressTag, RuntimeCampaignTechnologyTag>;
 };
 
 namespace
@@ -31,13 +31,6 @@ constexpr std::uint32_t k_sell_listing_id_base = 1000U;
     -> GameStateAccess<EconomyPhoneSystem>
 {
     return make_game_state_access<EconomyPhoneSystem>(invocation);
-}
-
-[[nodiscard]] const CampaignState& economy_phone_campaign(RuntimeInvocation& invocation)
-{
-    auto access = economy_phone_access(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    return *campaign;
 }
 
 [[nodiscard]] SiteWorldAccess<EconomyPhoneSystem> economy_phone_world(RuntimeInvocation& invocation)
@@ -209,7 +202,8 @@ bool phone_buy_stock_item_available(
     ItemId item_id) noexcept
 {
     auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
+    auto& faction_progress = access.template read<RuntimeCampaignFactionProgressTag>();
+    auto& technology = access.template read<RuntimeCampaignTechnologyTag>();
     const auto* item_def = find_item_def(item_id);
     if (item_def == nullptr)
     {
@@ -218,7 +212,10 @@ bool phone_buy_stock_item_available(
 
     if (item_def->linked_plant_id.value != 0U)
     {
-        return TechnologySystem::plant_unlocked(*campaign, item_def->linked_plant_id);
+        return TechnologySystem::plant_unlocked(
+            std::span<const FactionProgressState> {faction_progress},
+            technology,
+            item_def->linked_plant_id);
     }
 
     return item_buy_price_cash_points(item_id) > 0U;
@@ -865,12 +862,6 @@ Gs1Status EconomyPhoneSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    if (!campaign.has_value())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
     switch (message.type)
     {
     case GameMessageType::SiteRunStarted:
@@ -1041,12 +1032,6 @@ Gs1Status EconomyPhoneSystem::process_host_message(
 
 void EconomyPhoneSystem::run(RuntimeInvocation& invocation)
 {
-    auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    if (!campaign.has_value())
-    {
-        return;
-    }
     refresh_dynamic_sell_listings(invocation);
 }
 }  // namespace gs1

@@ -39,4 +39,13 @@ public:
             site_component_mask_of(SiteComponent::TaskBoard)};
     }
 };
+
+template <>
+struct system_state_tags<TaskBoardSystem>
+{
+    using type = type_list<
+        RuntimeCampaignFactionProgressTag,
+        RuntimeCampaignTechnologyTag,
+        RuntimeFixedStepSecondsTag>;
+};
 }  // namespace gs1

@@ -501,134 +501,134 @@ bool apply_modifier(
 }
 
 VillageTechnologyEffectState resolve_village_technology_effects(
-    const CampaignState& campaign) noexcept
+    std::span<const FactionProgressState> faction_progress) noexcept
 {
     VillageTechnologyEffectState effects {};
 
-    if (TechnologySystem::node_purchased(campaign, k_village_t1))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t1))
     {
         effects.shovel_meter_cost_reduction += 0.05f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t2))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t2))
     {
         // First timed-buff slot comes from the linked GlobalModifier preset.
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t3))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t3))
     {
         effects.shovel_plant_duration_reduction += 0.05f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t4))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t4))
     {
         // Worker-pack expansion resolves in site_run_factory.
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t5))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t5))
     {
         // Careful-depth access resolves in action_execution_system.
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t6))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t6))
     {
         effects.shovel_excavate_duration_reduction += 0.05f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t7))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t7))
     {
         effects.weather_nourishment_hydration_loss_reduction += 0.15f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t8))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t8))
     {
         effects.tier_two_food_buffs_upgraded = true;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t9))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t9))
     {
         effects.shovel_plant_duration_reduction += 0.05f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t10))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t10))
     {
         effects.careful_excavation_loot_rebalance = true;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t11))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t11))
     {
         // Worker-pack expansion resolves in site_run_factory.
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t12))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t12))
     {
         effects.weather_health_morale_loss_reduction += 0.15f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t13))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t13))
     {
         effects.shovel_excavate_duration_reduction += 0.05f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t14))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t14))
     {
         effects.weather_nourishment_hydration_loss_reduction += 0.15f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t15))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t15))
     {
         effects.careful_excavation_meter_cost_reduction = 0.20f;
         effects.careful_excavation_duration_reduction = 0.30f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t16))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t16))
     {
         effects.tier_five_food_buffs_upgraded = true;
     }
 
-    if (TechnologySystem::node_purchased(campaign, k_village_t17))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t17))
     {
         effects.shovel_meter_cost_reduction += 0.05f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t18))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t18))
     {
         effects.shovel_plant_duration_reduction += 0.05f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t19))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t19))
     {
         // Second timed-buff slot comes from the linked GlobalModifier preset.
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t21))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t21))
     {
         effects.shovel_meter_cost_reduction += 0.05f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t22))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t22))
     {
         effects.tier_eight_food_buffs_upgraded = true;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t23))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t23))
     {
         effects.shovel_excavate_duration_reduction += 0.05f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t24))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t24))
     {
         effects.weather_nourishment_hydration_loss_reduction += 0.20f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t25))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t25))
     {
         effects.thorough_excavation_loot_rebalance = true;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t26))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t26))
     {
         effects.shovel_plant_duration_reduction += 0.20f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t27))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t27))
     {
         effects.weather_health_morale_loss_reduction += 0.15f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t28))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t28))
     {
         effects.timed_buff_effect_multiplier = 1.10f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t29))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t29))
     {
         effects.shovel_plant_duration_reduction += 0.20f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t30))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t30))
     {
         effects.thorough_excavation_meter_cost_reduction = 0.20f;
         effects.thorough_excavation_duration_reduction = 0.30f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t31))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t31))
     {
         effects.weather_nourishment_hydration_loss_reduction += 0.20f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_village_t32))
+    if (TechnologySystem::node_purchased(faction_progress, k_village_t32))
     {
         effects.timed_buff_effect_multiplier = 1.25f;
     }
@@ -636,34 +636,34 @@ VillageTechnologyEffectState resolve_village_technology_effects(
 }
 
 BureauTechnologyEffectState resolve_bureau_technology_effects(
-    const CampaignState& campaign) noexcept
+    std::span<const FactionProgressState> faction_progress) noexcept
 {
     BureauTechnologyEffectState effects {};
     effects.unlocked_harvest_bonus_tier = HarvestBonusTier::Tier1;
     effects.harvest_bonus_proc_chance_percent = 6.0f;
     effects.harvest_bonus_higher_tier_bias_percent = 0.0f;
 
-    if (TechnologySystem::node_purchased(campaign, k_bureau_t5))
+    if (TechnologySystem::node_purchased(faction_progress, k_bureau_t5))
     {
         effects.unlocked_harvest_bonus_tier = HarvestBonusTier::Tier2;
     }
-    if (TechnologySystem::node_purchased(campaign, k_bureau_t10))
+    if (TechnologySystem::node_purchased(faction_progress, k_bureau_t10))
     {
         effects.harvest_bonus_higher_tier_bias_percent += 20.0f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_bureau_t15))
+    if (TechnologySystem::node_purchased(faction_progress, k_bureau_t15))
     {
         effects.harvest_bonus_proc_chance_percent += 6.0f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_bureau_t20))
+    if (TechnologySystem::node_purchased(faction_progress, k_bureau_t20))
     {
         effects.unlocked_harvest_bonus_tier = HarvestBonusTier::Tier3;
     }
-    if (TechnologySystem::node_purchased(campaign, k_bureau_t25))
+    if (TechnologySystem::node_purchased(faction_progress, k_bureau_t25))
     {
         effects.harvest_bonus_higher_tier_bias_percent += 20.0f;
     }
-    if (TechnologySystem::node_purchased(campaign, k_bureau_t30))
+    if (TechnologySystem::node_purchased(faction_progress, k_bureau_t30))
     {
         effects.harvest_bonus_proc_chance_percent += 6.0f;
     }
@@ -673,6 +673,18 @@ BureauTechnologyEffectState resolve_bureau_technology_effects(
     effects.harvest_bonus_higher_tier_bias_percent =
         std::clamp(effects.harvest_bonus_higher_tier_bias_percent, 0.0f, 100.0f);
     return effects;
+}
+
+VillageTechnologyEffectState resolve_village_technology_effects(
+    const CampaignState& campaign) noexcept
+{
+    return resolve_village_technology_effects(campaign.faction_progress);
+}
+
+BureauTechnologyEffectState resolve_bureau_technology_effects(
+    const CampaignState& campaign) noexcept
+{
+    return resolve_bureau_technology_effects(campaign.faction_progress);
 }
 
 ModifierId custom_consumable_modifier_id(
@@ -717,18 +729,18 @@ ModifierId custom_consumable_modifier_id(
 }
 
 void import_campaign_run_modifiers(
-    const CampaignState& campaign,
+    std::span<const FactionProgressState> faction_progress,
     ModifierState& modifier_state)
 {
-    for (const auto& faction_progress : campaign.faction_progress)
+    for (const auto& faction_progress_entry : faction_progress)
     {
-        if (!faction_progress.has_unlocked_assistant_package)
+        if (!faction_progress_entry.has_unlocked_assistant_package)
         {
             continue;
         }
 
         const auto* modifier_def =
-            find_modifier_def(ModifierId {faction_progress.unlocked_assistant_package_id});
+            find_modifier_def(ModifierId {faction_progress_entry.unlocked_assistant_package_id});
         if (modifier_def == nullptr)
         {
             continue;
@@ -741,14 +753,23 @@ void import_campaign_run_modifiers(
     }
 }
 
-void accumulate_campaign_technology_modifier_totals(
+void import_campaign_run_modifiers(
     const CampaignState& campaign,
+    ModifierState& modifier_state)
+{
+    import_campaign_run_modifiers(campaign.faction_progress, modifier_state);
+}
+
+void accumulate_campaign_technology_modifier_totals(
+    std::span<const FactionProgressState> faction_progress,
+    const TechnologyState& technology,
     ModifierChannelTotals& totals) noexcept
 {
+    (void)technology;
     for (const auto& node_def : all_technology_node_defs())
     {
         if (node_def.entry_kind != TechnologyEntryKind::GlobalModifier ||
-            !TechnologySystem::node_purchased(campaign, node_def.tech_node_id))
+            !TechnologySystem::node_purchased(faction_progress, node_def.tech_node_id))
         {
             continue;
         }
@@ -757,8 +778,18 @@ void accumulate_campaign_technology_modifier_totals(
             totals,
             scale_totals(
                 resolve_run_modifier_preset(node_def.linked_modifier_id),
-                TechnologySystem::current_effect_parameter(campaign, node_def)));
+                TechnologySystem::current_effect_parameter(faction_progress, node_def)));
     }
+}
+
+void accumulate_campaign_technology_modifier_totals(
+    const CampaignState& campaign,
+    ModifierChannelTotals& totals) noexcept
+{
+    accumulate_campaign_technology_modifier_totals(
+        campaign.faction_progress,
+        campaign.technology_state,
+        totals);
 }
 
 void accumulate_active_site_modifier_totals(
@@ -780,13 +811,15 @@ void accumulate_active_site_modifier_totals(
 }
 
 void accumulate_campaign_technology_harvest_output_modifiers(
-    const CampaignState& campaign,
+    std::span<const FactionProgressState> faction_progress,
+    const TechnologyState& technology,
     HarvestOutputModifierState& harvest_output_modifiers) noexcept
 {
+    (void)technology;
     for (const auto& node_def : all_technology_node_defs())
     {
         if (node_def.entry_kind != TechnologyEntryKind::GlobalModifier ||
-            !TechnologySystem::node_purchased(campaign, node_def.tech_node_id))
+            !TechnologySystem::node_purchased(faction_progress, node_def.tech_node_id))
         {
             continue;
         }
@@ -801,8 +834,18 @@ void accumulate_campaign_technology_harvest_output_modifiers(
             harvest_output_modifiers,
             scale_harvest_output_modifiers(
                 modifier_def->harvest_output_modifiers,
-                TechnologySystem::current_effect_parameter(campaign, node_def)));
+                TechnologySystem::current_effect_parameter(faction_progress, node_def)));
     }
+}
+
+void accumulate_campaign_technology_harvest_output_modifiers(
+    const CampaignState& campaign,
+    HarvestOutputModifierState& harvest_output_modifiers) noexcept
+{
+    accumulate_campaign_technology_harvest_output_modifiers(
+        campaign.faction_progress,
+        campaign.technology_state,
+        harvest_output_modifiers);
 }
 
 struct TimedModifierTickResult final
@@ -881,7 +924,8 @@ struct ResolvedModifierOutputs final
 };
 
 ResolvedModifierOutputs resolve_owned_modifiers(
-    const CampaignState& campaign,
+    std::span<const FactionProgressState> faction_progress,
+    const TechnologyState& technology,
     const ModifierState& modifier_state,
     const CampState& camp) noexcept
 {
@@ -903,29 +947,47 @@ ResolvedModifierOutputs resolve_owned_modifiers(
         resolved.totals,
         resolved.action_cost_modifiers,
         resolved.harvest_output_modifiers);
-    accumulate_campaign_technology_modifier_totals(campaign, resolved.totals);
+    accumulate_campaign_technology_modifier_totals(faction_progress, technology, resolved.totals);
     accumulate_campaign_technology_harvest_output_modifiers(
-        campaign,
+        faction_progress,
+        technology,
         resolved.harvest_output_modifiers);
-    resolved.village_technology_effects = resolve_village_technology_effects(campaign);
-    resolved.bureau_technology_effects = resolve_bureau_technology_effects(campaign);
+    resolved.village_technology_effects = resolve_village_technology_effects(faction_progress);
+    resolved.bureau_technology_effects = resolve_bureau_technology_effects(faction_progress);
     accumulate_totals(resolved.totals, camp_comfort_bias(camp));
     resolved.totals = clamp_totals(resolved.totals);
     return resolved;
 }
 
+ResolvedModifierOutputs resolve_owned_modifiers(
+    const CampaignState& campaign,
+    const ModifierState& modifier_state,
+    const CampState& camp) noexcept
+{
+    return resolve_owned_modifiers(
+        campaign.faction_progress,
+        campaign.technology_state,
+        modifier_state,
+        camp);
+}
+
 void resolve_modifier_totals(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<ModifierSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    if (!campaign.has_value())
+    const auto& faction_progress = access.template read<RuntimeCampaignFactionProgressTag>();
+    const auto& technology = access.template read<RuntimeCampaignTechnologyTag>();
+    if (!runtime_invocation_has_campaign(invocation))
     {
         return;
     }
 
     SiteWorldAccess<ModifierSystem> world {invocation};
     const auto next_outputs =
-        resolve_owned_modifiers(*campaign, world.read_modifier(), world.read_camp());
+        resolve_owned_modifiers(
+            faction_progress,
+            technology,
+            world.read_modifier(),
+            world.read_camp());
     auto& current_totals = world.own_modifier().resolved_channel_totals;
     const auto next_terrain_factors = resolve_terrain_factor_modifiers(next_outputs.totals);
     auto& current_terrain_factors = world.own_modifier().resolved_terrain_factor_modifiers;
@@ -963,8 +1025,10 @@ void handle_site_run_started(
     const SiteRunStartedMessage& /*payload*/) noexcept
 {
     auto access = make_game_state_access<ModifierSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    if (!campaign.has_value())
+    const auto& faction_progress = access.template read<RuntimeCampaignFactionProgressTag>();
+    const auto& technology = access.template read<RuntimeCampaignTechnologyTag>();
+    const auto& loadout_planner = access.template read<RuntimeCampaignLoadoutPlannerTag>();
+    if (!runtime_invocation_has_campaign(invocation))
     {
         return;
     }
@@ -980,12 +1044,12 @@ void handle_site_run_started(
     modifier_state.resolved_village_technology_effects = {};
     modifier_state.resolved_bureau_technology_effects = {};
 
-    const auto& aura_ids = campaign->loadout_planner_state.active_nearby_aura_modifier_ids;
+    const auto& aura_ids = loadout_planner.active_nearby_aura_modifier_ids;
     modifier_state.active_nearby_aura_modifier_ids.insert(
         modifier_state.active_nearby_aura_modifier_ids.end(),
         aura_ids.begin(),
         aura_ids.end());
-    import_campaign_run_modifiers(*campaign, modifier_state);
+    import_campaign_run_modifiers(faction_progress, modifier_state);
 
     resolve_modifier_totals(invocation);
 }
@@ -995,8 +1059,8 @@ void handle_inventory_item_use_completed(
     const InventoryItemUseCompletedMessage& payload) noexcept
 {
     auto access = make_game_state_access<ModifierSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    if (!campaign.has_value())
+    const auto& faction_progress = access.template read<RuntimeCampaignFactionProgressTag>();
+    if (!runtime_invocation_has_campaign(invocation))
     {
         return;
     }
@@ -1012,9 +1076,7 @@ void handle_inventory_item_use_completed(
     const ModifierId resolved_modifier_id =
         item_def->modifier_id.value != 0U
         ? item_def->modifier_id
-        : custom_consumable_modifier_id(
-            resolve_village_technology_effects(*campaign),
-            item_id);
+        : custom_consumable_modifier_id(resolve_village_technology_effects(faction_progress), item_id);
     if (resolved_modifier_id.value == 0U)
     {
         return;
@@ -1030,7 +1092,7 @@ void handle_inventory_item_use_completed(
     const float effect_scale =
         modifier_def->duration_eight_hour_blocks == 0U
         ? 1.0f
-        : resolve_village_technology_effects(*campaign).timed_buff_effect_multiplier;
+        : resolve_village_technology_effects(faction_progress).timed_buff_effect_multiplier;
 
     if (apply_modifier(
             world.own_modifier(),
@@ -1124,8 +1186,7 @@ Gs1Status ModifierSystem::process_game_message(
     const GameMessage& message)
 {
     auto access = make_game_state_access<ModifierSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
-    if (!campaign.has_value())
+    if (!runtime_invocation_has_campaign(invocation))
     {
         return GS1_STATUS_INVALID_STATE;
     }
@@ -1186,9 +1247,8 @@ Gs1Status ModifierSystem::process_host_message(
 void ModifierSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<ModifierSystem>(invocation);
-    auto& campaign = access.template read<RuntimeCampaignTag>();
     const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
-    if (!campaign.has_value())
+    if (!runtime_invocation_has_campaign(invocation))
     {
         return;
     }

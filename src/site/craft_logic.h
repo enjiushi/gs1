@@ -112,4 +112,9 @@ bool can_store_output_after_recipe_consumption(
 std::vector<const CraftRecipeDef*> recipes_for_station(
     const CampaignState& campaign,
     StructureId structure_id);
+
+std::vector<const CraftRecipeDef*> recipes_for_station(
+    std::span<const FactionProgressState> faction_progress,
+    const TechnologyState& technology,
+    StructureId structure_id);
 }  // namespace gs1::craft_logic
