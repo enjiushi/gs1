@@ -1,6 +1,7 @@
 #include "runtime/state_manager.h"
 
 #include "messages/game_message.h"
+#include "runtime/game_runtime.h"
 #include "runtime/runtime_state_access.h"
 #include "runtime/system_interface.h"
 
@@ -84,6 +85,9 @@ struct DuplicateCampaignCoreOwnerSystem final : StubSystemBase
 int main()
 {
     StateManager state_manager {};
+    auto& owned_state = state_manager.game_state();
+    owned_state.app_state = GS1_APP_STATE_REGIONAL_MAP;
+    assert(state_manager.query<StateSetId::AppState>(owned_state) == GS1_APP_STATE_REGIONAL_MAP);
 
     CampaignCoreOwnerSystem campaign_core_owner {};
     state_manager.register_resolver(campaign_core_owner);
@@ -115,6 +119,13 @@ int main()
     assert(state_manager.active_resolver(StateSetId::CampaignCore) == &campaign_core_owner);
     assert(state_manager.default_resolver(StateSetId::SiteRunMeta) == nullptr);
     assert(state_manager.active_resolver(StateSetId::SiteRunMeta) == nullptr);
+
+    Gs1RuntimeCreateDesc create_desc {};
+    create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    create_desc.api_version = gs1::k_api_version;
+    create_desc.fixed_step_seconds = 1.0 / 60.0;
+    gs1::GameRuntime runtime {create_desc};
+    assert(&runtime.state() == &runtime.state_manager().game_state());
 
     return 0;
 }

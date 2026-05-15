@@ -43,16 +43,16 @@ public:
         bool enabled) noexcept;
     [[nodiscard]] bool profiled_system_enabled(Gs1RuntimeProfileSystemId system_id) const noexcept;
 
-    [[nodiscard]] GameState& state() noexcept { return state_; }
-    [[nodiscard]] const GameState& state() const noexcept { return state_; }
+    [[nodiscard]] GameState& state() noexcept { return state_manager_.game_state(); }
+    [[nodiscard]] const GameState& state() const noexcept { return state_manager_.game_state(); }
     [[nodiscard]] StateManager& state_manager() noexcept { return state_manager_; }
     [[nodiscard]] const StateManager& state_manager() const noexcept { return state_manager_; }
-    [[nodiscard]] GameMessageQueue& message_queue() noexcept { return state_.message_queue; }
-    [[nodiscard]] const GameMessageQueue& message_queue() const noexcept { return state_.message_queue; }
-    [[nodiscard]] std::deque<Gs1RuntimeMessage>& runtime_messages() noexcept { return state_.runtime_messages; }
+    [[nodiscard]] GameMessageQueue& message_queue() noexcept { return state().message_queue; }
+    [[nodiscard]] const GameMessageQueue& message_queue() const noexcept { return state().message_queue; }
+    [[nodiscard]] std::deque<Gs1RuntimeMessage>& runtime_messages() noexcept { return state().runtime_messages; }
     [[nodiscard]] const std::deque<Gs1RuntimeMessage>& runtime_messages() const noexcept
     {
-        return state_.runtime_messages;
+        return state().runtime_messages;
     }
     [[nodiscard]] Gs1Status handle_message(const GameMessage& message);
     friend struct GameRuntimeProjectionTestAccess;
@@ -87,8 +87,8 @@ private:
 private:
     Gs1RuntimeCreateDesc create_desc_ {};
     std::string adapter_config_json_utf8_ {};
-    GameState state_ {};
     StateManager state_manager_ {};
+    GameState& state_;
     RuntimeGameStateViewCache state_view_cache_ {};
     std::deque<Gs1HostMessage> host_messages_ {};
     std::vector<std::unique_ptr<IRuntimeSystem>> systems_ {};

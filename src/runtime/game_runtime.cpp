@@ -217,12 +217,12 @@ constexpr auto record_timing_sample = [](auto& accumulator, double elapsed_ms) n
 
 RuntimeInvocation::RuntimeInvocation(GameRuntime& runtime) noexcept
     : runtime_(&runtime)
-    , owned_state_(&runtime.state_)
+    , owned_state_(&runtime.state())
     , state_manager_(&runtime.state_manager_)
-    , app_state_(&runtime.state_.app_state.get())
-    , fixed_step_seconds_(&runtime.state_.fixed_step_seconds.get())
-    , runtime_messages_(&runtime.state_.runtime_messages)
-    , game_messages_(&runtime.state_.message_queue)
+    , app_state_(&runtime.state().app_state.get())
+    , fixed_step_seconds_(&runtime.state().fixed_step_seconds.get())
+    , runtime_messages_(&runtime.state().runtime_messages)
+    , game_messages_(&runtime.state().message_queue)
 {
 }
 
@@ -279,10 +279,11 @@ void RuntimeInvocation::push_runtime_message(const Gs1RuntimeMessage& message)
 
 GameRuntime::GameRuntime(Gs1RuntimeCreateDesc create_desc)
     : create_desc_(create_desc)
+    , state_(state_manager_.game_state())
 {
     if (create_desc_.fixed_step_seconds > 0.0)
     {
-        state_.fixed_step_seconds = create_desc_.fixed_step_seconds;
+        state().fixed_step_seconds = create_desc_.fixed_step_seconds;
     }
 
     if (create_desc_.adapter_config_json_utf8 != nullptr)
@@ -514,12 +515,12 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
     auto status = GS1_STATUS_OK;
     if (!boot_initialized_)
     {
-        if (!state_.campaign_core.has_value() && !state_.site_run_meta.has_value())
+        if (!state().campaign_core.has_value() && !state().site_run_meta.has_value())
         {
             GameMessage boot_message {};
             boot_message.type = GameMessageType::OpenMainMenu;
             boot_message.set_payload(OpenMainMenuMessage {});
-            state_.message_queue.push_back(boot_message);
+            state().message_queue.push_back(boot_message);
 
             status = dispatch_queued_messages();
             if (status != GS1_STATUS_OK)
@@ -539,39 +540,39 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
         return status;
     }
 
-    if (!state_.site_run_meta.has_value())
+    if (!state().site_run_meta.has_value())
     {
-        out_result.runtime_messages_queued = static_cast<std::uint32_t>(state_.runtime_messages.size());
+        out_result.runtime_messages_queued = static_cast<std::uint32_t>(state().runtime_messages.size());
         finish_phase();
         return GS1_STATUS_OK;
     }
 
-    if (state_.app_state.get() == GS1_APP_STATE_SITE_LOADING)
+    if (state().app_state.get() == GS1_APP_STATE_SITE_LOADING)
     {
-        out_result.runtime_messages_queued = static_cast<std::uint32_t>(state_.runtime_messages.size());
+        out_result.runtime_messages_queued = static_cast<std::uint32_t>(state().runtime_messages.size());
         finish_phase();
         return GS1_STATUS_OK;
     }
 
-    if (!state_.site_clock.has_value())
+    if (!state().site_clock.has_value())
     {
-        out_result.runtime_messages_queued = static_cast<std::uint32_t>(state_.runtime_messages.size());
+        out_result.runtime_messages_queued = static_cast<std::uint32_t>(state().runtime_messages.size());
         finish_phase();
         return GS1_STATUS_OK;
     }
 
-    state_.site_clock->accumulator_real_seconds += request.real_delta_seconds;
+    state().site_clock->accumulator_real_seconds += request.real_delta_seconds;
 
-    while (state_.site_clock->accumulator_real_seconds >= state_.fixed_step_seconds)
+    while (state().site_clock->accumulator_real_seconds >= state().fixed_step_seconds)
     {
-        state_.site_clock->accumulator_real_seconds -= state_.fixed_step_seconds;
+        state().site_clock->accumulator_real_seconds -= state().fixed_step_seconds;
         run_fixed_step();
         out_result.fixed_steps_executed += 1U;
     }
 
     status = dispatch_queued_messages();
-    state_.move_direction = RuntimeMoveDirectionSnapshot {};
-    out_result.runtime_messages_queued = static_cast<std::uint32_t>(state_.runtime_messages.size());
+    state().move_direction = RuntimeMoveDirectionSnapshot {};
+    out_result.runtime_messages_queued = static_cast<std::uint32_t>(state().runtime_messages.size());
     finish_phase();
     return status;
 }
@@ -605,20 +606,20 @@ Gs1Status GameRuntime::run_phase2(const Gs1Phase2Request& request, Gs1Phase2Resu
         return status;
     }
 
-    out_result.runtime_messages_queued = static_cast<std::uint32_t>(state_.runtime_messages.size());
+    out_result.runtime_messages_queued = static_cast<std::uint32_t>(state().runtime_messages.size());
     finish_phase();
     return status;
 }
 
 Gs1Status GameRuntime::pop_runtime_message(Gs1RuntimeMessage& out_message)
 {
-    if (state_.runtime_messages.empty())
+    if (state().runtime_messages.empty())
     {
         return GS1_STATUS_BUFFER_EMPTY;
     }
 
-    out_message = state_.runtime_messages.front();
-    state_.runtime_messages.pop_front();
+    out_message = state().runtime_messages.front();
+    state().runtime_messages.pop_front();
     return GS1_STATUS_OK;
 }
 
@@ -636,12 +637,12 @@ Gs1Status GameRuntime::get_game_state_view(Gs1GameStateView& out_view)
 
 Gs1Status GameRuntime::query_site_tile_view(std::uint32_t tile_index, Gs1SiteTileView& out_tile) const
 {
-    if (!state_.site_run_meta.has_value())
+    if (!state().site_run_meta.has_value())
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
-    const auto& world = state_manager_.query<StateSetId::SiteWorld>(state_);
+    const auto& world = state_manager_.query<StateSetId::SiteWorld>(state());
     return build_site_tile_view(world->site_world.get(), tile_index, out_tile)
         ? GS1_STATUS_OK
         : GS1_STATUS_INVALID_ARGUMENT;
@@ -649,16 +650,16 @@ Gs1Status GameRuntime::query_site_tile_view(std::uint32_t tile_index, Gs1SiteTil
 
 Gs1Status GameRuntime::handle_message(const GameMessage& message)
 {
-    state_.message_queue.push_back(message);
+    state().message_queue.push_back(message);
     return dispatch_queued_messages();
 }
 
 Gs1Status GameRuntime::dispatch_queued_messages()
 {
-    while (!state_.message_queue.empty())
+    while (!state().message_queue.empty())
     {
-        const auto message = state_.message_queue.front();
-        state_.message_queue.pop_front();
+        const auto message = state().message_queue.front();
+        state().message_queue.pop_front();
 
         const auto status = dispatch_subscribed_message(message);
         if (status != GS1_STATUS_OK)
@@ -775,7 +776,7 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
 
 void GameRuntime::run_fixed_step()
 {
-    if (!state_.campaign_core.has_value() || !state_.site_run_meta.has_value())
+    if (!state().campaign_core.has_value() || !state().site_run_meta.has_value())
     {
         return;
     }

@@ -16,6 +16,9 @@ class StateManager final
 public:
     StateManager() = default;
 
+    [[nodiscard]] GameState& game_state() noexcept { return state_; }
+    [[nodiscard]] const GameState& game_state() const noexcept { return state_; }
+
     void register_resolver(IRuntimeSystem& system);
     void register_owned_state_set(IRuntimeSystem& system, StateSetId state_set);
 
@@ -41,6 +44,7 @@ private:
         return static_cast<std::size_t>(state_set);
     }
 
+    GameState state_ {};
     std::array<IRuntimeSystem*, static_cast<std::size_t>(StateSetId::Count)> default_resolver_by_state_set_ {};
     std::array<IRuntimeSystem*, static_cast<std::size_t>(StateSetId::Count)> active_resolver_by_state_set_ {};
 };
