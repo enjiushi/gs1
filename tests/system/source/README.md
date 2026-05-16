@@ -7,7 +7,3 @@ These files are auto-discovered by CMake from:
 - `tests/system/source/*.cpp`
 
 when `GS1_BUILD_TESTS=ON`.
-
-See the full authoring guide here:
-
-- [SYSTEM_TEST_MANUAL.md](E:/gs1/SYSTEM_TEST_MANUAL.md)

@@ -4,7 +4,6 @@ Sources:
 
 - [GDD.md](GDD.md)
 - [GAME_STRUCTURE.md](GAME_STRUCTURE.md)
-- [SYSTEM_DESIGN_STATUS.md](SYSTEM_DESIGN_STATUS.md)
 
 Purpose: lock the authored content contracts that must exist before detailed system-design work can safely define runtime structs, content-definition tables, generators, and validation tools.
 
