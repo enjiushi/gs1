@@ -1008,7 +1008,20 @@ void storage_device_breakage_destroys_owned_storage_and_items(
         !gs1::inventory_storage::find_device_storage_container(site_run, broken_device_entity_id).is_valid());
     GS1_SYSTEM_TEST_CHECK(
         context,
-        gs1::inventory_storage::storage_container_state_for_storage_id(site_run, storage_id) == nullptr);
+        gs1::inventory_storage::storage_container_state_for_storage_id(
+            gs1::InventoryStateRef {
+                site_run.inventory.next_storage_id,
+                site_run.inventory.worker_pack_slot_count,
+                site_run.inventory.worker_pack_storage_id,
+                site_run.inventory.worker_pack_container_entity_id,
+                site_run.inventory.item_membership_revision,
+                site_run.inventory.item_quantity_revision,
+                site_run.inventory.storage_containers,
+                site_run.inventory.storage_slot_item_instance_ids,
+                site_run.inventory.worker_pack_slots,
+                site_run.inventory.pending_deliveries,
+                site_run.inventory.pending_delivery_item_stacks},
+            storage_id) == nullptr);
 }
 }  // namespace
 

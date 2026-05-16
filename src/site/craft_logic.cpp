@@ -112,7 +112,23 @@ std::vector<flecs::entity> collect_nearby_source_containers(
             continue;
         }
 
-        if (!tile_in_craft_range(device_tile, inventory_storage::container_tile_coord(site_run, container)))
+        if (!tile_in_craft_range(
+                device_tile,
+                inventory_storage::container_tile_coord(
+                    gs1::InventoryStateRef {
+                        site_run.inventory.next_storage_id,
+                        site_run.inventory.worker_pack_slot_count,
+                        site_run.inventory.worker_pack_storage_id,
+                        site_run.inventory.worker_pack_container_entity_id,
+                        site_run.inventory.item_membership_revision,
+                        site_run.inventory.item_quantity_revision,
+                        site_run.inventory.storage_containers,
+                        site_run.inventory.storage_slot_item_instance_ids,
+                        site_run.inventory.worker_pack_slots,
+                        site_run.inventory.pending_deliveries,
+                        site_run.inventory.pending_delivery_item_stacks},
+                    site_run.site_world != nullptr ? &site_run.site_world->ecs_world() : nullptr,
+                    container)))
         {
             continue;
         }

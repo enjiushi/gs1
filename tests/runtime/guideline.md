@@ -12,9 +12,9 @@ Runtime-level tests and probes that validate split runtime flow, exported state-
 - `game_runtime_message_chain_test.cpp`: Runtime message-chain regression covering multi-system gameplay message dispatch, task-claim ordering, cue emission, crafted-output follow-up, and host-facing runtime message ordering.
 - `state_manager_test.cpp`: Focused resolver-registration coverage for `StateManager`, including default/active owner assignment, idempotent re-registration, duplicate-owner rejection, and untouched never-registered state sets.
 - `timed_modifier_projection_test.cpp`: Focused regression covering active site-modifier projection and remaining-game-hour bucketing behavior.
-- `site_system_message_flow_test.cpp`: Verifies cross-system site gameplay coordination through subscribed `GameMessage` flow on the real runtime path, including split-state compatibility round-trips that preserve the live `SiteWorld` contract for active site runs.
+- `site_system_message_flow_test.cpp`: Verifies cross-system site gameplay coordination through subscribed `GameMessage` flow on the real runtime path, including split-state fixture refreshes that preserve the live `SiteWorld` contract for active site runs without rebuilding temporary aggregates.
 - `game_runtime_performance_test.cpp`: Runtime performance-oriented coverage for deterministic mixed-site seeding and update cost.
-- `local_weather_perf_probe.cpp`: Focused local-weather performance probe with per-stage timing breakdowns for dense-cover investigation.
+- `local_weather_perf_probe.cpp`: Focused local-weather performance probe with per-stage timing breakdowns for dense-cover investigation, now using in-place split-state fixture refreshes after each run.
 - `smoke_engine_host_threading_test.cpp`: Verifies smoke-host frame-thread command draining, publication behavior, timing telemetry, and key viewer asset contracts.
 - `godot_debug_http_protocol_test.cpp`: Pure C++ regression for the Godot adapter's optional loopback debug HTTP command parser and semantic payload translation.
 - `godot_director_scene_policy_test.cpp`: Pure C++ regression for Godot director scene-reuse/switch policy.

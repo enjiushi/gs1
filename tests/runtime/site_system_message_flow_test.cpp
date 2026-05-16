@@ -68,8 +68,22 @@ Gs1Status invoke_system_message(
         move_direction.world_move_y,
         move_direction.world_move_z,
         move_direction.present};
-    gs1::write_campaign_state_to_state_sets(campaign, state, state_manager);
-    gs1::write_site_run_state_to_state_sets(active_site_run, state, state_manager);
+    if (campaign.has_value())
+    {
+        gs1::write_campaign_state_to_state_sets(*campaign, state, state_manager);
+    }
+    else
+    {
+        gs1::write_campaign_state_to_state_sets(std::optional<CampaignState> {}, state, state_manager);
+    }
+    if (active_site_run.has_value())
+    {
+        gs1::write_site_run_state_to_state_sets(*active_site_run, state, state_manager);
+    }
+    else
+    {
+        gs1::write_site_run_state_to_state_sets(std::optional<SiteRunState> {}, state, state_manager);
+    }
     RuntimeInvocation invocation {
         state,
         state_manager,
@@ -83,15 +97,35 @@ Gs1Status invoke_system_message(
     app_state = state.app_state.get();
     runtime_messages = state.runtime_messages;
     message_queue = state.message_queue;
-    campaign = state.campaign_core.has_value()
-        ? std::optional<CampaignState> {gs1::assemble_campaign_state_from_state_sets(state, state_manager)}
-        : std::nullopt;
-    active_site_run = state.site_run_meta.has_value()
-        ? std::optional<SiteRunState> {gs1::assemble_site_run_state_from_state_sets(
-              state,
-              state_manager,
-              invocation.site_world_handle())}
-        : std::nullopt;
+    if (state.campaign_core.has_value())
+    {
+        if (!campaign.has_value())
+        {
+            campaign.emplace();
+        }
+        gs1::apply_campaign_state_from_state_sets(*campaign, state, state_manager);
+    }
+    else
+    {
+        campaign.reset();
+    }
+
+    if (state.site_run_meta.has_value())
+    {
+        if (!active_site_run.has_value())
+        {
+            active_site_run.emplace();
+        }
+        gs1::apply_site_run_state_from_state_sets(
+            *active_site_run,
+            state,
+            state_manager,
+            invocation.site_world_handle());
+    }
+    else
+    {
+        active_site_run.reset();
+    }
     return status;
 }
 
@@ -116,8 +150,22 @@ void run_system(
         move_direction.world_move_y,
         move_direction.world_move_z,
         move_direction.present};
-    gs1::write_campaign_state_to_state_sets(campaign, state, state_manager);
-    gs1::write_site_run_state_to_state_sets(active_site_run, state, state_manager);
+    if (campaign.has_value())
+    {
+        gs1::write_campaign_state_to_state_sets(*campaign, state, state_manager);
+    }
+    else
+    {
+        gs1::write_campaign_state_to_state_sets(std::optional<CampaignState> {}, state, state_manager);
+    }
+    if (active_site_run.has_value())
+    {
+        gs1::write_site_run_state_to_state_sets(*active_site_run, state, state_manager);
+    }
+    else
+    {
+        gs1::write_site_run_state_to_state_sets(std::optional<SiteRunState> {}, state, state_manager);
+    }
     RuntimeInvocation invocation {
         state,
         state_manager,
@@ -131,15 +179,35 @@ void run_system(
     app_state = state.app_state.get();
     runtime_messages = state.runtime_messages;
     message_queue = state.message_queue;
-    campaign = state.campaign_core.has_value()
-        ? std::optional<CampaignState> {gs1::assemble_campaign_state_from_state_sets(state, state_manager)}
-        : std::nullopt;
-    active_site_run = state.site_run_meta.has_value()
-        ? std::optional<SiteRunState> {gs1::assemble_site_run_state_from_state_sets(
-              state,
-              state_manager,
-              invocation.site_world_handle())}
-        : std::nullopt;
+    if (state.campaign_core.has_value())
+    {
+        if (!campaign.has_value())
+        {
+            campaign.emplace();
+        }
+        gs1::apply_campaign_state_from_state_sets(*campaign, state, state_manager);
+    }
+    else
+    {
+        campaign.reset();
+    }
+
+    if (state.site_run_meta.has_value())
+    {
+        if (!active_site_run.has_value())
+        {
+            active_site_run.emplace();
+        }
+        gs1::apply_site_run_state_from_state_sets(
+            *active_site_run,
+            state,
+            state_manager,
+            invocation.site_world_handle());
+    }
+    else
+    {
+        active_site_run.reset();
+    }
 }
 
 void initialize_site_world(

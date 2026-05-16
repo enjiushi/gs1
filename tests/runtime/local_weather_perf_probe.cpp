@@ -145,8 +145,8 @@ PipelineTimings run_local_weather_pipeline(
     gs1::StateManager state_manager {};
     state.app_state = GS1_APP_STATE_SITE_ACTIVE;
     state.fixed_step_seconds = kFixedStepSeconds;
-    gs1::write_campaign_state_to_state_sets(std::optional<gs1::CampaignState> {campaign}, state, state_manager);
-    gs1::write_site_run_state_to_state_sets(std::optional<gs1::SiteRunState> {site_run}, state, state_manager);
+    gs1::write_campaign_state_to_state_sets(campaign, state, state_manager);
+    gs1::write_site_run_state_to_state_sets(site_run, state, state_manager);
 
     auto make_invocation = [&]() -> gs1::RuntimeInvocation
     {
@@ -173,7 +173,11 @@ PipelineTimings run_local_weather_pipeline(
     resolve_system.run(resolve_invocation);
     const auto total_ended = std::chrono::steady_clock::now();
 
-    site_run = gs1::assemble_site_run_state_from_state_sets(state, state_manager, site_run.site_world);
+    gs1::apply_site_run_state_from_state_sets(
+        site_run,
+        state,
+        state_manager,
+        site_run.site_world);
 
     return PipelineTimings {
         std::chrono::duration<double, std::milli>(device_started - plant_started).count(),

@@ -7,12 +7,12 @@
 
 namespace gs1
 {
-[[nodiscard]] inline CampaignState assemble_campaign_state_from_state_sets(
+inline void populate_campaign_state_from_state_sets(
+    CampaignState& campaign,
     const GameState& state,
     const StateManager& state_manager)
 {
-    CampaignState campaign {};
-
+    campaign = {};
     const auto& core = state_manager.query<StateSetId::CampaignCore>(state);
     const auto& faction_progress =
         state_manager.query<StateSetId::CampaignFactionProgress>(state);
@@ -20,7 +20,7 @@ namespace gs1
 
     if (!core.has_value())
     {
-        return campaign;
+        return;
     }
 
     campaign.campaign_id = core->campaign_id;
@@ -42,7 +42,22 @@ namespace gs1
     campaign.loadout_planner_state =
         assemble_loadout_planner_state_from_state_sets(state, state_manager);
     campaign.sites = assemble_sites_state_from_state_sets(state, state_manager);
+}
 
+inline void apply_campaign_state_from_state_sets(
+    CampaignState& campaign,
+    const GameState& state,
+    const StateManager& state_manager)
+{
+    populate_campaign_state_from_state_sets(campaign, state, state_manager);
+}
+
+[[nodiscard]] inline CampaignState assemble_campaign_state_from_state_sets(
+    const GameState& state,
+    const StateManager& state_manager)
+{
+    CampaignState campaign {};
+    populate_campaign_state_from_state_sets(campaign, state, state_manager);
     return campaign;
 }
 
@@ -90,13 +105,36 @@ inline void write_campaign_state_to_state_sets(
     write_sites_state_to_state_sets(campaign->sites, state, state_manager);
 }
 
-[[nodiscard]] inline SiteRunState assemble_site_run_state_from_state_sets(
+inline void write_campaign_state_to_state_sets(
+    const CampaignState& campaign,
+    GameState& state,
+    const StateManager& state_manager)
+{
+    state_manager.state<StateSetId::CampaignCore>(state) = CampaignCoreState {
+        campaign.campaign_id,
+        campaign.campaign_seed,
+        campaign.campaign_clock_minutes_elapsed,
+        campaign.campaign_days_total,
+        campaign.campaign_days_remaining,
+        campaign.app_state,
+        campaign.active_site_id};
+    write_regional_map_state_to_state_sets(campaign.regional_map_state, state, state_manager);
+    state_manager.state<StateSetId::CampaignFactionProgress>(state) = campaign.faction_progress;
+    state_manager.state<StateSetId::CampaignTechnology>(state) = campaign.technology_state;
+    write_loadout_planner_state_to_state_sets(
+        campaign.loadout_planner_state,
+        state,
+        state_manager);
+    write_sites_state_to_state_sets(campaign.sites, state, state_manager);
+}
+
+inline void populate_site_run_state_from_state_sets(
+    SiteRunState& site_run,
     const GameState& state,
     const StateManager& state_manager,
     const SiteWorldHandle& site_world)
 {
-    SiteRunState site_run {};
-
+    site_run = {};
     const auto& meta = state_manager.query<StateSetId::SiteRunMeta>(state);
     const auto& clock = state_manager.query<StateSetId::SiteClock>(state);
     const auto& camp = state_manager.query<StateSetId::SiteCamp>(state);
@@ -107,7 +145,7 @@ inline void write_campaign_state_to_state_sets(
 
     if (!meta.has_value())
     {
-        return site_run;
+        return;
     }
 
     site_run.site_run_id = meta->site_run_id;
@@ -158,6 +196,24 @@ inline void write_campaign_state_to_state_sets(
         move_direction.world_move_y,
         move_direction.world_move_z,
         move_direction.present};
+}
+
+inline void apply_site_run_state_from_state_sets(
+    SiteRunState& site_run,
+    const GameState& state,
+    const StateManager& state_manager,
+    const SiteWorldHandle& site_world)
+{
+    populate_site_run_state_from_state_sets(site_run, state, state_manager, site_world);
+}
+
+[[nodiscard]] inline SiteRunState assemble_site_run_state_from_state_sets(
+    const GameState& state,
+    const StateManager& state_manager,
+    const SiteWorldHandle& site_world)
+{
+    SiteRunState site_run {};
+    populate_site_run_state_from_state_sets(site_run, state, state_manager, site_world);
     return site_run;
 }
 
@@ -263,5 +319,50 @@ inline void write_site_run_state_to_state_sets(
         site_run->host_move_direction.world_move_y,
         site_run->host_move_direction.world_move_z,
         site_run->host_move_direction.present};
+}
+
+inline void write_site_run_state_to_state_sets(
+    const SiteRunState& site_run,
+    GameState& state,
+    const StateManager& state_manager)
+{
+    state_manager.state<StateSetId::SiteRunMeta>(state) = SiteRunMetaState {
+        site_run.site_run_id,
+        site_run.site_id,
+        site_run.site_archetype_id,
+        site_run.attempt_index,
+        site_run.site_attempt_seed,
+        site_run.run_status,
+        site_run.result_newly_revealed_site_count};
+    state_manager.state<StateSetId::SiteClock>(state) = site_run.clock;
+    state_manager.state<StateSetId::SiteCamp>(state) = site_run.camp;
+    write_inventory_state_to_state_sets(site_run.inventory, state, state_manager);
+    write_contractor_state_to_state_sets(site_run.contractor, state, state_manager);
+    state_manager.state<StateSetId::SiteWeather>(state) = site_run.weather;
+    state_manager.state<StateSetId::SiteEvent>(state) = site_run.event;
+    write_task_board_state_to_state_sets(site_run.task_board, state, state_manager);
+    write_modifier_state_to_state_sets(site_run.modifier, state, state_manager);
+    write_economy_state_to_state_sets(site_run.economy, state, state_manager);
+    write_craft_state_to_state_sets(site_run.craft, state, state_manager);
+    write_action_state_to_state_sets(site_run.site_action, state, state_manager);
+    state_manager.state<StateSetId::SiteCounters>(state) = site_run.counters;
+    write_site_objective_state_to_state_sets(site_run.objective, state, state_manager);
+    write_local_weather_resolve_state_to_state_sets(
+        site_run.local_weather_resolve,
+        state,
+        state_manager);
+    write_plant_weather_contribution_state_to_state_sets(
+        site_run.plant_weather_contribution,
+        state,
+        state_manager);
+    write_device_weather_contribution_state_to_state_sets(
+        site_run.device_weather_contribution,
+        state,
+        state_manager);
+    state_manager.state<StateSetId::MoveDirection>(state) = RuntimeMoveDirectionSnapshot {
+        site_run.host_move_direction.world_move_x,
+        site_run.host_move_direction.world_move_y,
+        site_run.host_move_direction.world_move_z,
+        site_run.host_move_direction.present};
 }
 }  // namespace gs1

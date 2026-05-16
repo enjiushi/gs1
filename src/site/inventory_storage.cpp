@@ -2046,9 +2046,12 @@ std::vector<flecs::entity> collect_all_storage_containers(
     return containers;
 }
 
-TileCoord container_tile_coord(SiteRunState& site_run, flecs::entity container) noexcept
+TileCoord container_tile_coord(
+    ConstInventoryStateRef inventory,
+    const flecs::world* world,
+    flecs::entity container) noexcept
 {
-    auto inventory = inventory_ref(site_run);
+    (void)world;
     const auto* storage_state =
         find_storage_container_state_by_entity_id(inventory, container.id());
     return storage_state == nullptr ? TileCoord {} : storage_state->tile_coord;
@@ -2222,11 +2225,5 @@ const StorageContainerEntryState* storage_container_state_for_storage_id(
     return find_storage_container_state_by_storage_id(inventory, storage_id);
 }
 
-const StorageContainerEntryState* storage_container_state_for_storage_id(
-    const SiteRunState& site_run,
-    std::uint32_t storage_id) noexcept
-{
-    return find_storage_container_state_by_storage_id(inventory_ref(site_run), storage_id);
-}
 }  // namespace gs1::inventory_storage
 
