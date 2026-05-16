@@ -80,8 +80,10 @@ struct InventoryState final
     std::uint64_t worker_pack_container_entity_id {0};
     std::uint64_t item_membership_revision {1U};
     std::uint64_t item_quantity_revision {1U};
-    std::vector<StorageContainerState> storage_containers {};
+    std::vector<StorageContainerEntryState> storage_containers {};
+    std::vector<std::uint64_t> storage_slot_item_instance_ids {};
     std::vector<InventorySlot> worker_pack_slots {};
-    std::vector<PendingDelivery> pending_delivery_queue {};
+    std::vector<PendingDeliveryEntryState> pending_deliveries {};
+    std::vector<InventorySlot> pending_delivery_item_stacks {};
 };
 }  // namespace gs1

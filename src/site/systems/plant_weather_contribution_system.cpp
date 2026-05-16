@@ -86,66 +86,76 @@ const gs1::PlantDef& resolve_occupant_def(
 }
 
 void ensure_runtime_buffers(
-    gs1::PlantWeatherContributionState& state,
+    gs1::PlantWeatherContributionMetaState& meta,
+    std::vector<std::uint32_t>& dirty_tile_indices,
+    std::vector<std::uint8_t>& dirty_tile_mask,
     std::size_t tile_count)
 {
-    if (state.dirty_tile_mask.size() == tile_count)
+    if (dirty_tile_mask.size() == tile_count)
     {
         return;
     }
 
-    state.dirty_tile_indices.clear();
-    state.dirty_tile_mask.assign(tile_count, 0U);
-    state.full_rebuild_pending = true;
-    state.last_wind_direction_sector = 0xffU;
+    dirty_tile_indices.clear();
+    dirty_tile_mask.assign(tile_count, 0U);
+    meta.full_rebuild_pending = true;
+    meta.last_wind_direction_sector = 0xffU;
 }
 
-void mark_tile_dirty(gs1::PlantWeatherContributionState& state, std::uint32_t index)
+void mark_tile_dirty(
+    std::vector<std::uint32_t>& dirty_tile_indices,
+    std::vector<std::uint8_t>& dirty_tile_mask,
+    std::uint32_t index)
 {
-    if (index >= state.dirty_tile_mask.size() || state.dirty_tile_mask[index] != 0U)
+    if (index >= dirty_tile_mask.size() || dirty_tile_mask[index] != 0U)
     {
         return;
     }
 
-    state.dirty_tile_mask[index] = 1U;
-    state.dirty_tile_indices.push_back(index);
+    dirty_tile_mask[index] = 1U;
+    dirty_tile_indices.push_back(index);
 }
 
 void mark_all_tiles_dirty(
-    gs1::PlantWeatherContributionState& state,
+    gs1::PlantWeatherContributionMetaState& meta,
+    std::vector<std::uint32_t>& dirty_tile_indices,
+    std::vector<std::uint8_t>& dirty_tile_mask,
     std::size_t tile_count)
 {
-    state.dirty_tile_indices.clear();
-    if (state.dirty_tile_mask.size() != tile_count)
+    dirty_tile_indices.clear();
+    if (dirty_tile_mask.size() != tile_count)
     {
-        state.dirty_tile_mask.assign(tile_count, 0U);
+        dirty_tile_mask.assign(tile_count, 0U);
     }
 
     for (std::uint32_t index = 0U; index < tile_count; ++index)
     {
-        state.dirty_tile_mask[index] = 1U;
-        state.dirty_tile_indices.push_back(index);
+        dirty_tile_mask[index] = 1U;
+        dirty_tile_indices.push_back(index);
     }
 
-    state.full_rebuild_pending = false;
+    meta.full_rebuild_pending = false;
 }
 
-void clear_dirty_tiles(gs1::PlantWeatherContributionState& state) noexcept
+void clear_dirty_tiles(
+    std::vector<std::uint32_t>& dirty_tile_indices,
+    std::vector<std::uint8_t>& dirty_tile_mask) noexcept
 {
-    for (const std::uint32_t index : state.dirty_tile_indices)
+    for (const std::uint32_t index : dirty_tile_indices)
     {
-        if (index < state.dirty_tile_mask.size())
+        if (index < dirty_tile_mask.size())
         {
-            state.dirty_tile_mask[index] = 0U;
+            dirty_tile_mask[index] = 0U;
         }
     }
 
-    state.dirty_tile_indices.clear();
+    dirty_tile_indices.clear();
 }
 
 void mark_tiles_affected_by_source(
     gs1::SiteWorldAccess<gs1::PlantWeatherContributionSystem>& world,
-    gs1::PlantWeatherContributionState& state,
+    std::vector<std::uint32_t>& dirty_tile_indices,
+    std::vector<std::uint8_t>& dirty_tile_mask,
     gs1::TileCoord source_coord)
 {
     if (!world.tile_coord_in_bounds(source_coord))
@@ -162,7 +172,7 @@ void mark_tiles_affected_by_source(
             return;
         }
 
-        mark_tile_dirty(state, world.tile_index(target_coord));
+        mark_tile_dirty(dirty_tile_indices, dirty_tile_mask, world.tile_index(target_coord));
     });
 }
 
@@ -547,13 +557,15 @@ Gs1Status process_message(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    auto& runtime = world.own_plant_weather_runtime();
-    ensure_runtime_buffers(runtime, world.tile_count());
+    auto& runtime_meta = world.own_plant_weather_runtime_meta();
+    auto& dirty_tile_indices = world.own_plant_weather_dirty_tile_indices();
+    auto& dirty_tile_mask = world.own_plant_weather_dirty_tile_mask();
+    ensure_runtime_buffers(runtime_meta, dirty_tile_indices, dirty_tile_mask, world.tile_count());
 
     switch (message.type)
     {
     case gs1::GameMessageType::SiteRunStarted:
-        runtime.full_rebuild_pending = true;
+        runtime_meta.full_rebuild_pending = true;
         return GS1_STATUS_OK;
 
     case gs1::GameMessageType::TileEcologyChanged:
@@ -565,10 +577,11 @@ Gs1Status process_message(
             return GS1_STATUS_OK;
         }
 
-        mark_tiles_affected_by_source(
-            world,
-            runtime,
-            gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
+            mark_tiles_affected_by_source(
+                world,
+                dirty_tile_indices,
+                dirty_tile_mask,
+                gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
         return GS1_STATUS_OK;
     }
 
@@ -586,7 +599,8 @@ Gs1Status process_message(
 
             mark_tiles_affected_by_source(
                 world,
-                runtime,
+                dirty_tile_indices,
+                dirty_tile_mask,
                 gs1::TileCoord {entry.target_tile_x, entry.target_tile_y});
         }
         return GS1_STATUS_OK;
@@ -605,23 +619,25 @@ void run_system(gs1::RuntimeInvocation& invocation)
         return;
     }
 
-    auto& runtime = world.own_plant_weather_runtime();
-    ensure_runtime_buffers(runtime, world.tile_count());
+    auto& runtime_meta = world.own_plant_weather_runtime_meta();
+    auto& dirty_tile_indices = world.own_plant_weather_dirty_tile_indices();
+    auto& dirty_tile_mask = world.own_plant_weather_dirty_tile_mask();
+    ensure_runtime_buffers(runtime_meta, dirty_tile_indices, dirty_tile_mask, world.tile_count());
 
     const std::uint8_t wind_sector = gs1::quantize_wind_direction_sector(
         world.read_weather().weather_wind_direction_degrees);
-    if (runtime.last_wind_direction_sector != wind_sector)
+    if (runtime_meta.last_wind_direction_sector != wind_sector)
     {
-        runtime.last_wind_direction_sector = wind_sector;
-        runtime.full_rebuild_pending = true;
+        runtime_meta.last_wind_direction_sector = wind_sector;
+        runtime_meta.full_rebuild_pending = true;
     }
 
-    if (runtime.full_rebuild_pending)
+    if (runtime_meta.full_rebuild_pending)
     {
-        mark_all_tiles_dirty(runtime, world.tile_count());
+        mark_all_tiles_dirty(runtime_meta, dirty_tile_indices, dirty_tile_mask, world.tile_count());
     }
 
-    if (runtime.dirty_tile_indices.empty())
+    if (dirty_tile_indices.empty())
     {
         return;
     }
@@ -629,7 +645,7 @@ void run_system(gs1::RuntimeInvocation& invocation)
     const gs1::WeatherDirectionStep wind_direction =
         gs1::resolve_wind_direction_step(world.read_weather().weather_wind_direction_degrees);
     const std::uint8_t max_distance = resolve_max_plant_contribution_distance();
-    for (const std::uint32_t tile_index : runtime.dirty_tile_indices)
+    for (const std::uint32_t tile_index : dirty_tile_indices)
     {
         const gs1::TileCoord target_coord = world.tile_coord(tile_index);
         write_tile_contribution(
@@ -638,7 +654,7 @@ void run_system(gs1::RuntimeInvocation& invocation)
             recompute_tile_contribution(world, wind_direction, max_distance, target_coord));
     }
 
-    clear_dirty_tiles(runtime);
+    clear_dirty_tiles(dirty_tile_indices, dirty_tile_mask);
 }
 }  // namespace
 

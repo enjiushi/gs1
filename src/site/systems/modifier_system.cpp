@@ -411,7 +411,7 @@ std::uint16_t projected_remaining_game_hours(double remaining_world_minutes) noe
         std::numeric_limits<std::uint16_t>::max()));
 }
 
-std::uint32_t count_active_timed_buffs(const ModifierState& modifier_state) noexcept
+std::uint32_t count_active_timed_buffs(ConstModifierStateRef modifier_state) noexcept
 {
     return static_cast<std::uint32_t>(std::count_if(
         modifier_state.active_site_modifiers.begin(),
@@ -419,6 +419,19 @@ std::uint32_t count_active_timed_buffs(const ModifierState& modifier_state) noex
         [](const ActiveSiteModifierState& modifier) {
             return is_timed_modifier(modifier);
         }));
+}
+
+std::uint32_t count_active_timed_buffs(ModifierStateRef modifier_state) noexcept
+{
+    return count_active_timed_buffs(ConstModifierStateRef {
+        modifier_state.active_nearby_aura_modifier_ids,
+        modifier_state.active_site_modifiers,
+        modifier_state.resolved_channel_totals,
+        modifier_state.resolved_terrain_factor_modifiers,
+        modifier_state.resolved_action_cost_modifiers,
+        modifier_state.resolved_harvest_output_modifiers,
+        modifier_state.resolved_village_technology_effects,
+        modifier_state.resolved_bureau_technology_effects});
 }
 
 std::int32_t discrete_timed_buff_cap_bias(float bias) noexcept
@@ -431,13 +444,26 @@ std::int32_t discrete_timed_buff_cap_bias(float bias) noexcept
     return static_cast<std::int32_t>(std::ceil(static_cast<double>(bias) - 1e-4));
 }
 
-std::uint32_t resolved_active_timed_buff_cap(const ModifierState& modifier_state) noexcept
+std::uint32_t resolved_active_timed_buff_cap(ConstModifierStateRef modifier_state) noexcept
 {
     const auto& tuning = modifier_system_tuning();
     const std::int32_t base_cap = static_cast<std::int32_t>(tuning.active_timed_buff_cap);
     const std::int32_t cap_bias =
         discrete_timed_buff_cap_bias(modifier_state.resolved_channel_totals.timed_buff_cap_bias);
     return static_cast<std::uint32_t>(std::max(0, base_cap + cap_bias));
+}
+
+std::uint32_t resolved_active_timed_buff_cap(ModifierStateRef modifier_state) noexcept
+{
+    return resolved_active_timed_buff_cap(ConstModifierStateRef {
+        modifier_state.active_nearby_aura_modifier_ids,
+        modifier_state.active_site_modifiers,
+        modifier_state.resolved_channel_totals,
+        modifier_state.resolved_terrain_factor_modifiers,
+        modifier_state.resolved_action_cost_modifiers,
+        modifier_state.resolved_harvest_output_modifiers,
+        modifier_state.resolved_village_technology_effects,
+        modifier_state.resolved_bureau_technology_effects});
 }
 
 ActiveSiteModifierState make_active_modifier_state(
@@ -459,7 +485,7 @@ ActiveSiteModifierState make_active_modifier_state(
 }
 
 std::vector<ActiveSiteModifierState>::iterator find_active_modifier(
-    ModifierState& modifier_state,
+    ModifierStateRef modifier_state,
     ModifierId modifier_id) noexcept
 {
     return std::find_if(
@@ -471,7 +497,7 @@ std::vector<ActiveSiteModifierState>::iterator find_active_modifier(
 }
 
 bool apply_modifier(
-    ModifierState& modifier_state,
+    ModifierStateRef modifier_state,
     const ModifierDef& modifier_def,
     ItemId source_item_id,
     float effect_scale = 1.0f) noexcept
@@ -730,7 +756,7 @@ ModifierId custom_consumable_modifier_id(
 
 void import_campaign_run_modifiers(
     std::span<const FactionProgressState> faction_progress,
-    ModifierState& modifier_state)
+    ModifierStateRef modifier_state)
 {
     for (const auto& faction_progress_entry : faction_progress)
     {
@@ -755,7 +781,7 @@ void import_campaign_run_modifiers(
 
 void import_campaign_run_modifiers(
     const CampaignState& campaign,
-    ModifierState& modifier_state)
+    ModifierStateRef modifier_state)
 {
     import_campaign_run_modifiers(campaign.faction_progress, modifier_state);
 }
@@ -793,7 +819,7 @@ void accumulate_campaign_technology_modifier_totals(
 }
 
 void accumulate_active_site_modifier_totals(
-    const ModifierState& modifier_state,
+    ConstModifierStateRef modifier_state,
     ModifierChannelTotals& totals,
     ActionCostModifierState& action_cost_modifiers,
     HarvestOutputModifierState& harvest_output_modifiers) noexcept
@@ -855,7 +881,7 @@ struct TimedModifierTickResult final
 };
 
 TimedModifierTickResult tick_timed_modifiers(
-    ModifierState& modifier_state,
+    ModifierStateRef modifier_state,
     double elapsed_world_minutes) noexcept
 {
     if (modifier_state.active_site_modifiers.empty() || elapsed_world_minutes <= 0.0)
@@ -900,7 +926,7 @@ TimedModifierTickResult tick_timed_modifiers(
 }
 
 bool end_timed_modifier(
-    ModifierState& modifier_state,
+    ModifierStateRef modifier_state,
     ModifierId modifier_id) noexcept
 {
     const auto active_it = find_active_modifier(modifier_state, modifier_id);
@@ -926,7 +952,7 @@ struct ResolvedModifierOutputs final
 ResolvedModifierOutputs resolve_owned_modifiers(
     std::span<const FactionProgressState> faction_progress,
     const TechnologyState& technology,
-    const ModifierState& modifier_state,
+    ConstModifierStateRef modifier_state,
     const CampState& camp) noexcept
 {
     ResolvedModifierOutputs resolved {};
@@ -961,7 +987,7 @@ ResolvedModifierOutputs resolve_owned_modifiers(
 
 ResolvedModifierOutputs resolve_owned_modifiers(
     const CampaignState& campaign,
-    const ModifierState& modifier_state,
+    ConstModifierStateRef modifier_state,
     const CampState& camp) noexcept
 {
     return resolve_owned_modifiers(
@@ -988,13 +1014,14 @@ void resolve_modifier_totals(RuntimeInvocation& invocation)
             technology,
             world.read_modifier(),
             world.read_camp());
-    auto& current_totals = world.own_modifier().resolved_channel_totals;
+    auto current_modifier = world.own_modifier();
+    auto& current_totals = current_modifier.resolved_channel_totals;
     const auto next_terrain_factors = resolve_terrain_factor_modifiers(next_outputs.totals);
-    auto& current_terrain_factors = world.own_modifier().resolved_terrain_factor_modifiers;
-    auto& current_action_cost_modifiers = world.own_modifier().resolved_action_cost_modifiers;
-    auto& current_harvest_output_modifiers = world.own_modifier().resolved_harvest_output_modifiers;
-    auto& current_village_effects = world.own_modifier().resolved_village_technology_effects;
-    auto& current_bureau_effects = world.own_modifier().resolved_bureau_technology_effects;
+    auto& current_terrain_factors = current_modifier.resolved_terrain_factor_modifiers;
+    auto& current_action_cost_modifiers = current_modifier.resolved_action_cost_modifiers;
+    auto& current_harvest_output_modifiers = current_modifier.resolved_harvest_output_modifiers;
+    auto& current_village_effects = current_modifier.resolved_village_technology_effects;
+    auto& current_bureau_effects = current_modifier.resolved_bureau_technology_effects;
 
     if (!totals_match(current_totals, next_outputs.totals) ||
         !terrain_factors_match(current_terrain_factors, next_terrain_factors) ||
@@ -1027,14 +1054,13 @@ void handle_site_run_started(
     auto access = make_game_state_access<ModifierSystem>(invocation);
     const auto& faction_progress = access.template read<RuntimeCampaignFactionProgressTag>();
     const auto& technology = access.template read<RuntimeCampaignTechnologyTag>();
-    const auto& loadout_planner = access.template read<RuntimeCampaignLoadoutPlannerTag>();
     if (!runtime_invocation_has_campaign(invocation))
     {
         return;
     }
 
     SiteWorldAccess<ModifierSystem> world {invocation};
-    auto& modifier_state = world.own_modifier();
+    auto modifier_state = world.own_modifier();
     modifier_state.active_nearby_aura_modifier_ids.clear();
     modifier_state.active_site_modifiers.clear();
     modifier_state.resolved_channel_totals = {};
@@ -1044,7 +1070,10 @@ void handle_site_run_started(
     modifier_state.resolved_village_technology_effects = {};
     modifier_state.resolved_bureau_technology_effects = {};
 
-    const auto& aura_ids = loadout_planner.active_nearby_aura_modifier_ids;
+    const auto& aura_ids = invocation.state_manager()
+                               ->state<StateSetId::CampaignLoadoutPlannerNearbyAuraModifiers>(
+                                   *invocation.owned_state())
+                               .value();
     modifier_state.active_nearby_aura_modifier_ids.insert(
         modifier_state.active_nearby_aura_modifier_ids.end(),
         aura_ids.begin(),

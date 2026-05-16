@@ -76,7 +76,8 @@ Gs1Status invoke_system_message(
         move_direction.world_move_x,
         move_direction.world_move_y,
         move_direction.world_move_z,
-        move_direction.present};
+        move_direction.present,
+        active_site_run.has_value() ? active_site_run->site_world : gs1::SiteWorldHandle {}};
     System system {};
     const auto status = system.process_game_message(invocation, message);
     app_state = state.app_state.get();
@@ -89,7 +90,7 @@ Gs1Status invoke_system_message(
         ? std::optional<SiteRunState> {gs1::assemble_site_run_state_from_state_sets(
               state,
               state_manager,
-              nullptr)}
+              invocation.site_world_handle())}
         : std::nullopt;
     return status;
 }
@@ -123,7 +124,8 @@ void run_system(
         move_direction.world_move_x,
         move_direction.world_move_y,
         move_direction.world_move_z,
-        move_direction.present};
+        move_direction.present,
+        active_site_run.has_value() ? active_site_run->site_world : gs1::SiteWorldHandle {}};
     System system {};
     system.run(invocation);
     app_state = state.app_state.get();
@@ -136,7 +138,7 @@ void run_system(
         ? std::optional<SiteRunState> {gs1::assemble_site_run_state_from_state_sets(
               state,
               state_manager,
-              nullptr)}
+              invocation.site_world_handle())}
         : std::nullopt;
 }
 
@@ -237,6 +239,8 @@ int main()
             site_start_queue,
             runtime_messages) == GS1_STATUS_OK);
     assert(active_site_run.has_value());
+    assert(active_site_run->site_world != nullptr);
+    assert(active_site_run->site_world->initialized());
     assert(app_state == GS1_APP_STATE_SITE_LOADING);
     assert(site_start_queue.size() == 1U);
     assert(site_start_queue.front().type == GameMessageType::SiteRunStarted);
@@ -255,8 +259,6 @@ int main()
     GameMessageQueue message_queue {};
     std::optional<CampaignState> site_campaign {campaign};
     std::optional<SiteRunState> runtime_site_run {std::move(site_run)};
-    auto& site_run_ref = runtime_site_run.value();
-
     run_system<SiteTimeSystem>(
         app_state,
         site_campaign,
@@ -271,6 +273,7 @@ int main()
         runtime_messages,
         0.25,
         SiteMoveDirectionInput {1.0f, 0.0f, 0.0f, true});
+    auto& site_run_ref = runtime_site_run.value();
     const auto worker_position = gs1::site_world_access::worker_position(site_run_ref);
     assert(worker_position.tile_x > 2.0f);
     assert(worker_position.tile_y == 2.0f);

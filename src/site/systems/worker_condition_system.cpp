@@ -114,7 +114,7 @@ float resolve_factor(float base, float bias) noexcept
 }
 
 bool active_modifier_present(
-    const ModifierState& modifier_state,
+    ConstModifierStateRef modifier_state,
     ModifierId modifier_id) noexcept
 {
     return std::any_of(
@@ -126,7 +126,7 @@ bool active_modifier_present(
 }
 
 float special_energy_recovery_bonus(
-    const ModifierState& modifier_state) noexcept
+    ConstModifierStateRef modifier_state) noexcept
 {
     float bonus = 0.0f;
     if (active_modifier_present(modifier_state, k_modifier_wormwood_broth) ||
@@ -144,7 +144,7 @@ float special_energy_recovery_bonus(
 }
 
 float special_health_recovery_delta(
-    const ModifierState& modifier_state,
+    ConstModifierStateRef modifier_state,
     float step_real_seconds) noexcept
 {
     if (step_real_seconds <= 0.0f)
@@ -170,7 +170,7 @@ float special_health_recovery_delta(
 }
 
 float special_morale_recovery_delta(
-    const ModifierState& modifier_state,
+    ConstModifierStateRef modifier_state,
     float step_real_seconds) noexcept
 {
     if (step_real_seconds <= 0.0f)
@@ -221,10 +221,9 @@ bool worker_conditions_changed(
         previous.is_sheltered != current.is_sheltered;
 }
 
-bool action_is_executing(const ActionState& action_state) noexcept
+bool action_is_executing(const ConstActionStateRef& action_state) noexcept
 {
-    return action_state.current_action_id.has_value() &&
-        action_state.started_at_world_minute.has_value();
+    return action_state.has_current_action_id && action_state.has_started_at_world_minute;
 }
 
 std::uint32_t compute_change_mask(
@@ -491,7 +490,7 @@ void accumulate_passive_deltas(
     WorkerMeterDeltas& deltas,
     const SiteWorld::WorkerConditionData& previous,
     const SiteWorld::TileLocalWeatherData& local_weather,
-    const ModifierState& modifier_state,
+    ConstModifierStateRef modifier_state,
     float step_game_minutes,
     float step_real_seconds) noexcept
 {

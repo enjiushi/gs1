@@ -19,6 +19,7 @@
 #include <cmath>
 #include <cstdint>
 #include <vector>
+#include <span>
 
 namespace gs1
 {
@@ -192,7 +193,7 @@ bool tracked_tile_has_plant(const TaskTrackedTileState& tile) noexcept
 }
 
 bool tracked_tile_coord_in_bounds(
-    const TaskBoardState& board,
+    const ConstTaskBoardStateRef board,
     TileCoord coord) noexcept
 {
     return coord.x >= 0 &&
@@ -202,7 +203,7 @@ bool tracked_tile_coord_in_bounds(
 }
 
 std::size_t tracked_tile_index(
-    const TaskBoardState& board,
+    const ConstTaskBoardStateRef board,
     TileCoord coord) noexcept
 {
     return static_cast<std::size_t>(coord.y) * board.tracked_tile_width +
@@ -210,7 +211,7 @@ std::size_t tracked_tile_index(
 }
 
 TaskTrackedTileState* tracked_tile_state(
-    TaskBoardState& board,
+    TaskBoardStateRef board,
     TileCoord coord) noexcept
 {
     if (!tracked_tile_coord_in_bounds(board, coord))
@@ -223,7 +224,7 @@ TaskTrackedTileState* tracked_tile_state(
 }
 
 const TaskTrackedTileState* tracked_tile_state(
-    const TaskBoardState& board,
+    const ConstTaskBoardStateRef board,
     TileCoord coord) noexcept
 {
     if (!tracked_tile_coord_in_bounds(board, coord))
@@ -236,7 +237,7 @@ const TaskTrackedTileState* tracked_tile_state(
 }
 
 void update_populated_neighbor_counts(
-    TaskBoardState& board,
+    TaskBoardStateRef board,
     TileCoord center,
     bool previously_populated,
     bool now_populated) noexcept
@@ -264,7 +265,7 @@ void update_populated_neighbor_counts(
 }
 
 void apply_tracked_plant_state(
-    TaskBoardState& board,
+    TaskBoardStateRef board,
     TileCoord coord,
     std::uint32_t plant_type_id,
     std::uint32_t ground_cover_type_id,
@@ -359,7 +360,7 @@ std::uint32_t action_direct_cost_cash_points(
 
 std::uint32_t resolved_task_direct_cost_cash_points(
     const TaskTemplateDef& task_template_def,
-    const TaskInstanceState& task) noexcept
+    const TaskInstanceEntryState& task) noexcept
 {
     switch (task_template_def.progress_kind)
     {
@@ -943,7 +944,7 @@ bool task_template_is_onboarding_only(TaskTemplateId task_template_id) noexcept
 
 bool onboarding_chain_effective(
     SiteId site_id,
-    const TaskBoardState& board) noexcept
+    const ConstTaskBoardStateRef board) noexcept
 {
     for (const auto& task : board.visible_tasks)
     {
@@ -957,7 +958,7 @@ bool onboarding_chain_effective(
     return false;
 }
 
-std::uint32_t next_task_instance_id(const TaskBoardState& board) noexcept
+std::uint32_t next_task_instance_id(const ConstTaskBoardStateRef board) noexcept
 {
     std::uint32_t next_id = 1U;
     for (const auto& task : board.visible_tasks)
@@ -968,7 +969,7 @@ std::uint32_t next_task_instance_id(const TaskBoardState& board) noexcept
     return next_id;
 }
 
-TaskInstanceState make_task_instance(
+TaskInstanceEntryState make_task_instance(
     RuntimeInvocation& invocation,
     TaskInstanceId task_instance_id,
     const TaskTemplateDef& task_template_def,
@@ -979,7 +980,7 @@ TaskInstanceState make_task_instance(
         task_board_world(invocation).site_attempt_seed(),
         task_template_def.task_template_id.value,
         task_instance_id.value);
-    TaskInstanceState task {};
+    TaskInstanceEntryState task {};
     task.task_instance_id = task_instance_id;
     task.task_template_id = task_template_def.task_template_id;
     task.publisher_faction_id = task_template_def.publisher_faction_id;
@@ -1105,8 +1106,8 @@ TaskInstanceState make_task_instance(
         task.difficulty_cash_points,
         k_reward_budget_multiplier_percent);
     task.current_progress_amount = 0U;
-    task.reward_draft_options =
-        make_reward_draft_options(invocation, task_instance_id, task_template_def, onboarding_seed);
+    task.reward_draft_option_offset = 0U;
+    task.reward_draft_option_count = 0U;
     task.runtime_list_kind = TaskRuntimeListKind::Visible;
     if (onboarding_seed != nullptr && onboarding_seed->follow_up_task_template_id.value != 0U)
     {
@@ -1116,14 +1117,21 @@ TaskInstanceState make_task_instance(
     return task;
 }
 
-void reset_task_board(TaskBoardState& board) noexcept
+void reset_task_board(TaskBoardStateRef board) noexcept
 {
     board.visible_tasks.clear();
+    board.reward_draft_options.clear();
     board.tracked_tiles.clear();
     board.accepted_task_ids.clear();
     board.completed_task_ids.clear();
     board.claimed_task_ids.clear();
-    board.active_chain_state.reset();
+    board.active_chain_task_chain_id = 0U;
+    board.active_chain_current_accepted_step_index = 0U;
+    board.active_chain_surfaced_follow_up_task_instance_id = TaskInstanceId {};
+    board.has_active_chain_state = false;
+    board.active_chain_has_current_accepted_step_index = false;
+    board.active_chain_has_surfaced_follow_up_task_instance_id = false;
+    board.active_chain_is_broken = false;
     board.task_pool_size = 0U;
     board.tracked_tile_width = 0U;
     board.tracked_tile_height = 0U;
@@ -1138,7 +1146,7 @@ void reset_task_board(TaskBoardState& board) noexcept
 
 void initialize_task_tracking_cache(
     RuntimeInvocation& invocation,
-    TaskBoardState& board) noexcept
+    TaskBoardStateRef board) noexcept
 {
     board.tracked_tile_width = task_board_world(invocation).tile_width();
     board.tracked_tile_height = task_board_world(invocation).tile_height();
@@ -1147,7 +1155,7 @@ void initialize_task_tracking_cache(
     board.site_completion_tile_threshold = task_board_world(invocation).read_counters().site_completion_tile_threshold;
 }
 
-TaskInstanceState* find_task_instance(TaskBoardState& board, TaskInstanceId id) noexcept
+TaskInstanceEntryState* find_task_instance(TaskBoardStateRef board, TaskInstanceId id) noexcept
 {
     for (auto& task : board.visible_tasks)
     {
@@ -1162,23 +1170,23 @@ TaskInstanceState* find_task_instance(TaskBoardState& board, TaskInstanceId id) 
 
 bool complete_task(
     RuntimeInvocation& invocation,
-    TaskBoardState& board,
-    TaskInstanceState& task) noexcept;
+    TaskBoardStateRef board,
+    TaskInstanceEntryState& task) noexcept;
 
 bool is_snapshot_progress_kind(TaskProgressKind progress_kind) noexcept;
 bool is_duration_progress_kind(TaskProgressKind progress_kind) noexcept;
 bool refresh_snapshot_task_progress(
     RuntimeInvocation& invocation,
-    TaskBoardState& board,
-    TaskInstanceState& task) noexcept;
+    TaskBoardStateRef board,
+    TaskInstanceEntryState& task) noexcept;
 bool refresh_duration_task_condition(
     RuntimeInvocation& invocation,
-    TaskInstanceState& task) noexcept;
+    TaskInstanceEntryState& task) noexcept;
 
 void activate_task_instance(
     RuntimeInvocation& invocation,
-    TaskBoardState& board,
-    TaskInstanceState& task) noexcept
+    TaskBoardStateRef board,
+    TaskInstanceEntryState& task) noexcept
 {
     if (task.runtime_list_kind != TaskRuntimeListKind::Visible)
     {
@@ -1218,10 +1226,10 @@ void activate_task_instance(
 }
 
 TaskRewardDraftOption* find_reward_option(
-    TaskInstanceState& task,
+    std::span<TaskRewardDraftOption> reward_options,
     RewardCandidateId reward_candidate_id) noexcept
 {
-    for (auto& reward_option : task.reward_draft_options)
+    for (auto& reward_option : reward_options)
     {
         if (reward_option.reward_candidate_id == reward_candidate_id)
         {
@@ -1232,9 +1240,10 @@ TaskRewardDraftOption* find_reward_option(
     return nullptr;
 }
 
-bool has_selected_reward(const TaskInstanceState& task) noexcept
+bool has_selected_reward(
+    std::span<const TaskRewardDraftOption> reward_options) noexcept
 {
-    for (const auto& reward_option : task.reward_draft_options)
+    for (const auto& reward_option : reward_options)
     {
         if (reward_option.selected)
         {
@@ -1343,8 +1352,8 @@ bool queue_reward_message(
 
 bool complete_task(
     RuntimeInvocation& invocation,
-    TaskBoardState& board,
-    TaskInstanceState& task) noexcept
+    TaskBoardStateRef board,
+    TaskInstanceEntryState& task) noexcept
 {
     (void)invocation;
     if (task.runtime_list_kind != TaskRuntimeListKind::Accepted)
@@ -1359,28 +1368,28 @@ bool complete_task(
 }
 
 bool item_matches_task(
-    const TaskInstanceState& task,
+    const TaskInstanceEntryState& task,
     ItemId item_id) noexcept
 {
     return task.item_id.value == 0U || task.item_id == item_id;
 }
 
 bool plant_matches_task(
-    const TaskInstanceState& task,
+    const TaskInstanceEntryState& task,
     PlantId planted_plant_id) noexcept
 {
     return task.plant_id.value == 0U || task.plant_id == planted_plant_id;
 }
 
 bool structure_matches_task(
-    const TaskInstanceState& task,
+    const TaskInstanceEntryState& task,
     StructureId structure_id) noexcept
 {
     return task.structure_id.value == 0U || task.structure_id == structure_id;
 }
 
 bool action_matches_task(
-    const TaskInstanceState& task,
+    const TaskInstanceEntryState& task,
     ActionKind action_kind) noexcept
 {
     return task.action_kind == ActionKind::None || task.action_kind == action_kind;
@@ -1392,7 +1401,7 @@ void advance_matching_accepted_tasks(
     std::uint32_t amount,
     Matcher matcher)
 {
-    auto& board = task_board_world(invocation).own_task_board();
+    auto board = task_board_world(invocation).own_task_board();
     bool mutated = false;
 
     for (auto& task : board.visible_tasks)
@@ -1429,7 +1438,7 @@ void advance_matching_accepted_tasks(
 }
 
 std::uint8_t build_structure_set_mask(
-    const TaskInstanceState& task,
+    const TaskInstanceEntryState& task,
     StructureId structure_id) noexcept
 {
     std::uint8_t mask = 0U;
@@ -1462,7 +1471,7 @@ void advance_build_structure_set_tasks(
     RuntimeInvocation& invocation,
     StructureId structure_id)
 {
-    auto& board = task_board_world(invocation).own_task_board();
+    auto board = task_board_world(invocation).own_task_board();
     bool mutated = false;
 
     for (auto& task : board.visible_tasks)
@@ -1543,7 +1552,7 @@ bool is_duration_progress_kind(TaskProgressKind progress_kind) noexcept
 }
 
 bool matches_density_task_filter(
-    const TaskInstanceState& task,
+    const TaskInstanceEntryState& task,
     PlantId plant_id) noexcept
 {
     if (plant_id.value == 0U)
@@ -1560,8 +1569,8 @@ bool matches_density_task_filter(
 }
 
 std::uint32_t count_plants_with_density_at_least(
-    const TaskBoardState& board,
-    const TaskInstanceState& task) noexcept
+    const ConstTaskBoardStateRef board,
+    const TaskInstanceEntryState& task) noexcept
 {
     std::uint32_t count = 0U;
     for (const auto& tile : board.tracked_tiles)
@@ -1579,8 +1588,8 @@ std::uint32_t count_plants_with_density_at_least(
 }
 
 std::uint32_t count_plants_with_protection_at_least(
-    const TaskBoardState& board,
-    const TaskInstanceState& task,
+    const ConstTaskBoardStateRef board,
+    const TaskInstanceEntryState& task,
     PlantProtectionChannel channel) noexcept
 {
     std::uint32_t count = 0U;
@@ -1622,7 +1631,7 @@ std::uint32_t count_plants_with_protection_at_least(
 }
 
 std::uint32_t count_nearby_populated_plant_tiles(
-    const TaskBoardState& board) noexcept
+    const ConstTaskBoardStateRef board) noexcept
 {
     std::uint32_t count = 0U;
     for (const auto& tile : board.tracked_tiles)
@@ -1644,9 +1653,9 @@ std::uint32_t count_nearby_populated_plant_tiles(
 std::uint32_t calculate_snapshot_progress(
     RuntimeInvocation& invocation,
     const TaskTemplateDef& task_template_def,
-    const TaskInstanceState& task) noexcept
+    const TaskInstanceEntryState& task) noexcept
 {
-    const auto& board = task_board_world(invocation).read_task_board();
+    const auto board = task_board_world(invocation).read_task_board();
     switch (task_template_def.progress_kind)
     {
     case TaskProgressKind::RestorationTiles:
@@ -1677,7 +1686,7 @@ std::uint32_t calculate_snapshot_progress(
 }
 
 bool all_worker_meters_at_least(
-    const TaskBoardState& board,
+    const ConstTaskBoardStateRef board,
     float threshold) noexcept
 {
     return board.worker.valid &&
@@ -1689,7 +1698,7 @@ bool all_worker_meters_at_least(
 }
 
 bool all_devices_integrity_at_least(
-    const TaskBoardState& board,
+    const ConstTaskBoardStateRef board,
     float threshold) noexcept
 {
     bool found_device = false;
@@ -1711,7 +1720,7 @@ bool all_devices_integrity_at_least(
 }
 
 std::uint32_t count_tiles_moisture_at_least(
-    const TaskBoardState& board,
+    const ConstTaskBoardStateRef board,
     float threshold) noexcept
 {
     std::uint32_t count = 0U;
@@ -1727,7 +1736,7 @@ std::uint32_t count_tiles_moisture_at_least(
 }
 
 std::uint32_t count_tiles_heat_at_most(
-    const TaskBoardState& board,
+    const ConstTaskBoardStateRef board,
     float threshold) noexcept
 {
     std::uint32_t count = 0U;
@@ -1743,7 +1752,7 @@ std::uint32_t count_tiles_heat_at_most(
 }
 
 std::uint32_t count_tiles_dust_at_most(
-    const TaskBoardState& board,
+    const ConstTaskBoardStateRef board,
     float threshold) noexcept
 {
     std::uint32_t count = 0U;
@@ -1759,7 +1768,7 @@ std::uint32_t count_tiles_dust_at_most(
 }
 
 bool living_plant_duration_condition_met(
-    const TaskInstanceState& task,
+    const TaskInstanceEntryState& task,
     const LivingPlantStabilityChangedMessage& payload) noexcept
 {
     return (payload.status_flags & LIVING_PLANT_STABILITY_ALL_TRACKED_PLANTS_STABLE) != 0U &&
@@ -1769,9 +1778,9 @@ bool living_plant_duration_condition_met(
 bool duration_condition_met(
     RuntimeInvocation& invocation,
     const TaskTemplateDef& task_template_def,
-    TaskInstanceState& task) noexcept
+    TaskInstanceEntryState& task) noexcept
 {
-    const auto& board = task_board_world(invocation).read_task_board();
+    const auto board = task_board_world(invocation).read_task_board();
     switch (task_template_def.progress_kind)
     {
     case TaskProgressKind::KeepAllWorkerMetersAboveForDuration:
@@ -1794,12 +1803,12 @@ bool duration_condition_met(
 
 bool refresh_snapshot_task_progress(
     RuntimeInvocation& invocation,
-    TaskBoardState& board,
-    TaskInstanceState& task) noexcept;
+    TaskBoardStateRef board,
+    TaskInstanceEntryState& task) noexcept;
 
 bool refresh_duration_task_condition(
     RuntimeInvocation& invocation,
-    TaskInstanceState& task) noexcept
+    TaskInstanceEntryState& task) noexcept
 {
     const auto* task_template_def = find_task_template_def(task.task_template_id);
     if (task_template_def == nullptr || !is_duration_progress_kind(task_template_def->progress_kind))
@@ -1823,7 +1832,7 @@ bool refresh_snapshot_tasks_if(
     RuntimeInvocation& invocation,
     Predicate predicate) noexcept
 {
-    auto& board = task_board_world(invocation).own_task_board();
+    auto board = task_board_world(invocation).own_task_board();
     bool mutated = false;
     for (auto& task : board.visible_tasks)
     {
@@ -1843,7 +1852,7 @@ bool refresh_duration_task_conditions_if(
     RuntimeInvocation& invocation,
     Predicate predicate) noexcept
 {
-    auto& board = task_board_world(invocation).own_task_board();
+    auto board = task_board_world(invocation).own_task_board();
     bool mutated = false;
     for (auto& task : board.visible_tasks)
     {
@@ -1865,8 +1874,8 @@ bool refresh_duration_task_conditions_if(
 
 bool refresh_snapshot_task_progress(
     RuntimeInvocation& invocation,
-    TaskBoardState& board,
-    TaskInstanceState& task) noexcept
+    TaskBoardStateRef board,
+    TaskInstanceEntryState& task) noexcept
 {
     if (task.runtime_list_kind == TaskRuntimeListKind::PendingClaim ||
         task.runtime_list_kind == TaskRuntimeListKind::Claimed)
@@ -1903,7 +1912,7 @@ bool refresh_snapshot_task_progress(
 bool refresh_snapshot_tasks(
     RuntimeInvocation& invocation) noexcept
 {
-    auto& board = task_board_world(invocation).own_task_board();
+    auto board = task_board_world(invocation).own_task_board();
     bool mutated = false;
     for (auto& task : board.visible_tasks)
     {
@@ -1916,7 +1925,7 @@ bool refresh_normal_task_pool(
     RuntimeInvocation& invocation,
     bool force_dirty = false) noexcept
 {
-    auto& board = task_board_world(invocation).own_task_board();
+    auto board = task_board_world(invocation).own_task_board();
     if (onboarding_chain_effective(task_board_world(invocation).site_id(), board))
     {
         return false;
@@ -1929,7 +1938,7 @@ bool refresh_normal_task_pool(
     const auto visible_begin = std::remove_if(
         board.visible_tasks.begin(),
         board.visible_tasks.end(),
-        [](const TaskInstanceState& task) {
+        [](const TaskInstanceEntryState& task) {
             return task.runtime_list_kind == TaskRuntimeListKind::Visible;
         });
     if (visible_begin != board.visible_tasks.end())
@@ -1996,7 +2005,7 @@ bool refresh_normal_task_pool(
 bool update_duration_tasks(
     RuntimeInvocation& invocation) noexcept
 {
-    auto& board = task_board_world(invocation).own_task_board();
+    auto board = task_board_world(invocation).own_task_board();
     const double step_minutes =
         runtime_minutes_from_real_seconds(
             make_game_state_access<TaskBoardSystem>(invocation).template read<RuntimeFixedStepSecondsTag>());
@@ -2054,7 +2063,7 @@ void handle_site_run_started(
     RuntimeInvocation& invocation,
     const SiteRunStartedMessage& payload)
 {
-    auto& board = task_board_world(invocation).own_task_board();
+    auto board = task_board_world(invocation).own_task_board();
     reset_task_board(board);
     initialize_task_tracking_cache(invocation, board);
     std::uint32_t site_seed_count = 0U;
@@ -2076,7 +2085,7 @@ void handle_site_run_started(
         const auto* task_template_def = find_task_template_def(root_seed->task_template_id);
         if (task_template_def != nullptr)
         {
-            board.visible_tasks.push_back(make_task_instance(
+    board.visible_tasks.push_back(make_task_instance(
                 invocation,
                 TaskInstanceId {1U},
                 *task_template_def,
@@ -2145,14 +2154,14 @@ void handle_task_accept_requested(
     RuntimeInvocation& invocation,
     const TaskAcceptRequestedMessage& payload)
 {
-    auto& board = task_board_world(invocation).own_task_board();
+    auto board = task_board_world(invocation).own_task_board();
     if (board.accepted_task_ids.size() >= board.accepted_task_cap)
     {
         return;
     }
 
     const TaskInstanceId requested_id {payload.task_instance_id};
-    TaskInstanceState* task = find_task_instance(board, requested_id);
+    TaskInstanceEntryState* task = find_task_instance(board, requested_id);
     if (task == nullptr || task->runtime_list_kind != TaskRuntimeListKind::Visible)
     {
         return;
@@ -2166,14 +2175,17 @@ void handle_task_reward_claim_requested(
     RuntimeInvocation& invocation,
     const TaskRewardClaimRequestedMessage& payload)
 {
-    auto& board = task_board_world(invocation).own_task_board();
-    TaskInstanceState* task = find_task_instance(board, TaskInstanceId {payload.task_instance_id});
+    auto board = task_board_world(invocation).own_task_board();
+    TaskInstanceEntryState* task = find_task_instance(board, TaskInstanceId {payload.task_instance_id});
     if (task == nullptr || task->runtime_list_kind != TaskRuntimeListKind::PendingClaim)
     {
         return;
     }
 
-    if (has_selected_reward(*task))
+    if (has_selected_reward(std::span<const TaskRewardDraftOption>{
+            board.reward_draft_options.data() +
+                static_cast<std::ptrdiff_t>(task->reward_draft_option_offset),
+            static_cast<std::size_t>(task->reward_draft_option_count)}))
     {
         return;
     }
@@ -2181,11 +2193,16 @@ void handle_task_reward_claim_requested(
     TaskRewardDraftOption* reward_option = nullptr;
     if (payload.reward_candidate_id != 0U)
     {
-        reward_option = find_reward_option(*task, RewardCandidateId {payload.reward_candidate_id});
+        reward_option = find_reward_option(
+            std::span<TaskRewardDraftOption>{
+                board.reward_draft_options.data() +
+                    static_cast<std::ptrdiff_t>(task->reward_draft_option_offset),
+                static_cast<std::size_t>(task->reward_draft_option_count)},
+            RewardCandidateId {payload.reward_candidate_id});
     }
-    else if (!task->reward_draft_options.empty())
+    else if (task->reward_draft_option_count != 0U)
     {
-        reward_option = &task->reward_draft_options.front();
+        reward_option = &board.reward_draft_options[static_cast<std::size_t>(task->reward_draft_option_offset)];
     }
 
     if (reward_option == nullptr)
@@ -2193,7 +2210,10 @@ void handle_task_reward_claim_requested(
         return;
     }
 
-    for (const auto& reward_bundle_option : task->reward_draft_options)
+    const auto reward_options = std::span<TaskRewardDraftOption>{
+        board.reward_draft_options.data() + static_cast<std::ptrdiff_t>(task->reward_draft_option_offset),
+        static_cast<std::size_t>(task->reward_draft_option_count)};
+    for (const auto& reward_bundle_option : reward_options)
     {
         const auto* reward_candidate_def = find_reward_candidate_def(reward_bundle_option.reward_candidate_id);
         if (reward_candidate_def == nullptr || !queue_reward_message(invocation, *reward_candidate_def))
@@ -2204,10 +2224,9 @@ void handle_task_reward_claim_requested(
 
     const auto claimed_task_instance_id = task->task_instance_id.value;
     const auto claimed_task_template_id = task->task_template_id.value;
-    const auto reward_candidate_count =
-        static_cast<std::uint32_t>(task->reward_draft_options.size());
+    const auto reward_candidate_count = task->reward_draft_option_count;
 
-    for (auto& reward_bundle_option : task->reward_draft_options)
+    for (auto& reward_bundle_option : reward_options)
     {
         reward_bundle_option.selected = true;
     }
@@ -2257,7 +2276,7 @@ void handle_restoration_progress(
     RuntimeInvocation& invocation,
     const RestorationProgressChangedMessage& payload)
 {
-    auto& board = task_board_world(invocation).own_task_board();
+    auto board = task_board_world(invocation).own_task_board();
     board.fully_grown_tile_count = payload.fully_grown_tile_count;
     board.site_completion_tile_threshold = payload.site_completion_tile_threshold;
     bool mutated = false;
@@ -2309,7 +2328,7 @@ void handle_tile_ecology_changed(
         return;
     }
 
-    auto& board = task_board_world(invocation).own_task_board();
+    auto board = task_board_world(invocation).own_task_board();
     apply_tracked_plant_state(
         board,
         TileCoord {payload.target_tile_x, payload.target_tile_y},
@@ -2331,7 +2350,7 @@ void handle_tile_ecology_batch_changed(
     RuntimeInvocation& invocation,
     const TileEcologyBatchChangedMessage& payload)
 {
-    auto& board = task_board_world(invocation).own_task_board();
+    auto board = task_board_world(invocation).own_task_board();
     bool any_relevant_entry = false;
     for (std::size_t index = 0U;
          index < payload.entry_count && index < k_tile_ecology_batch_entry_count;
@@ -2375,7 +2394,7 @@ void handle_site_tile_state_changed(
     RuntimeInvocation& invocation,
     const SiteTileStateChangedMessage& payload)
 {
-    auto& board = task_board_world(invocation).own_task_board();
+    auto board = task_board_world(invocation).own_task_board();
     apply_tracked_plant_state(
         board,
         TileCoord {payload.target_tile_x, payload.target_tile_y},
@@ -2413,7 +2432,7 @@ void handle_worker_meters_changed(
     RuntimeInvocation& invocation,
     const WorkerMetersChangedMessage& payload)
 {
-    auto& board = task_board_world(invocation).own_task_board();
+    auto board = task_board_world(invocation).own_task_board();
     board.worker.health = payload.player_health;
     board.worker.hydration = payload.player_hydration;
     board.worker.nourishment = payload.player_nourishment;
@@ -2460,7 +2479,7 @@ void handle_site_device_condition_changed(
     RuntimeInvocation& invocation,
     const SiteDeviceConditionChangedMessage& payload)
 {
-    auto& board = task_board_world(invocation).own_task_board();
+    auto board = task_board_world(invocation).own_task_board();
     TaskTrackedTileState* tracked = tracked_tile_state(
         board,
         TileCoord {payload.target_tile_x, payload.target_tile_y});
@@ -2481,7 +2500,7 @@ void handle_living_plant_stability_changed(
     RuntimeInvocation& invocation,
     const LivingPlantStabilityChangedMessage& payload)
 {
-    auto& board = task_board_world(invocation).own_task_board();
+    auto board = task_board_world(invocation).own_task_board();
     board.tracked_living_plant_count = payload.tracked_living_plant_count;
     board.all_tracked_living_plants_stable =
         (payload.status_flags & LIVING_PLANT_STABILITY_ALL_TRACKED_PLANTS_STABLE) != 0U;
@@ -2523,7 +2542,7 @@ void handle_phone_listing_purchased(
     advance_matching_accepted_tasks(
         invocation,
         payload.quantity == 0U ? 1U : payload.quantity,
-        [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+        [&](const TaskTemplateDef& task_template_def, const TaskInstanceEntryState& task) {
             return task_template_def.progress_kind == TaskProgressKind::BuyItem &&
                 item_matches_task(task, ItemId {payload.item_id});
         });
@@ -2537,7 +2556,7 @@ void handle_phone_listing_sold(
     advance_matching_accepted_tasks(
         invocation,
         quantity,
-        [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+        [&](const TaskTemplateDef& task_template_def, const TaskInstanceEntryState& task) {
             return task_template_def.progress_kind == TaskProgressKind::SellItem &&
                 item_matches_task(task, ItemId {payload.item_id});
         });
@@ -2547,7 +2566,7 @@ void handle_phone_listing_sold(
         advance_matching_accepted_tasks(
             invocation,
             quantity,
-            [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+            [&](const TaskTemplateDef& task_template_def, const TaskInstanceEntryState& task) {
                 (void)task;
                 return task_template_def.progress_kind == TaskProgressKind::SellCraftedItem;
             });
@@ -2559,7 +2578,7 @@ void handle_phone_listing_sold(
         advance_matching_accepted_tasks(
             invocation,
             sell_price_cash_points * quantity,
-            [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+            [&](const TaskTemplateDef& task_template_def, const TaskInstanceEntryState& task) {
                 (void)task;
                 return task_template_def.progress_kind == TaskProgressKind::EarnMoney;
             });
@@ -2573,7 +2592,7 @@ void handle_inventory_transfer_completed(
     advance_matching_accepted_tasks(
         invocation,
         payload.quantity == 0U ? 1U : payload.quantity,
-        [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+        [&](const TaskTemplateDef& task_template_def, const TaskInstanceEntryState& task) {
             return task_template_def.progress_kind == TaskProgressKind::TransferItem &&
                 item_matches_task(task, ItemId {payload.item_id});
         });
@@ -2586,7 +2605,7 @@ void handle_inventory_item_submitted(
     advance_matching_accepted_tasks(
         invocation,
         payload.quantity == 0U ? 1U : payload.quantity,
-        [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+        [&](const TaskTemplateDef& task_template_def, const TaskInstanceEntryState& task) {
             return task_template_def.progress_kind == TaskProgressKind::SubmitItem &&
                 item_matches_task(task, ItemId {payload.item_id});
         });
@@ -2599,7 +2618,7 @@ void handle_site_tile_planting_completed(
     advance_matching_accepted_tasks(
         invocation,
         1U,
-        [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+        [&](const TaskTemplateDef& task_template_def, const TaskInstanceEntryState& task) {
             return task_template_def.progress_kind == TaskProgressKind::PlantItem &&
                 plant_matches_task(task, PlantId {payload.plant_type_id});
         });
@@ -2607,7 +2626,7 @@ void handle_site_tile_planting_completed(
     advance_matching_accepted_tasks(
         invocation,
         1U,
-        [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+        [&](const TaskTemplateDef& task_template_def, const TaskInstanceEntryState& task) {
             (void)task;
             return task_template_def.progress_kind == TaskProgressKind::PlantAny;
         });
@@ -2621,7 +2640,7 @@ void handle_inventory_craft_completed(
     advance_matching_accepted_tasks(
         invocation,
         quantity,
-        [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+        [&](const TaskTemplateDef& task_template_def, const TaskInstanceEntryState& task) {
             return task_template_def.progress_kind == TaskProgressKind::CraftRecipe &&
                 (task.recipe_id.value == 0U ||
                     task.recipe_id.value == payload.recipe_id);
@@ -2630,7 +2649,7 @@ void handle_inventory_craft_completed(
     advance_matching_accepted_tasks(
         invocation,
         quantity,
-        [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+        [&](const TaskTemplateDef& task_template_def, const TaskInstanceEntryState& task) {
             return task_template_def.progress_kind == TaskProgressKind::CraftItem &&
                 item_matches_task(task, ItemId {payload.output_item_id});
         });
@@ -2638,7 +2657,7 @@ void handle_inventory_craft_completed(
     advance_matching_accepted_tasks(
         invocation,
         quantity,
-        [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+        [&](const TaskTemplateDef& task_template_def, const TaskInstanceEntryState& task) {
             (void)task;
             return task_template_def.progress_kind == TaskProgressKind::CraftAnyItem;
         });
@@ -2651,7 +2670,7 @@ void handle_inventory_item_use_completed(
     advance_matching_accepted_tasks(
         invocation,
         payload.quantity == 0U ? 1U : payload.quantity,
-        [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+        [&](const TaskTemplateDef& task_template_def, const TaskInstanceEntryState& task) {
             return task_template_def.progress_kind == TaskProgressKind::ConsumeItem &&
                 item_matches_task(task, ItemId {payload.item_id});
         });
@@ -2664,7 +2683,7 @@ void handle_site_action_completed(
     advance_matching_accepted_tasks(
         invocation,
         1U,
-        [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+        [&](const TaskTemplateDef& task_template_def, const TaskInstanceEntryState& task) {
             return task_template_def.progress_kind == TaskProgressKind::PerformAction &&
                 action_matches_task(task, action_kind_from_gs1(payload.action_kind));
         });
@@ -2678,7 +2697,7 @@ void handle_site_action_completed(
     advance_matching_accepted_tasks(
         invocation,
         1U,
-        [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+        [&](const TaskTemplateDef& task_template_def, const TaskInstanceEntryState& task) {
             (void)task;
             return task_template_def.progress_kind == TaskProgressKind::ConsumeItem;
         });
@@ -2691,7 +2710,7 @@ void handle_site_device_placed(
     advance_matching_accepted_tasks(
         invocation,
         1U,
-        [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+        [&](const TaskTemplateDef& task_template_def, const TaskInstanceEntryState& task) {
             return task_template_def.progress_kind == TaskProgressKind::BuildStructure &&
                 structure_matches_task(task, StructureId {payload.structure_id});
         });
@@ -2699,7 +2718,7 @@ void handle_site_device_placed(
     advance_matching_accepted_tasks(
         invocation,
         1U,
-        [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+        [&](const TaskTemplateDef& task_template_def, const TaskInstanceEntryState& task) {
             (void)task;
             return task_template_def.progress_kind == TaskProgressKind::BuildAnyStructure;
         });
@@ -2719,7 +2738,7 @@ void handle_money_award_requested(
     advance_matching_accepted_tasks(
         invocation,
         static_cast<std::uint32_t>(payload.delta),
-        [&](const TaskTemplateDef& task_template_def, const TaskInstanceState& task) {
+        [&](const TaskTemplateDef& task_template_def, const TaskInstanceEntryState& task) {
             (void)task;
             return task_template_def.progress_kind == TaskProgressKind::EarnMoney;
         });
@@ -2932,7 +2951,7 @@ void TaskBoardSystem::run(RuntimeInvocation& invocation)
     {
         return;
     }
-    auto& board = task_board_world(invocation).own_task_board();
+    auto board = task_board_world(invocation).own_task_board();
     if (onboarding_chain_effective(task_board_world(invocation).site_id(), board))
     {
         board.minutes_until_next_refresh = 0.0;

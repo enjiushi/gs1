@@ -3,6 +3,7 @@
 #include "campaign/systems/technology_system.h"
 #include "content/defs/item_defs.h"
 #include "site/inventory_storage.h"
+#include "site/systems/site_system_context.h"
 #include "site/site_world_access.h"
 
 #include <algorithm>
@@ -42,7 +43,7 @@ bool worker_pack_included_for_device(const SiteRunState& site_run, TileCoord dev
 }
 
 std::vector<flecs::entity> collect_nearby_source_containers(
-    const InventoryState& inventory,
+    const ConstInventoryStateRef inventory,
     const flecs::world* world,
     TileCoord worker_tile,
     TileCoord device_tile)
@@ -71,7 +72,7 @@ std::vector<flecs::entity> collect_nearby_source_containers(
         }
 
         const auto* storage_state =
-            inventory_storage::find_storage_container_state_by_entity_id(inventory, container.id());
+            inventory_storage::find_storage_container_entry_by_entity_id(inventory, container.id());
         if (storage_state == nullptr ||
             !tile_in_craft_range(device_tile, storage_state->tile_coord))
         {
@@ -123,7 +124,7 @@ std::vector<flecs::entity> collect_nearby_source_containers(
 }
 
 std::vector<std::uint64_t> collect_nearby_item_instance_ids(
-    const InventoryState& inventory,
+    const ConstInventoryStateRef inventory,
     const flecs::world* world,
     TileCoord worker_tile,
     TileCoord device_tile)
@@ -224,8 +225,8 @@ std::vector<std::uint64_t> slice_cached_nearby_items(
 }  // namespace
 
 std::vector<std::uint64_t> nearby_item_instance_ids_for_device(
-    const InventoryState& inventory,
-    flecs::world* world,
+    const ConstInventoryStateRef inventory,
+    const flecs::world* world,
     TileCoord worker_tile,
     const std::vector<CraftDeviceCacheEntryState>& device_caches,
     const std::vector<std::uint64_t>& nearby_items,
@@ -270,8 +271,8 @@ std::vector<std::uint64_t> nearby_item_instance_ids_for_device(
 }
 
 std::uint32_t available_cached_item_quantity(
-    const InventoryState& inventory,
-    flecs::world* world,
+    const ConstInventoryStateRef inventory,
+    const flecs::world* world,
     const std::vector<std::uint64_t>& item_instance_ids,
     ItemId item_id) noexcept
 {
@@ -326,8 +327,8 @@ bool recipe_requires_hammer(const CraftRecipeDef& recipe_def) noexcept
 }
 
 bool can_satisfy_recipe_ingredients(
-    const InventoryState& inventory,
-    flecs::world* world,
+    const ConstInventoryStateRef inventory,
+    const flecs::world* world,
     const std::vector<std::uint64_t>& item_instance_ids,
     const CraftRecipeDef& recipe_def) noexcept
 {
@@ -363,8 +364,8 @@ bool can_satisfy_recipe_ingredients(
 }
 
 bool can_satisfy_recipe_requirements(
-    const InventoryState& inventory,
-    flecs::world* world,
+    const ConstInventoryStateRef inventory,
+    const flecs::world* world,
     const std::vector<std::uint64_t>& item_instance_ids,
     const CraftRecipeDef& recipe_def) noexcept
 {
@@ -399,16 +400,16 @@ bool can_satisfy_recipe_requirements(
 }
 
 bool can_store_output_after_recipe_consumption(
-    const InventoryState& inventory,
-    flecs::world* world,
+    const ConstInventoryStateRef inventory,
+    const flecs::world* world,
     flecs::entity output_container,
     const std::vector<flecs::entity>& source_containers,
     const CraftRecipeDef& recipe_def)
 {
     std::vector<InventorySlot> simulated_slots {};
     const auto slot_count = inventory_storage::slot_count_in_container(
-        const_cast<InventoryState&>(inventory),
-        const_cast<flecs::world*>(world),
+        inventory,
+        world,
         output_container);
     simulated_slots.resize(slot_count);
     for (std::uint32_t slot_index = 0U; slot_index < slot_count; ++slot_index)
@@ -434,8 +435,8 @@ bool can_store_output_after_recipe_consumption(
             {
                 const auto available =
                     inventory_storage::available_item_quantity_in_container(
-                        const_cast<InventoryState&>(inventory),
-                        const_cast<flecs::world*>(world),
+                        inventory,
+                        world,
                         container,
                         ingredient.item_id);
                 remaining = available >= remaining ? 0U : remaining - available;

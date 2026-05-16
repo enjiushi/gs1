@@ -16,6 +16,7 @@
 namespace gs1
 {
 class GameRuntime;
+struct SiteWorldHandle;
 struct SiteMoveDirectionInput;
 
 template <class... Ts>
@@ -38,23 +39,11 @@ struct RuntimeAppStateTag
 {
 };
 
-struct RuntimeCampaignRegionalMapTag
-{
-};
-
 struct RuntimeCampaignFactionProgressTag
 {
 };
 
 struct RuntimeCampaignTechnologyTag
-{
-};
-
-struct RuntimeCampaignLoadoutPlannerTag
-{
-};
-
-struct RuntimeCampaignSitesTag
 {
 };
 
@@ -77,14 +66,15 @@ class RuntimeInvocation final
 public:
     explicit RuntimeInvocation(GameRuntime& runtime) noexcept;
     explicit RuntimeInvocation(GameState& state) noexcept;
-    RuntimeInvocation(GameState& state, StateManager& state_manager) noexcept;
+    RuntimeInvocation(GameState& state, StateManager& state_manager, SiteWorldHandle site_world = {}) noexcept;
     RuntimeInvocation(
         GameState& state,
         StateManager& state_manager,
         float move_direction_x,
         float move_direction_y,
         float move_direction_z,
-        bool move_direction_present) noexcept;
+        bool move_direction_present,
+        SiteWorldHandle site_world = {}) noexcept;
     ~RuntimeInvocation() = default;
 
     RuntimeInvocation(const RuntimeInvocation&) = delete;
@@ -96,6 +86,11 @@ public:
     [[nodiscard]] const GameState* owned_state() const noexcept { return owned_state_; }
     [[nodiscard]] StateManager* state_manager() noexcept { return state_manager_; }
     [[nodiscard]] const StateManager* state_manager() const noexcept { return state_manager_; }
+    void set_site_world(const SiteWorldHandle& site_world) noexcept { site_world_ = site_world; }
+    void set_site_world(std::nullptr_t) noexcept { site_world_ = nullptr; }
+    [[nodiscard]] SiteWorld* site_world() noexcept { return site_world_.get(); }
+    [[nodiscard]] const SiteWorld* site_world() const noexcept { return site_world_.get(); }
+    [[nodiscard]] const SiteWorldHandle& site_world_handle() const noexcept { return site_world_; }
     [[nodiscard]] GameMessageQueue& game_message_queue() noexcept { return *game_messages_; }
     [[nodiscard]] const GameMessageQueue& game_message_queue() const noexcept { return *game_messages_; }
     [[nodiscard]] std::deque<Gs1RuntimeMessage>& runtime_message_queue() noexcept
@@ -106,23 +101,6 @@ public:
     {
         return *runtime_messages_;
     }
-
-    [[nodiscard]] RegionalMapState& compat_campaign_regional_map_state();
-    [[nodiscard]] LoadoutPlannerState& compat_campaign_loadout_planner_state();
-    [[nodiscard]] std::vector<SiteMetaState>& compat_campaign_sites_state();
-
-    [[nodiscard]] InventoryState& compat_inventory_state();
-    [[nodiscard]] ContractorState& compat_contractor_state();
-    [[nodiscard]] TaskBoardState& compat_task_board_state();
-    [[nodiscard]] ModifierState& compat_modifier_state();
-    [[nodiscard]] EconomyState& compat_economy_state();
-    [[nodiscard]] ActionState& compat_action_state();
-    [[nodiscard]] SiteObjectiveState& compat_objective_state();
-    [[nodiscard]] LocalWeatherResolveState& compat_local_weather_resolve_state();
-    [[nodiscard]] PlantWeatherContributionState& compat_plant_weather_contribution_state();
-    [[nodiscard]] DeviceWeatherContributionState& compat_device_weather_contribution_state();
-
-    void flush_compatibility_state();
 
     void push_game_message(const GameMessage& message);
     void push_runtime_message(const Gs1RuntimeMessage& message);
@@ -137,21 +115,9 @@ private:
     Gs1AppState* app_state_ {nullptr};
     double* fixed_step_seconds_ {nullptr};
     RuntimeMoveDirectionSnapshot move_direction_ {};
+    SiteWorldHandle site_world_ {};
     std::deque<Gs1RuntimeMessage>* runtime_messages_ {nullptr};
     GameMessageQueue* game_messages_ {nullptr};
-    std::optional<RegionalMapState> compat_campaign_regional_map_ {};
-    std::optional<LoadoutPlannerState> compat_campaign_loadout_planner_ {};
-    std::optional<std::vector<SiteMetaState>> compat_campaign_sites_ {};
-    std::optional<InventoryState> compat_inventory_ {};
-    std::optional<ContractorState> compat_contractor_ {};
-    std::optional<TaskBoardState> compat_task_board_ {};
-    std::optional<ModifierState> compat_modifier_ {};
-    std::optional<EconomyState> compat_economy_ {};
-    std::optional<ActionState> compat_action_ {};
-    std::optional<SiteObjectiveState> compat_objective_ {};
-    std::optional<LocalWeatherResolveState> compat_local_weather_resolve_ {};
-    std::optional<PlantWeatherContributionState> compat_plant_weather_contribution_ {};
-    std::optional<DeviceWeatherContributionState> compat_device_weather_contribution_ {};
 };
 
 template <class Tag>
@@ -169,12 +135,6 @@ inline decltype(auto) runtime_invocation_state_ref<RuntimeAppStateTag>(RuntimeIn
 }
 
 template <>
-inline decltype(auto) runtime_invocation_state_ref<RuntimeCampaignRegionalMapTag>(RuntimeInvocation& invocation)
-{
-    return invocation.compat_campaign_regional_map_state();
-}
-
-template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeCampaignFactionProgressTag>(
     RuntimeInvocation& invocation)
 {
@@ -185,19 +145,6 @@ template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeCampaignTechnologyTag>(RuntimeInvocation& invocation)
 {
     return invocation.state_manager_->state<StateSetId::CampaignTechnology>(*invocation.owned_state_).value();
-}
-
-template <>
-inline decltype(auto) runtime_invocation_state_ref<RuntimeCampaignLoadoutPlannerTag>(
-    RuntimeInvocation& invocation)
-{
-    return invocation.compat_campaign_loadout_planner_state();
-}
-
-template <>
-inline decltype(auto) runtime_invocation_state_ref<RuntimeCampaignSitesTag>(RuntimeInvocation& invocation)
-{
-    return invocation.compat_campaign_sites_state();
 }
 
 template <>

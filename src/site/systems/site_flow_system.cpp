@@ -14,21 +14,21 @@ constexpr float k_worker_move_speed_tiles_per_second = 3.5f;
 constexpr float k_radians_to_degrees = 57.2957795f;
 constexpr float k_worker_position_epsilon = 0.0001f;
 
-bool has_active_action(const ActionState& action_state) noexcept
+bool has_active_action(ConstActionStateRef action_state) noexcept
 {
-    return action_state.current_action_id.has_value() &&
+    return action_state.has_current_action_id &&
         action_state.action_kind != ActionKind::None;
 }
 
-bool action_waits_for_worker_approach(const ActionState& action_state) noexcept
+bool action_waits_for_worker_approach(ConstActionStateRef action_state) noexcept
 {
     return has_active_action(action_state) &&
         !action_state.awaiting_placement_reservation &&
-        !action_state.started_at_world_minute.has_value() &&
-        action_state.approach_tile.has_value();
+        !action_state.has_started_at_world_minute &&
+        action_state.has_approach_tile;
 }
 
-bool action_blocks_worker_movement(const ActionState& action_state) noexcept
+bool action_blocks_worker_movement(ConstActionStateRef action_state) noexcept
 {
     return has_active_action(action_state) &&
         action_impacts_worker_movement(action_state.action_kind);
@@ -129,7 +129,7 @@ void SiteFlowSystem::run(RuntimeInvocation& invocation)
     }
 
     auto worker = world.read_worker();
-    const auto& action_state = world.read_action();
+    const auto action_state = world.read_action();
     const float movement_step =
         k_worker_move_speed_tiles_per_second * static_cast<float>(fixed_step_seconds);
 
@@ -140,12 +140,12 @@ void SiteFlowSystem::run(RuntimeInvocation& invocation)
     }
     else if (action_blocks_worker_movement(action_state))
     {
-        if (action_state.target_tile.has_value())
+        if (action_state.has_target_tile)
         {
             const float face_dx =
-                static_cast<float>(action_state.target_tile->x) - worker.position.tile_x;
+                static_cast<float>(action_state.target_tile.x) - worker.position.tile_x;
             const float face_dy =
-                static_cast<float>(action_state.target_tile->y) - worker.position.tile_y;
+                static_cast<float>(action_state.target_tile.y) - worker.position.tile_y;
             const float next_facing = facing_degrees_for_direction(face_dx, face_dy);
             if (std::fabs(next_facing - worker.position.facing_degrees) > k_worker_position_epsilon)
             {

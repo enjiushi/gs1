@@ -56,9 +56,10 @@ public:
     {
         return state().runtime_messages;
     }
-    void set_site_world(SiteWorld* site_world) noexcept { site_world_ = site_world; }
-    [[nodiscard]] SiteWorld* site_world() noexcept { return site_world_; }
-    [[nodiscard]] const SiteWorld* site_world() const noexcept { return site_world_; }
+    void set_site_world(const SiteWorldHandle& site_world) noexcept { site_world_ = site_world; }
+    void set_site_world(std::nullptr_t) noexcept { site_world_ = nullptr; }
+    [[nodiscard]] SiteWorld* site_world() noexcept { return site_world_.get(); }
+    [[nodiscard]] const SiteWorld* site_world() const noexcept { return site_world_.get(); }
     [[nodiscard]] Gs1Status handle_message(const GameMessage& message);
     friend struct GameRuntimeProjectionTestAccess;
     friend class RuntimeInvocation;
@@ -92,7 +93,7 @@ private:
 private:
     Gs1RuntimeCreateDesc create_desc_ {};
     std::string adapter_config_json_utf8_ {};
-    SiteWorld* site_world_ {nullptr};
+    SiteWorldHandle site_world_ {};
     StateManager state_manager_ {};
     GameState& state_;
     RuntimeGameStateViewCache state_view_cache_ {};

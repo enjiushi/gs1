@@ -40,52 +40,6 @@ struct TaskTrackedTileState final
     bool populated_by_plant {false};
 };
 
-struct TaskTrackedWorkerState final
-{
-    float health {0.0f};
-    float hydration {0.0f};
-    float nourishment {0.0f};
-    float energy {0.0f};
-    float morale {0.0f};
-    bool valid {false};
-};
-
-struct TaskInstanceState final
-{
-    TaskInstanceId task_instance_id {};
-    TaskTemplateId task_template_id {};
-    FactionId publisher_faction_id {};
-    std::uint32_t task_tier_id {0};
-    std::uint32_t target_amount {0};
-    std::uint32_t required_count {0};
-    std::uint32_t current_progress_amount {0};
-    ItemId item_id {};
-    PlantId plant_id {};
-    RecipeId recipe_id {};
-    StructureId structure_id {};
-    StructureId secondary_structure_id {};
-    StructureId tertiary_structure_id {};
-    ActionKind action_kind {ActionKind::None};
-    float threshold_value {0.0f};
-    float expected_task_hours_in_game {0.0f};
-    float risk_multiplier {0.0f};
-    std::uint32_t direct_cost_cash_points {0U};
-    std::uint32_t time_cost_cash_points {0U};
-    std::uint32_t risk_cost_cash_points {0U};
-    std::uint32_t difficulty_cash_points {0U};
-    std::uint32_t reward_budget_cash_points {0U};
-    std::vector<TaskRewardDraftOption> reward_draft_options {};
-    TaskRuntimeListKind runtime_list_kind {TaskRuntimeListKind::Visible};
-    std::uint32_t chain_id {0};
-    std::uint32_t chain_step_index {0};
-    TaskTemplateId follow_up_task_template_id {};
-    double progress_accumulator {0.0};
-    std::uint8_t requirement_mask {0U};
-    std::uint8_t reserved0[3] {};
-    bool has_chain {false};
-    bool has_follow_up_task_template {false};
-};
-
 struct TaskInstanceEntryState final
 {
     TaskInstanceId task_instance_id {};
@@ -123,6 +77,18 @@ struct TaskInstanceEntryState final
     bool has_follow_up_task_template {false};
 };
 
+struct TaskTrackedWorkerState final
+{
+    float health {0.0f};
+    float hydration {0.0f};
+    float nourishment {0.0f};
+    float energy {0.0f};
+    float morale {0.0f};
+    bool valid {false};
+};
+
+using TaskInstanceState = TaskInstanceEntryState;
+
 struct TaskChainState final
 {
     std::uint32_t task_chain_id {0};
@@ -156,6 +122,7 @@ struct TaskBoardMetaState final
 struct TaskBoardState final
 {
     std::vector<TaskInstanceState> visible_tasks {};
+    std::vector<TaskRewardDraftOption> reward_draft_options {};
     std::vector<TaskTrackedTileState> tracked_tiles {};
     std::vector<TaskInstanceId> accepted_task_ids {};
     std::vector<TaskInstanceId> completed_task_ids {};

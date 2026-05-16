@@ -201,14 +201,14 @@ float normalized_hash(std::uint64_t value) noexcept
 }
 
 bool objective_uses_repeating_weather_waves(
-    const SiteObjectiveState& objective) noexcept
+    ConstSiteObjectiveStateRef objective) noexcept
 {
     return objective.type == SiteObjectiveType::HighwayProtection ||
         objective.type == SiteObjectiveType::CashTargetSurvival;
 }
 
 bool objective_wave_window_is_active(
-    const SiteObjectiveState& objective,
+    ConstSiteObjectiveStateRef objective,
     double world_time_minutes) noexcept
 {
     if (!objective_uses_repeating_weather_waves(objective))
@@ -249,7 +249,7 @@ bool has_active_event(const EventState& event) noexcept
 
 bool onboarding_chain_weather_locked(
     SiteId site_id,
-    const TaskBoardState& board) noexcept
+    const ConstTaskBoardStateRef& board) noexcept
 {
     for (const auto& task : board.visible_tasks)
     {

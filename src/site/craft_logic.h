@@ -11,6 +11,11 @@
 #include <cstdint>
 #include <vector>
 
+namespace gs1
+{
+struct ConstInventoryStateRef;
+}
+
 namespace gs1::craft_logic
 {
 inline constexpr int k_craft_cache_radius_tiles = 5;
@@ -20,7 +25,7 @@ bool worker_pack_included_for_device(TileCoord worker_tile, TileCoord device_til
 bool worker_pack_included_for_device(const SiteRunState& site_run, TileCoord device_tile) noexcept;
 
 std::vector<flecs::entity> collect_nearby_source_containers(
-    const InventoryState& inventory,
+    ConstInventoryStateRef inventory,
     const flecs::world* world,
     TileCoord worker_tile,
     TileCoord device_tile);
@@ -30,7 +35,7 @@ std::vector<flecs::entity> collect_nearby_source_containers(
     TileCoord device_tile);
 
 std::vector<std::uint64_t> collect_nearby_item_instance_ids(
-    const InventoryState& inventory,
+    ConstInventoryStateRef inventory,
     const flecs::world* world,
     TileCoord worker_tile,
     TileCoord device_tile);
@@ -56,8 +61,8 @@ const CraftDeviceCacheState* find_device_cache(
     std::uint64_t device_entity_id) noexcept;
 
 std::vector<std::uint64_t> nearby_item_instance_ids_for_device(
-    const InventoryState& inventory,
-    flecs::world* world,
+    ConstInventoryStateRef inventory,
+    const flecs::world* world,
     TileCoord worker_tile,
     const std::vector<CraftDeviceCacheEntryState>& device_caches,
     const std::vector<std::uint64_t>& nearby_items,
@@ -72,8 +77,8 @@ std::vector<std::uint64_t> nearby_item_instance_ids_for_device(
     TileCoord device_tile);
 
 std::uint32_t available_cached_item_quantity(
-    const InventoryState& inventory,
-    flecs::world* world,
+    ConstInventoryStateRef inventory,
+    const flecs::world* world,
     const std::vector<std::uint64_t>& item_instance_ids,
     ItemId item_id) noexcept;
 
@@ -85,8 +90,8 @@ std::uint32_t available_cached_item_quantity(
 bool recipe_requires_hammer(const CraftRecipeDef& recipe_def) noexcept;
 
 bool can_satisfy_recipe_ingredients(
-    const InventoryState& inventory,
-    flecs::world* world,
+    ConstInventoryStateRef inventory,
+    const flecs::world* world,
     const std::vector<std::uint64_t>& item_instance_ids,
     const CraftRecipeDef& recipe_def) noexcept;
 
@@ -96,8 +101,8 @@ bool can_satisfy_recipe_ingredients(
     const CraftRecipeDef& recipe_def) noexcept;
 
 bool can_satisfy_recipe_requirements(
-    const InventoryState& inventory,
-    flecs::world* world,
+    ConstInventoryStateRef inventory,
+    const flecs::world* world,
     const std::vector<std::uint64_t>& item_instance_ids,
     const CraftRecipeDef& recipe_def) noexcept;
 
@@ -107,8 +112,8 @@ bool can_satisfy_recipe_requirements(
     const CraftRecipeDef& recipe_def) noexcept;
 
 bool can_store_output_after_recipe_consumption(
-    const InventoryState& inventory,
-    flecs::world* world,
+    ConstInventoryStateRef inventory,
+    const flecs::world* world,
     flecs::entity output_container,
     const std::vector<flecs::entity>& source_containers,
     const CraftRecipeDef& recipe_def);

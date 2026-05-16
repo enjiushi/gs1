@@ -44,7 +44,6 @@ struct system_state_tags<ModifierSystem>
     using type = type_list<
         RuntimeCampaignFactionProgressTag,
         RuntimeCampaignTechnologyTag,
-        RuntimeCampaignLoadoutPlannerTag,
         RuntimeFixedStepSecondsTag>;
 };
 }  // namespace gs1

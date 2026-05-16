@@ -478,51 +478,27 @@ inline void write_campaign_state_to_state_sets(
     }
     if (storage_containers.has_value())
     {
-        inventory.storage_containers.reserve(storage_containers->size());
-        for (const auto& entry : *storage_containers)
-        {
-            StorageContainerState container {};
-            container.storage_id = entry.storage_id;
-            container.container_entity_id = entry.container_entity_id;
-            container.owner_device_entity_id = entry.owner_device_entity_id;
-            container.container_kind = entry.container_kind;
-            container.tile_coord = entry.tile_coord;
-            container.flags = entry.flags;
-            if (storage_slot_item_ids.has_value() &&
-                entry.slot_item_offset <= storage_slot_item_ids->size())
-            {
-                const auto offset = static_cast<std::size_t>(entry.slot_item_offset);
-                const auto count = static_cast<std::size_t>(entry.slot_item_count);
-                const auto safe_count = std::min(count, storage_slot_item_ids->size() - offset);
-                container.slot_item_instance_ids.insert(
-                    container.slot_item_instance_ids.end(),
-                    storage_slot_item_ids->begin() + static_cast<std::ptrdiff_t>(offset),
-                    storage_slot_item_ids->begin() + static_cast<std::ptrdiff_t>(offset + safe_count));
-            }
-            inventory.storage_containers.push_back(std::move(container));
-        }
+        inventory.storage_containers = *storage_containers;
+    }
+    if (storage_slot_item_ids.has_value())
+    {
+        inventory.storage_slot_item_instance_ids = *storage_slot_item_ids;
     }
     if (pending_deliveries.has_value())
     {
-        inventory.pending_delivery_queue.reserve(pending_deliveries->size());
+        inventory.pending_deliveries.reserve(pending_deliveries->size());
         for (const auto& entry : *pending_deliveries)
         {
-            PendingDelivery delivery {};
-            delivery.delivery_id = entry.delivery_id;
-            delivery.state = entry.state;
-            if (pending_item_stacks.has_value() &&
-                entry.item_stack_offset <= pending_item_stacks->size())
-            {
-                const auto offset = static_cast<std::size_t>(entry.item_stack_offset);
-                const auto count = static_cast<std::size_t>(entry.item_stack_count);
-                const auto safe_count = std::min(count, pending_item_stacks->size() - offset);
-                delivery.item_stacks.insert(
-                    delivery.item_stacks.end(),
-                    pending_item_stacks->begin() + static_cast<std::ptrdiff_t>(offset),
-                    pending_item_stacks->begin() + static_cast<std::ptrdiff_t>(offset + safe_count));
-            }
-            inventory.pending_delivery_queue.push_back(std::move(delivery));
+            inventory.pending_deliveries.push_back(entry);
         }
+    }
+    if (pending_item_stacks.has_value())
+    {
+        inventory.pending_delivery_item_stacks.reserve(pending_item_stacks->size());
+        inventory.pending_delivery_item_stacks.insert(
+            inventory.pending_delivery_item_stacks.end(),
+            pending_item_stacks->begin(),
+            pending_item_stacks->end());
     }
 
     return inventory;
@@ -542,48 +518,20 @@ inline void write_inventory_state_to_state_sets(
         inventory.item_quantity_revision};
     state_manager.state<StateSetId::SiteInventoryWorkerPackSlots>(state) =
         inventory.worker_pack_slots;
-
-    std::vector<StorageContainerEntryState> storage_entries {};
-    std::vector<std::uint64_t> slot_item_ids {};
-    storage_entries.reserve(inventory.storage_containers.size());
-    for (const auto& container : inventory.storage_containers)
-    {
-        const auto offset = static_cast<std::uint32_t>(slot_item_ids.size());
-        slot_item_ids.insert(
-            slot_item_ids.end(),
-            container.slot_item_instance_ids.begin(),
-            container.slot_item_instance_ids.end());
-        storage_entries.push_back(StorageContainerEntryState {
-            container.storage_id,
-            container.container_entity_id,
-            container.owner_device_entity_id,
-            container.container_kind,
-            container.tile_coord,
-            container.flags,
-            offset,
-            static_cast<std::uint32_t>(container.slot_item_instance_ids.size())});
-    }
     state_manager.state<StateSetId::SiteInventoryStorageContainers>(state) =
-        std::move(storage_entries);
+        inventory.storage_containers;
     state_manager.state<StateSetId::SiteInventoryStorageSlotItemIds>(state) =
-        std::move(slot_item_ids);
+        inventory.storage_slot_item_instance_ids;
 
     std::vector<PendingDeliveryEntryState> delivery_entries {};
     std::vector<InventorySlot> delivery_item_stacks {};
-    delivery_entries.reserve(inventory.pending_delivery_queue.size());
-    for (const auto& delivery : inventory.pending_delivery_queue)
+    delivery_entries.reserve(inventory.pending_deliveries.size());
+    delivery_item_stacks.reserve(inventory.pending_delivery_item_stacks.size());
+    for (const auto& delivery : inventory.pending_deliveries)
     {
-        const auto offset = static_cast<std::uint32_t>(delivery_item_stacks.size());
-        delivery_item_stacks.insert(
-            delivery_item_stacks.end(),
-            delivery.item_stacks.begin(),
-            delivery.item_stacks.end());
-        delivery_entries.push_back(PendingDeliveryEntryState {
-            delivery.delivery_id,
-            offset,
-            static_cast<std::uint32_t>(delivery.item_stacks.size()),
-            delivery.state});
+        delivery_entries.push_back(delivery);
     }
+    delivery_item_stacks = inventory.pending_delivery_item_stacks;
     state_manager.state<StateSetId::SiteInventoryPendingDeliveries>(state) =
         std::move(delivery_entries);
     state_manager.state<StateSetId::SiteInventoryPendingDeliveryItemStacks>(state) =
@@ -646,6 +594,7 @@ inline void write_contractor_state_to_state_sets(
     const StateManager& state_manager)
 {
     TaskBoardState board {};
+    std::vector<TaskRewardDraftOption> reward_entries {};
 
     const auto& meta = state_manager.query<StateSetId::SiteTaskBoardMeta>(state);
     const auto& visible_tasks =
@@ -745,14 +694,18 @@ inline void write_contractor_state_to_state_sets(
                 const auto offset = static_cast<std::size_t>(entry.reward_draft_option_offset);
                 const auto count = static_cast<std::size_t>(entry.reward_draft_option_count);
                 const auto safe_count = std::min(count, reward_options->size() - offset);
-                task.reward_draft_options.insert(
-                    task.reward_draft_options.end(),
+                task.reward_draft_option_offset = static_cast<std::uint32_t>(reward_entries.size());
+                task.reward_draft_option_count = static_cast<std::uint32_t>(safe_count);
+                reward_entries.insert(
+                    reward_entries.end(),
                     reward_options->begin() + static_cast<std::ptrdiff_t>(offset),
                     reward_options->begin() + static_cast<std::ptrdiff_t>(offset + safe_count));
             }
             board.visible_tasks.push_back(std::move(task));
         }
     }
+
+    board.reward_draft_options = std::move(reward_entries);
 
     return board;
 }
@@ -798,13 +751,10 @@ inline void write_task_board_state_to_state_sets(
     std::vector<TaskInstanceEntryState> task_entries {};
     std::vector<TaskRewardDraftOption> reward_entries {};
     task_entries.reserve(board.visible_tasks.size());
+    reward_entries.reserve(board.reward_draft_options.size());
     for (const auto& task : board.visible_tasks)
     {
         const auto offset = static_cast<std::uint32_t>(reward_entries.size());
-        reward_entries.insert(
-            reward_entries.end(),
-            task.reward_draft_options.begin(),
-            task.reward_draft_options.end());
         TaskInstanceEntryState entry {};
         entry.task_instance_id = task.task_instance_id;
         entry.task_template_id = task.task_template_id;
@@ -837,8 +787,7 @@ inline void write_task_board_state_to_state_sets(
         entry.has_chain = task.has_chain;
         entry.has_follow_up_task_template = task.has_follow_up_task_template;
         entry.reward_draft_option_offset = offset;
-        entry.reward_draft_option_count =
-            static_cast<std::uint32_t>(task.reward_draft_options.size());
+        entry.reward_draft_option_count = task.reward_draft_option_count;
         task_entries.push_back(entry);
     }
     state_manager.state<StateSetId::SiteTaskBoardVisibleTasks>(state) = std::move(task_entries);
@@ -1299,7 +1248,7 @@ inline void write_device_weather_contribution_state_to_state_sets(
 [[nodiscard]] inline SiteRunState assemble_site_run_state_from_state_sets(
     const GameState& state,
     const StateManager& state_manager,
-    const SiteWorld* site_world)
+    const SiteWorldHandle& site_world)
 {
     SiteRunState site_run {};
 
@@ -1323,7 +1272,7 @@ inline void write_device_weather_contribution_state_to_state_sets(
     site_run.site_attempt_seed = meta->site_attempt_seed;
     site_run.run_status = meta->run_status;
     site_run.result_newly_revealed_site_count = meta->result_newly_revealed_site_count;
-    site_run.site_world = const_cast<SiteWorld*>(site_world);
+    site_run.site_world = site_world;
     if (clock.has_value())
     {
         site_run.clock = *clock;

@@ -278,7 +278,7 @@ void rebuild_site_view(
     for (const auto& storage : inventory.storage_containers)
     {
         const std::uint32_t slot_offset = static_cast<std::uint32_t>(cache.inventory_slots.size());
-        for (std::size_t slot_index = 0; slot_index < storage.slot_item_instance_ids.size(); ++slot_index)
+        for (std::uint32_t slot_index = 0U; slot_index < storage.slot_item_count; ++slot_index)
         {
             const bool worker_pack_storage = storage.storage_id == inventory.worker_pack_storage_id;
             const InventorySlot* source_slot =
@@ -307,7 +307,12 @@ void rebuild_site_view(
             }
             else
             {
-                const auto instance_id = storage.slot_item_instance_ids[slot_index];
+                const auto flat_slot_index =
+                    static_cast<std::size_t>(storage.slot_item_offset + slot_index);
+                const auto instance_id =
+                    flat_slot_index < inventory.storage_slot_item_instance_ids.size()
+                    ? inventory.storage_slot_item_instance_ids[flat_slot_index]
+                    : 0U;
                 slot_view.occupied = instance_id != 0U ? 1U : 0U;
                 slot_view.item_instance_id = static_cast<std::uint32_t>(instance_id);
             }
@@ -324,14 +329,16 @@ void rebuild_site_view(
             storage.tile_coord.y,
             storage.flags,
             slot_offset,
-            static_cast<std::uint32_t>(storage.slot_item_instance_ids.size())});
+            storage.slot_item_count});
     }
 
     for (const auto& task : task_board.visible_tasks)
     {
         const std::uint32_t reward_offset = static_cast<std::uint32_t>(cache.task_reward_draft_options.size());
-        for (const auto& reward : task.reward_draft_options)
+        for (std::uint32_t index = 0U; index < task.reward_draft_option_count; ++index)
         {
+            const auto& reward = task_board.reward_draft_options[
+                static_cast<std::size_t>(task.reward_draft_option_offset + index)];
             cache.task_reward_draft_options.push_back(Gs1TaskRewardDraftOptionView {
                 id_value(reward.reward_candidate_id),
                 reward.selected ? 1U : 0U,
@@ -365,7 +372,7 @@ void rebuild_site_view(
             task.difficulty_cash_points,
             task.reward_budget_cash_points,
             reward_offset,
-            static_cast<std::uint32_t>(task.reward_draft_options.size()),
+            task.reward_draft_option_count,
             task.chain_id,
             task.chain_step_index,
             id_value(task.follow_up_task_template_id),

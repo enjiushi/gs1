@@ -77,7 +77,7 @@ bool apply_site_cash_delta(
         return false;
     }
 
-    auto& economy = economy_phone_world(invocation).own_economy();
+    auto economy = economy_phone_world(invocation).own_economy();
     economy.current_cash = static_cast<std::int32_t>(
         static_cast<std::int64_t>(economy.current_cash) + delta);
     return true;
@@ -110,7 +110,7 @@ std::uint32_t make_sell_listing_id(ItemId item_id) noexcept
     return k_sell_listing_id_base + item_id.value;
 }
 
-PhoneListingState* find_listing(EconomyState& economy, std::uint32_t listing_id) noexcept
+PhoneListingState* find_listing(EconomyStateRef economy, std::uint32_t listing_id) noexcept
 {
     for (auto& listing : economy.available_phone_listings)
     {
@@ -122,7 +122,7 @@ PhoneListingState* find_listing(EconomyState& economy, std::uint32_t listing_id)
     return nullptr;
 }
 
-PhoneListingState* find_sell_listing_for_item(EconomyState& economy, std::uint32_t item_id) noexcept
+PhoneListingState* find_sell_listing_for_item(EconomyStateRef economy, std::uint32_t item_id) noexcept
 {
     for (auto& listing : economy.available_phone_listings)
     {
@@ -135,7 +135,7 @@ PhoneListingState* find_sell_listing_for_item(EconomyState& economy, std::uint32
     return nullptr;
 }
 
-PhoneListingState* find_unlockable_listing(EconomyState& economy, std::uint32_t unlockable_id) noexcept
+PhoneListingState* find_unlockable_listing(EconomyStateRef economy, std::uint32_t unlockable_id) noexcept
 {
     for (auto& listing : economy.available_phone_listings)
     {
@@ -222,7 +222,7 @@ bool phone_buy_stock_item_available(
 }
 
 PhoneListingState* find_generated_stock_listing(
-    EconomyState& economy,
+    EconomyStateRef economy,
     std::uint32_t listing_id) noexcept
 {
     for (auto& listing : economy.available_phone_listings)
@@ -247,10 +247,10 @@ std::vector<std::uint64_t> phone_item_instance_ids(
     }
 
     return inventory_storage::collect_item_instance_ids_in_containers(
-        const_cast<InventoryState&>(inventory),
+        inventory,
         world.ecs_world_ptr(),
         inventory_storage::collect_all_storage_containers(
-            const_cast<InventoryState&>(inventory),
+            inventory,
             world.ecs_world_ptr(),
             true));
 }
@@ -276,12 +276,9 @@ std::uint32_t available_global_item_quantity(
     return available_quantity > reserved_quantity ? available_quantity - reserved_quantity : 0U;
 }
 
-std::uint64_t action_reservation_signature(const ActionState& action_state) noexcept
+std::uint64_t action_reservation_signature(ConstActionStateRef action_state) noexcept
 {
-    std::uint64_t signature =
-        action_state.current_action_id.has_value()
-            ? static_cast<std::uint64_t>(action_state.current_action_id->value)
-            : 0ULL;
+    std::uint64_t signature = static_cast<std::uint64_t>(action_state.current_action_id.value);
     signature ^= static_cast<std::uint64_t>(action_state.reserved_input_item_stacks.size()) << 32U;
     for (const auto& reserved_stack : action_state.reserved_input_item_stacks)
     {
@@ -452,7 +449,7 @@ void refresh_generated_buy_stock_listings(
     RuntimeInvocation& invocation,
     bool force_dirty = false)
 {
-    auto& economy = economy_phone_world(invocation).own_economy();
+    auto economy = economy_phone_world(invocation).own_economy();
     const auto* site_content = find_prototype_site_content(economy_phone_world(invocation).site_id());
     const auto next_generation = economy.phone_buy_stock_refresh_generation + 1U;
 
@@ -507,7 +504,7 @@ void refresh_dynamic_sell_listings(
     RuntimeInvocation& invocation,
     bool force_dirty = false)
 {
-    auto& economy = economy_phone_world(invocation).own_economy();
+    auto economy = economy_phone_world(invocation).own_economy();
     const auto& inventory = economy_phone_world(invocation).read_inventory();
     const auto reservation_signature = action_reservation_signature(economy_phone_world(invocation).read_action());
     const bool revisions_unchanged =
@@ -701,7 +698,7 @@ Gs1Status process_unlockable_purchase(
     std::uint32_t unlockable_id,
     std::int32_t price)
 {
-    auto& economy = economy_phone_world(invocation).own_economy();
+    auto economy = economy_phone_world(invocation).own_economy();
     if (price < 0 || !money_delta_fits(-static_cast<std::int64_t>(price)))
     {
         return GS1_STATUS_INVALID_STATE;
@@ -734,7 +731,7 @@ void reveal_unlockable_for_site(
         return;
     }
 
-    auto& economy = economy_phone_world(invocation).own_economy();
+    auto economy = economy_phone_world(invocation).own_economy();
     if (!contains_unlockable(economy.revealed_site_unlockable_ids, unlockable_id))
     {
         economy.revealed_site_unlockable_ids.push_back(unlockable_id);
@@ -792,7 +789,7 @@ void append_seed_phone_listing(
 
 void seed_site_economy(RuntimeInvocation& invocation, std::uint32_t site_id)
 {
-    auto& economy = economy_phone_world(invocation).own_economy();
+    auto economy = economy_phone_world(invocation).own_economy();
     const auto* site_content = find_prototype_site_content(SiteId {site_id});
     economy.phone_listing_source_membership_revision = 0U;
     economy.phone_listing_source_quantity_revision = 0U;

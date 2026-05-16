@@ -4,6 +4,7 @@
 #include "content/defs/item_defs.h"
 #include "content/prototype_content.h"
 #include "runtime/game_runtime.h"
+#include "runtime/runtime_split_state_compat.h"
 
 #include <algorithm>
 
@@ -126,12 +127,6 @@ Gs1Status process_loadout_planner_message(
     RuntimeInvocation& invocation,
     const GameMessage& message);
 
-template <>
-struct system_state_tags<LoadoutPlannerSystem>
-{
-    using type = type_list<RuntimeCampaignLoadoutPlannerTag, RuntimeCampaignSitesTag>;
-};
-
 void LoadoutPlannerSystem::initialize_campaign_state(CampaignState& campaign)
 {
     const auto& content = get_prototype_campaign_content();
@@ -211,8 +206,26 @@ Gs1Status process_loadout_planner_message(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    auto& planner = runtime_invocation_state_ref<RuntimeCampaignLoadoutPlannerTag>(invocation);
-    auto& sites = runtime_invocation_state_ref<RuntimeCampaignSitesTag>(invocation);
+    auto& planner =
+        invocation.state_manager()->state<StateSetId::CampaignLoadoutPlannerMeta>(*invocation.owned_state())
+            .value();
+    auto& baseline_items = invocation.state_manager()
+                               ->state<StateSetId::CampaignLoadoutPlannerBaselineItems>(
+                                   *invocation.owned_state())
+                               .value();
+    auto& available_support_items = invocation.state_manager()
+                                        ->state<StateSetId::CampaignLoadoutPlannerAvailableSupportItems>(
+                                            *invocation.owned_state())
+                                        .value();
+    auto& selected_slots = invocation.state_manager()
+                               ->state<StateSetId::CampaignLoadoutPlannerSelectedSlots>(
+                                   *invocation.owned_state())
+                               .value();
+    auto& nearby_aura_ids = invocation.state_manager()
+                                ->state<StateSetId::CampaignLoadoutPlannerNearbyAuraModifiers>(
+                                    *invocation.owned_state())
+                                .value();
+    auto sites = assemble_sites_state_from_state_sets(*invocation.owned_state(), *invocation.state_manager());
 
     std::uint32_t selected_site_id = 0U;
     switch (message.type)
@@ -235,14 +248,38 @@ Gs1Status process_loadout_planner_message(
 
     if (selected_site_id == 0U)
     {
-        planner.selected_target_site_id.reset();
+        planner.has_selected_target_site_id = false;
+        planner.selected_target_site_id = SiteId {};
     }
     else
     {
+        planner.has_selected_target_site_id = true;
         planner.selected_target_site_id = SiteId {selected_site_id};
     }
 
-    rebuild_selected_loadout(planner, sites);
+    LoadoutPlannerState planner_state {};
+    if (planner.has_selected_target_site_id)
+    {
+        planner_state.selected_target_site_id = planner.selected_target_site_id;
+    }
+    planner_state.baseline_deployment_items = baseline_items;
+    planner_state.available_exported_support_items = available_support_items;
+    planner_state.selected_loadout_slots = selected_slots;
+    planner_state.active_nearby_aura_modifier_ids = nearby_aura_ids;
+    planner_state.support_quota_per_contributor = planner.support_quota_per_contributor;
+    planner_state.support_quota = planner.support_quota;
+
+    rebuild_selected_loadout(planner_state, sites);
+
+    planner = LoadoutPlannerMetaState {
+        planner_state.selected_target_site_id.value_or(SiteId {}),
+        planner_state.support_quota_per_contributor,
+        planner_state.support_quota,
+        planner_state.selected_target_site_id.has_value()};
+    baseline_items = std::move(planner_state.baseline_deployment_items);
+    available_support_items = std::move(planner_state.available_exported_support_items);
+    selected_slots = std::move(planner_state.selected_loadout_slots);
+    nearby_aura_ids = std::move(planner_state.active_nearby_aura_modifier_ids);
     return GS1_STATUS_OK;
 }
 }  // namespace gs1

@@ -152,7 +152,8 @@ PipelineTimings run_local_weather_pipeline(
     {
         return gs1::RuntimeInvocation {
             state,
-            state_manager};
+            state_manager,
+            site_run.site_world};
     };
 
     gs1::PlantWeatherContributionSystem plant_system {};
@@ -172,7 +173,7 @@ PipelineTimings run_local_weather_pipeline(
     resolve_system.run(resolve_invocation);
     const auto total_ended = std::chrono::steady_clock::now();
 
-    site_run = gs1::assemble_site_run_state_from_state_sets(state, state_manager, nullptr);
+    site_run = gs1::assemble_site_run_state_from_state_sets(state, state_manager, site_run.site_world);
 
     return PipelineTimings {
         std::chrono::duration<double, std::milli>(device_started - plant_started).count(),

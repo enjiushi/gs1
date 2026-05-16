@@ -16,6 +16,9 @@
 namespace gs1
 {
 struct CampaignState;
+struct ConstInventoryStateRef;
+struct ConstTaskBoardStateRef;
+struct ConstActionStateRef;
 
 enum class SiteComponent : std::uint8_t
 {
@@ -254,15 +257,331 @@ struct SiteMoveDirectionInput final
     bool present {false};
 };
 
+struct ModifierStateRef final
+{
+    std::vector<ModifierId>& active_nearby_aura_modifier_ids;
+    std::vector<ActiveSiteModifierState>& active_site_modifiers;
+    ModifierChannelTotals& resolved_channel_totals;
+    TerrainFactorModifierState& resolved_terrain_factor_modifiers;
+    ActionCostModifierState& resolved_action_cost_modifiers;
+    HarvestOutputModifierState& resolved_harvest_output_modifiers;
+    VillageTechnologyEffectState& resolved_village_technology_effects;
+    BureauTechnologyEffectState& resolved_bureau_technology_effects;
+};
+
+struct ConstModifierStateRef final
+{
+    const std::vector<ModifierId>& active_nearby_aura_modifier_ids;
+    const std::vector<ActiveSiteModifierState>& active_site_modifiers;
+    const ModifierChannelTotals& resolved_channel_totals;
+    const TerrainFactorModifierState& resolved_terrain_factor_modifiers;
+    const ActionCostModifierState& resolved_action_cost_modifiers;
+    const HarvestOutputModifierState& resolved_harvest_output_modifiers;
+    const VillageTechnologyEffectState& resolved_village_technology_effects;
+    const BureauTechnologyEffectState& resolved_bureau_technology_effects;
+};
+
+struct EconomyStateRef final
+{
+    std::int32_t& current_cash;
+    std::int32_t& phone_delivery_fee;
+    std::uint16_t& phone_delivery_minutes;
+    std::uint64_t& phone_listing_source_membership_revision;
+    std::uint64_t& phone_listing_source_quantity_revision;
+    std::uint64_t& phone_listing_source_action_reservation_signature;
+    std::uint32_t& phone_buy_stock_refresh_generation;
+    std::vector<std::uint32_t>& revealed_site_unlockable_ids;
+    std::vector<std::uint32_t>& direct_purchase_unlockable_ids;
+    std::vector<PhoneListingState>& available_phone_listings;
+};
+
+struct ConstEconomyStateRef final
+{
+    const std::int32_t& current_cash;
+    const std::int32_t& phone_delivery_fee;
+    const std::uint16_t& phone_delivery_minutes;
+    const std::uint64_t& phone_listing_source_membership_revision;
+    const std::uint64_t& phone_listing_source_quantity_revision;
+    const std::uint64_t& phone_listing_source_action_reservation_signature;
+    const std::uint32_t& phone_buy_stock_refresh_generation;
+    const std::vector<std::uint32_t>& revealed_site_unlockable_ids;
+    const std::vector<std::uint32_t>& direct_purchase_unlockable_ids;
+    const std::vector<PhoneListingState>& available_phone_listings;
+};
+
+struct InventoryStateRef final
+{
+    std::uint32_t& next_storage_id;
+    std::uint32_t& worker_pack_slot_count;
+    std::uint32_t& worker_pack_storage_id;
+    std::uint64_t& worker_pack_container_entity_id;
+    std::uint64_t& item_membership_revision;
+    std::uint64_t& item_quantity_revision;
+    std::vector<StorageContainerEntryState>& storage_containers;
+    std::vector<std::uint64_t>& storage_slot_item_instance_ids;
+    std::vector<InventorySlot>& worker_pack_slots;
+    std::vector<PendingDeliveryEntryState>& pending_deliveries;
+    std::vector<InventorySlot>& pending_delivery_item_stacks;
+
+    [[nodiscard]] operator ConstInventoryStateRef() const noexcept;
+};
+
+struct ConstInventoryStateRef final
+{
+    const std::uint32_t& next_storage_id;
+    const std::uint32_t& worker_pack_slot_count;
+    const std::uint32_t& worker_pack_storage_id;
+    const std::uint64_t& worker_pack_container_entity_id;
+    const std::uint64_t& item_membership_revision;
+    const std::uint64_t& item_quantity_revision;
+    const std::vector<StorageContainerEntryState>& storage_containers;
+    const std::vector<std::uint64_t>& storage_slot_item_instance_ids;
+    const std::vector<InventorySlot>& worker_pack_slots;
+    const std::vector<PendingDeliveryEntryState>& pending_deliveries;
+    const std::vector<InventorySlot>& pending_delivery_item_stacks;
+};
+
+struct TaskBoardStateRef final
+{
+    std::vector<TaskInstanceEntryState>& visible_tasks;
+    std::vector<TaskRewardDraftOption>& reward_draft_options;
+    std::vector<TaskTrackedTileState>& tracked_tiles;
+    std::vector<TaskInstanceId>& accepted_task_ids;
+    std::vector<TaskInstanceId>& completed_task_ids;
+    std::vector<TaskInstanceId>& claimed_task_ids;
+    std::uint32_t& task_pool_size;
+    std::uint32_t& accepted_task_cap;
+    std::uint32_t& tracked_tile_width;
+    std::uint32_t& tracked_tile_height;
+    std::uint32_t& fully_grown_tile_count;
+    std::uint32_t& site_completion_tile_threshold;
+    std::uint32_t& tracked_living_plant_count;
+    std::uint32_t& refresh_generation;
+    double& minutes_until_next_refresh;
+    TaskTrackedWorkerState& worker;
+    std::uint32_t& active_chain_task_chain_id;
+    std::uint32_t& active_chain_current_accepted_step_index;
+    TaskInstanceId& active_chain_surfaced_follow_up_task_instance_id;
+    bool& all_tracked_living_plants_stable;
+    bool& has_active_chain_state;
+    bool& active_chain_has_current_accepted_step_index;
+    bool& active_chain_has_surfaced_follow_up_task_instance_id;
+    bool& active_chain_is_broken;
+
+    [[nodiscard]] operator ConstTaskBoardStateRef() const noexcept;
+};
+
+struct ConstTaskBoardStateRef final
+{
+    const std::vector<TaskInstanceEntryState>& visible_tasks;
+    const std::vector<TaskRewardDraftOption>& reward_draft_options;
+    const std::vector<TaskTrackedTileState>& tracked_tiles;
+    const std::vector<TaskInstanceId>& accepted_task_ids;
+    const std::vector<TaskInstanceId>& completed_task_ids;
+    const std::vector<TaskInstanceId>& claimed_task_ids;
+    const std::uint32_t& task_pool_size;
+    const std::uint32_t& accepted_task_cap;
+    const std::uint32_t& tracked_tile_width;
+    const std::uint32_t& tracked_tile_height;
+    const std::uint32_t& fully_grown_tile_count;
+    const std::uint32_t& site_completion_tile_threshold;
+    const std::uint32_t& tracked_living_plant_count;
+    const std::uint32_t& refresh_generation;
+    const double& minutes_until_next_refresh;
+    const TaskTrackedWorkerState& worker;
+    const std::uint32_t& active_chain_task_chain_id;
+    const std::uint32_t& active_chain_current_accepted_step_index;
+    const TaskInstanceId& active_chain_surfaced_follow_up_task_instance_id;
+    const bool& all_tracked_living_plants_stable;
+    const bool& has_active_chain_state;
+    const bool& active_chain_has_current_accepted_step_index;
+    const bool& active_chain_has_surfaced_follow_up_task_instance_id;
+    const bool& active_chain_is_broken;
+};
+
+struct ActionStateRef final
+{
+    RuntimeActionId& current_action_id;
+    ActionKind& action_kind;
+    TileCoord& target_tile;
+    TileCoord& approach_tile;
+    std::uint32_t& primary_subject_id;
+    std::uint32_t& secondary_subject_id;
+    std::uint32_t& item_id;
+    std::uint32_t& placement_reservation_token;
+    std::uint16_t& quantity;
+    std::uint8_t& request_flags;
+    bool& awaiting_placement_reservation;
+    bool& reactivate_placement_mode_on_completion;
+    double& total_action_minutes;
+    double& remaining_action_minutes;
+    DeferredWorkerMeterDelta& deferred_meter_delta;
+    float& resolved_harvest_density;
+    bool& resolved_harvest_outputs_valid;
+    double& started_at_world_minute;
+    PlacementModeMetaState& placement_mode;
+    bool& has_current_action_id;
+    bool& has_target_tile;
+    bool& has_approach_tile;
+    bool& has_started_at_world_minute;
+    std::vector<ReservedItemStack>& reserved_input_item_stacks;
+    std::vector<ResolvedHarvestOutputStack>& resolved_harvest_outputs;
+
+    [[nodiscard]] operator ConstActionStateRef() const noexcept;
+};
+
+struct ConstActionStateRef final
+{
+    const RuntimeActionId& current_action_id;
+    const ActionKind& action_kind;
+    const TileCoord& target_tile;
+    const TileCoord& approach_tile;
+    const std::uint32_t& primary_subject_id;
+    const std::uint32_t& secondary_subject_id;
+    const std::uint32_t& item_id;
+    const std::uint32_t& placement_reservation_token;
+    const std::uint16_t& quantity;
+    const std::uint8_t& request_flags;
+    const bool& awaiting_placement_reservation;
+    const bool& reactivate_placement_mode_on_completion;
+    const double& total_action_minutes;
+    const double& remaining_action_minutes;
+    const DeferredWorkerMeterDelta& deferred_meter_delta;
+    const float& resolved_harvest_density;
+    const bool& resolved_harvest_outputs_valid;
+    const double& started_at_world_minute;
+    const PlacementModeMetaState& placement_mode;
+    const bool& has_current_action_id;
+    const bool& has_target_tile;
+    const bool& has_approach_tile;
+    const bool& has_started_at_world_minute;
+    const std::vector<ReservedItemStack>& reserved_input_item_stacks;
+    const std::vector<ResolvedHarvestOutputStack>& resolved_harvest_outputs;
+};
+
+inline InventoryStateRef::operator ConstInventoryStateRef() const noexcept
+{
+    return ConstInventoryStateRef {
+        next_storage_id,
+        worker_pack_slot_count,
+        worker_pack_storage_id,
+        worker_pack_container_entity_id,
+        item_membership_revision,
+        item_quantity_revision,
+        storage_containers,
+        storage_slot_item_instance_ids,
+        worker_pack_slots,
+        pending_deliveries,
+        pending_delivery_item_stacks};
+}
+
+inline TaskBoardStateRef::operator ConstTaskBoardStateRef() const noexcept
+{
+    return ConstTaskBoardStateRef {
+        visible_tasks,
+        reward_draft_options,
+        tracked_tiles,
+        accepted_task_ids,
+        completed_task_ids,
+        claimed_task_ids,
+        task_pool_size,
+        accepted_task_cap,
+        tracked_tile_width,
+        tracked_tile_height,
+        fully_grown_tile_count,
+        site_completion_tile_threshold,
+        tracked_living_plant_count,
+        refresh_generation,
+        minutes_until_next_refresh,
+        worker,
+        active_chain_task_chain_id,
+        active_chain_current_accepted_step_index,
+        active_chain_surfaced_follow_up_task_instance_id,
+        all_tracked_living_plants_stable,
+        has_active_chain_state,
+        active_chain_has_current_accepted_step_index,
+        active_chain_has_surfaced_follow_up_task_instance_id,
+        active_chain_is_broken};
+}
+
+inline ActionStateRef::operator ConstActionStateRef() const noexcept
+{
+    return ConstActionStateRef {
+        current_action_id,
+        action_kind,
+        target_tile,
+        approach_tile,
+        primary_subject_id,
+        secondary_subject_id,
+        item_id,
+        placement_reservation_token,
+        quantity,
+        request_flags,
+        awaiting_placement_reservation,
+        reactivate_placement_mode_on_completion,
+        total_action_minutes,
+        remaining_action_minutes,
+        deferred_meter_delta,
+        resolved_harvest_density,
+        resolved_harvest_outputs_valid,
+        started_at_world_minute,
+        placement_mode,
+        has_current_action_id,
+        has_target_tile,
+        has_approach_tile,
+        has_started_at_world_minute,
+        reserved_input_item_stacks,
+        resolved_harvest_outputs};
+}
+
+struct SiteObjectiveStateRef final
+{
+    SiteObjectiveType& type;
+    double& time_limit_minutes;
+    double& completion_hold_minutes;
+    double& completion_hold_progress_minutes;
+    double& paused_main_timer_minutes;
+    double& last_evaluated_world_time_minutes;
+    std::int32_t& target_cash_points;
+    SiteObjectiveTargetEdge& target_edge;
+    std::uint8_t& target_band_width;
+    float& highway_max_average_sand_cover;
+    float& last_target_average_sand_level;
+    bool& has_hold_baseline;
+    std::vector<std::uint32_t>& target_tile_indices;
+    std::vector<std::uint8_t>& target_tile_mask;
+    std::vector<std::uint32_t>& connection_start_tile_indices;
+    std::vector<std::uint8_t>& connection_start_tile_mask;
+    std::vector<std::uint32_t>& connection_goal_tile_indices;
+    std::vector<std::uint8_t>& connection_goal_tile_mask;
+};
+
+struct ConstSiteObjectiveStateRef final
+{
+    const SiteObjectiveType& type;
+    const double& time_limit_minutes;
+    const double& completion_hold_minutes;
+    const double& completion_hold_progress_minutes;
+    const double& paused_main_timer_minutes;
+    const double& last_evaluated_world_time_minutes;
+    const std::int32_t& target_cash_points;
+    const SiteObjectiveTargetEdge& target_edge;
+    const std::uint8_t& target_band_width;
+    const float& highway_max_average_sand_cover;
+    const float& last_target_average_sand_level;
+    const bool& has_hold_baseline;
+    const std::vector<std::uint32_t>& target_tile_indices;
+    const std::vector<std::uint8_t>& target_tile_mask;
+    const std::vector<std::uint32_t>& connection_start_tile_indices;
+    const std::vector<std::uint8_t>& connection_start_tile_mask;
+    const std::vector<std::uint32_t>& connection_goal_tile_indices;
+    const std::vector<std::uint8_t>& connection_goal_tile_mask;
+};
+
 template <typename SystemTag>
 class SiteWorldAccess final
 {
 public:
-    explicit SiteWorldAccess(SiteRunState& site_run) noexcept
-        : site_run_(&site_run)
-    {
-    }
-
     explicit SiteWorldAccess(RuntimeInvocation& invocation) noexcept
         : invocation_(&invocation)
     {
@@ -706,11 +1025,36 @@ public:
     [[nodiscard]] const CampState& read_camp() const noexcept { return camp_state(); }
     [[nodiscard]] CampState& own_camp() noexcept { return camp_state(); }
 
-    [[nodiscard]] const InventoryState& read_inventory() const noexcept { return inventory_state(); }
-    [[nodiscard]] InventoryState& own_inventory() noexcept { return inventory_state(); }
-
-    [[nodiscard]] const ContractorState& read_contractor() const noexcept { return contractor_state(); }
-    [[nodiscard]] ContractorState& own_contractor() noexcept { return contractor_state(); }
+    [[nodiscard]] ConstInventoryStateRef read_inventory() const noexcept
+    {
+        return ConstInventoryStateRef {
+            inventory_meta_state().next_storage_id,
+            inventory_meta_state().worker_pack_slot_count,
+            inventory_meta_state().worker_pack_storage_id,
+            inventory_meta_state().worker_pack_container_entity_id,
+            inventory_meta_state().item_membership_revision,
+            inventory_meta_state().item_quantity_revision,
+            inventory_storage_containers_state(),
+            inventory_storage_slot_item_ids_state(),
+            inventory_worker_pack_slots_state(),
+            inventory_pending_deliveries_state(),
+            inventory_pending_delivery_item_stacks_state()};
+    }
+    [[nodiscard]] InventoryStateRef own_inventory() noexcept
+    {
+        return InventoryStateRef {
+            inventory_meta_state().next_storage_id,
+            inventory_meta_state().worker_pack_slot_count,
+            inventory_meta_state().worker_pack_storage_id,
+            inventory_meta_state().worker_pack_container_entity_id,
+            inventory_meta_state().item_membership_revision,
+            inventory_meta_state().item_quantity_revision,
+            inventory_storage_containers_state(),
+            inventory_storage_slot_item_ids_state(),
+            inventory_worker_pack_slots_state(),
+            inventory_pending_deliveries_state(),
+            inventory_pending_delivery_item_stacks_state()};
+    }
 
     [[nodiscard]] const WeatherState& read_weather() const noexcept { return weather_state(); }
     [[nodiscard]] WeatherState& own_weather() noexcept { return weather_state(); }
@@ -725,47 +1069,278 @@ public:
         return site_world_ptr();
     }
 
-    [[nodiscard]] const LocalWeatherResolveState& read_local_weather_runtime() const noexcept
+    [[nodiscard]] const LocalWeatherResolveMetaState& read_local_weather_runtime_meta() const noexcept
     {
-        return local_weather_runtime_state();
+        return local_weather_runtime_meta_state();
+    }
+    [[nodiscard]] LocalWeatherResolveMetaState& own_local_weather_runtime_meta() noexcept
+    {
+        return local_weather_runtime_meta_state();
+    }
+    [[nodiscard]] const std::vector<SiteWorld::TileWeatherContributionData>&
+    read_local_weather_last_total_contributions() const noexcept
+    {
+        return local_weather_last_total_contributions_state();
+    }
+    [[nodiscard]] std::vector<SiteWorld::TileWeatherContributionData>&
+    own_local_weather_last_total_contributions() noexcept
+    {
+        return local_weather_last_total_contributions_state();
     }
 
-    [[nodiscard]] LocalWeatherResolveState& own_local_weather_runtime() noexcept
+    [[nodiscard]] const PlantWeatherContributionMetaState& read_plant_weather_runtime_meta() const noexcept
     {
-        return local_weather_runtime_state();
+        return plant_weather_runtime_meta_state();
+    }
+    [[nodiscard]] PlantWeatherContributionMetaState& own_plant_weather_runtime_meta() noexcept
+    {
+        return plant_weather_runtime_meta_state();
+    }
+    [[nodiscard]] const std::vector<std::uint32_t>& read_plant_weather_dirty_tile_indices() const noexcept
+    {
+        return plant_weather_dirty_tile_indices_state();
+    }
+    [[nodiscard]] std::vector<std::uint32_t>& own_plant_weather_dirty_tile_indices() noexcept
+    {
+        return plant_weather_dirty_tile_indices_state();
+    }
+    [[nodiscard]] const std::vector<std::uint8_t>& read_plant_weather_dirty_tile_mask() const noexcept
+    {
+        return plant_weather_dirty_tile_mask_state();
+    }
+    [[nodiscard]] std::vector<std::uint8_t>& own_plant_weather_dirty_tile_mask() noexcept
+    {
+        return plant_weather_dirty_tile_mask_state();
     }
 
-    [[nodiscard]] const PlantWeatherContributionState& read_plant_weather_runtime() const noexcept
+    [[nodiscard]] const DeviceWeatherContributionMetaState& read_device_weather_runtime_meta() const noexcept
     {
-        return plant_weather_runtime_state();
+        return device_weather_runtime_meta_state();
     }
-
-    [[nodiscard]] PlantWeatherContributionState& own_plant_weather_runtime() noexcept
+    [[nodiscard]] DeviceWeatherContributionMetaState& own_device_weather_runtime_meta() noexcept
     {
-        return plant_weather_runtime_state();
+        return device_weather_runtime_meta_state();
     }
-
-    [[nodiscard]] const DeviceWeatherContributionState& read_device_weather_runtime() const noexcept
+    [[nodiscard]] const std::vector<std::uint32_t>& read_device_weather_dirty_tile_indices() const noexcept
     {
-        return device_weather_runtime_state();
+        return device_weather_dirty_tile_indices_state();
     }
-
-    [[nodiscard]] DeviceWeatherContributionState& own_device_weather_runtime() noexcept
+    [[nodiscard]] std::vector<std::uint32_t>& own_device_weather_dirty_tile_indices() noexcept
     {
-        return device_weather_runtime_state();
+        return device_weather_dirty_tile_indices_state();
+    }
+    [[nodiscard]] const std::vector<std::uint8_t>& read_device_weather_dirty_tile_mask() const noexcept
+    {
+        return device_weather_dirty_tile_mask_state();
+    }
+    [[nodiscard]] std::vector<std::uint8_t>& own_device_weather_dirty_tile_mask() noexcept
+    {
+        return device_weather_dirty_tile_mask_state();
     }
 
     [[nodiscard]] const EventState& read_event() const noexcept { return event_state(); }
     [[nodiscard]] EventState& own_event() noexcept { return event_state(); }
 
-    [[nodiscard]] const TaskBoardState& read_task_board() const noexcept { return task_board_state(); }
-    [[nodiscard]] TaskBoardState& own_task_board() noexcept { return task_board_state(); }
+    [[nodiscard]] ConstTaskBoardStateRef read_task_board() const noexcept
+    {
+        return ConstTaskBoardStateRef {
+            task_board_visible_tasks_state(),
+            task_board_reward_draft_options_state(),
+            task_board_tracked_tiles_state(),
+            task_board_accepted_task_ids_state(),
+            task_board_completed_task_ids_state(),
+            task_board_claimed_task_ids_state(),
+            task_board_meta_state().task_pool_size,
+            task_board_meta_state().accepted_task_cap,
+            task_board_meta_state().tracked_tile_width,
+            task_board_meta_state().tracked_tile_height,
+            task_board_meta_state().fully_grown_tile_count,
+            task_board_meta_state().site_completion_tile_threshold,
+            task_board_meta_state().tracked_living_plant_count,
+            task_board_meta_state().refresh_generation,
+            task_board_meta_state().minutes_until_next_refresh,
+            task_board_meta_state().worker,
+            task_board_meta_state().active_chain_task_chain_id,
+            task_board_meta_state().active_chain_current_accepted_step_index,
+            task_board_meta_state().active_chain_surfaced_follow_up_task_instance_id,
+            task_board_meta_state().all_tracked_living_plants_stable,
+            task_board_meta_state().has_active_chain_state,
+            task_board_meta_state().active_chain_has_current_accepted_step_index,
+            task_board_meta_state().active_chain_has_surfaced_follow_up_task_instance_id,
+            task_board_meta_state().active_chain_is_broken};
+    }
+    [[nodiscard]] TaskBoardStateRef own_task_board() noexcept
+    {
+        return TaskBoardStateRef {
+            task_board_visible_tasks_state(),
+            task_board_reward_draft_options_state(),
+            task_board_tracked_tiles_state(),
+            task_board_accepted_task_ids_state(),
+            task_board_completed_task_ids_state(),
+            task_board_claimed_task_ids_state(),
+            task_board_meta_state().task_pool_size,
+            task_board_meta_state().accepted_task_cap,
+            task_board_meta_state().tracked_tile_width,
+            task_board_meta_state().tracked_tile_height,
+            task_board_meta_state().fully_grown_tile_count,
+            task_board_meta_state().site_completion_tile_threshold,
+            task_board_meta_state().tracked_living_plant_count,
+            task_board_meta_state().refresh_generation,
+            task_board_meta_state().minutes_until_next_refresh,
+            task_board_meta_state().worker,
+            task_board_meta_state().active_chain_task_chain_id,
+            task_board_meta_state().active_chain_current_accepted_step_index,
+            task_board_meta_state().active_chain_surfaced_follow_up_task_instance_id,
+            task_board_meta_state().all_tracked_living_plants_stable,
+            task_board_meta_state().has_active_chain_state,
+            task_board_meta_state().active_chain_has_current_accepted_step_index,
+            task_board_meta_state().active_chain_has_surfaced_follow_up_task_instance_id,
+            task_board_meta_state().active_chain_is_broken};
+    }
 
-    [[nodiscard]] const ModifierState& read_modifier() const noexcept { return modifier_state(); }
-    [[nodiscard]] ModifierState& own_modifier() noexcept { return modifier_state(); }
+    [[nodiscard]] const ModifierChannelTotals& read_modifier_channel_totals() const noexcept
+    {
+        return modifier_meta_state().resolved_channel_totals;
+    }
+    [[nodiscard]] ModifierChannelTotals& own_modifier_channel_totals() noexcept
+    {
+        return modifier_meta_state().resolved_channel_totals;
+    }
+    [[nodiscard]] const TerrainFactorModifierState& read_modifier_terrain_factor_modifiers() const noexcept
+    {
+        return modifier_meta_state().resolved_terrain_factor_modifiers;
+    }
+    [[nodiscard]] TerrainFactorModifierState& own_modifier_terrain_factor_modifiers() noexcept
+    {
+        return modifier_meta_state().resolved_terrain_factor_modifiers;
+    }
+    [[nodiscard]] const ActionCostModifierState& read_modifier_action_cost_modifiers() const noexcept
+    {
+        return modifier_meta_state().resolved_action_cost_modifiers;
+    }
+    [[nodiscard]] ActionCostModifierState& own_modifier_action_cost_modifiers() noexcept
+    {
+        return modifier_meta_state().resolved_action_cost_modifiers;
+    }
+    [[nodiscard]] const HarvestOutputModifierState& read_modifier_harvest_output_modifiers() const noexcept
+    {
+        return modifier_meta_state().resolved_harvest_output_modifiers;
+    }
+    [[nodiscard]] HarvestOutputModifierState& own_modifier_harvest_output_modifiers() noexcept
+    {
+        return modifier_meta_state().resolved_harvest_output_modifiers;
+    }
+    [[nodiscard]] const VillageTechnologyEffectState& read_modifier_village_technology_effects() const noexcept
+    {
+        return modifier_meta_state().resolved_village_technology_effects;
+    }
+    [[nodiscard]] VillageTechnologyEffectState& own_modifier_village_technology_effects() noexcept
+    {
+        return modifier_meta_state().resolved_village_technology_effects;
+    }
+    [[nodiscard]] const BureauTechnologyEffectState& read_modifier_bureau_technology_effects() const noexcept
+    {
+        return modifier_meta_state().resolved_bureau_technology_effects;
+    }
+    [[nodiscard]] BureauTechnologyEffectState& own_modifier_bureau_technology_effects() noexcept
+    {
+        return modifier_meta_state().resolved_bureau_technology_effects;
+    }
+    [[nodiscard]] const std::vector<ModifierId>& read_modifier_nearby_aura_ids() const noexcept
+    {
+        return modifier_nearby_aura_ids_state();
+    }
+    [[nodiscard]] std::vector<ModifierId>& own_modifier_nearby_aura_ids() noexcept
+    {
+        return modifier_nearby_aura_ids_state();
+    }
+    [[nodiscard]] const std::vector<ActiveSiteModifierState>& read_active_site_modifiers() const noexcept
+    {
+        return active_site_modifiers_state();
+    }
+    [[nodiscard]] std::vector<ActiveSiteModifierState>& own_active_site_modifiers() noexcept
+    {
+        return active_site_modifiers_state();
+    }
+    [[nodiscard]] ConstModifierStateRef read_modifier() const noexcept
+    {
+        return ConstModifierStateRef {
+            modifier_nearby_aura_ids_state(),
+            active_site_modifiers_state(),
+            modifier_meta_state().resolved_channel_totals,
+            modifier_meta_state().resolved_terrain_factor_modifiers,
+            modifier_meta_state().resolved_action_cost_modifiers,
+            modifier_meta_state().resolved_harvest_output_modifiers,
+            modifier_meta_state().resolved_village_technology_effects,
+            modifier_meta_state().resolved_bureau_technology_effects};
+    }
+    [[nodiscard]] ModifierStateRef own_modifier() noexcept
+    {
+        return ModifierStateRef {
+            modifier_nearby_aura_ids_state(),
+            active_site_modifiers_state(),
+            modifier_meta_state().resolved_channel_totals,
+            modifier_meta_state().resolved_terrain_factor_modifiers,
+            modifier_meta_state().resolved_action_cost_modifiers,
+            modifier_meta_state().resolved_harvest_output_modifiers,
+            modifier_meta_state().resolved_village_technology_effects,
+            modifier_meta_state().resolved_bureau_technology_effects};
+    }
 
-    [[nodiscard]] const EconomyState& read_economy() const noexcept { return economy_state(); }
-    [[nodiscard]] EconomyState& own_economy() noexcept { return economy_state(); }
+    [[nodiscard]] const EconomyMetaState& read_economy_meta() const noexcept { return economy_meta_state(); }
+    [[nodiscard]] EconomyMetaState& own_economy_meta() noexcept { return economy_meta_state(); }
+    [[nodiscard]] const std::vector<std::uint32_t>& read_economy_revealed_unlockable_ids() const noexcept
+    {
+        return economy_revealed_unlockable_ids_state();
+    }
+    [[nodiscard]] std::vector<std::uint32_t>& own_economy_revealed_unlockable_ids() noexcept
+    {
+        return economy_revealed_unlockable_ids_state();
+    }
+    [[nodiscard]] const std::vector<std::uint32_t>& read_economy_direct_purchase_unlockable_ids() const noexcept
+    {
+        return economy_direct_purchase_unlockable_ids_state();
+    }
+    [[nodiscard]] std::vector<std::uint32_t>& own_economy_direct_purchase_unlockable_ids() noexcept
+    {
+        return economy_direct_purchase_unlockable_ids_state();
+    }
+    [[nodiscard]] const std::vector<PhoneListingState>& read_economy_phone_listings() const noexcept
+    {
+        return economy_phone_listings_state();
+    }
+    [[nodiscard]] std::vector<PhoneListingState>& own_economy_phone_listings() noexcept
+    {
+        return economy_phone_listings_state();
+    }
+    [[nodiscard]] ConstEconomyStateRef read_economy() const noexcept
+    {
+        return ConstEconomyStateRef {
+            economy_meta_state().current_cash,
+            economy_meta_state().phone_delivery_fee,
+            economy_meta_state().phone_delivery_minutes,
+            economy_meta_state().phone_listing_source_membership_revision,
+            economy_meta_state().phone_listing_source_quantity_revision,
+            economy_meta_state().phone_listing_source_action_reservation_signature,
+            economy_meta_state().phone_buy_stock_refresh_generation,
+            economy_revealed_unlockable_ids_state(),
+            economy_direct_purchase_unlockable_ids_state(),
+            economy_phone_listings_state()};
+    }
+    [[nodiscard]] EconomyStateRef own_economy() noexcept
+    {
+        return EconomyStateRef {
+            economy_meta_state().current_cash,
+            economy_meta_state().phone_delivery_fee,
+            economy_meta_state().phone_delivery_minutes,
+            economy_meta_state().phone_listing_source_membership_revision,
+            economy_meta_state().phone_listing_source_quantity_revision,
+            economy_meta_state().phone_listing_source_action_reservation_signature,
+            economy_meta_state().phone_buy_stock_refresh_generation,
+            economy_revealed_unlockable_ids_state(),
+            economy_direct_purchase_unlockable_ids_state(),
+            economy_phone_listings_state()};
+    }
 
     [[nodiscard]] const CraftDeviceCacheRuntimeState& read_craft_device_cache_runtime() const noexcept
     {
@@ -830,284 +1405,507 @@ public:
         return craft_context_options_state();
     }
 
-    [[nodiscard]] const ActionState& read_action() const noexcept { return action_state(); }
-    [[nodiscard]] ActionState& own_action() noexcept { return action_state(); }
+    [[nodiscard]] ConstActionStateRef read_action() const noexcept
+    {
+        return ConstActionStateRef {
+            action_meta_state().current_action_id,
+            action_meta_state().action_kind,
+            action_meta_state().target_tile,
+            action_meta_state().approach_tile,
+            action_meta_state().primary_subject_id,
+            action_meta_state().secondary_subject_id,
+            action_meta_state().item_id,
+            action_meta_state().placement_reservation_token,
+            action_meta_state().quantity,
+            action_meta_state().request_flags,
+            action_meta_state().awaiting_placement_reservation,
+            action_meta_state().reactivate_placement_mode_on_completion,
+            action_meta_state().total_action_minutes,
+            action_meta_state().remaining_action_minutes,
+            action_meta_state().deferred_meter_delta,
+            action_meta_state().resolved_harvest_density,
+            action_meta_state().resolved_harvest_outputs_valid,
+            action_meta_state().started_at_world_minute,
+            action_meta_state().placement_mode,
+            action_meta_state().has_current_action_id,
+            action_meta_state().has_target_tile,
+            action_meta_state().has_approach_tile,
+            action_meta_state().has_started_at_world_minute,
+            action_reserved_input_item_stacks_state(),
+            action_resolved_harvest_outputs_state()};
+    }
+    [[nodiscard]] ActionStateRef own_action() noexcept
+    {
+        return ActionStateRef {
+            action_meta_state().current_action_id,
+            action_meta_state().action_kind,
+            action_meta_state().target_tile,
+            action_meta_state().approach_tile,
+            action_meta_state().primary_subject_id,
+            action_meta_state().secondary_subject_id,
+            action_meta_state().item_id,
+            action_meta_state().placement_reservation_token,
+            action_meta_state().quantity,
+            action_meta_state().request_flags,
+            action_meta_state().awaiting_placement_reservation,
+            action_meta_state().reactivate_placement_mode_on_completion,
+            action_meta_state().total_action_minutes,
+            action_meta_state().remaining_action_minutes,
+            action_meta_state().deferred_meter_delta,
+            action_meta_state().resolved_harvest_density,
+            action_meta_state().resolved_harvest_outputs_valid,
+            action_meta_state().started_at_world_minute,
+            action_meta_state().placement_mode,
+            action_meta_state().has_current_action_id,
+            action_meta_state().has_target_tile,
+            action_meta_state().has_approach_tile,
+            action_meta_state().has_started_at_world_minute,
+            action_reserved_input_item_stacks_state(),
+            action_resolved_harvest_outputs_state()};
+    }
 
     [[nodiscard]] const SiteCounters& read_counters() const noexcept { return counters_state(); }
     [[nodiscard]] SiteCounters& own_counters() noexcept { return counters_state(); }
 
-    [[nodiscard]] const SiteObjectiveState& read_objective() const noexcept { return objective_state(); }
-    [[nodiscard]] SiteObjectiveState& own_objective() noexcept { return objective_state(); }
-
-private:
-    [[nodiscard]] SiteRunState& aggregate_site_run() const
+    [[nodiscard]] const SiteObjectiveMetaState& read_objective_meta() const noexcept
     {
-        return *site_run_;
+        return objective_meta_state();
+    }
+    [[nodiscard]] SiteObjectiveMetaState& own_objective_meta() noexcept
+    {
+        return objective_meta_state();
+    }
+    [[nodiscard]] const std::vector<std::uint32_t>& read_objective_target_tile_indices() const noexcept
+    {
+        return objective_target_tile_indices_state();
+    }
+    [[nodiscard]] std::vector<std::uint32_t>& own_objective_target_tile_indices() noexcept
+    {
+        return objective_target_tile_indices_state();
+    }
+    [[nodiscard]] const std::vector<std::uint8_t>& read_objective_target_tile_mask() const noexcept
+    {
+        return objective_target_tile_mask_state();
+    }
+    [[nodiscard]] std::vector<std::uint8_t>& own_objective_target_tile_mask() noexcept
+    {
+        return objective_target_tile_mask_state();
+    }
+    [[nodiscard]] const std::vector<std::uint32_t>& read_objective_connection_start_tile_indices()
+        const noexcept
+    {
+        return objective_connection_start_tile_indices_state();
+    }
+    [[nodiscard]] std::vector<std::uint32_t>& own_objective_connection_start_tile_indices() noexcept
+    {
+        return objective_connection_start_tile_indices_state();
+    }
+    [[nodiscard]] const std::vector<std::uint8_t>& read_objective_connection_start_tile_mask() const noexcept
+    {
+        return objective_connection_start_tile_mask_state();
+    }
+    [[nodiscard]] std::vector<std::uint8_t>& own_objective_connection_start_tile_mask() noexcept
+    {
+        return objective_connection_start_tile_mask_state();
+    }
+    [[nodiscard]] const std::vector<std::uint32_t>& read_objective_connection_goal_tile_indices()
+        const noexcept
+    {
+        return objective_connection_goal_tile_indices_state();
+    }
+    [[nodiscard]] std::vector<std::uint32_t>& own_objective_connection_goal_tile_indices() noexcept
+    {
+        return objective_connection_goal_tile_indices_state();
+    }
+    [[nodiscard]] const std::vector<std::uint8_t>& read_objective_connection_goal_tile_mask() const noexcept
+    {
+        return objective_connection_goal_tile_mask_state();
+    }
+    [[nodiscard]] std::vector<std::uint8_t>& own_objective_connection_goal_tile_mask() noexcept
+    {
+        return objective_connection_goal_tile_mask_state();
+    }
+    [[nodiscard]] ConstSiteObjectiveStateRef read_objective() const noexcept
+    {
+        return ConstSiteObjectiveStateRef {
+            objective_meta_state().type,
+            objective_meta_state().time_limit_minutes,
+            objective_meta_state().completion_hold_minutes,
+            objective_meta_state().completion_hold_progress_minutes,
+            objective_meta_state().paused_main_timer_minutes,
+            objective_meta_state().last_evaluated_world_time_minutes,
+            objective_meta_state().target_cash_points,
+            objective_meta_state().target_edge,
+            objective_meta_state().target_band_width,
+            objective_meta_state().highway_max_average_sand_cover,
+            objective_meta_state().last_target_average_sand_level,
+            objective_meta_state().has_hold_baseline,
+            objective_target_tile_indices_state(),
+            objective_target_tile_mask_state(),
+            objective_connection_start_tile_indices_state(),
+            objective_connection_start_tile_mask_state(),
+            objective_connection_goal_tile_indices_state(),
+            objective_connection_goal_tile_mask_state()};
+    }
+    [[nodiscard]] SiteObjectiveStateRef own_objective() noexcept
+    {
+        return SiteObjectiveStateRef {
+            objective_meta_state().type,
+            objective_meta_state().time_limit_minutes,
+            objective_meta_state().completion_hold_minutes,
+            objective_meta_state().completion_hold_progress_minutes,
+            objective_meta_state().paused_main_timer_minutes,
+            objective_meta_state().last_evaluated_world_time_minutes,
+            objective_meta_state().target_cash_points,
+            objective_meta_state().target_edge,
+            objective_meta_state().target_band_width,
+            objective_meta_state().highway_max_average_sand_cover,
+            objective_meta_state().last_target_average_sand_level,
+            objective_meta_state().has_hold_baseline,
+            objective_target_tile_indices_state(),
+            objective_target_tile_mask_state(),
+            objective_connection_start_tile_indices_state(),
+            objective_connection_start_tile_mask_state(),
+            objective_connection_goal_tile_indices_state(),
+            objective_connection_goal_tile_mask_state()};
     }
 
+private:
     [[nodiscard]] SiteClockState& site_clock_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->state_manager()->state<StateSetId::SiteClock>(*invocation_->owned_state()).value();
-        }
-
-        return aggregate_site_run().clock;
+        return invocation_->state_manager()->state<StateSetId::SiteClock>(*invocation_->owned_state()).value();
     }
 
     [[nodiscard]] CampState& camp_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->state_manager()->state<StateSetId::SiteCamp>(*invocation_->owned_state()).value();
-        }
-
-        return aggregate_site_run().camp;
+        return invocation_->state_manager()->state<StateSetId::SiteCamp>(*invocation_->owned_state()).value();
     }
 
-    [[nodiscard]] InventoryState& inventory_state() const
+    [[nodiscard]] InventoryMetaState& inventory_meta_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->compat_inventory_state();
-        }
-
-        return aggregate_site_run().inventory;
-    }
-
-    [[nodiscard]] ContractorState& contractor_state() const
-    {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->compat_contractor_state();
-        }
-
-        return aggregate_site_run().contractor;
+        return invocation_->state_manager()->state<StateSetId::SiteInventoryMeta>(*invocation_->owned_state())
+            .value();
     }
 
     [[nodiscard]] WeatherState& weather_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->state_manager()->state<StateSetId::SiteWeather>(*invocation_->owned_state()).value();
-        }
-
-        return aggregate_site_run().weather;
+        return invocation_->state_manager()->state<StateSetId::SiteWeather>(*invocation_->owned_state()).value();
     }
 
-    [[nodiscard]] LocalWeatherResolveState& local_weather_runtime_state() const
+    [[nodiscard]] LocalWeatherResolveMetaState& local_weather_runtime_meta_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->compat_local_weather_resolve_state();
-        }
-
-        return aggregate_site_run().local_weather_resolve;
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteLocalWeatherResolveMeta>(*invocation_->owned_state())
+            .value();
     }
 
-    [[nodiscard]] PlantWeatherContributionState& plant_weather_runtime_state() const
+    [[nodiscard]] std::vector<SiteWorld::TileWeatherContributionData>&
+    local_weather_last_total_contributions_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->compat_plant_weather_contribution_state();
-        }
-
-        return aggregate_site_run().plant_weather_contribution;
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteLocalWeatherResolveLastTotalContributions>(*invocation_->owned_state())
+            .value();
     }
 
-    [[nodiscard]] DeviceWeatherContributionState& device_weather_runtime_state() const
+    [[nodiscard]] PlantWeatherContributionMetaState& plant_weather_runtime_meta_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->compat_device_weather_contribution_state();
-        }
+        return invocation_->state_manager()
+            ->state<StateSetId::SitePlantWeatherContributionMeta>(*invocation_->owned_state())
+            .value();
+    }
 
-        return aggregate_site_run().device_weather_contribution;
+    [[nodiscard]] std::vector<std::uint32_t>& plant_weather_dirty_tile_indices_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SitePlantWeatherContributionDirtyTileIndices>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<std::uint8_t>& plant_weather_dirty_tile_mask_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SitePlantWeatherContributionDirtyTileMask>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] DeviceWeatherContributionMetaState& device_weather_runtime_meta_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteDeviceWeatherContributionMeta>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<std::uint32_t>& device_weather_dirty_tile_indices_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteDeviceWeatherContributionDirtyTileIndices>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<std::uint8_t>& device_weather_dirty_tile_mask_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteDeviceWeatherContributionDirtyTileMask>(*invocation_->owned_state())
+            .value();
     }
 
     [[nodiscard]] EventState& event_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->state_manager()->state<StateSetId::SiteEvent>(*invocation_->owned_state()).value();
-        }
-
-        return aggregate_site_run().event;
+        return invocation_->state_manager()->state<StateSetId::SiteEvent>(*invocation_->owned_state()).value();
     }
 
-    [[nodiscard]] TaskBoardState& task_board_state() const
+    [[nodiscard]] TaskBoardMetaState& task_board_meta_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->compat_task_board_state();
-        }
-
-        return aggregate_site_run().task_board;
+        return invocation_->state_manager()->state<StateSetId::SiteTaskBoardMeta>(*invocation_->owned_state())
+            .value();
     }
 
-    [[nodiscard]] ModifierState& modifier_state() const
+    [[nodiscard]] ModifierMetaState& modifier_meta_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->compat_modifier_state();
-        }
-
-        return aggregate_site_run().modifier;
+        return invocation_->state_manager()->state<StateSetId::SiteModifierMeta>(*invocation_->owned_state())
+            .value();
     }
 
-    [[nodiscard]] EconomyState& economy_state() const
+    [[nodiscard]] std::vector<ModifierId>& modifier_nearby_aura_ids_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->compat_economy_state();
-        }
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteModifierNearbyAuraIds>(*invocation_->owned_state())
+            .value();
+    }
 
-        return aggregate_site_run().economy;
+    [[nodiscard]] std::vector<ActiveSiteModifierState>& active_site_modifiers_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteModifierActiveSiteModifiers>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] EconomyMetaState& economy_meta_state() const
+    {
+        return invocation_->state_manager()->state<StateSetId::SiteEconomyMeta>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<std::uint32_t>& economy_revealed_unlockable_ids_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteEconomyRevealedUnlockableIds>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<std::uint32_t>& economy_direct_purchase_unlockable_ids_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteEconomyDirectPurchaseUnlockableIds>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<PhoneListingState>& economy_phone_listings_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteEconomyPhoneListings>(*invocation_->owned_state())
+            .value();
     }
 
     [[nodiscard]] CraftDeviceCacheRuntimeState& craft_device_cache_runtime_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->state_manager()
-                ->state<StateSetId::SiteCraftDeviceCacheRuntime>(*invocation_->owned_state())
-                .value();
-        }
-
-        return aggregate_site_run().craft;
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteCraftDeviceCacheRuntime>(*invocation_->owned_state())
+            .value();
     }
 
     [[nodiscard]] std::vector<CraftDeviceCacheEntryState>& craft_device_caches_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->state_manager()
-                ->state<StateSetId::SiteCraftDeviceCaches>(*invocation_->owned_state())
-                .value();
-        }
-
-        craft_device_cache_compatibility_.clear();
-        craft_device_cache_compatibility_.reserve(aggregate_site_run().craft.device_caches.size());
-        for (const auto& cache : aggregate_site_run().craft.device_caches)
-        {
-            craft_device_cache_compatibility_.push_back(CraftDeviceCacheEntryState {
-                cache.device_entity_id,
-                cache.source_membership_revision,
-                cache.worker_pack_included,
-                0U,
-                static_cast<std::uint32_t>(cache.nearby_item_instance_ids.size())});
-        }
-        return craft_device_cache_compatibility_;
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteCraftDeviceCaches>(*invocation_->owned_state())
+            .value();
     }
 
     [[nodiscard]] std::vector<std::uint64_t>& craft_nearby_items_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->state_manager()
-                ->state<StateSetId::SiteCraftNearbyItems>(*invocation_->owned_state())
-                .value();
-        }
-
-        static thread_local std::vector<std::uint64_t> compatibility_items {};
-        compatibility_items.clear();
-        for (const auto& cache : aggregate_site_run().craft.device_caches)
-        {
-            compatibility_items.insert(
-                compatibility_items.end(),
-                cache.nearby_item_instance_ids.begin(),
-                cache.nearby_item_instance_ids.end());
-        }
-        return compatibility_items;
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteCraftNearbyItems>(*invocation_->owned_state())
+            .value();
     }
 
     [[nodiscard]] PhoneInventoryCacheMetaState& craft_phone_cache_meta_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->state_manager()
-                ->state<StateSetId::SiteCraftPhoneCacheMeta>(*invocation_->owned_state())
-                .value();
-        }
-
-        return aggregate_site_run().craft.phone_cache;
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteCraftPhoneCacheMeta>(*invocation_->owned_state())
+            .value();
     }
 
     [[nodiscard]] std::vector<std::uint64_t>& craft_phone_items_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->state_manager()
-                ->state<StateSetId::SiteCraftPhoneItems>(*invocation_->owned_state())
-                .value();
-        }
-
-        return aggregate_site_run().craft.phone_cache.item_instance_ids;
+        return invocation_->state_manager()->state<StateSetId::SiteCraftPhoneItems>(*invocation_->owned_state())
+            .value();
     }
 
     [[nodiscard]] CraftContextMetaState& craft_context_meta_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->state_manager()
-                ->state<StateSetId::SiteCraftContextMeta>(*invocation_->owned_state())
-                .value();
-        }
-
-        return aggregate_site_run().craft.context;
+        return invocation_->state_manager()->state<StateSetId::SiteCraftContextMeta>(*invocation_->owned_state())
+            .value();
     }
 
     [[nodiscard]] std::vector<CraftContextOptionState>& craft_context_options_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->state_manager()
-                ->state<StateSetId::SiteCraftContextOptions>(*invocation_->owned_state())
-                .value();
-        }
-
-        return aggregate_site_run().craft.context.options;
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteCraftContextOptions>(*invocation_->owned_state())
+            .value();
     }
 
-    [[nodiscard]] ActionState& action_state() const
+    [[nodiscard]] ActionMetaState& action_meta_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->compat_action_state();
-        }
+        return invocation_->state_manager()->state<StateSetId::SiteActionMeta>(*invocation_->owned_state()).value();
+    }
 
-        return aggregate_site_run().site_action;
+    [[nodiscard]] std::vector<StorageContainerEntryState>& inventory_storage_containers_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteInventoryStorageContainers>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<std::uint64_t>& inventory_storage_slot_item_ids_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteInventoryStorageSlotItemIds>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<InventorySlot>& inventory_worker_pack_slots_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteInventoryWorkerPackSlots>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<PendingDeliveryEntryState>& inventory_pending_deliveries_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteInventoryPendingDeliveries>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<InventorySlot>& inventory_pending_delivery_item_stacks_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteInventoryPendingDeliveryItemStacks>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<TaskInstanceEntryState>& task_board_visible_tasks_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteTaskBoardVisibleTasks>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<TaskRewardDraftOption>& task_board_reward_draft_options_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteTaskBoardRewardDraftOptions>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<TaskTrackedTileState>& task_board_tracked_tiles_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteTaskBoardTrackedTiles>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<TaskInstanceId>& task_board_accepted_task_ids_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteTaskBoardAcceptedTaskIds>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<TaskInstanceId>& task_board_completed_task_ids_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteTaskBoardCompletedTaskIds>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<TaskInstanceId>& task_board_claimed_task_ids_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteTaskBoardClaimedTaskIds>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<ReservedItemStack>& action_reserved_input_item_stacks_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteActionReservedInputItemStacks>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<ResolvedHarvestOutputStack>& action_resolved_harvest_outputs_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteActionResolvedHarvestOutputs>(*invocation_->owned_state())
+            .value();
     }
 
     [[nodiscard]] SiteCounters& counters_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->state_manager()->state<StateSetId::SiteCounters>(*invocation_->owned_state())
-                .value();
-        }
-
-        return aggregate_site_run().counters;
+        return invocation_->state_manager()->state<StateSetId::SiteCounters>(*invocation_->owned_state()).value();
     }
 
-    [[nodiscard]] SiteObjectiveState& objective_state() const
+    [[nodiscard]] SiteObjectiveMetaState& objective_meta_state() const
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->compat_objective_state();
-        }
+        return invocation_->state_manager()->state<StateSetId::SiteObjectiveMeta>(*invocation_->owned_state())
+            .value();
+    }
 
-        return aggregate_site_run().objective;
+    [[nodiscard]] std::vector<std::uint32_t>& objective_target_tile_indices_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteObjectiveTargetTileIndices>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<std::uint8_t>& objective_target_tile_mask_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteObjectiveTargetTileMask>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<std::uint32_t>& objective_connection_start_tile_indices_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteObjectiveConnectionStartTileIndices>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<std::uint8_t>& objective_connection_start_tile_mask_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteObjectiveConnectionStartTileMask>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<std::uint32_t>& objective_connection_goal_tile_indices_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteObjectiveConnectionGoalTileIndices>(*invocation_->owned_state())
+            .value();
+    }
+
+    [[nodiscard]] std::vector<std::uint8_t>& objective_connection_goal_tile_mask_state() const
+    {
+        return invocation_->state_manager()
+            ->state<StateSetId::SiteObjectiveConnectionGoalTileMask>(*invocation_->owned_state())
+            .value();
     }
 
     [[nodiscard]] const SiteWorld* site_world_ptr() const noexcept
     {
-        if (invocation_ != nullptr)
-        {
-            return invocation_->runtime() != nullptr ? invocation_->runtime()->site_world() : nullptr;
-        }
-
-        return site_run_ != nullptr ? site_run_->site_world.get() : nullptr;
+        return invocation_->site_world();
     }
 
     [[nodiscard]] SiteWorld* site_world_ptr() noexcept
@@ -1116,8 +1914,6 @@ private:
     }
 
     RuntimeInvocation* invocation_ {nullptr};
-    SiteRunState* site_run_ {nullptr};
-    mutable std::vector<CraftDeviceCacheEntryState> craft_device_cache_compatibility_ {};
 };
 
 }  // namespace gs1

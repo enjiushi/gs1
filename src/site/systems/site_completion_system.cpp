@@ -157,8 +157,8 @@ bool green_wall_regions_connected(const SiteWorldAccess<SiteCompletionSystem>& w
 }
 
 float normalized_cash_target_progress(
-    const SiteObjectiveState& objective,
-    const EconomyState& economy) noexcept
+    ConstSiteObjectiveStateRef objective,
+    ConstEconomyStateRef economy) noexcept
 {
     if (objective.target_cash_points <= 0)
     {
@@ -177,7 +177,7 @@ void run_green_wall_connection(
     GameMessageQueue& message_queue,
     const SiteClockState& clock)
 {
-    auto& objective = world.own_objective();
+    auto objective = world.own_objective();
     const double delta_minutes = std::max(
         0.0,
         clock.world_time_minutes - objective.last_evaluated_world_time_minutes);

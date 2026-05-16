@@ -85,15 +85,15 @@ void emit_site_one_local_weather_probe_log(
 }
 
 void ensure_local_weather_runtime_buffers(
-    gs1::LocalWeatherResolveState& state,
+    std::vector<gs1::SiteWorld::TileWeatherContributionData>& last_total_weather_contributions,
     std::size_t tile_count)
 {
-    if (state.last_total_weather_contributions.size() == tile_count)
+    if (last_total_weather_contributions.size() == tile_count)
     {
         return;
     }
 
-    state.last_total_weather_contributions.assign(tile_count, gs1::zero_weather_contribution());
+    last_total_weather_contributions.assign(tile_count, gs1::zero_weather_contribution());
 }
 
 bool ecology_has_projected_plant_visual(
@@ -192,7 +192,7 @@ Gs1Status process_message(
 
     if (message.type == gs1::GameMessageType::SiteRunStarted)
     {
-        world.own_local_weather_runtime().emit_full_snapshot_on_next_run = true;
+        world.own_local_weather_runtime_meta().emit_full_snapshot_on_next_run = true;
     }
 
     return GS1_STATUS_OK;
@@ -206,11 +206,12 @@ void run_system(gs1::RuntimeInvocation& invocation)
         return;
     }
 
-    auto& runtime = world.own_local_weather_runtime();
-    ensure_local_weather_runtime_buffers(runtime, world.tile_count());
+    auto& runtime_meta = world.own_local_weather_runtime_meta();
+    auto& last_total_contributions = world.own_local_weather_last_total_contributions();
+    ensure_local_weather_runtime_buffers(last_total_contributions, world.tile_count());
 
-    const bool emit_full_snapshot = runtime.emit_full_snapshot_on_next_run;
-    runtime.emit_full_snapshot_on_next_run = false;
+    const bool emit_full_snapshot = runtime_meta.emit_full_snapshot_on_next_run;
+    runtime_meta.emit_full_snapshot_on_next_run = false;
 
     const auto base_weather = compute_base_local_weather(world);
     auto* ecs_world_ptr = world.ecs_world_ptr();
@@ -250,7 +251,7 @@ void run_system(gs1::RuntimeInvocation& invocation)
             const gs1::site_ecs::TilePlantWeatherContribution& plant_contribution_component,
             const gs1::site_ecs::TileDeviceWeatherContribution& device_contribution_component) {
             const std::size_t index = index_component.value;
-            if (index >= runtime.last_total_weather_contributions.size())
+            if (index >= last_total_contributions.size())
             {
                 return;
             }
@@ -260,7 +261,7 @@ void run_system(gs1::RuntimeInvocation& invocation)
                     weather_contribution_from_component(plant_contribution_component),
                     weather_contribution_from_component(device_contribution_component)));
             const auto resolved_weather = resolve_local_weather(base_weather, total_contribution);
-            const auto previous_total_contribution = runtime.last_total_weather_contributions[index];
+            const auto previous_total_contribution = last_total_contributions[index];
             const gs1::SiteWorld::TileLocalWeatherData previous_local_weather {
                 heat_component.value,
                 wind_component.value,
@@ -317,7 +318,7 @@ void run_system(gs1::RuntimeInvocation& invocation)
                     density_component.value);
             }
 
-            runtime.last_total_weather_contributions[index] = total_contribution;
+            last_total_contributions[index] = total_contribution;
         });
 }
 }  // namespace

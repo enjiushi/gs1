@@ -390,6 +390,7 @@ struct SplitRuntimeFixture final
 {
     GameState state {};
     StateManager state_manager {};
+    SiteWorldHandle site_world {};
 
     void seed(
         Gs1AppState app_state,
@@ -412,6 +413,7 @@ struct SplitRuntimeFixture final
             move_direction.present};
         write_campaign_state_to_state_sets(campaign, state, state_manager);
         write_site_run_state_to_state_sets(active_site_run, state, state_manager);
+        site_world = active_site_run.has_value() ? active_site_run->site_world : SiteWorldHandle {};
     }
 
     [[nodiscard]] RuntimeInvocation make_invocation(SiteMoveDirectionInput move_direction = {}) noexcept
@@ -422,10 +424,12 @@ struct SplitRuntimeFixture final
             move_direction.world_move_x,
             move_direction.world_move_y,
             move_direction.world_move_z,
-            move_direction.present};
+            move_direction.present,
+            site_world};
     }
 
     void sync(
+        const RuntimeInvocation& invocation,
         Gs1AppState& app_state,
         std::optional<CampaignState>& campaign,
         std::optional<SiteRunState>& active_site_run,
@@ -435,6 +439,7 @@ struct SplitRuntimeFixture final
         app_state = state.app_state.get();
         runtime_messages = state.runtime_messages;
         message_queue = state.message_queue;
+        site_world = invocation.site_world_handle();
         campaign = state.campaign_core.has_value()
             ? std::optional<CampaignState> {assemble_campaign_state_from_state_sets(state, state_manager)}
             : std::nullopt;
@@ -442,7 +447,7 @@ struct SplitRuntimeFixture final
             ? std::optional<SiteRunState> {assemble_site_run_state_from_state_sets(
                   state,
                   state_manager,
-                  nullptr)}
+                  site_world)}
             : std::nullopt;
     }
 };
@@ -470,7 +475,7 @@ inline Gs1Status invoke_system_message(
     auto invocation = fixture.make_invocation(move_direction);
     System system {};
     const auto status = system.process_game_message(invocation, message);
-    fixture.sync(app_state, campaign, active_site_run, runtime_messages, message_queue);
+    fixture.sync(invocation, app_state, campaign, active_site_run, runtime_messages, message_queue);
     return status;
 }
 
@@ -581,7 +586,7 @@ inline void invoke_system_run(
     auto invocation = fixture.make_invocation(move_direction);
     System system {};
     system.run(invocation);
-    fixture.sync(app_state, campaign, active_site_run, runtime_messages, message_queue);
+    fixture.sync(invocation, app_state, campaign, active_site_run, runtime_messages, message_queue);
 }
 
 template <typename System>

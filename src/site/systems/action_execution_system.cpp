@@ -75,7 +75,7 @@ void append_resolved_harvest_output(
     std::uint16_t quantity) noexcept;
 
 bool worker_pack_has_item(
-    const InventoryState& inventory,
+    const ConstInventoryStateRef inventory,
     ItemId item_id) noexcept
 {
     for (const auto& slot : inventory.worker_pack_slots)
@@ -132,7 +132,7 @@ float shovel_duration_reduction_for_action(
 }
 
 bool excavation_depth_matches_loot_rebalance(
-    const ModifierState& modifier_state,
+    ConstModifierStateRef modifier_state,
     ExcavationDepth depth) noexcept
 {
     const auto& effects = modifier_state.resolved_village_technology_effects;
@@ -1024,12 +1024,15 @@ void enqueue_message(GameMessageQueue& queue, GameMessageType type, const Payloa
     queue.push_back(message);
 }
 
-void clear_action_state(ActionState& action_state) noexcept
+void clear_action_state(ActionStateRef action_state) noexcept
 {
-    action_state.current_action_id.reset();
+    action_state.current_action_id = RuntimeActionId {};
+    action_state.has_current_action_id = false;
     action_state.action_kind = ActionKind::None;
-    action_state.target_tile.reset();
-    action_state.approach_tile.reset();
+    action_state.target_tile = TileCoord {};
+    action_state.has_target_tile = false;
+    action_state.approach_tile = TileCoord {};
+    action_state.has_approach_tile = false;
     action_state.primary_subject_id = 0U;
     action_state.secondary_subject_id = 0U;
     action_state.item_id = 0U;
@@ -1045,14 +1048,17 @@ void clear_action_state(ActionState& action_state) noexcept
     action_state.deferred_meter_delta = {};
     action_state.resolved_harvest_density = 0.0f;
     action_state.resolved_harvest_outputs_valid = false;
-    action_state.started_at_world_minute.reset();
+    action_state.started_at_world_minute = 0.0;
+    action_state.has_started_at_world_minute = false;
+    action_state.placement_mode = PlacementModeMetaState {};
 }
 
-void clear_placement_mode(PlacementModeState& placement_mode) noexcept
+void clear_placement_mode(PlacementModeMetaState& placement_mode) noexcept
 {
     placement_mode.active = false;
     placement_mode.action_kind = ActionKind::None;
-    placement_mode.target_tile.reset();
+    placement_mode.target_tile = TileCoord {};
+    placement_mode.has_target_tile = false;
     placement_mode.primary_subject_id = 0U;
     placement_mode.secondary_subject_id = 0U;
     placement_mode.item_id = 0U;
@@ -1063,31 +1069,111 @@ void clear_placement_mode(PlacementModeState& placement_mode) noexcept
     placement_mode.blocked_mask = 0ULL;
 }
 
-std::uint32_t action_id_value(const ActionState& action_state) noexcept
+std::uint32_t action_id_value(const ConstActionStateRef action_state) noexcept
 {
-    if (action_state.current_action_id.has_value())
+    if (action_state.has_current_action_id)
     {
-        return action_state.current_action_id->value;
+        return action_state.current_action_id.value;
     }
     return 0U;
 }
 
-TileCoord action_target_tile(const ActionState& action_state) noexcept
+std::uint32_t action_id_value(const ActionStateRef action_state) noexcept
 {
-    if (action_state.target_tile.has_value())
+    return action_id_value(ConstActionStateRef {
+        action_state.current_action_id,
+        action_state.action_kind,
+        action_state.target_tile,
+        action_state.approach_tile,
+        action_state.primary_subject_id,
+        action_state.secondary_subject_id,
+        action_state.item_id,
+        action_state.placement_reservation_token,
+        action_state.quantity,
+        action_state.request_flags,
+        action_state.awaiting_placement_reservation,
+        action_state.reactivate_placement_mode_on_completion,
+        action_state.total_action_minutes,
+        action_state.remaining_action_minutes,
+        action_state.deferred_meter_delta,
+        action_state.resolved_harvest_density,
+        action_state.resolved_harvest_outputs_valid,
+        action_state.started_at_world_minute,
+        action_state.placement_mode,
+        action_state.has_current_action_id,
+        action_state.has_target_tile,
+        action_state.has_approach_tile,
+        action_state.has_started_at_world_minute,
+        action_state.reserved_input_item_stacks,
+        action_state.resolved_harvest_outputs});
+}
+
+TileCoord action_target_tile(const ConstActionStateRef action_state) noexcept
+{
+    if (action_state.has_target_tile)
     {
-        return *action_state.target_tile;
+        return action_state.target_tile;
     }
     return TileCoord {};
 }
 
-TileCoord action_approach_tile(const ActionState& action_state) noexcept
+TileCoord action_target_tile(const ActionStateRef action_state) noexcept
 {
-    if (action_state.approach_tile.has_value())
+    return action_target_tile(ConstActionStateRef {
+        action_state.current_action_id,
+        action_state.action_kind,
+        action_state.target_tile,
+        action_state.approach_tile,
+        action_state.primary_subject_id,
+        action_state.secondary_subject_id,
+        action_state.item_id,
+        action_state.placement_reservation_token,
+        action_state.quantity,
+        action_state.request_flags,
+        action_state.awaiting_placement_reservation,
+        action_state.reactivate_placement_mode_on_completion,
+        action_state.total_action_minutes,
+        action_state.remaining_action_minutes,
+        action_state.deferred_meter_delta,
+        action_state.resolved_harvest_density,
+        action_state.resolved_harvest_outputs_valid,
+        action_state.started_at_world_minute,
+        action_state.placement_mode,
+        action_state.has_current_action_id,
+        action_state.has_target_tile,
+        action_state.has_approach_tile,
+        action_state.has_started_at_world_minute,
+        action_state.reserved_input_item_stacks,
+        action_state.resolved_harvest_outputs});
+}
+
+TileCoord action_approach_tile(const ConstActionStateRef action_state) noexcept
+{
+    if (action_state.has_approach_tile)
     {
-        return *action_state.approach_tile;
+        return action_state.approach_tile;
     }
     return action_target_tile(action_state);
+}
+
+[[nodiscard]] constexpr bool has_target_tile(const ConstActionStateRef action_state) noexcept
+{
+    return action_state.has_target_tile;
+}
+
+[[nodiscard]] constexpr bool has_approach_tile(const ConstActionStateRef action_state) noexcept
+{
+    return action_state.has_approach_tile;
+}
+
+[[nodiscard]] constexpr bool has_current_action_id(const ConstActionStateRef action_state) noexcept
+{
+    return action_state.has_current_action_id;
+}
+
+[[nodiscard]] constexpr bool has_started_at_world_minute(const ConstActionStateRef action_state) noexcept
+{
+    return action_state.has_started_at_world_minute;
 }
 
 bool should_request_placement_reservation(ActionKind action_kind) noexcept
@@ -1131,7 +1217,7 @@ void emit_site_action_started(
             duration_minutes});
 }
 
-void emit_site_action_completed(GameMessageQueue& queue, const ActionState& action_state)
+void emit_site_action_completed(GameMessageQueue& queue, const ConstActionStateRef action_state)
 {
     const TileCoord target_tile = action_target_tile(action_state);
     enqueue_message(
@@ -1144,8 +1230,8 @@ void emit_site_action_completed(GameMessageQueue& queue, const ActionState& acti
             0U,
             target_tile.x,
             target_tile.y,
-            action_state.primary_subject_id,
-            action_state.secondary_subject_id});
+        action_state.primary_subject_id,
+        action_state.secondary_subject_id});
 }
 
 DeferredWorkerMeterDelta resolve_worker_meter_cost_delta(
@@ -1264,9 +1350,9 @@ DeferredWorkerMeterDelta resolve_worker_meter_cost_delta(
 
 void emit_deferred_worker_meter_cost_request(
     GameMessageQueue& queue,
-    const ActionState& action_state)
+    const ConstActionStateRef action_state)
 {
-    if (!action_state.current_action_id.has_value() ||
+    if (!action_state.has_current_action_id ||
         action_state.deferred_meter_delta.flags == 0U)
     {
         return;
@@ -1276,7 +1362,7 @@ void emit_deferred_worker_meter_cost_request(
         queue,
         GameMessageType::WorkerMeterDeltaRequested,
         WorkerMeterDeltaRequestedMessage {
-            action_state.current_action_id->value,
+            action_state.current_action_id.value,
             action_state.deferred_meter_delta.flags,
             action_state.deferred_meter_delta.health_delta,
             action_state.deferred_meter_delta.hydration_delta,
@@ -1311,16 +1397,76 @@ void emit_site_action_failed(
             secondary_subject_id});
 }
 
-bool has_active_action(const ActionState& action_state) noexcept
+bool has_active_action(const ConstActionStateRef action_state) noexcept
 {
-    return action_state.current_action_id.has_value() &&
+    return action_state.has_current_action_id &&
         action_state.action_kind != ActionKind::None;
 }
 
-bool has_active_placement_mode(const ActionState& action_state) noexcept
+bool has_active_action(const ActionStateRef action_state) noexcept
+{
+    return has_active_action(ConstActionStateRef {
+        action_state.current_action_id,
+        action_state.action_kind,
+        action_state.target_tile,
+        action_state.approach_tile,
+        action_state.primary_subject_id,
+        action_state.secondary_subject_id,
+        action_state.item_id,
+        action_state.placement_reservation_token,
+        action_state.quantity,
+        action_state.request_flags,
+        action_state.awaiting_placement_reservation,
+        action_state.reactivate_placement_mode_on_completion,
+        action_state.total_action_minutes,
+        action_state.remaining_action_minutes,
+        action_state.deferred_meter_delta,
+        action_state.resolved_harvest_density,
+        action_state.resolved_harvest_outputs_valid,
+        action_state.started_at_world_minute,
+        action_state.placement_mode,
+        action_state.has_current_action_id,
+        action_state.has_target_tile,
+        action_state.has_approach_tile,
+        action_state.has_started_at_world_minute,
+        action_state.reserved_input_item_stacks,
+        action_state.resolved_harvest_outputs});
+}
+
+bool has_active_placement_mode(const ConstActionStateRef action_state) noexcept
 {
     return action_state.placement_mode.active &&
         action_state.placement_mode.action_kind != ActionKind::None;
+}
+
+bool has_active_placement_mode(const ActionStateRef action_state) noexcept
+{
+    return has_active_placement_mode(ConstActionStateRef {
+        action_state.current_action_id,
+        action_state.action_kind,
+        action_state.target_tile,
+        action_state.approach_tile,
+        action_state.primary_subject_id,
+        action_state.secondary_subject_id,
+        action_state.item_id,
+        action_state.placement_reservation_token,
+        action_state.quantity,
+        action_state.request_flags,
+        action_state.awaiting_placement_reservation,
+        action_state.reactivate_placement_mode_on_completion,
+        action_state.total_action_minutes,
+        action_state.remaining_action_minutes,
+        action_state.deferred_meter_delta,
+        action_state.resolved_harvest_density,
+        action_state.resolved_harvest_outputs_valid,
+        action_state.started_at_world_minute,
+        action_state.placement_mode,
+        action_state.has_current_action_id,
+        action_state.has_target_tile,
+        action_state.has_approach_tile,
+        action_state.has_started_at_world_minute,
+        action_state.reserved_input_item_stacks,
+        action_state.resolved_harvest_outputs});
 }
 
 bool action_supports_deferred_target_selection(ActionKind action_kind) noexcept
@@ -1352,7 +1498,7 @@ std::uint64_t full_blocked_mask_for_footprint(TileFootprint footprint) noexcept
 }
 
 std::uint32_t available_worker_pack_item_quantity(
-    const InventoryState& inventory,
+    ConstInventoryStateRef inventory,
     ItemId item_id) noexcept
 {
     std::uint32_t total_quantity = 0U;
@@ -1369,8 +1515,24 @@ std::uint32_t available_worker_pack_item_quantity(
     return total_quantity;
 }
 
+std::uint32_t available_worker_pack_item_quantity(
+    InventoryStateRef inventory,
+    ItemId item_id) noexcept
+{
+    std::uint32_t total_quantity = 0U;
+    for (const auto& slot : inventory.worker_pack_slots)
+    {
+        if (slot.occupied && slot.item_id == item_id && slot.item_quantity > 0U)
+        {
+            total_quantity += slot.item_quantity;
+        }
+    }
+
+    return total_quantity;
+}
+
 std::uint32_t reserved_worker_pack_item_quantity(
-    const ActionState& action_state,
+    ConstActionStateRef action_state,
     ItemId item_id) noexcept
 {
     std::uint32_t total_quantity = 0U;
@@ -1386,6 +1548,40 @@ std::uint32_t reserved_worker_pack_item_quantity(
     }
 
     return total_quantity;
+}
+
+std::uint32_t reserved_worker_pack_item_quantity(
+    ActionStateRef action_state,
+    ItemId item_id) noexcept
+{
+    return reserved_worker_pack_item_quantity(
+        ConstActionStateRef {
+            action_state.current_action_id,
+            action_state.action_kind,
+            action_state.target_tile,
+            action_state.approach_tile,
+            action_state.primary_subject_id,
+            action_state.secondary_subject_id,
+            action_state.item_id,
+            action_state.placement_reservation_token,
+            action_state.quantity,
+            action_state.request_flags,
+            action_state.awaiting_placement_reservation,
+            action_state.reactivate_placement_mode_on_completion,
+            action_state.total_action_minutes,
+            action_state.remaining_action_minutes,
+            action_state.deferred_meter_delta,
+            action_state.resolved_harvest_density,
+            action_state.resolved_harvest_outputs_valid,
+            action_state.started_at_world_minute,
+            action_state.placement_mode,
+            action_state.has_current_action_id,
+            action_state.has_target_tile,
+            action_state.has_approach_tile,
+            action_state.has_started_at_world_minute,
+            action_state.reserved_input_item_stacks,
+            action_state.resolved_harvest_outputs},
+        item_id);
 }
 
 const ItemDef* action_item_def(
@@ -1447,7 +1643,7 @@ bool action_requires_item(ActionKind action_kind, std::uint32_t item_id) noexcep
 
 bool should_reactivate_plant_placement_mode_after_completion(
     RuntimeInvocation& invocation,
-    const ActionState& action_state)
+    const ConstActionStateRef action_state)
 {
     if (!action_state.reactivate_placement_mode_on_completion ||
         action_state.action_kind != ActionKind::Plant)
@@ -1474,7 +1670,7 @@ bool should_reactivate_plant_placement_mode_after_completion(
 }
 
 void reactivate_plant_placement_mode_from_completed_action(
-    ActionState& action_state)
+    ActionStateRef action_state)
 {
     const TileCoord target_tile = action_target_tile(action_state);
     const TileFootprint footprint =
@@ -1498,7 +1694,7 @@ void reactivate_plant_placement_mode_from_completed_action(
     placement_mode.blocked_mask = full_blocked_mask_for_footprint(footprint);
 }
 
-Gs1InventoryContainerKind reserved_item_container_kind(const ActionState& action_state) noexcept
+Gs1InventoryContainerKind reserved_item_container_kind(const ConstActionStateRef action_state) noexcept
 {
     if (!action_state.reserved_input_item_stacks.empty())
     {
@@ -1508,7 +1704,7 @@ Gs1InventoryContainerKind reserved_item_container_kind(const ActionState& action
     return GS1_INVENTORY_CONTAINER_WORKER_PACK;
 }
 
-void populate_reserved_input_items(ActionState& action_state)
+void populate_reserved_input_items(ActionStateRef action_state)
 {
     action_state.reserved_input_item_stacks.clear();
     if (!action_requires_item(action_state.action_kind, action_state.item_id))
@@ -1531,7 +1727,7 @@ void populate_reserved_input_items(ActionState& action_state)
 
 SiteActionFailureReason validate_reserved_item_completion(
     RuntimeInvocation& invocation,
-    const ActionState& action_state)
+    ConstActionStateRef action_state)
 {
     auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     for (const auto& reserved_stack : action_state.reserved_input_item_stacks)
@@ -1712,7 +1908,7 @@ SiteActionFailureReason validate_excavation_target(
 }
 
 ExcavationTierPercents resolve_excavation_tier_percents(
-    const ModifierState& modifier_state,
+    ConstModifierStateRef modifier_state,
     ExcavationDepth depth) noexcept
 {
     const auto* depth_def = find_excavation_depth_def(depth);
@@ -1769,7 +1965,7 @@ ExcavationTierPercents resolve_excavation_tier_percents(
 }
 
 ExcavationLootTier roll_excavation_loot_tier(
-    const ModifierState& modifier_state,
+    ConstModifierStateRef modifier_state,
     ExcavationDepth depth,
     std::uint64_t seed) noexcept
 {
@@ -1917,7 +2113,7 @@ bool craft_output_fits_for_action(
 
     const auto source_containers =
         craft_logic::collect_nearby_source_containers(
-            world.own_inventory(),
+            world.read_inventory(),
             world.ecs_world_ptr(),
             world.read_worker().position.tile_coord,
             target_tile);
@@ -1947,17 +2143,47 @@ bool craft_output_fits_for_action(
         recipe_def);
 }
 
-bool is_action_waiting_for_placement(const ActionState& action_state) noexcept
+bool is_action_waiting_for_placement(const ConstActionStateRef action_state) noexcept
 {
     return has_active_action(action_state) && action_state.awaiting_placement_reservation;
 }
 
-bool action_has_started(const ActionState& action_state) noexcept
+bool action_has_started(const ConstActionStateRef action_state) noexcept
 {
-    return action_state.started_at_world_minute.has_value();
+    return action_state.has_started_at_world_minute;
 }
 
-bool is_action_waiting_for_worker_approach(const ActionState& action_state) noexcept
+bool action_has_started(const ActionStateRef action_state) noexcept
+{
+    return action_has_started(ConstActionStateRef {
+        action_state.current_action_id,
+        action_state.action_kind,
+        action_state.target_tile,
+        action_state.approach_tile,
+        action_state.primary_subject_id,
+        action_state.secondary_subject_id,
+        action_state.item_id,
+        action_state.placement_reservation_token,
+        action_state.quantity,
+        action_state.request_flags,
+        action_state.awaiting_placement_reservation,
+        action_state.reactivate_placement_mode_on_completion,
+        action_state.total_action_minutes,
+        action_state.remaining_action_minutes,
+        action_state.deferred_meter_delta,
+        action_state.resolved_harvest_density,
+        action_state.resolved_harvest_outputs_valid,
+        action_state.started_at_world_minute,
+        action_state.placement_mode,
+        action_state.has_current_action_id,
+        action_state.has_target_tile,
+        action_state.has_approach_tile,
+        action_state.has_started_at_world_minute,
+        action_state.reserved_input_item_stacks,
+        action_state.resolved_harvest_outputs});
+}
+
+bool is_action_waiting_for_worker_approach(const ConstActionStateRef action_state) noexcept
 {
     return has_active_action(action_state) &&
         !action_state.awaiting_placement_reservation &&
@@ -1965,19 +2191,19 @@ bool is_action_waiting_for_worker_approach(const ActionState& action_state) noex
         !action_has_started(action_state);
 }
 
-bool is_action_in_progress(const ActionState& action_state) noexcept
+bool is_action_in_progress(const ConstActionStateRef action_state) noexcept
 {
     return has_active_action(action_state) && action_has_started(action_state);
 }
 
-double current_action_total_duration_minutes(const ActionState& action_state) noexcept
+double current_action_total_duration_minutes(const ConstActionStateRef action_state) noexcept
 {
     return std::max(action_state.total_action_minutes, k_minimum_action_duration_minutes);
 }
 
 float resolve_action_progress_scale(
     RuntimeInvocation& invocation,
-    const ActionState& action_state) noexcept
+    const ConstActionStateRef action_state) noexcept
 {
     static_cast<void>(invocation);
     static_cast<void>(action_state);
@@ -1986,7 +2212,7 @@ float resolve_action_progress_scale(
 
 double action_elapsed_minutes_for_step(
     RuntimeInvocation& invocation,
-    const ActionState& action_state) noexcept
+    const ConstActionStateRef action_state) noexcept
 {
     auto access = make_game_state_access<ActionExecutionSystem>(invocation);
     const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
@@ -2030,9 +2256,9 @@ bool action_target_supports_interaction_range(
 
 bool worker_is_at_action_approach_tile(
     RuntimeInvocation& invocation,
-    const ActionState& action_state) noexcept
+    const ConstActionStateRef action_state) noexcept
 {
-    if (!action_state.approach_tile.has_value())
+    if (!action_state.has_approach_tile)
     {
         return true;
     }
@@ -2040,23 +2266,24 @@ bool worker_is_at_action_approach_tile(
     auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     return device_interaction_logic::worker_is_at_tile(
         world.read_worker(),
-        *action_state.approach_tile);
+        action_state.approach_tile);
 }
 
 void begin_action_execution(
     RuntimeInvocation& invocation,
-    ActionState& action_state)
+    ActionStateRef action_state)
 {
     auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
-    if (!action_state.current_action_id.has_value() || action_has_started(action_state))
+    if (!action_state.has_current_action_id || action_has_started(action_state))
     {
         return;
     }
 
     action_state.started_at_world_minute = world.read_time().world_time_minutes;
+    action_state.has_started_at_world_minute = true;
     emit_site_action_started(
         invocation.game_message_queue(),
-        action_state.current_action_id.value(),
+        action_state.current_action_id,
         action_state.action_kind,
         action_state.request_flags,
         action_target_tile(action_state),
@@ -2183,7 +2410,7 @@ TileCoord resolve_initial_placement_mode_tile(
 
 void update_placement_mode_preview(
     RuntimeInvocation& invocation,
-    PlacementModeState& placement_mode,
+    PlacementModeMetaState placement_mode,
     TileCoord target_tile)
 {
     auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
@@ -2212,18 +2439,18 @@ void update_placement_mode_preview(
 
 bool placement_mode_can_commit_to_tile(
     RuntimeInvocation& invocation,
-    PlacementModeState& placement_mode,
+    PlacementModeMetaState placement_mode,
     TileCoord target_tile)
 {
     auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
     update_placement_mode_preview(invocation, placement_mode, target_tile);
-    return placement_mode.target_tile.has_value() &&
-        world.tile_coord_in_bounds(*placement_mode.target_tile) &&
+    return placement_mode.has_target_tile &&
+        world.tile_coord_in_bounds(placement_mode.target_tile) &&
         placement_mode.blocked_mask == 0ULL;
 }
 
 bool placement_mode_matches_request(
-    const PlacementModeState& placement_mode,
+    const PlacementModeMetaState placement_mode,
     ActionKind action_kind,
     std::uint16_t quantity,
     std::uint32_t primary_subject_id,
@@ -2240,9 +2467,9 @@ bool placement_mode_matches_request(
 
 void emit_placement_reservation_released(
     GameMessageQueue& queue,
-    const ActionState& action_state)
+    ConstActionStateRef action_state)
 {
-    if (!action_state.current_action_id.has_value())
+    if (!action_state.has_current_action_id)
     {
         return;
     }
@@ -2251,16 +2478,16 @@ void emit_placement_reservation_released(
         queue,
         GameMessageType::PlacementReservationReleased,
         PlacementReservationReleasedMessage {
-            action_state.current_action_id->value,
+            action_state.current_action_id.value,
             action_state.placement_reservation_token});
 }
 
 void emit_placement_mode_commit_rejected(
     GameMessageQueue& queue,
-    const PlacementModeState& placement_mode,
+    const PlacementModeMetaState placement_mode,
     TileCoord target_tile)
 {
-    const TileCoord rejected_tile = placement_mode.target_tile.value_or(target_tile);
+    const TileCoord rejected_tile = placement_mode.has_target_tile ? placement_mode.target_tile : target_tile;
     enqueue_message(
         queue,
         GameMessageType::PlacementModeCommitRejected,
@@ -2274,7 +2501,7 @@ void emit_placement_mode_commit_rejected(
 
 void emit_action_fact_messages(
     RuntimeInvocation& invocation,
-    const ActionState& action_state)
+    const ConstActionStateRef action_state)
 {
     auto& queue = invocation.game_message_queue();
     const TileCoord target_tile = action_target_tile(action_state);
@@ -2482,10 +2709,10 @@ void emit_action_fact_messages(
 
 SiteActionFailureReason validate_craft_completion(
     RuntimeInvocation& invocation,
-    const ActionState& action_state)
+    const ConstActionStateRef action_state)
 {
     auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
-    if (!action_state.target_tile.has_value() || action_state.secondary_subject_id == 0U)
+    if (!action_state.has_target_tile || action_state.secondary_subject_id == 0U)
     {
         return SiteActionFailureReason::InvalidState;
     }
@@ -2496,18 +2723,18 @@ SiteActionFailureReason validate_craft_completion(
         return SiteActionFailureReason::InvalidState;
     }
 
-    if (!world.tile_coord_in_bounds(*action_state.target_tile) || !world.has_world())
+    if (!world.tile_coord_in_bounds(action_state.target_tile) || !world.has_world())
     {
         return SiteActionFailureReason::InvalidTarget;
     }
 
-    const auto tile = world.read_tile(*action_state.target_tile);
+    const auto tile = world.read_tile(action_state.target_tile);
     if (tile.device.structure_id != recipe_def->station_structure_id)
     {
         return SiteActionFailureReason::InvalidTarget;
     }
 
-    const auto device_entity_id = world.device_entity_id(*action_state.target_tile);
+    const auto device_entity_id = world.device_entity_id(action_state.target_tile);
     if (device_entity_id == 0U)
     {
         return SiteActionFailureReason::InvalidTarget;
@@ -2515,7 +2742,7 @@ SiteActionFailureReason validate_craft_completion(
 
     if (!craft_ingredients_available_for_action(
             invocation,
-            *action_state.target_tile,
+            action_state.target_tile,
             device_entity_id,
             *recipe_def))
     {
@@ -2524,7 +2751,7 @@ SiteActionFailureReason validate_craft_completion(
 
     if (!craft_output_fits_for_action(
             invocation,
-            *action_state.target_tile,
+            action_state.target_tile,
             device_entity_id,
             *recipe_def))
     {
@@ -2536,26 +2763,26 @@ SiteActionFailureReason validate_craft_completion(
 
 SiteActionFailureReason validate_repair_completion(
     RuntimeInvocation& invocation,
-    const ActionState& action_state)
+    const ConstActionStateRef action_state)
 {
-    if (!action_state.target_tile.has_value())
+    if (!action_state.has_target_tile)
     {
         return SiteActionFailureReason::InvalidState;
     }
 
-    return validate_repair_target(invocation, *action_state.target_tile);
+    return validate_repair_target(invocation, action_state.target_tile);
 }
 
 SiteActionFailureReason validate_harvest_completion(
     RuntimeInvocation& invocation,
-    const ActionState& action_state)
+    const ConstActionStateRef action_state)
 {
-    if (!action_state.target_tile.has_value())
+    if (!action_state.has_target_tile)
     {
         return SiteActionFailureReason::InvalidState;
     }
 
-    const auto failure_reason = validate_harvest_target(invocation, *action_state.target_tile);
+    const auto failure_reason = validate_harvest_target(invocation, action_state.target_tile);
     if (failure_reason != SiteActionFailureReason::None)
     {
         return failure_reason;
@@ -2573,16 +2800,16 @@ SiteActionFailureReason validate_harvest_completion(
 
 SiteActionFailureReason validate_excavation_completion(
     RuntimeInvocation& invocation,
-    const ActionState& action_state)
+    const ConstActionStateRef action_state)
 {
-    if (!action_state.target_tile.has_value())
+    if (!action_state.has_target_tile)
     {
         return SiteActionFailureReason::InvalidState;
     }
 
     return validate_excavation_target(
         invocation,
-        *action_state.target_tile,
+        action_state.target_tile,
         excavation_depth_from_subject_id(action_state.primary_subject_id));
 }
 
@@ -2605,7 +2832,7 @@ Gs1Status handle_start_site_action(
     const StartSiteActionMessage& payload)
 {
     auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
-    auto& action_state = world.own_action();
+    auto action_state = world.own_action();
     const ActionKind action_kind = to_action_kind(payload.action_kind);
     const bool deferred_target_selection =
         (payload.flags & GS1_SITE_ACTION_REQUEST_FLAG_DEFERRED_TARGET_SELECTION) != 0U;
@@ -2666,12 +2893,12 @@ Gs1Status handle_start_site_action(
             return GS1_STATUS_OK;
         }
 
-        const auto placement_mode = action_state.placement_mode;
+            const auto placement_mode = action_state.placement_mode;
         reactivate_plant_placement_mode_on_completion =
             placement_mode.action_kind == ActionKind::Plant &&
             placement_mode.item_id != 0U;
         clear_placement_mode(action_state.placement_mode);
-        target_tile = placement_mode.target_tile.value_or(target_tile);
+        target_tile = placement_mode.has_target_tile ? placement_mode.target_tile : target_tile;
         primary_subject_id = placement_mode.primary_subject_id;
         secondary_subject_id = placement_mode.secondary_subject_id;
         item_id = placement_mode.item_id;
@@ -2945,7 +3172,7 @@ Gs1Status handle_start_site_action(
             primary_subject_id,
             item_id,
             craft_recipe);
-        const RuntimeActionId action_id = allocate_runtime_action_id();
+    const RuntimeActionId action_id = allocate_runtime_action_id();
         std::vector<ResolvedHarvestOutputStack> resolved_harvest_outputs {};
         float resolved_harvest_density = 0.0f;
         if (action_kind == ActionKind::Harvest && harvest_plant_def != nullptr)
@@ -2978,7 +3205,8 @@ Gs1Status handle_start_site_action(
         action_state.current_action_id = action_id;
         action_state.action_kind = action_kind;
         action_state.target_tile = target_tile;
-        action_state.approach_tile.reset();
+        action_state.has_approach_tile = false;
+        action_state.approach_tile = TileCoord {};
         action_state.primary_subject_id = primary_subject_id;
         action_state.secondary_subject_id =
             action_kind == ActionKind::Craft && craft_recipe != nullptr
@@ -2999,7 +3227,8 @@ Gs1Status handle_start_site_action(
         action_state.resolved_harvest_outputs = std::move(resolved_harvest_outputs);
         action_state.resolved_harvest_density = resolved_harvest_density;
         action_state.resolved_harvest_outputs_valid = action_kind == ActionKind::Harvest;
-        action_state.started_at_world_minute.reset();
+        action_state.has_started_at_world_minute = false;
+        action_state.started_at_world_minute = 0.0;
         action_state.awaiting_placement_reservation =
             should_request_placement_reservation(action_kind);
         populate_reserved_input_items(action_state);
@@ -3030,7 +3259,7 @@ Gs1Status handle_start_site_action(
                 return GS1_STATUS_OK;
             }
 
-            action_state.approach_tile = approach_tile;
+        action_state.approach_tile = *approach_tile;
         }
 
         if (action_state.awaiting_placement_reservation)
@@ -3062,7 +3291,7 @@ Gs1Status handle_cancel_site_action(
     const CancelSiteActionMessage& payload)
 {
     auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
-    auto& action_state = world.own_action();
+    auto action_state = world.own_action();
         const bool cancels_current =
             (payload.flags & GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION) != 0U;
         const bool cancels_placement_mode =
@@ -3079,8 +3308,8 @@ Gs1Status handle_cancel_site_action(
         }
 
         const bool matches_id =
-            action_state.current_action_id.has_value() &&
-            payload.action_id == action_state.current_action_id->value;
+            action_state.has_current_action_id &&
+            payload.action_id == action_state.current_action_id.value;
 
         if (!cancels_current && !matches_id)
         {
@@ -3107,7 +3336,7 @@ Gs1Status handle_placement_mode_cursor_moved(
     const PlacementModeCursorMovedMessage& payload)
 {
     auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
-    auto& action_state = world.own_action();
+    auto action_state = world.own_action();
         if (!has_active_placement_mode(action_state))
         {
             return GS1_STATUS_OK;
@@ -3168,7 +3397,7 @@ Gs1Status ActionExecutionSystem::process_game_message(
     {
         return GS1_STATUS_INVALID_STATE;
     }
-    auto& action_state = world.own_action();
+    auto action_state = world.own_action();
     const auto& payload_type = message.type;
     switch (payload_type)
     {
@@ -3309,7 +3538,7 @@ void ActionExecutionSystem::run(RuntimeInvocation& invocation)
     {
         return;
     }
-    auto& action_state = world.own_action();
+    auto action_state = world.own_action();
     if (is_action_waiting_for_worker_approach(action_state) &&
         worker_is_at_action_approach_tile(invocation, action_state))
     {
@@ -3389,11 +3618,11 @@ void ActionExecutionSystem::run(RuntimeInvocation& invocation)
             return;
         }
 
-        if (action_state.target_tile.has_value())
-        {
-            action_state.secondary_subject_id = static_cast<std::uint32_t>(std::lround(
-                world.read_tile(*action_state.target_tile).ecology.plant_density * 100.0f));
-        }
+    if (action_state.has_target_tile)
+    {
+        action_state.secondary_subject_id = static_cast<std::uint32_t>(std::lround(
+            world.read_tile(action_state.target_tile).ecology.plant_density * 100.0f));
+    }
     }
     else if (action_state.action_kind == ActionKind::Excavate)
     {
