@@ -104,11 +104,21 @@ void rebuild_campaign_progression_entries(
 
 void rebuild_campaign_view(
     const CampaignCoreState& campaign_core,
-    const RegionalMapState& regional_map,
+    const RegionalMapMetaState& regional_map,
+    std::span<const SiteId> revealed_site_ids,
+    std::span<const SiteId> available_site_ids,
+    std::span<const SiteId> completed_site_ids,
     std::span<const FactionProgressState> faction_progress,
     const TechnologyState& technology,
-    const LoadoutPlannerState& loadout_planner,
-    std::span<const SiteMetaState> sites,
+    const LoadoutPlannerMetaState& loadout_planner,
+    std::span<const LoadoutSlot> baseline_deployment_items,
+    std::span<const LoadoutSlot> available_exported_support_items,
+    std::span<const LoadoutSlot> selected_loadout_slots,
+    std::span<const ModifierId> active_nearby_aura_modifier_ids,
+    std::span<const SiteMetaEntryState> sites,
+    std::span<const SiteId> site_adjacency_ids,
+    std::span<const LoadoutSlot> site_exported_support_items,
+    std::span<const ModifierId> site_nearby_aura_modifier_ids,
     RuntimeGameStateViewCache& cache)
 {
     cache.faction_progress.clear();
@@ -134,15 +144,15 @@ void rebuild_campaign_view(
     cache.campaign_sites.clear();
     cache.campaign_sites.reserve(sites.size());
 
-    for (const auto site_id : regional_map.revealed_site_ids)
+    for (const auto site_id : revealed_site_ids)
     {
         cache.revealed_site_ids.push_back(id_value(site_id));
     }
-    for (const auto site_id : regional_map.available_site_ids)
+    for (const auto site_id : available_site_ids)
     {
         cache.available_site_ids.push_back(id_value(site_id));
     }
-    for (const auto site_id : regional_map.completed_site_ids)
+    for (const auto site_id : completed_site_ids)
     {
         cache.completed_site_ids.push_back(id_value(site_id));
     }
@@ -150,18 +160,39 @@ void rebuild_campaign_view(
     for (const auto& site : sites)
     {
         const std::uint32_t adjacency_offset = static_cast<std::uint32_t>(cache.site_adjacency_ids.size());
-        for (const auto adjacent_site_id : site.adjacent_site_ids)
+        for (std::uint32_t index = 0U; index < site.adjacent_site_count; ++index)
         {
-            cache.site_adjacency_ids.push_back(id_value(adjacent_site_id));
+            const auto flat_index =
+                static_cast<std::size_t>(site.adjacent_site_offset + index);
+            if (flat_index < site_adjacency_ids.size())
+            {
+                cache.site_adjacency_ids.push_back(id_value(site_adjacency_ids[flat_index]));
+            }
         }
 
         const std::uint32_t support_offset = static_cast<std::uint32_t>(cache.site_exported_support_items.size());
-        append_loadout_slots(site.exported_support_items, cache.site_exported_support_items);
+        for (std::uint32_t index = 0U; index < site.exported_support_item_count; ++index)
+        {
+            const auto flat_index =
+                static_cast<std::size_t>(site.exported_support_item_offset + index);
+            if (flat_index < site_exported_support_items.size())
+            {
+                append_loadout_slots(
+                    std::span<const LoadoutSlot> {&site_exported_support_items[flat_index], 1U},
+                    cache.site_exported_support_items);
+            }
+        }
 
         const std::uint32_t aura_offset = static_cast<std::uint32_t>(cache.site_nearby_aura_modifier_ids.size());
-        for (const auto modifier_id : site.nearby_aura_modifier_ids)
+        for (std::uint32_t index = 0U; index < site.nearby_aura_modifier_count; ++index)
         {
-            cache.site_nearby_aura_modifier_ids.push_back(id_value(modifier_id));
+            const auto flat_index =
+                static_cast<std::size_t>(site.nearby_aura_modifier_offset + index);
+            if (flat_index < site_nearby_aura_modifier_ids.size())
+            {
+                cache.site_nearby_aura_modifier_ids.push_back(
+                    id_value(site_nearby_aura_modifier_ids[flat_index]));
+            }
         }
 
         cache.campaign_sites.push_back(Gs1CampaignSiteView {
@@ -177,11 +208,11 @@ void rebuild_campaign_view(
             static_cast<std::uint32_t>(site.completion_reputation_reward),
             site.completion_faction_reputation_reward,
             adjacency_offset,
-            static_cast<std::uint32_t>(site.adjacent_site_ids.size()),
+            site.adjacent_site_count,
             support_offset,
-            static_cast<std::uint32_t>(site.exported_support_items.size()),
+            site.exported_support_item_count,
             aura_offset,
-            static_cast<std::uint32_t>(site.nearby_aura_modifier_ids.size()),
+            site.nearby_aura_modifier_count,
             site.has_support_package_id ? 1U : 0U,
             {0U, 0U, 0U}});
     }
@@ -191,15 +222,15 @@ void rebuild_campaign_view(
     cache.selected_loadout_slots.clear();
     cache.active_nearby_aura_modifier_ids.clear();
     append_loadout_slots(
-        loadout_planner.baseline_deployment_items,
+        baseline_deployment_items,
         cache.baseline_deployment_items);
     append_loadout_slots(
-        loadout_planner.available_exported_support_items,
+        available_exported_support_items,
         cache.available_exported_support_items);
     append_loadout_slots(
-        loadout_planner.selected_loadout_slots,
+        selected_loadout_slots,
         cache.selected_loadout_slots);
-    for (const auto modifier_id : loadout_planner.active_nearby_aura_modifier_ids)
+    for (const auto modifier_id : active_nearby_aura_modifier_ids)
     {
         cache.active_nearby_aura_modifier_ids.push_back(id_value(modifier_id));
     }
@@ -213,8 +244,8 @@ void rebuild_campaign_view(
         campaign_core.campaign_days_total,
         campaign_core.campaign_days_remaining,
         static_cast<std::uint32_t>(std::max(0, technology.total_reputation)),
-        regional_map.selected_site_id.has_value()
-            ? static_cast<std::int32_t>(id_value(regional_map.selected_site_id.value()))
+        regional_map.has_selected_site_id
+            ? static_cast<std::int32_t>(id_value(regional_map.selected_site_id))
             : -1,
         campaign_core.active_site_id.has_value()
             ? static_cast<std::int32_t>(id_value(campaign_core.active_site_id.value()))
@@ -254,17 +285,22 @@ void rebuild_site_view(
     const SiteWorld* site_world,
     const SiteClockState& clock,
     const CampState& camp,
-    const InventoryState& inventory,
+    const InventoryMetaState& inventory,
+    std::span<const StorageContainerEntryState> storage_containers,
+    std::span<const std::uint64_t> storage_slot_item_instance_ids,
+    std::span<const InventorySlot> worker_pack_slots,
     const WeatherState& weather,
     const EventState& event,
-    const TaskBoardState& task_board,
-    const ModifierState& modifier,
-    const EconomyState& economy,
+    std::span<const TaskInstanceEntryState> visible_tasks,
+    std::span<const TaskRewardDraftOption> reward_draft_options,
+    std::span<const ActiveSiteModifierState> active_modifiers,
+    const EconomyMetaState& economy,
+    std::span<const PhoneListingState> phone_listings,
     const CraftContextMetaState& craft_context,
     std::span<const CraftContextOptionState> craft_context_options,
-    const ActionState& site_action,
+    const ActionMetaState& site_action,
     const SiteCounters& counters,
-    const SiteObjectiveState& objective,
+    const SiteObjectiveMetaState& objective,
     RuntimeGameStateViewCache& cache)
 {
     cache.inventory_storages.clear();
@@ -275,15 +311,15 @@ void rebuild_site_view(
     cache.phone_listings.clear();
     cache.craft_context_options.clear();
 
-    for (const auto& storage : inventory.storage_containers)
+    for (const auto& storage : storage_containers)
     {
         const std::uint32_t slot_offset = static_cast<std::uint32_t>(cache.inventory_slots.size());
         for (std::uint32_t slot_index = 0U; slot_index < storage.slot_item_count; ++slot_index)
         {
             const bool worker_pack_storage = storage.storage_id == inventory.worker_pack_storage_id;
             const InventorySlot* source_slot =
-                worker_pack_storage && slot_index < inventory.worker_pack_slots.size()
-                ? &inventory.worker_pack_slots[slot_index]
+                worker_pack_storage && slot_index < worker_pack_slots.size()
+                ? &worker_pack_slots[slot_index]
                 : nullptr;
             Gs1InventorySlotView slot_view {
                 storage.storage_id,
@@ -310,8 +346,8 @@ void rebuild_site_view(
                 const auto flat_slot_index =
                     static_cast<std::size_t>(storage.slot_item_offset + slot_index);
                 const auto instance_id =
-                    flat_slot_index < inventory.storage_slot_item_instance_ids.size()
-                    ? inventory.storage_slot_item_instance_ids[flat_slot_index]
+                    flat_slot_index < storage_slot_item_instance_ids.size()
+                    ? storage_slot_item_instance_ids[flat_slot_index]
                     : 0U;
                 slot_view.occupied = instance_id != 0U ? 1U : 0U;
                 slot_view.item_instance_id = static_cast<std::uint32_t>(instance_id);
@@ -332,12 +368,19 @@ void rebuild_site_view(
             storage.slot_item_count});
     }
 
-    for (const auto& task : task_board.visible_tasks)
+    for (const auto& task : visible_tasks)
     {
         const std::uint32_t reward_offset = static_cast<std::uint32_t>(cache.task_reward_draft_options.size());
         for (std::uint32_t index = 0U; index < task.reward_draft_option_count; ++index)
         {
-            const auto& reward = task_board.reward_draft_options[
+            const auto reward_index =
+                static_cast<std::size_t>(task.reward_draft_option_offset + index);
+            if (reward_index >= reward_draft_options.size())
+            {
+                break;
+            }
+
+            const auto& reward = reward_draft_options[
                 static_cast<std::size_t>(task.reward_draft_option_offset + index)];
             cache.task_reward_draft_options.push_back(Gs1TaskRewardDraftOptionView {
                 id_value(reward.reward_candidate_id),
@@ -382,7 +425,7 @@ void rebuild_site_view(
             {0U, 0U}});
     }
 
-    for (const auto& active_modifier : modifier.active_site_modifiers)
+    for (const auto& active_modifier : active_modifiers)
     {
         cache.active_modifiers.push_back(Gs1SiteModifierView {
             id_value(active_modifier.modifier_id),
@@ -393,7 +436,7 @@ void rebuild_site_view(
             {0U, 0U, 0U, 0U, 0U, 0U, 0U}});
     }
 
-    for (const auto& listing : economy.available_phone_listings)
+    for (const auto& listing : phone_listings)
     {
         cache.phone_listings.push_back(Gs1PhoneListingView {
             listing.listing_id,
@@ -423,8 +466,8 @@ void rebuild_site_view(
     const auto event_template_id = event.active_event_template_id.has_value()
         ? id_value(event.active_event_template_id.value())
         : 0U;
-    const auto current_action_id = site_action.current_action_id.has_value()
-        ? id_value(site_action.current_action_id.value())
+    const auto current_action_id = site_action.has_current_action_id
+        ? id_value(site_action.current_action_id)
         : 0U;
     const auto& placement_mode = site_action.placement_mode;
 
@@ -484,16 +527,16 @@ void rebuild_site_view(
             event.wave_sequence_index},
         Gs1SiteActionView {
             current_action_id,
-            site_action.current_action_id.has_value() ? 1U : 0U,
+            site_action.has_current_action_id ? 1U : 0U,
             static_cast<Gs1SiteActionKind>(site_action.action_kind),
             site_action.quantity,
-            site_action.target_tile.has_value() ? site_action.target_tile->x : 0,
-            site_action.target_tile.has_value() ? site_action.target_tile->y : 0,
-            site_action.target_tile.has_value() ? 1U : 0U,
+            site_action.has_target_tile ? site_action.target_tile.x : 0,
+            site_action.has_target_tile ? site_action.target_tile.y : 0,
+            site_action.has_target_tile ? 1U : 0U,
             {0U, 0U, 0U},
-            site_action.approach_tile.has_value() ? site_action.approach_tile->x : 0,
-            site_action.approach_tile.has_value() ? site_action.approach_tile->y : 0,
-            site_action.approach_tile.has_value() ? 1U : 0U,
+            site_action.has_approach_tile ? site_action.approach_tile.x : 0,
+            site_action.has_approach_tile ? site_action.approach_tile.y : 0,
+            site_action.has_approach_tile ? 1U : 0U,
             {0U, 0U, 0U},
             site_action.primary_subject_id,
             site_action.secondary_subject_id,
@@ -505,16 +548,16 @@ void rebuild_site_view(
             0U,
             site_action.total_action_minutes,
             site_action.remaining_action_minutes,
-            site_action.started_at_world_minute.value_or(0.0),
-            site_action.started_at_world_minute.has_value() ? 1U : 0U,
+            site_action.started_at_world_minute,
+            site_action.has_started_at_world_minute ? 1U : 0U,
             {0U, 0U, 0U, 0U, 0U, 0U, 0U}},
         Gs1PlacementModeView {
             static_cast<Gs1SiteActionKind>(placement_mode.action_kind),
             placement_mode.active ? 1U : 0U,
             placement_mode.quantity,
-            placement_mode.target_tile.has_value() ? placement_mode.target_tile->x : 0,
-            placement_mode.target_tile.has_value() ? placement_mode.target_tile->y : 0,
-            placement_mode.target_tile.has_value() ? 1U : 0U,
+            placement_mode.has_target_tile ? placement_mode.target_tile.x : 0,
+            placement_mode.has_target_tile ? placement_mode.target_tile.y : 0,
+            placement_mode.has_target_tile ? 1U : 0U,
             placement_mode.request_flags,
             placement_mode.footprint_width,
             placement_mode.footprint_height,
@@ -601,17 +644,49 @@ void rebuild_game_state_view_cache(
 
     if (state.campaign_core.has_value())
     {
-        const auto regional_map = assemble_regional_map_state_from_state_sets(state, state_manager);
-        const auto loadout =
-            assemble_loadout_planner_state_from_state_sets(state, state_manager);
-        const auto sites = assemble_sites_state_from_state_sets(state, state_manager);
+        const auto& regional_map =
+            *state_manager.query<StateSetId::CampaignRegionalMapMeta>(state);
+        const auto& revealed_site_ids =
+            *state_manager.query<StateSetId::CampaignRegionalMapRevealedSites>(state);
+        const auto& available_site_ids =
+            *state_manager.query<StateSetId::CampaignRegionalMapAvailableSites>(state);
+        const auto& completed_site_ids =
+            *state_manager.query<StateSetId::CampaignRegionalMapCompletedSites>(state);
+        const auto& loadout =
+            *state_manager.query<StateSetId::CampaignLoadoutPlannerMeta>(state);
+        const auto& baseline_items =
+            *state_manager.query<StateSetId::CampaignLoadoutPlannerBaselineItems>(state);
+        const auto& available_support_items =
+            *state_manager.query<StateSetId::CampaignLoadoutPlannerAvailableSupportItems>(state);
+        const auto& selected_slots =
+            *state_manager.query<StateSetId::CampaignLoadoutPlannerSelectedSlots>(state);
+        const auto& nearby_aura_ids =
+            *state_manager.query<StateSetId::CampaignLoadoutPlannerNearbyAuraModifiers>(state);
+        const auto& site_entries =
+            *state_manager.query<StateSetId::CampaignSiteMetaEntries>(state);
+        const auto& site_adjacency_ids =
+            *state_manager.query<StateSetId::CampaignSiteAdjacentIds>(state);
+        const auto& site_exported_support_items =
+            *state_manager.query<StateSetId::CampaignSiteExportedSupportItems>(state);
+        const auto& site_nearby_aura_modifier_ids =
+            *state_manager.query<StateSetId::CampaignSiteNearbyAuraModifierIds>(state);
         rebuild_campaign_view(
             *state_manager.query<StateSetId::CampaignCore>(state),
             regional_map,
+            revealed_site_ids,
+            available_site_ids,
+            completed_site_ids,
             *state_manager.query<StateSetId::CampaignFactionProgress>(state),
             *state_manager.query<StateSetId::CampaignTechnology>(state),
             loadout,
-            sites,
+            baseline_items,
+            available_support_items,
+            selected_slots,
+            nearby_aura_ids,
+            site_entries,
+            site_adjacency_ids,
+            site_exported_support_items,
+            site_nearby_aura_modifier_ids,
             cache);
         cache.root.campaign = &cache.campaign;
     }
@@ -623,28 +698,27 @@ void rebuild_game_state_view_cache(
 
     if (state.site_run_meta.has_value())
     {
-        const auto inventory = assemble_inventory_state_from_state_sets(state, state_manager);
-        const auto task_board = assemble_task_board_state_from_state_sets(state, state_manager);
-        const auto modifier = assemble_modifier_state_from_state_sets(state, state_manager);
-        const auto economy = assemble_economy_state_from_state_sets(state, state_manager);
-        const auto action = assemble_action_state_from_state_sets(state, state_manager);
-        const auto objective = assemble_site_objective_state_from_state_sets(state, state_manager);
         rebuild_site_view(
             *state_manager.query<StateSetId::SiteRunMeta>(state),
             runtime.site_world(),
             *state_manager.query<StateSetId::SiteClock>(state),
             *state_manager.query<StateSetId::SiteCamp>(state),
-            inventory,
+            *state_manager.query<StateSetId::SiteInventoryMeta>(state),
+            *state_manager.query<StateSetId::SiteInventoryStorageContainers>(state),
+            *state_manager.query<StateSetId::SiteInventoryStorageSlotItemIds>(state),
+            *state_manager.query<StateSetId::SiteInventoryWorkerPackSlots>(state),
             *state_manager.query<StateSetId::SiteWeather>(state),
             *state_manager.query<StateSetId::SiteEvent>(state),
-            task_board,
-            modifier,
-            economy,
+            *state_manager.query<StateSetId::SiteTaskBoardVisibleTasks>(state),
+            *state_manager.query<StateSetId::SiteTaskBoardRewardDraftOptions>(state),
+            *state_manager.query<StateSetId::SiteModifierActiveSiteModifiers>(state),
+            *state_manager.query<StateSetId::SiteEconomyMeta>(state),
+            *state_manager.query<StateSetId::SiteEconomyPhoneListings>(state),
             *state_manager.query<StateSetId::SiteCraftContextMeta>(state),
             *state_manager.query<StateSetId::SiteCraftContextOptions>(state),
-            action,
+            *state_manager.query<StateSetId::SiteActionMeta>(state),
             *state_manager.query<StateSetId::SiteCounters>(state),
-            objective,
+            *state_manager.query<StateSetId::SiteObjectiveMeta>(state),
             cache);
         cache.root.active_site = &cache.site;
     }

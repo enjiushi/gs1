@@ -2968,8 +2968,9 @@ Gs1Status handle_start_site_action(
             }
 
             const auto required_quantity = requested_quantity;
-            if (available_worker_pack_item_quantity(world.read_inventory(), item_def->item_id) <
-                required_quantity)
+            const auto available_quantity =
+                available_worker_pack_item_quantity(world.read_inventory(), item_def->item_id);
+            if (available_quantity < required_quantity)
             {
                 emit_site_action_failed(
                     invocation.game_message_queue(),
@@ -3203,8 +3204,10 @@ Gs1Status handle_start_site_action(
         }
 
         action_state.current_action_id = action_id;
+        action_state.has_current_action_id = true;
         action_state.action_kind = action_kind;
         action_state.target_tile = target_tile;
+        action_state.has_target_tile = true;
         action_state.has_approach_tile = false;
         action_state.approach_tile = TileCoord {};
         action_state.primary_subject_id = primary_subject_id;
@@ -3260,6 +3263,7 @@ Gs1Status handle_start_site_action(
             }
 
         action_state.approach_tile = *approach_tile;
+        action_state.has_approach_tile = true;
         }
 
         if (action_state.awaiting_placement_reservation)

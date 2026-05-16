@@ -313,11 +313,13 @@ void inventory_regression_runner(
 
     if (scenario == "use_item" || scenario == "transfer")
     {
-        site_run.inventory.worker_pack_slots[0].occupied = true;
-        site_run.inventory.worker_pack_slots[0].item_id = gs1::ItemId {gs1::k_item_water_container};
-        site_run.inventory.worker_pack_slots[0].item_quantity = 2U;
-        site_run.inventory.worker_pack_slots[0].item_condition = 1.0f;
-        site_run.inventory.worker_pack_slots[0].item_freshness = 1.0f;
+        GS1_SYSTEM_TEST_REQUIRE(
+            context,
+            set_worker_pack_slot_stack(
+                site_run,
+                0U,
+                gs1::ItemId {gs1::k_item_water_container},
+                2U));
     }
 
     if (scenario == "use_item")
@@ -349,9 +351,13 @@ void inventory_regression_runner(
         const std::uint32_t destination_slot = parse_u32(context, values, "destination_slot", 1U);
         if (parse_bool(values, "prefill_destination_with_same_item", false))
         {
-            site_run.inventory.worker_pack_slots[destination_slot] = site_run.inventory.worker_pack_slots[source_slot];
-            site_run.inventory.worker_pack_slots[destination_slot].item_quantity =
-                parse_u32(context, values, "prefill_destination_quantity", 1U);
+            GS1_SYSTEM_TEST_REQUIRE(
+                context,
+                set_worker_pack_slot_stack(
+                    site_run,
+                    destination_slot,
+                    gs1::ItemId {gs1::k_item_water_container},
+                    parse_u32(context, values, "prefill_destination_quantity", 1U)));
         }
 
         const auto status = invoke_system_message<InventorySystem>(

@@ -2,7 +2,7 @@
 #include "content/defs/plant_defs.h"
 #include "messages/game_message.h"
 #include "runtime/game_state.h"
-#include "runtime/runtime_split_state_compat.h"
+#include "../system/source/split_state_test_helpers.h"
 #include "runtime/state_manager.h"
 #include "runtime/system_interface.h"
 #include "site/site_run_state.h"

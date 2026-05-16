@@ -7,7 +7,7 @@
 #include "content/defs/item_defs.h"
 #include "messages/game_message.h"
 #include "runtime/game_state.h"
-#include "runtime/runtime_split_state_compat.h"
+#include "split_state_test_helpers.h"
 #include "runtime/state_manager.h"
 #include "runtime/system_interface.h"
 #include "site/inventory_storage.h"
@@ -434,7 +434,7 @@ struct SplitRuntimeFixture final
         std::optional<CampaignState>& campaign,
         std::optional<SiteRunState>& active_site_run,
         std::deque<Gs1RuntimeMessage>& runtime_messages,
-        GameMessageQueue& message_queue) const
+        GameMessageQueue& message_queue)
     {
         app_state = state.app_state.get();
         runtime_messages = state.runtime_messages;
@@ -702,6 +702,84 @@ inline flecs::entity worker_entity(SiteRunState& site_run)
 inline flecs::entity starter_storage_container(SiteRunState& site_run)
 {
     return gs1::inventory_storage::starter_storage_container(site_run);
+}
+
+inline bool set_container_slot_stack(
+    SiteRunState& site_run,
+    flecs::entity container,
+    std::uint32_t slot_index,
+    ItemId item_id,
+    std::uint32_t quantity,
+    float condition = 1.0f,
+    float freshness = 1.0f)
+{
+    if (site_run.site_world == nullptr || !container.is_valid())
+    {
+        return false;
+    }
+
+    auto* storage = [&]() -> StorageContainerEntryState* {
+        for (auto& entry : site_run.inventory.storage_containers)
+        {
+            if (entry.container_entity_id == container.id())
+            {
+                return &entry;
+            }
+        }
+        return nullptr;
+    }();
+    if (storage == nullptr || slot_index >= storage->slot_item_count)
+    {
+        return false;
+    }
+
+    const auto flat_slot_index =
+        static_cast<std::size_t>(storage->slot_item_offset) + static_cast<std::size_t>(slot_index);
+    if (flat_slot_index >= site_run.inventory.storage_slot_item_instance_ids.size())
+    {
+        return false;
+    }
+
+    if (const auto existing = gs1::inventory_storage::item_entity_for_slot(site_run, container, slot_index);
+        existing.is_valid())
+    {
+        existing.destruct();
+    }
+    site_run.inventory.storage_slot_item_instance_ids[flat_slot_index] = 0U;
+
+    if (item_id.value != 0U && quantity > 0U)
+    {
+        const auto created = gs1::inventory_storage::create_item_entity(
+            site_run.site_world->ecs_world(),
+            container,
+            slot_index,
+            item_id,
+            quantity,
+            condition,
+            freshness);
+        site_run.inventory.storage_slot_item_instance_ids[flat_slot_index] = created.id();
+    }
+
+    gs1::inventory_storage::sync_projection_views(site_run);
+    return true;
+}
+
+inline bool set_worker_pack_slot_stack(
+    SiteRunState& site_run,
+    std::uint32_t slot_index,
+    ItemId item_id,
+    std::uint32_t quantity,
+    float condition = 1.0f,
+    float freshness = 1.0f)
+{
+    return set_container_slot_stack(
+        site_run,
+        gs1::inventory_storage::worker_pack_container(site_run),
+        slot_index,
+        item_id,
+        quantity,
+        condition,
+        freshness);
 }
 
 template <typename Component, typename Func>

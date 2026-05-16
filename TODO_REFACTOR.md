@@ -10,6 +10,7 @@
 - [ ] Remove the remaining narrow aggregate compatibility helpers once tests and view rebuilds stop depending on them.
   Target: `src/runtime/runtime_split_state_compat.h`.
 - [ ] Stop assembling temporary aggregate `CampaignState` / `SiteRunState` values in non-production callers that still use the compatibility surface.
-  Target: `tests/system/source/system_test_fixtures.h`, runtime/system tests that still seed aggregate `site_run` state directly, and `src/runtime/game_state_view.cpp`.
+  Progress: `src/runtime/game_state_view.cpp` now rebuilds its cache directly from flat state sets without reassembling temporary aggregate site/campaign slices.
+  Remaining target: `tests/system/source/system_test_fixtures.h` and runtime/system tests that still seed aggregate `site_run` state directly.
 - [ ] Remove the last aggregate convenience bridges that only exist to adapt `SiteRunState` callers onto split inventory/action helpers after the test-side compatibility cleanup is finished.
   Target: `src/site/inventory_storage.cpp` `SiteRunState` adapter helpers and any now-redundant aggregate overloads.

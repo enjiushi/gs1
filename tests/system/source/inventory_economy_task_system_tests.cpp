@@ -513,11 +513,13 @@ void inventory_transfer_moves_and_merges_stacks(gs1::testing::SystemTestExecutio
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
-    site_run.inventory.worker_pack_slots[0].occupied = true;
-    site_run.inventory.worker_pack_slots[0].item_id = gs1::ItemId {gs1::k_item_water_container};
-    site_run.inventory.worker_pack_slots[0].item_quantity = 2U;
-    site_run.inventory.worker_pack_slots[0].item_condition = 1.0f;
-    site_run.inventory.worker_pack_slots[0].item_freshness = 1.0f;
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        set_worker_pack_slot_stack(
+            site_run,
+            0U,
+            gs1::ItemId {gs1::k_item_water_container},
+            2U));
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -537,7 +539,13 @@ void inventory_transfer_moves_and_merges_stacks(gs1::testing::SystemTestExecutio
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[3].item_id.value == 1U);
     GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.worker_pack_slots[3].item_quantity == 1U);
 
-    site_run.inventory.worker_pack_slots[4] = site_run.inventory.worker_pack_slots[3];
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        set_worker_pack_slot_stack(
+            site_run,
+            4U,
+            gs1::ItemId {gs1::k_item_water_container},
+            1U));
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         invoke_system_message<InventorySystem>(
@@ -767,17 +775,20 @@ void inventory_item_consume_removes_quantity_across_matching_stacks(
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
-    site_run.inventory.worker_pack_slots[0].occupied = true;
-    site_run.inventory.worker_pack_slots[0].item_id = gs1::ItemId {gs1::k_item_water_container};
-    site_run.inventory.worker_pack_slots[0].item_quantity = 2U;
-    site_run.inventory.worker_pack_slots[0].item_condition = 1.0f;
-    site_run.inventory.worker_pack_slots[0].item_freshness = 1.0f;
-
-    site_run.inventory.worker_pack_slots[3].occupied = true;
-    site_run.inventory.worker_pack_slots[3].item_id = gs1::ItemId {gs1::k_item_water_container};
-    site_run.inventory.worker_pack_slots[3].item_quantity = 2U;
-    site_run.inventory.worker_pack_slots[3].item_condition = 1.0f;
-    site_run.inventory.worker_pack_slots[3].item_freshness = 1.0f;
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        set_worker_pack_slot_stack(
+            site_run,
+            0U,
+            gs1::ItemId {gs1::k_item_water_container},
+            2U));
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        set_worker_pack_slot_stack(
+            site_run,
+            3U,
+            gs1::ItemId {gs1::k_item_water_container},
+            2U));
 
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -813,11 +824,13 @@ void inventory_item_use_drink_defers_item_and_meter_changes_until_action_complet
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
-    site_run.inventory.worker_pack_slots[0].occupied = true;
-    site_run.inventory.worker_pack_slots[0].item_id = gs1::ItemId {gs1::k_item_water_container};
-    site_run.inventory.worker_pack_slots[0].item_quantity = 2U;
-    site_run.inventory.worker_pack_slots[0].item_condition = 1.0f;
-    site_run.inventory.worker_pack_slots[0].item_freshness = 1.0f;
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        set_worker_pack_slot_stack(
+            site_run,
+            0U,
+            gs1::ItemId {gs1::k_item_water_container},
+            2U));
 
     auto worker_conditions = site_run.site_world->worker_conditions();
     worker_conditions.hydration = 40.0f;
@@ -900,11 +913,13 @@ void inventory_item_use_food_restores_nourishment_without_refilling_energy(
                 GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
-    site_run.inventory.worker_pack_slots[0].occupied = true;
-    site_run.inventory.worker_pack_slots[0].item_id = gs1::ItemId {gs1::k_item_food_pack};
-    site_run.inventory.worker_pack_slots[0].item_quantity = 2U;
-    site_run.inventory.worker_pack_slots[0].item_condition = 1.0f;
-    site_run.inventory.worker_pack_slots[0].item_freshness = 1.0f;
+    GS1_SYSTEM_TEST_REQUIRE(
+        context,
+        set_worker_pack_slot_stack(
+            site_run,
+            0U,
+            gs1::ItemId {gs1::k_item_food_pack},
+            2U));
 
     auto worker_conditions = site_run.site_world->worker_conditions();
     worker_conditions.health = 100.0f;
@@ -1408,11 +1423,14 @@ void inventory_delivery_queues_only_overflow_until_delivery_crate_space_opens(
          slot_index < gs1::inventory_storage::slot_count_in_container(site_run, delivery_box);
          ++slot_index)
     {
-        (void)gs1::inventory_storage::add_item_to_container(
-            site_run,
-            delivery_box,
-            gs1::ItemId {gs1::k_item_wood_bundle},
-            20U);
+        GS1_SYSTEM_TEST_REQUIRE(
+            context,
+            set_container_slot_stack(
+                site_run,
+                delivery_box,
+                slot_index,
+                gs1::ItemId {gs1::k_item_wood_bundle},
+                20U));
     }
 
     GS1_SYSTEM_TEST_REQUIRE(
@@ -1425,10 +1443,10 @@ void inventory_delivery_queues_only_overflow_until_delivery_crate_space_opens(
                     gs1::k_item_ordos_wormwood_seed_bundle,
                     3U,
                     1U})) == GS1_STATUS_OK);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.pending_delivery_queue.size() == 1U);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.pending_deliveries.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        site_run.inventory.pending_delivery_queue.front().state == gs1::PendingDeliveryState::Pending);
+        site_run.inventory.pending_deliveries.front().state == gs1::PendingDeliveryState::Pending);
     GS1_SYSTEM_TEST_CHECK(context, delivery_box_slot_stack(site_run, 0U) != nullptr);
 
     for (int step = 0; step < 8; ++step)
@@ -1437,7 +1455,7 @@ void inventory_delivery_queues_only_overflow_until_delivery_crate_space_opens(
     }
     GS1_SYSTEM_TEST_CHECK(
         context,
-        site_run.inventory.pending_delivery_queue.front().state == gs1::PendingDeliveryState::Pending);
+        site_run.inventory.pending_deliveries.front().state == gs1::PendingDeliveryState::Pending);
     GS1_SYSTEM_TEST_CHECK(
         context,
         gs1::inventory_storage::available_item_quantity_in_container(
@@ -1453,7 +1471,7 @@ void inventory_delivery_queues_only_overflow_until_delivery_crate_space_opens(
     GS1_SYSTEM_TEST_CHECK(context, cleared_quantity == 0U);
 
     invoke_system_run<InventorySystem>(site_context);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.pending_delivery_queue.empty());
+    GS1_SYSTEM_TEST_CHECK(context, site_run.inventory.pending_deliveries.empty());
     GS1_SYSTEM_TEST_REQUIRE(context, delivery_box_slot_stack(site_run, 0U) != nullptr);
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -2857,8 +2875,13 @@ void task_board_reward_claim_queues_resolved_message_after_reward_effects(
     task.target_amount = 1U;
     task.current_progress_amount = 1U;
     task.runtime_list_kind = TaskRuntimeListKind::PendingClaim;
-    task.reward_draft_options.push_back(gs1::TaskRewardDraftOption {gs1::RewardCandidateId {1U}, false});
-    task.reward_draft_options.push_back(gs1::TaskRewardDraftOption {gs1::RewardCandidateId {2U}, false});
+    task.reward_draft_option_offset =
+        static_cast<std::uint32_t>(site_run.task_board.reward_draft_options.size());
+    task.reward_draft_option_count = 2U;
+    site_run.task_board.reward_draft_options.push_back(
+        gs1::TaskRewardDraftOption {gs1::RewardCandidateId {1U}, false});
+    site_run.task_board.reward_draft_options.push_back(
+        gs1::TaskRewardDraftOption {gs1::RewardCandidateId {2U}, false});
     site_run.task_board.completed_task_ids.push_back(task.task_instance_id);
 
     GS1_SYSTEM_TEST_REQUIRE(
@@ -2892,8 +2915,13 @@ void task_board_reward_claim_uses_first_draft_option_when_candidate_is_unspecifi
     task.target_amount = 1U;
     task.current_progress_amount = 1U;
     task.runtime_list_kind = TaskRuntimeListKind::PendingClaim;
-    task.reward_draft_options.push_back(gs1::TaskRewardDraftOption {gs1::RewardCandidateId {1U}, false});
-    task.reward_draft_options.push_back(gs1::TaskRewardDraftOption {gs1::RewardCandidateId {2U}, false});
+    task.reward_draft_option_offset =
+        static_cast<std::uint32_t>(site_run.task_board.reward_draft_options.size());
+    task.reward_draft_option_count = 2U;
+    site_run.task_board.reward_draft_options.push_back(
+        gs1::TaskRewardDraftOption {gs1::RewardCandidateId {1U}, false});
+    site_run.task_board.reward_draft_options.push_back(
+        gs1::TaskRewardDraftOption {gs1::RewardCandidateId {2U}, false});
     site_run.task_board.completed_task_ids.push_back(task.task_instance_id);
 
     GS1_SYSTEM_TEST_REQUIRE(
@@ -2917,8 +2945,8 @@ void task_board_reward_claim_uses_first_draft_option_when_candidate_is_unspecifi
     GS1_SYSTEM_TEST_CHECK(
         context,
         count_queued_messages(queue, GameMessageType::InventoryDeliveryRequested) == 1U);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.visible_tasks.front().reward_draft_options[0].selected);
-    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.visible_tasks.front().reward_draft_options[1].selected);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.reward_draft_options[0].selected);
+    GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.reward_draft_options[1].selected);
 }
 
 void task_board_content_tuning_exposes_internal_prices_and_task_scoring_inputs(

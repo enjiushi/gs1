@@ -471,6 +471,27 @@ void try_add_delivery_to_crate(
             stack.occupied = remaining_quantity > 0U;
         }
     }
+
+    std::size_t write_index = start_offset;
+    for (std::size_t stack_index = start_offset; stack_index < end_offset; ++stack_index)
+    {
+        auto& stack = inventory.pending_delivery_item_stacks[stack_index];
+        if (!stack.occupied || stack.item_quantity == 0U)
+        {
+            stack = InventorySlot {};
+            continue;
+        }
+
+        if (write_index != stack_index)
+        {
+            inventory.pending_delivery_item_stacks[write_index] = stack;
+            stack = InventorySlot {};
+        }
+        ++write_index;
+    }
+
+    delivery.item_stack_count =
+        static_cast<std::uint32_t>(write_index - start_offset);
 }
 
 void seed_inventory_from_loadout(RuntimeInvocation& invocation) noexcept
@@ -1252,6 +1273,7 @@ Gs1Status handle_inventory_delivery_requested(
     const InventoryDeliveryRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(invocation, [&]() -> Gs1Status {
+        auto inventory = inventory_world(invocation).own_inventory();
         const ItemId item_id {payload.item_id};
         if (find_item_def(item_id) == nullptr)
         {
@@ -1270,20 +1292,22 @@ Gs1Status handle_inventory_delivery_requested(
             return GS1_STATUS_INVALID_ARGUMENT;
         }
 
+        delivery.item_stack_offset =
+            static_cast<std::uint32_t>(inventory.pending_delivery_item_stacks.size());
+        inventory.pending_delivery_item_stacks.push_back(InventorySlot {
+            0U,
+            ItemId {entry.item_id},
+            entry.quantity,
+            1.0f,
+            1.0f,
+            true});
         try_add_delivery_to_crate(invocation, delivery);
+        inventory.pending_delivery_item_stacks.resize(
+            static_cast<std::size_t>(delivery.item_stack_offset) +
+            static_cast<std::size_t>(delivery.item_stack_count));
         if (delivery_has_pending_items(delivery))
         {
-            auto inventory = inventory_world(invocation).own_inventory();
-            delivery.item_stack_offset =
-                static_cast<std::uint32_t>(inventory.pending_delivery_item_stacks.size());
             inventory.pending_deliveries.push_back(delivery);
-            inventory.pending_delivery_item_stacks.push_back(InventorySlot {
-                0U,
-                ItemId {entry.item_id},
-                entry.quantity,
-                1.0f,
-                1.0f,
-                true});
         }
         return GS1_STATUS_OK;
     });
@@ -1294,6 +1318,7 @@ Gs1Status handle_inventory_delivery_batch_requested(
     const InventoryDeliveryBatchRequestedMessage& payload) noexcept
 {
     return mutate_inventory_storage(invocation, [&]() -> Gs1Status {
+        auto inventory = inventory_world(invocation).own_inventory();
         if (payload.entry_count == 0U || payload.entry_count > k_inventory_delivery_batch_entry_count)
         {
             return GS1_STATUS_INVALID_ARGUMENT;
@@ -1318,28 +1343,30 @@ Gs1Status handle_inventory_delivery_batch_requested(
             return GS1_STATUS_INVALID_ARGUMENT;
         }
 
+        delivery.item_stack_offset =
+            static_cast<std::uint32_t>(inventory.pending_delivery_item_stacks.size());
+        for (std::uint8_t index = 0U; index < payload.entry_count; ++index)
+        {
+            const auto& batch_entry = payload.entries[index];
+            if (batch_entry.item_id == 0U || batch_entry.quantity == 0U)
+            {
+                continue;
+            }
+
+            inventory.pending_delivery_item_stacks.push_back(InventorySlot {
+                0U,
+                ItemId {batch_entry.item_id},
+                batch_entry.quantity,
+                1.0f,
+                1.0f,
+                true});
+        }
         try_add_delivery_to_crate(invocation, delivery);
+        inventory.pending_delivery_item_stacks.resize(
+            static_cast<std::size_t>(delivery.item_stack_offset) +
+            static_cast<std::size_t>(delivery.item_stack_count));
         if (delivery_has_pending_items(delivery))
         {
-            auto inventory = inventory_world(invocation).own_inventory();
-            delivery.item_stack_offset =
-                static_cast<std::uint32_t>(inventory.pending_delivery_item_stacks.size());
-            for (std::uint8_t index = 0U; index < payload.entry_count; ++index)
-            {
-                const auto& batch_entry = payload.entries[index];
-                if (batch_entry.item_id == 0U || batch_entry.quantity == 0U)
-                {
-                    continue;
-                }
-
-                inventory.pending_delivery_item_stacks.push_back(InventorySlot {
-                    0U,
-                    ItemId {batch_entry.item_id},
-                    batch_entry.quantity,
-                    1.0f,
-                    1.0f,
-                    true});
-            }
             inventory.pending_deliveries.push_back(delivery);
         }
         return GS1_STATUS_OK;
@@ -1406,7 +1433,6 @@ void progress_pending_deliveries(RuntimeInvocation& invocation) noexcept
                 return !delivery_has_pending_items(delivery);
             }),
         inventory.pending_deliveries.end());
-
     mark_changed_slot_views(invocation, before_worker);
 }
 

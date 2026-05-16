@@ -91,6 +91,14 @@ flecs::entity entity_from_id(
 }
 
 flecs::entity entity_from_id(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    std::uint64_t entity_id) noexcept
+{
+    return entity_from_id(inventory, const_cast<flecs::world*>(world), entity_id);
+}
+
+flecs::entity entity_from_id(
     ConstInventoryStateRef inventory,
     const flecs::world* world,
     std::uint64_t entity_id) noexcept
@@ -143,6 +151,20 @@ const StorageContainerEntryState* find_storage_container_state_by_entity_id(
     return nullptr;
 }
 
+StorageContainerEntryState* find_storage_container_entry_by_entity_id(
+    InventoryStateRef inventory,
+    std::uint64_t container_entity_id) noexcept
+{
+    return find_storage_container_state_by_entity_id(inventory, container_entity_id);
+}
+
+const StorageContainerEntryState* find_storage_container_entry_by_entity_id(
+    ConstInventoryStateRef inventory,
+    std::uint64_t container_entity_id) noexcept
+{
+    return find_storage_container_state_by_entity_id(inventory, container_entity_id);
+}
+
 StorageContainerEntryState* find_storage_container_state_by_storage_id(
     InventoryStateRef inventory,
     std::uint32_t storage_id) noexcept
@@ -173,6 +195,20 @@ const StorageContainerEntryState* find_storage_container_state_by_storage_id(
     return nullptr;
 }
 
+StorageContainerEntryState* find_storage_container_entry_by_storage_id(
+    InventoryStateRef inventory,
+    std::uint32_t storage_id) noexcept
+{
+    return find_storage_container_state_by_storage_id(inventory, storage_id);
+}
+
+const StorageContainerEntryState* find_storage_container_entry_by_storage_id(
+    ConstInventoryStateRef inventory,
+    std::uint32_t storage_id) noexcept
+{
+    return find_storage_container_state_by_storage_id(inventory, storage_id);
+}
+
 void bump_item_membership_revision(InventoryStateRef inventory) noexcept
 {
     inventory.item_membership_revision += 1U;
@@ -197,6 +233,35 @@ flecs::entity tile_entity_for_coord(SiteRunState& site_run, TileCoord coord) noe
 flecs::entity find_container_entity(
     InventoryStateRef inventory,
     flecs::world* world,
+    StorageContainerKind kind,
+    std::uint64_t owner_device_entity_id) noexcept
+{
+    for (const auto& storage : inventory.storage_containers)
+    {
+        const bool kind_matches =
+            (kind == StorageContainerKind::WorkerPack &&
+                storage.container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK) ||
+            (kind == StorageContainerKind::DeviceStorage &&
+                storage.container_kind == GS1_INVENTORY_CONTAINER_DEVICE_STORAGE);
+        if (!kind_matches)
+        {
+            continue;
+        }
+
+        if (owner_device_entity_id != 0U && storage.owner_device_entity_id != owner_device_entity_id)
+        {
+            continue;
+        }
+
+        return entity_from_id(inventory, world, storage.container_entity_id);
+    }
+
+    return {};
+}
+
+flecs::entity find_container_entity(
+    ConstInventoryStateRef inventory,
+    const flecs::world* world,
     StorageContainerKind kind,
     std::uint64_t owner_device_entity_id) noexcept
 {
@@ -354,6 +419,13 @@ flecs::entity worker_pack_container(
     return entity_from_id(inventory, world, inventory.worker_pack_container_entity_id);
 }
 
+flecs::entity worker_pack_container(
+    InventoryStateRef inventory,
+    const flecs::world* world) noexcept
+{
+    return entity_from_id(inventory, world, inventory.worker_pack_container_entity_id);
+}
+
 flecs::entity starter_storage_container(SiteRunState& site_run) noexcept
 {
     if (site_run.site_world == nullptr || !site_run.site_world->contains(site_run.camp.starter_storage_tile))
@@ -403,6 +475,28 @@ flecs::entity container_for_kind(
 }
 
 flecs::entity container_for_kind(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    Gs1InventoryContainerKind kind,
+    std::uint64_t owner_entity_id) noexcept
+{
+    switch (kind)
+    {
+    case GS1_INVENTORY_CONTAINER_WORKER_PACK:
+        return worker_pack_container(inventory, world);
+    case GS1_INVENTORY_CONTAINER_DEVICE_STORAGE:
+        return owner_entity_id == 0U
+            ? flecs::entity {}
+            : find_device_storage_container(
+                  inventory,
+                  world,
+                  owner_entity_id);
+    default:
+        return {};
+    }
+}
+
+flecs::entity container_for_kind(
     SiteRunState& site_run,
     Gs1InventoryContainerKind kind,
     std::uint64_t owner_entity_id) noexcept
@@ -423,6 +517,30 @@ flecs::entity container_for_kind(
 flecs::entity container_for_storage_id(
     ConstInventoryStateRef inventory,
     flecs::world* world,
+    std::uint32_t storage_id) noexcept
+{
+    const auto* storage_state =
+        find_storage_container_state_by_storage_id(inventory, storage_id);
+    return storage_state == nullptr
+        ? flecs::entity {}
+        : entity_from_id(inventory, world, storage_state->container_entity_id);
+}
+
+flecs::entity container_for_storage_id(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    std::uint32_t storage_id) noexcept
+{
+    const auto* storage_state =
+        find_storage_container_state_by_storage_id(inventory, storage_id);
+    return storage_state == nullptr
+        ? flecs::entity {}
+        : entity_from_id(inventory, world, storage_state->container_entity_id);
+}
+
+flecs::entity container_for_storage_id(
+    ConstInventoryStateRef inventory,
+    const flecs::world* world,
     std::uint32_t storage_id) noexcept
 {
     const auto* storage_state =
@@ -469,6 +587,20 @@ std::uint32_t storage_id_for_container(
 
     const auto* storage_state =
         find_storage_container_state_by_entity_id(inventory_ref(site_run), container.id());
+    return storage_state == nullptr ? 0U : storage_state->storage_id;
+}
+
+std::uint32_t storage_id_for_container(
+    InventoryStateRef inventory,
+    flecs::entity container) noexcept
+{
+    if (!container.is_valid())
+    {
+        return 0U;
+    }
+
+    const auto* storage_state =
+        find_storage_container_state_by_entity_id(inventory, container.id());
     return storage_state == nullptr ? 0U : storage_state->storage_id;
 }
 
@@ -530,6 +662,24 @@ flecs::entity item_entity_for_slot(
 }
 
 flecs::entity item_entity_for_slot(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    flecs::entity container,
+    std::uint32_t slot_index) noexcept
+{
+    const auto* storage_state =
+        find_storage_container_state_by_entity_id(inventory, container.id());
+    const auto* slot_ids =
+        storage_state == nullptr ? nullptr : slot_items_ptr(inventory, *storage_state);
+    if (storage_state == nullptr || slot_ids == nullptr || slot_index >= storage_state->slot_item_count)
+    {
+        return {};
+    }
+
+    return entity_from_id(inventory, world, slot_ids[slot_index]);
+}
+
+flecs::entity item_entity_for_slot(
     const SiteRunState& site_run,
     flecs::entity container,
     std::uint32_t slot_index) noexcept
@@ -547,6 +697,16 @@ const StorageItemStack* stack_data(const SiteRunState& site_run, flecs::entity i
 
 const StorageItemStack* stack_data(
     ConstInventoryStateRef inventory,
+    flecs::entity item) noexcept
+{
+    (void)inventory;
+    return item.is_valid() && item.has<StorageItemStack>()
+        ? &item.get<StorageItemStack>()
+        : nullptr;
+}
+
+const StorageItemStack* stack_data(
+    InventoryStateRef inventory,
     flecs::entity item) noexcept
 {
     (void)inventory;
@@ -618,6 +778,32 @@ void sync_projection_slots_for_container(
 }
 
 void sync_projection_slots_for_container(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    flecs::entity container,
+    std::vector<InventorySlot>& destination)
+{
+    sync_projection_slots_for_container(
+        static_cast<ConstInventoryStateRef>(inventory),
+        const_cast<flecs::world*>(world),
+        container,
+        destination);
+}
+
+void sync_projection_slots_for_container(
+    ConstInventoryStateRef inventory,
+    const flecs::world* world,
+    flecs::entity container,
+    std::vector<InventorySlot>& destination)
+{
+    sync_projection_slots_for_container(
+        inventory,
+        const_cast<flecs::world*>(world),
+        container,
+        destination);
+}
+
+void sync_projection_slots_for_container(
     SiteRunState& site_run,
     flecs::entity container,
     std::vector<InventorySlot>& destination)
@@ -654,6 +840,11 @@ void sync_projection_views(InventoryStateRef inventory, flecs::world* world)
         inventory.worker_pack_slots);
 }
 
+void sync_projection_views(InventoryStateRef inventory, const flecs::world* world)
+{
+    sync_projection_views(inventory, const_cast<flecs::world*>(world));
+}
+
 void sync_projection_views(SiteRunState& site_run)
 {
     sync_projection_slots_for_container(
@@ -683,6 +874,11 @@ void initialize_site_inventory_storage(InventoryStateRef inventory, flecs::world
     inventory.worker_pack_container_entity_id = worker_container.id();
     inventory.worker_pack_storage_id = storage_id_for_container(inventory, worker_container);
     sync_projection_views(inventory, world);
+}
+
+void initialize_site_inventory_storage(InventoryStateRef inventory, const flecs::world* world)
+{
+    initialize_site_inventory_storage(inventory, const_cast<flecs::world*>(world));
 }
 
 void initialize_site_inventory_storage(SiteRunState& site_run)
@@ -780,6 +976,15 @@ void import_projection_views_into_storage_if_needed(InventoryStateRef inventory,
     sync_projection_views(inventory, world);
 }
 
+void import_projection_views_into_storage_if_needed(
+    InventoryStateRef inventory,
+    const flecs::world* world)
+{
+    import_projection_views_into_storage_if_needed(
+        inventory,
+        const_cast<flecs::world*>(world));
+}
+
 void import_projection_views_into_storage_if_needed(SiteRunState& site_run)
 {
     import_projection_views_into_storage_if_needed(
@@ -788,6 +993,11 @@ void import_projection_views_into_storage_if_needed(SiteRunState& site_run)
 }
 
 bool storage_initialized(ConstInventoryStateRef inventory) noexcept
+{
+    return inventory.worker_pack_container_entity_id != 0U;
+}
+
+bool storage_initialized(InventoryStateRef inventory) noexcept
 {
     return inventory.worker_pack_container_entity_id != 0U;
 }
@@ -876,6 +1086,25 @@ std::uint32_t add_item_to_container(
 }
 
 std::uint32_t add_item_to_container(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    flecs::entity container,
+    ItemId item_id,
+    std::uint32_t quantity,
+    float condition,
+    float freshness)
+{
+    return add_item_to_container(
+        inventory,
+        const_cast<flecs::world*>(world),
+        container,
+        item_id,
+        quantity,
+        condition,
+        freshness);
+}
+
+std::uint32_t add_item_to_container(
     SiteRunState& site_run,
     flecs::entity container,
     ItemId item_id,
@@ -920,6 +1149,32 @@ std::uint32_t available_item_quantity_in_container(
 }
 
 std::uint32_t available_item_quantity_in_container(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    flecs::entity container,
+    ItemId item_id) noexcept
+{
+    return available_item_quantity_in_container(
+        static_cast<ConstInventoryStateRef>(inventory),
+        const_cast<flecs::world*>(world),
+        container,
+        item_id);
+}
+
+std::uint32_t available_item_quantity_in_container(
+    ConstInventoryStateRef inventory,
+    const flecs::world* world,
+    flecs::entity container,
+    ItemId item_id) noexcept
+{
+    return available_item_quantity_in_container(
+        inventory,
+        const_cast<flecs::world*>(world),
+        container,
+        item_id);
+}
+
+std::uint32_t available_item_quantity_in_container(
     SiteRunState& site_run,
     flecs::entity container,
     ItemId item_id) noexcept
@@ -960,6 +1215,20 @@ std::uint32_t available_item_quantity_in_container_kind(
 }
 
 std::uint32_t available_item_quantity_in_container_kind(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    Gs1InventoryContainerKind kind,
+    ItemId item_id,
+    std::uint64_t owner_entity_id) noexcept
+{
+    return available_item_quantity_in_container(
+        inventory,
+        world,
+        container_for_kind(inventory, world, kind, owner_entity_id),
+        item_id);
+}
+
+std::uint32_t available_item_quantity_in_container_kind(
     SiteRunState& site_run,
     Gs1InventoryContainerKind kind,
     ItemId item_id,
@@ -983,6 +1252,32 @@ std::uint32_t available_item_quantity_in_containers(
         total += available_item_quantity_in_container(inventory, world, container, item_id);
     }
     return total;
+}
+
+std::uint32_t available_item_quantity_in_containers(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    const std::vector<flecs::entity>& containers,
+    ItemId item_id) noexcept
+{
+    return available_item_quantity_in_containers(
+        static_cast<ConstInventoryStateRef>(inventory),
+        const_cast<flecs::world*>(world),
+        containers,
+        item_id);
+}
+
+std::uint32_t available_item_quantity_in_containers(
+    ConstInventoryStateRef inventory,
+    const flecs::world* world,
+    const std::vector<flecs::entity>& containers,
+    ItemId item_id) noexcept
+{
+    return available_item_quantity_in_containers(
+        inventory,
+        const_cast<flecs::world*>(world),
+        containers,
+        item_id);
 }
 
 std::uint32_t available_item_quantity_in_containers(
@@ -1058,6 +1353,21 @@ std::uint32_t consume_item_type_from_container(
 }
 
 std::uint32_t consume_item_type_from_container(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    flecs::entity container,
+    ItemId item_id,
+    std::uint32_t quantity)
+{
+    return consume_item_type_from_container(
+        inventory,
+        const_cast<flecs::world*>(world),
+        container,
+        item_id,
+        quantity);
+}
+
+std::uint32_t consume_item_type_from_container(
     SiteRunState& site_run,
     flecs::entity container,
     ItemId item_id,
@@ -1121,6 +1431,19 @@ bool consume_quantity_from_item_entity(
 }
 
 bool consume_quantity_from_item_entity(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    flecs::entity item_entity,
+    std::uint32_t quantity)
+{
+    return consume_quantity_from_item_entity(
+        inventory,
+        const_cast<flecs::world*>(world),
+        item_entity,
+        quantity);
+}
+
+bool consume_quantity_from_item_entity(
     SiteRunState& site_run,
     flecs::entity item_entity,
     std::uint32_t quantity)
@@ -1150,6 +1473,21 @@ std::uint32_t consume_item_type_from_containers(
         remaining = consume_item_type_from_container(inventory, world, container, item_id, remaining);
     }
     return remaining;
+}
+
+std::uint32_t consume_item_type_from_containers(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    const std::vector<flecs::entity>& containers,
+    ItemId item_id,
+    std::uint32_t quantity)
+{
+    return consume_item_type_from_containers(
+        inventory,
+        const_cast<flecs::world*>(world),
+        containers,
+        item_id,
+        quantity);
 }
 
 std::uint32_t consume_item_type_from_containers(
@@ -1209,6 +1547,21 @@ bool can_fit_item_in_container(
     }
 
     return remaining == 0U;
+}
+
+bool can_fit_item_in_container(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    flecs::entity container,
+    ItemId item_id,
+    std::uint32_t quantity) noexcept
+{
+    return can_fit_item_in_container(
+        inventory,
+        const_cast<flecs::world*>(world),
+        container,
+        item_id,
+        quantity);
 }
 
 bool can_fit_item_in_container(
@@ -1364,6 +1717,29 @@ bool transfer_between_slots(
 }
 
 bool transfer_between_slots(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    Gs1InventoryContainerKind source_kind,
+    std::uint32_t source_slot_index,
+    Gs1InventoryContainerKind destination_kind,
+    std::uint32_t destination_slot_index,
+    std::uint32_t quantity,
+    std::uint64_t source_owner_entity_id,
+    std::uint64_t destination_owner_entity_id)
+{
+    return transfer_between_slots(
+        inventory,
+        const_cast<flecs::world*>(world),
+        source_kind,
+        source_slot_index,
+        destination_kind,
+        destination_slot_index,
+        quantity,
+        source_owner_entity_id,
+        destination_owner_entity_id);
+}
+
+bool transfer_between_slots(
     SiteRunState& site_run,
     Gs1InventoryContainerKind source_kind,
     std::uint32_t source_slot_index,
@@ -1419,6 +1795,30 @@ std::uint32_t slot_count_in_container(
         : storage_state->slot_item_count;
 }
 
+std::uint32_t slot_count_in_container(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    flecs::entity container) noexcept
+{
+    (void)world;
+    const auto* storage_state =
+        find_storage_container_state_by_entity_id(inventory, container.id());
+    return storage_state == nullptr
+        ? 0U
+        : storage_state->slot_item_count;
+}
+
+std::uint32_t slot_count_in_container(
+    ConstInventoryStateRef inventory,
+    const flecs::world* world,
+    flecs::entity container) noexcept
+{
+    return slot_count_in_container(
+        inventory,
+        const_cast<flecs::world*>(world),
+        container);
+}
+
 std::vector<std::uint64_t> collect_item_instance_ids_in_containers(
     ConstInventoryStateRef inventory,
     flecs::world* world,
@@ -1434,6 +1834,17 @@ std::vector<std::uint64_t> collect_item_instance_ids_in_containers(
     std::sort(item_ids.begin(), item_ids.end());
     item_ids.erase(std::unique(item_ids.begin(), item_ids.end()), item_ids.end());
     return item_ids;
+}
+
+std::vector<std::uint64_t> collect_item_instance_ids_in_containers(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    const std::vector<flecs::entity>& containers)
+{
+    return collect_item_instance_ids_in_containers(
+        static_cast<ConstInventoryStateRef>(inventory),
+        const_cast<flecs::world*>(world),
+        containers);
 }
 
 std::vector<std::uint64_t> collect_item_instance_ids_in_containers(
@@ -1492,6 +1903,17 @@ std::vector<std::uint64_t> collect_item_instance_ids_in_container(
     }
 
     return item_ids;
+}
+
+std::vector<std::uint64_t> collect_item_instance_ids_in_container(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    flecs::entity container)
+{
+    return collect_item_instance_ids_in_container(
+        static_cast<ConstInventoryStateRef>(inventory),
+        const_cast<flecs::world*>(world),
+        container);
 }
 
 std::vector<std::uint64_t> collect_item_instance_ids_in_container(
@@ -1565,6 +1987,17 @@ std::vector<flecs::entity> collect_all_storage_containers(
         return lhs.id() < rhs.id();
     });
     return containers;
+}
+
+std::vector<flecs::entity> collect_all_storage_containers(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    bool include_device_storage)
+{
+    return collect_all_storage_containers(
+        static_cast<ConstInventoryStateRef>(inventory),
+        const_cast<flecs::world*>(world),
+        include_device_storage);
 }
 
 std::vector<flecs::entity> collect_all_storage_containers(
@@ -1682,6 +2115,17 @@ flecs::entity find_device_storage_container(
 }
 
 flecs::entity find_device_storage_container(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    std::uint64_t device_entity_id) noexcept
+{
+    return find_device_storage_container(
+        inventory,
+        const_cast<flecs::world*>(world),
+        device_entity_id);
+}
+
+flecs::entity find_device_storage_container(
     SiteRunState& site_run,
     std::uint64_t device_entity_id) noexcept
 {
@@ -1748,6 +2192,17 @@ bool destroy_storage_container(
     return true;
 }
 
+bool destroy_storage_container(
+    InventoryStateRef inventory,
+    const flecs::world* world,
+    flecs::entity container)
+{
+    return destroy_storage_container(
+        inventory,
+        const_cast<flecs::world*>(world),
+        container);
+}
+
 bool destroy_storage_container(SiteRunState& site_run, flecs::entity container)
 {
     return destroy_storage_container(inventory_ref(site_run), ecs_world_ptr(site_run), container);
@@ -1755,6 +2210,13 @@ bool destroy_storage_container(SiteRunState& site_run, flecs::entity container)
 
 const StorageContainerEntryState* storage_container_state_for_storage_id(
     ConstInventoryStateRef inventory,
+    std::uint32_t storage_id) noexcept
+{
+    return find_storage_container_state_by_storage_id(inventory, storage_id);
+}
+
+const StorageContainerEntryState* storage_container_state_for_storage_id(
+    InventoryStateRef inventory,
     std::uint32_t storage_id) noexcept
 {
     return find_storage_container_state_by_storage_id(inventory, storage_id);
