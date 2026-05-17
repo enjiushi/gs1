@@ -3,6 +3,10 @@ id = "regional_backdrop_core"
 
   [[group.targets]]
   kind = "scene"
+  path = "res://scenes/regional_map.tscn"
+
+  [[group.targets]]
+  kind = "scene"
   path = "res://scenes/regional_map_backdrop.tscn"
 
   [[group.targets]]
@@ -30,6 +34,10 @@ id = "main_menu_backdrop_core"
 
   [[group.targets]]
   kind = "scene"
+  path = "res://scenes/main_menu.tscn"
+
+  [[group.targets]]
+  kind = "scene"
   path = "res://scenes/main_menu_backdrop.tscn"
 
   [[group.targets]]
@@ -52,8 +60,32 @@ id = "main_menu_backdrop_core"
   path = "res://assets/terrain/textures/dirt (3).png"
   resource_type = "Texture2D"
 
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/terrain3d_00_00.res"
+  resource_type = "Resource"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/terrain3d_00-01.res"
+  resource_type = "Resource"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/terrain3d-01_00.res"
+  resource_type = "Resource"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/terrain3d-01-01.res"
+  resource_type = "Resource"
+
 [[group]]
 id = "site_terrain_core"
+
+  [[group.targets]]
+  kind = "scene"
+  path = "res://scenes/site_session.tscn"
 
   [[group.targets]]
   kind = "resource"
@@ -79,6 +111,26 @@ id = "site_terrain_core"
   kind = "resource"
   path = "res://assets/terrain/textures/road dirt.png"
   resource_type = "Texture2D"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/terrain3d_00_00.res"
+  resource_type = "Resource"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/terrain3d_00-01.res"
+  resource_type = "Resource"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/terrain3d-01_00.res"
+  resource_type = "Resource"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/terrain3d-01-01.res"
+  resource_type = "Resource"
 
 [[transition]]
 from = "main_menu"

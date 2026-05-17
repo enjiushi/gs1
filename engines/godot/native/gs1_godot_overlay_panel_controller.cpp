@@ -358,22 +358,20 @@ void Gs1GodotOverlayPanelController::update_protection_selector()
     };
     for (const SelectorButtonSpec& button_def : button_defs)
     {
+        const std::int64_t overlay_mode = static_cast<std::int64_t>(button_def.mode);
         Dictionary action;
-        action["type"] = static_cast<int>(button_def.action_type);
-        action["target_id"] = 0;
-        action["arg0"] =
-            button_def.action_type == k_gameplay_action_set_site_protection_overlay_mode
-                ? static_cast<std::int64_t>(button_def.mode)
-                : 0LL;
-        action["arg1"] = 0;
+        action["type"] = static_cast<std::int64_t>(button_def.action_type);
+        action["target_id"] = 0LL;
+        action["arg0"] = overlay_mode;
+        action["arg1"] = 0LL;
 
         Dictionary spec;
-        spec["setup_id"] = static_cast<int>(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
-        spec["element_id"] = static_cast<int>(button_def.element_id);
+        spec["setup_id"] = static_cast<std::int64_t>(GS1_UI_SETUP_SITE_PROTECTION_SELECTOR);
+        spec["element_id"] = static_cast<std::int64_t>(button_def.element_id);
         spec["text"] = button_def.action_type == k_gameplay_action_close_site_protection_ui
             ? String("Close")
             : protection_mode_label(button_def.mode);
-        spec["flags"] = 0;
+        spec["flags"] = 0LL;
         spec["action"] = action;
         button_specs.push_back(spec);
     }
