@@ -361,10 +361,10 @@ void Gs1GodotOverlayPanelController::update_protection_selector()
         Dictionary action;
         action["type"] = static_cast<int>(button_def.action_type);
         action["target_id"] = 0;
-        action["arg0"] = static_cast<int64_t>(
+        action["arg0"] =
             button_def.action_type == k_gameplay_action_set_site_protection_overlay_mode
-                ? button_def.mode
-                : 0);
+                ? static_cast<std::int64_t>(button_def.mode)
+                : 0LL;
         action["arg1"] = 0;
 
         Dictionary spec;

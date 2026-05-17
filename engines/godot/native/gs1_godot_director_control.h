@@ -62,6 +62,8 @@ private:
     using ScreenKind = Gs1GodotDirectorScreenKind;
 
     void cache_nodes();
+    void begin_background_resource_prewarms();
+    void poll_background_resource_prewarms();
     void ensure_active_scene();
     void begin_async_scene_switch(ScreenKind kind);
     void poll_async_scene_switch();
@@ -99,6 +101,7 @@ private:
     godot::String loading_scene_path_ {"res://scenes/loading.tscn"};
     godot::String main_menu_scene_path_ {"res://scenes/main_menu.tscn"};
     godot::String regional_map_scene_path_ {"res://scenes/regional_map.tscn"};
+    godot::String regional_map_backdrop_scene_path_ {"res://scenes/regional_map_backdrop.tscn"};
     godot::String site_session_scene_path_ {"res://scenes/site_session.tscn"};
 
     Gs1GodotAdapterService adapter_service_ {};
@@ -110,6 +113,8 @@ private:
     ScreenKind pending_async_target_kind_ {GS1_GODOT_SCREEN_KIND_NONE};
     godot::String pending_async_scene_path_ {};
     std::vector<godot::String> pending_async_resource_paths_ {};
+    godot::Ref<godot::PackedScene> retained_regional_backdrop_scene_ {};
+    bool regional_backdrop_prewarm_requested_ {false};
     bool pending_async_transition_buffers_engine_messages_ {false};
     bool pending_async_transition_submits_site_scene_ready_ {false};
     int last_app_state_ {-1};
