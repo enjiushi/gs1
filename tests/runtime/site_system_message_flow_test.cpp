@@ -234,8 +234,7 @@ void initialize_site_world(
             100.0f,
             100.0f,
             100.0f,
-            1.0f,
-            false});
+            1.0f});
 }
 
 template <typename System>

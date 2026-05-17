@@ -248,7 +248,6 @@ struct WorkerVitals final
     float energy;
     float morale;
     float work_efficiency;
-    bool is_sheltered;
 };
 
 #define GS1_REQUIRE_TRIVIAL(Type) \

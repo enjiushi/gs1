@@ -2,6 +2,7 @@
 
 #include "support/excavation_types.h"
 #include "support/id_types.h"
+#include "site/weather_state.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -98,7 +99,6 @@ public:
         float energy;
         float morale;
         float work_efficiency;
-        bool is_sheltered;
     };
 
     struct WorkerData final
@@ -122,7 +122,6 @@ public:
         float worker_energy;
         float worker_morale;
         float worker_work_efficiency;
-        bool worker_is_sheltered;
     };
 
     SiteWorld();
@@ -186,6 +185,7 @@ public:
     void set_worker_position(const WorkerPositionData& data);
     [[nodiscard]] WorkerConditionData worker_conditions() const;
     void set_worker_conditions(const WorkerConditionData& data);
+    [[nodiscard]] bool worker_is_sheltered(const WeatherState& weather) const noexcept;
     [[nodiscard]] WorkerData worker() const;
     void set_worker(const WorkerData& data);
 

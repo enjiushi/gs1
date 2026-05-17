@@ -363,8 +363,7 @@ SiteWorld::WorkerConditionData worker_conditions_from_entity(flecs::entity entit
         vitals.energy_cap,
         vitals.energy,
         vitals.morale,
-        vitals.work_efficiency,
-        vitals.is_sheltered};
+        vitals.work_efficiency};
 }
 
 SiteWorld::WorkerData worker_data_from_entity(flecs::entity entity)
@@ -393,8 +392,7 @@ void apply_worker_conditions_to_entity(flecs::entity entity, const SiteWorld::Wo
         data.energy_cap,
         data.energy,
         data.morale,
-        data.work_efficiency,
-        data.is_sheltered});
+        data.work_efficiency});
 }
 }  // namespace
 
@@ -522,8 +520,7 @@ void SiteWorld::initialize(const CreateDesc& desc)
             desc.worker_energy_cap,
             desc.worker_energy,
             desc.worker_morale,
-            desc.worker_work_efficiency,
-            desc.worker_is_sheltered});
+            desc.worker_work_efficiency});
 
     impl_->worker_entity = worker_entity.id();
     impl_->initialized = true;
@@ -1046,6 +1043,26 @@ void SiteWorld::set_worker_conditions(const WorkerConditionData& data)
     }
 
     apply_worker_conditions_to_entity(impl_->world.entity(impl_->worker_entity), data);
+}
+
+bool SiteWorld::worker_is_sheltered(const WeatherState& weather) const noexcept
+{
+    if (impl_ == nullptr || impl_->worker_entity == 0U)
+    {
+        return false;
+    }
+
+    const auto worker = worker_position();
+    if (!contains(worker.tile_coord))
+    {
+        return false;
+    }
+
+    const auto local_weather = tile_local_weather(worker.tile_coord);
+    constexpr float k_shelter_epsilon = 0.01f;
+    return local_weather.heat < weather.weather_heat - k_shelter_epsilon ||
+        local_weather.wind < weather.weather_wind - k_shelter_epsilon ||
+        local_weather.dust < weather.weather_dust - k_shelter_epsilon;
 }
 
 SiteWorld::WorkerData SiteWorld::worker() const

@@ -143,4 +143,9 @@ inline void set_worker_conditions(SiteRunState& site_run, const SiteWorld::Worke
         site_run.site_world->set_worker_conditions(data);
     }
 }
+
+inline bool worker_is_sheltered(const SiteRunState& site_run) noexcept
+{
+    return has_world(site_run) ? site_run.site_world->worker_is_sheltered(site_run.weather) : false;
+}
 }  // namespace gs1::site_world_access

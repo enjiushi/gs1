@@ -92,8 +92,7 @@ gs1::SiteRunState make_site_run()
             100.0f,
             100.0f,
             100.0f,
-            1.0f,
-            false});
+            1.0f});
     site_run.weather.weather_heat = 20.0f;
     site_run.weather.weather_wind = 12.0f;
     site_run.weather.weather_dust = 8.0f;

@@ -1,18 +1,14 @@
-[gd_scene load_steps=27 format=3]
+[gd_scene format=3 uid="uid://t845byd25q0y"]
 
-[ext_resource type="Texture2D" path="res://assets/menu_backdrop/hdri/qwantani_afternoon_puresky_4k.hdr" id="1_hdri"]
-[ext_resource type="PackedScene" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Tile_Ground.fbx" id="2_ground"]
-[ext_resource type="PackedScene" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Rock_Formations_3.fbx" id="3_rock_form_a"]
-[ext_resource type="PackedScene" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Rock_Formations_11.fbx" id="4_rock_form_b"]
-[ext_resource type="PackedScene" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Rock_Platforms_7.fbx" id="5_rock_platform"]
-[ext_resource type="PackedScene" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Cactus_Tall_1.fbx" id="6_cactus_tall"]
-[ext_resource type="PackedScene" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Cactus_Small_4.fbx" id="7_cactus_small"]
-[ext_resource type="PackedScene" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Grass_7.fbx" id="8_grass"]
-[ext_resource type="PackedScene" path="res://assets/menu_backdrop/desert_props/FBX/rock_1.001.fbx" id="9_desert_rock"]
-[ext_resource type="Texture2D" path="res://assets/terrain/textures/g_pal_00_color.png" id="10_terrain_a"]
-[ext_resource type="Texture2D" path="res://assets/terrain/textures/dirt (2).png" id="11_terrain_b"]
-[ext_resource type="Texture2D" path="res://assets/terrain/textures/dirt (1).png" id="12_terrain_c"]
-[ext_resource type="Texture2D" path="res://assets/terrain/textures/dirt (3).png" id="13_terrain_d"]
+[ext_resource type="Texture2D" uid="uid://csky0vg0bmgg3" path="res://assets/menu_backdrop/hdri/qwantani_afternoon_puresky_4k.hdr" id="1_hdri"]
+[ext_resource type="PackedScene" uid="uid://c5gfb8td7bhq8" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Tile_Ground.fbx" id="2_ground"]
+[ext_resource type="PackedScene" uid="uid://drcbaa5b83mvk" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Rock_Formations_3.fbx" id="3_rock_form_a"]
+[ext_resource type="PackedScene" uid="uid://b6vw2hejicpvf" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Rock_Formations_11.fbx" id="4_rock_form_b"]
+[ext_resource type="PackedScene" uid="uid://dtp04yyiupau0" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Rock_Platforms_7.fbx" id="5_rock_platform"]
+[ext_resource type="PackedScene" uid="uid://cvg8ey1t40h3k" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Cactus_Tall_1.fbx" id="6_cactus_tall"]
+[ext_resource type="PackedScene" uid="uid://b5bumrugvyfol" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Cactus_Small_4.fbx" id="7_cactus_small"]
+[ext_resource type="PackedScene" uid="uid://0rx6t4t5kaih" path="res://assets/menu_backdrop/canyonterrain/fbx_unity/Grass_7.fbx" id="8_grass"]
+[ext_resource type="PackedScene" uid="uid://dc78uog8ld37f" path="res://assets/menu_backdrop/desert_props/FBX/rock_1.001.fbx" id="9_desert_rock"]
 
 [sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_regional"]
 panorama = ExtResource("1_hdri")
@@ -24,7 +20,6 @@ sky_material = SubResource("PanoramaSkyMaterial_regional")
 background_mode = 2
 sky = SubResource("Sky_regional")
 ambient_light_source = 2
-ambient_light_sky_contribution = 1.0
 tonemap_exposure = 0.98
 
 [sub_resource type="Gradient" id="Gradient_regional"]
@@ -79,6 +74,7 @@ _shader_parameters = {
 &"world_space_normal_blend": true
 }
 world_background = 2
+show_checkered = true
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_regional"]
 transparency = 4
@@ -98,201 +94,123 @@ last_lod = 0
 last_shadow_lod = 0
 lod0_range = 128.0
 
-[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_regional_a"]
-name = "g_pal_00_color"
-albedo_texture = ExtResource("10_terrain_a")
-ao_strength = 0.533
-uv_scale = 0.55
-detiling_rotation = 0.25
-detiling_shift = 0.265
-
-[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_regional_b"]
-name = "dirt (2)"
-id = 1
-albedo_texture = ExtResource("11_terrain_b")
-uv_scale = 0.555
-detiling_rotation = 0.25
-detiling_shift = 0.25
-
-[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_regional_c"]
-name = "dirt (1)"
-id = 2
-albedo_texture = ExtResource("12_terrain_c")
-uv_scale = 0.55
-detiling_rotation = 0.25
-detiling_shift = 0.25
-
-[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_regional_d"]
-name = "dirt (3)"
-id = 3
-albedo_texture = ExtResource("13_terrain_d")
-uv_scale = 0.55
-detiling_rotation = 0.25
-detiling_shift = 0.25
-
 [sub_resource type="Terrain3DAssets" id="Terrain3DAssets_regional"]
 mesh_list = Array[Terrain3DMeshAsset]([SubResource("Terrain3DMeshAsset_regional")])
-texture_list = Array[Terrain3DTextureAsset]([SubResource("Terrain3DTextureAsset_regional_a"), SubResource("Terrain3DTextureAsset_regional_b"), SubResource("Terrain3DTextureAsset_regional_c"), SubResource("Terrain3DTextureAsset_regional_d")])
 
-[node name="RegionalMapWorld" type="Node3D"]
+[node name="RegionalMapWorld" type="Node3D" unique_id=1076570873]
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=446687148]
 environment = SubResource("Environment_regional")
 
-[node name="RegionalSun" type="DirectionalLight3D" parent="."]
-rotation_degrees = Vector3(-42, 26, 0)
-light_energy = 3.55
+[node name="RegionalSun" type="DirectionalLight3D" parent="." unique_id=146238898]
+transform = Transform3D(0.89879405, -0.29332757, 0.32577324, 0, 0.7431448, 0.6691306, -0.43837115, -0.6014106, 0.6679341, 0, 0, 0)
 light_color = Color(1, 0.917647, 0.756863, 1)
+light_energy = 3.55
 shadow_enabled = true
 shadow_blur = 0.7
 
-[node name="RegionalFill" type="DirectionalLight3D" parent="."]
-rotation_degrees = Vector3(-8, -118, 0)
-light_energy = 0.56
+[node name="RegionalFill" type="DirectionalLight3D" parent="." unique_id=537176872]
+transform = Transform3D(-0.46947157, 0.12288255, -0.8743548, 0, 0.99026805, 0.1391731, 0.88294756, 0.065337814, -0.4649027, 0, 0, 0)
 light_color = Color(0.705882, 0.827451, 1, 1)
+light_energy = 0.56
 
-[node name="RegionalBounce" type="DirectionalLight3D" parent="."]
-rotation_degrees = Vector3(44, 31, 0)
-light_energy = 0.24
+[node name="RegionalBounce" type="DirectionalLight3D" parent="." unique_id=1955508208]
+transform = Transform3D(0.8571673, 0.3577755, 0.3704874, 0, 0.7193398, -0.6946584, -0.5150381, 0.5954385, 0.61659455, 0, 0, 0)
 light_color = Color(0.960784, 0.737255, 0.470588, 1)
+light_energy = 0.24
 
-[node name="RegionalMapCamera" type="Camera3D" parent="."]
-position = Vector3(0, 19, 18)
-rotation_degrees = Vector3(-48, 0, 0)
+[node name="RegionalMapCamera" type="Camera3D" parent="." unique_id=1472184818]
+transform = Transform3D(1, 0, 0, 0, 0.66913056, 0.74314487, 0, -0.74314487, 0.66913056, 0, 19, 18)
 current = true
 fov = 34.0
-near = 0.05
 far = 700.0
 
-[node name="TerrainBackdrop" type="Node3D" parent="."]
+[node name="TerrainBackdrop" type="Node3D" parent="." unique_id=1315319114]
 
-[node name="DuneA" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
-position = Vector3(-13.6, -0.18, 7.2)
-rotation_degrees = Vector3(0, -16, 0)
-scale = Vector3(4.6, 1, 4.6)
+[node name="DuneA" parent="TerrainBackdrop" unique_id=1541693370 instance=ExtResource("2_ground")]
+transform = Transform3D(4.4218035, 0, -1.2679318, 0, 1, 0, 1.2679318, 0, 4.4218035, -13.6, -0.18, 7.2)
 
-[node name="DuneB" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
-position = Vector3(-5.2, -0.1, 1.1)
-rotation_degrees = Vector3(0, 12, 0)
-scale = Vector3(5.2, 1, 5.2)
+[node name="DuneB" parent="TerrainBackdrop" unique_id=61348301 instance=ExtResource("2_ground")]
+transform = Transform3D(5.0863676, 0, 1.0811408, 0, 1, 0, -1.0811408, 0, 5.0863676, -5.2, -0.1, 1.1)
 
-[node name="DuneC" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
-position = Vector3(5.4, -0.08, -0.8)
-rotation_degrees = Vector3(0, -10, 0)
-scale = Vector3(5.6, 1, 5.6)
+[node name="DuneC" parent="TerrainBackdrop" unique_id=1452168956 instance=ExtResource("2_ground")]
+transform = Transform3D(5.514923, 0, -0.9724298, 0, 1, 0, 0.9724298, 0, 5.514923, 5.4, -0.08, -0.8)
 
-[node name="DuneD" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
-position = Vector3(14.2, -0.12, 5.8)
-rotation_degrees = Vector3(0, 18, 0)
-scale = Vector3(5.0, 1, 5.0)
+[node name="DuneD" parent="TerrainBackdrop" unique_id=1088576178 instance=ExtResource("2_ground")]
+transform = Transform3D(4.755283, 0, 1.545085, 0, 1, 0, -1.545085, 0, 4.755283, 14.2, -0.12, 5.8)
 
-[node name="DuneE" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
-position = Vector3(0.6, -0.05, 10.4)
-rotation_degrees = Vector3(0, 6, 0)
-scale = Vector3(5.4, 1, 5.4)
+[node name="DuneE" parent="TerrainBackdrop" unique_id=45187308 instance=ExtResource("2_ground")]
+transform = Transform3D(5.3704185, 0, 0.5644537, 0, 1, 0, -0.5644537, 0, 5.3704185, 0.6, -0.05, 10.4)
 
-[node name="DuneF" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
-position = Vector3(-8.8, -0.22, 13.6)
-rotation_degrees = Vector3(0, -24, 0)
-scale = Vector3(4.8, 1, 4.8)
+[node name="DuneF" parent="TerrainBackdrop" unique_id=1142949755 instance=ExtResource("2_ground")]
+transform = Transform3D(4.3850183, 0, -1.952336, 0, 1, 0, 1.952336, 0, 4.3850183, -8.8, -0.22, 13.6)
 
-[node name="DuneG" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
-position = Vector3(10.7, -0.22, 13.1)
-rotation_degrees = Vector3(0, 20, 0)
-scale = Vector3(4.9, 1, 4.9)
+[node name="DuneG" parent="TerrainBackdrop" unique_id=306912201 instance=ExtResource("2_ground")]
+transform = Transform3D(4.604494, 0, 1.6758987, 0, 1, 0, -1.6758987, 0, 4.604494, 10.7, -0.22, 13.1)
 
-[node name="DuneH" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
-position = Vector3(-16.4, -0.26, -4.9)
-rotation_degrees = Vector3(0, 8, 0)
-scale = Vector3(4.2, 1, 4.2)
+[node name="DuneH" parent="TerrainBackdrop" unique_id=228297146 instance=ExtResource("2_ground")]
+transform = Transform3D(4.159126, 0, 0.584527, 0, 1, 0, -0.584527, 0, 4.159126, -16.4, -0.26, -4.9)
 
-[node name="DuneI" parent="TerrainBackdrop" instance=ExtResource("2_ground")]
-position = Vector3(16.9, -0.22, -5.7)
-rotation_degrees = Vector3(0, -12, 0)
-scale = Vector3(4.4, 1, 4.4)
+[node name="DuneI" parent="TerrainBackdrop" unique_id=1164466089 instance=ExtResource("2_ground")]
+transform = Transform3D(4.3038497, 0, -0.9148115, 0, 1, 0, 0.9148115, 0, 4.3038497, 16.9, -0.22, -5.7)
 
-[node name="NorthShelf" parent="TerrainBackdrop" instance=ExtResource("5_rock_platform")]
-position = Vector3(1.8, -0.38, -12.9)
-rotation_degrees = Vector3(0, 10, 0)
-scale = Vector3(7.8, 3.9, 7.8)
+[node name="NorthShelf" parent="TerrainBackdrop" unique_id=420287248 instance=ExtResource("5_rock_platform")]
+transform = Transform3D(7.6815004, 0, 1.3544558, 0, 3.9, 0, -1.3544558, 0, 7.6815004, 1.8, -0.38, -12.9)
 
-[node name="NorthRidgeA" parent="TerrainBackdrop" instance=ExtResource("4_rock_form_b")]
-position = Vector3(-10.4, -0.2, -18.8)
-rotation_degrees = Vector3(0, -6, 0)
-scale = Vector3(8.7, 7.4, 8.7)
+[node name="NorthRidgeA" parent="TerrainBackdrop" unique_id=385946438 instance=ExtResource("4_rock_form_b")]
+transform = Transform3D(8.652341, 0, -0.9093976, 0, 7.4, 0, 0.9093976, 0, 8.652341, -10.4, -0.2, -18.8)
 
-[node name="NorthRidgeB" parent="TerrainBackdrop" instance=ExtResource("3_rock_form_a")]
-position = Vector3(14.5, -0.28, -18.2)
-rotation_degrees = Vector3(0, 22, 0)
-scale = Vector3(9.4, 7.8, 9.4)
+[node name="NorthRidgeB" parent="TerrainBackdrop" unique_id=2039025919 instance=ExtResource("3_rock_form_a")]
+transform = Transform3D(8.715528, 0, 3.5213017, 0, 7.8, 0, -3.5213017, 0, 8.715528, 14.5, -0.28, -18.2)
 
-[node name="EastRidge" parent="TerrainBackdrop" instance=ExtResource("4_rock_form_b")]
-position = Vector3(24.8, -0.1, 2.8)
-rotation_degrees = Vector3(0, 48, 0)
-scale = Vector3(6.6, 5.1, 6.6)
+[node name="EastRidge" parent="TerrainBackdrop" unique_id=40314760 instance=ExtResource("4_rock_form_b")]
+transform = Transform3D(4.4162617, 0, 4.904756, 0, 5.1, 0, -4.904756, 0, 4.4162617, 24.8, -0.1, 2.8)
 
-[node name="WestRidge" parent="TerrainBackdrop" instance=ExtResource("3_rock_form_a")]
-position = Vector3(-24.6, -0.14, 4.4)
-rotation_degrees = Vector3(0, -42, 0)
-scale = Vector3(7.2, 5.5, 7.2)
+[node name="WestRidge" parent="TerrainBackdrop" unique_id=249861970 instance=ExtResource("3_rock_form_a")]
+transform = Transform3D(5.3506427, 0, -4.8177404, 0, 5.5, 0, 4.8177404, 0, 5.3506427, -24.6, -0.14, 4.4)
 
-[node name="SouthRidge" parent="TerrainBackdrop" instance=ExtResource("5_rock_platform")]
-position = Vector3(4.8, -0.34, 21.6)
-rotation_degrees = Vector3(0, -18, 0)
-scale = Vector3(6.8, 3.5, 6.8)
+[node name="SouthRidge" parent="TerrainBackdrop" unique_id=2095753602 instance=ExtResource("5_rock_platform")]
+transform = Transform3D(6.4671845, 0, -2.1013157, 0, 3.5, 0, 2.1013157, 0, 6.4671845, 4.8, -0.34, 21.6)
 
-[node name="Scatter" type="Node3D" parent="TerrainBackdrop"]
+[node name="Scatter" type="Node3D" parent="TerrainBackdrop" unique_id=1946811272]
 
-[node name="CactusNorth" parent="TerrainBackdrop/Scatter" instance=ExtResource("6_cactus_tall")]
-position = Vector3(8.6, 0, -7.8)
-rotation_degrees = Vector3(0, -18, 0)
-scale = Vector3(1.18, 1.18, 1.18)
+[node name="CactusNorth" parent="TerrainBackdrop/Scatter" unique_id=1592279388 instance=ExtResource("6_cactus_tall")]
+transform = Transform3D(1.1222466, 0, -0.36464006, 0, 1.18, 0, 0.36464006, 0, 1.1222466, 8.6, 0, -7.8)
 
-[node name="CactusWest" parent="TerrainBackdrop/Scatter" instance=ExtResource("7_cactus_small")]
-position = Vector3(-12.4, 0, 9.1)
-rotation_degrees = Vector3(0, 24, 0)
-scale = Vector3(0.96, 0.96, 0.96)
+[node name="CactusWest" parent="TerrainBackdrop/Scatter" unique_id=1312982725 instance=ExtResource("7_cactus_small")]
+transform = Transform3D(0.8770036, 0, 0.39046717, 0, 0.96, 0, -0.39046717, 0, 0.8770036, -12.4, 0, 9.1)
 
-[node name="CactusEast" parent="TerrainBackdrop/Scatter" instance=ExtResource("7_cactus_small")]
-position = Vector3(15.2, 0, 9.5)
-rotation_degrees = Vector3(0, 34, 0)
-scale = Vector3(1.02, 1.02, 1.02)
+[node name="CactusEast" parent="TerrainBackdrop/Scatter" unique_id=1648233029 instance=ExtResource("7_cactus_small")]
+transform = Transform3D(0.84561837, 0, 0.57037675, 0, 1.02, 0, -0.57037675, 0, 0.84561837, 15.2, 0, 9.5)
 
-[node name="GrassSouth" parent="TerrainBackdrop/Scatter" instance=ExtResource("8_grass")]
-position = Vector3(-5.4, 0, 15.1)
-rotation_degrees = Vector3(0, -12, 0)
-scale = Vector3(1.8, 1.8, 1.8)
+[node name="GrassSouth" parent="TerrainBackdrop/Scatter" unique_id=1653529901 instance=ExtResource("8_grass")]
+transform = Transform3D(1.7606657, 0, -0.37424105, 0, 1.8, 0, 0.37424105, 0, 1.7606657, -5.4, 0, 15.1)
 
-[node name="GrassCenter" parent="TerrainBackdrop/Scatter" instance=ExtResource("8_grass")]
-position = Vector3(7.7, 0, 11.2)
-rotation_degrees = Vector3(0, 20, 0)
-scale = Vector3(1.6, 1.6, 1.6)
+[node name="GrassCenter" parent="TerrainBackdrop/Scatter" unique_id=540478015 instance=ExtResource("8_grass")]
+transform = Transform3D(1.5035082, 0, 0.5472322, 0, 1.6, 0, -0.5472322, 0, 1.5035082, 7.7, 0, 11.2)
 
-[node name="RockScatterA" parent="TerrainBackdrop/Scatter" instance=ExtResource("9_desert_rock")]
-position = Vector3(-2.7, 0.03, -5.2)
-rotation_degrees = Vector3(0, 18, 0)
-scale = Vector3(0.88, 0.88, 0.88)
+[node name="RockScatterA" parent="TerrainBackdrop/Scatter" unique_id=1281287354 instance=ExtResource("9_desert_rock")]
+transform = Transform3D(0.83692974, 0, 0.27193496, 0, 0.88, 0, -0.27193496, 0, 0.83692974, -2.7, 0.03, -5.2)
 
-[node name="RockScatterB" parent="TerrainBackdrop/Scatter" instance=ExtResource("9_desert_rock")]
-position = Vector3(11.6, 0.03, 2.4)
-rotation_degrees = Vector3(0, -14, 0)
-scale = Vector3(0.76, 0.76, 0.76)
+[node name="RockScatterB" parent="TerrainBackdrop/Scatter" unique_id=1878776109 instance=ExtResource("9_desert_rock")]
+transform = Transform3D(0.73742473, 0, -0.18386064, 0, 0.76, 0, 0.18386064, 0, 0.73742473, 11.6, 0.03, 2.4)
 
-[node name="RockScatterC" parent="TerrainBackdrop/Scatter" instance=ExtResource("9_desert_rock")]
-position = Vector3(-14.8, 0.03, 1.8)
-rotation_degrees = Vector3(0, 26, 0)
-scale = Vector3(0.94, 0.94, 0.94)
+[node name="RockScatterC" parent="TerrainBackdrop/Scatter" unique_id=2065958612 instance=ExtResource("9_desert_rock")]
+transform = Transform3D(0.8448664, 0, 0.41206887, 0, 0.94, 0, -0.41206887, 0, 0.8448664, -14.8, 0.03, 1.8)
 
-[node name="TerrainRoot" type="Node3D" parent="."]
+[node name="TerrainRoot" type="Node3D" parent="." unique_id=1084241098]
 
-[node name="LinkRoot" type="Node3D" parent="."]
+[node name="LinkRoot" type="Node3D" parent="." unique_id=1874754329]
 
-[node name="SiteRoot" type="Node3D" parent="."]
+[node name="SiteRoot" type="Node3D" parent="." unique_id=2010196167]
 
-[node name="Terrain3D" type="Terrain3D" parent="."]
+[node name="Terrain3D" type="Terrain3D" parent="." unique_id=1419526242]
 data_directory = "res://assets/terrain"
 material = SubResource("Terrain3DMaterial_regional")
 assets = SubResource("Terrain3DAssets_regional")
+save_16_bit = true
+mesh_lods = 1
 free_editor_textures = false
+show_checkered = true
 top_level = true
 metadata/_edit_lock_ = true

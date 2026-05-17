@@ -1573,8 +1573,15 @@ void worker_condition_run_softens_environmental_decay_when_sheltered(
     sheltered_worker.health = 90.0f;
     sheltered_worker.energy = 90.0f;
     sheltered_worker.morale = 70.0f;
-    sheltered_worker.is_sheltered = true;
     gs1::site_world_access::set_worker_conditions(sheltered_run, sheltered_worker);
+    sheltered_run.weather.weather_heat = 90.0f;
+    sheltered_run.weather.weather_wind = 90.0f;
+    sheltered_run.weather.weather_dust = 90.0f;
+    auto sheltered_tile = sheltered_run.site_world->tile_at(TileCoord {2, 2});
+    sheltered_tile.local_weather.heat = 30.0f;
+    sheltered_tile.local_weather.wind = 30.0f;
+    sheltered_tile.local_weather.dust = 30.0f;
+    sheltered_run.site_world->set_tile(TileCoord {2, 2}, sheltered_tile);
 
     invoke_system_run<WorkerConditionSystem>(exposed_context);
     invoke_system_run<WorkerConditionSystem>(sheltered_context);

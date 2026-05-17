@@ -408,8 +408,7 @@ SiteRunState SiteRunFactory::create_site_run(
             100.0f,
             100.0f,
             100.0f,
-            1.0f,
-            false});
+            1.0f});
     run.site_world = std::move(site_world);
     seed_site_fertility(run, site_content);
     if (site_content != nullptr)

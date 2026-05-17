@@ -183,8 +183,7 @@ inline SiteRunState make_test_site_run(
             100.0f,
             100.0f,
             100.0f,
-            1.0f,
-            false});
+            1.0f});
     if (site_run.site_world->contains(site_run.camp.delivery_box_tile))
     {
         auto tile = site_run.site_world->tile_at(site_run.camp.delivery_box_tile);

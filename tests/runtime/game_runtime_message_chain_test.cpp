@@ -955,9 +955,9 @@ void site_weather_changes_emit_hud_wind_warning_codes()
         assert(payload.warning_code == k_hud_warning_wind_exposure);
     }
 
-    auto worker_conditions = gs1::site_world_access::worker_conditions(site_run);
-    worker_conditions.is_sheltered = true;
-    gs1::site_world_access::set_worker_conditions(site_run, worker_conditions);
+    site_run.weather.weather_heat = 60.0f;
+    site_run.weather.weather_wind = 24.0f;
+    site_run.weather.weather_dust = 16.0f;
     gs1::GameRuntimeProjectionTestAccess::mark_projection_dirty(runtime, gs1::SITE_PROJECTION_UPDATE_WORKER);
     gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
 

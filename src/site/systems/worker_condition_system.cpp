@@ -217,8 +217,7 @@ bool worker_conditions_changed(
         previous.energy_cap != current.energy_cap ||
         previous.energy != current.energy ||
         previous.morale != current.morale ||
-        previous.work_efficiency != current.work_efficiency ||
-        previous.is_sheltered != current.is_sheltered;
+        previous.work_efficiency != current.work_efficiency;
 }
 
 bool action_is_executing(const ConstActionStateRef& action_state) noexcept
@@ -490,6 +489,7 @@ void accumulate_passive_deltas(
     WorkerMeterDeltas& deltas,
     const SiteWorld::WorkerConditionData& previous,
     const SiteWorld::TileLocalWeatherData& local_weather,
+    bool is_sheltered,
     ConstModifierStateRef modifier_state,
     float step_game_minutes,
     float step_real_seconds) noexcept
@@ -502,7 +502,7 @@ void accumulate_passive_deltas(
     const auto& tuning = worker_condition_tuning();
     const auto& modifiers = modifier_state.resolved_channel_totals;
     const auto& village_effects = modifier_state.resolved_village_technology_effects;
-    const float exposure_scale = previous.is_sheltered ? tuning.sheltered_exposure_scale : 1.0f;
+    const float exposure_scale = is_sheltered ? tuning.sheltered_exposure_scale : 1.0f;
     const float heat = normalize_meter(std::max(local_weather.heat, 0.0f)) * exposure_scale;
     const float wind = normalize_meter(std::max(local_weather.wind, 0.0f)) * exposure_scale;
     const float dust = normalize_meter(std::max(local_weather.dust, 0.0f)) * exposure_scale;
@@ -626,6 +626,12 @@ SiteWorld::WorkerConditionData resolve_worker_conditions(
         resolve_work_efficiency(current, modifiers, deltas.work_efficiency);
     return current;
 }
+
+bool worker_is_sheltered(const SiteWorldAccess<WorkerConditionSystem>& world) noexcept
+{
+    const auto* site_world = world.read_site_world();
+    return site_world != nullptr && site_world->worker_is_sheltered(world.read_weather());
+}
 }  // namespace
 
 const char* WorkerConditionSystem::name() const noexcept
@@ -687,6 +693,7 @@ Gs1Status WorkerConditionSystem::process_game_message(
 
     auto worker = world.read_worker();
     const auto previous = worker.conditions;
+    const bool is_sheltered = worker_is_sheltered(world);
     const auto deltas =
         message.type == GameMessageType::WorkerMeterDeltaRequested
         ? deltas_from_message(message.payload_as<WorkerMeterDeltaRequestedMessage>())
@@ -732,10 +739,12 @@ void WorkerConditionSystem::run(RuntimeInvocation& invocation)
     WorkerMeterDeltas deltas {};
     const float step_real_seconds =
         static_cast<float>(std::max(0.0, fixed_step_seconds));
+    const bool is_sheltered = worker_is_sheltered(world);
     accumulate_passive_deltas(
         deltas,
         previous,
         world.read_tile_local_weather(worker.position.tile_coord),
+        is_sheltered,
         world.read_modifier(),
         static_cast<float>(runtime_minutes_from_real_seconds(fixed_step_seconds)),
         step_real_seconds);

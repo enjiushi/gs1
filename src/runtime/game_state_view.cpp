@@ -599,7 +599,7 @@ void rebuild_site_view(
             worker.conditions.energy,
             worker.conditions.morale,
             worker.conditions.work_efficiency,
-            worker.conditions.is_sheltered ? 1U : 0U,
+            site_world != nullptr && site_world->worker_is_sheltered(weather) ? 1U : 0U,
             {0U, 0U, 0U}},
         economy.current_cash,
         economy.phone_delivery_fee,
