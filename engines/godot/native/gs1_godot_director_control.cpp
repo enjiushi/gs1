@@ -78,7 +78,6 @@ void Gs1GodotDirectorControl::_ready()
     set_process(true);
     adapter_service_.subscribe(GS1_ENGINE_MESSAGE_SET_APP_STATE, *this);
     cache_nodes();
-    begin_background_resource_prewarms();
     ensure_active_scene();
 }
 
@@ -86,7 +85,7 @@ void Gs1GodotDirectorControl::_process(double delta)
 {
     adapter_service_.begin_frame(delta);
     cache_nodes();
-    poll_background_resource_prewarms();
+    prewarm_manager_.poll();
     poll_async_scene_switch();
     ensure_active_scene();
     adapter_service_.finish_frame();
@@ -98,63 +97,6 @@ void Gs1GodotDirectorControl::cache_nodes()
     {
         scene_host_ = Object::cast_to<Control>(get_node_or_null(scene_host_path_));
     }
-}
-
-void Gs1GodotDirectorControl::begin_background_resource_prewarms()
-{
-    if (regional_backdrop_prewarm_requested_ || !retained_regional_backdrop_scene_.is_null())
-    {
-        return;
-    }
-
-    ResourceLoader* resource_loader = ResourceLoader::get_singleton();
-    if (resource_loader == nullptr || regional_map_backdrop_scene_path_.is_empty())
-    {
-        return;
-    }
-
-    const Error status = resource_loader->load_threaded_request(
-        regional_map_backdrop_scene_path_,
-        "PackedScene",
-        true,
-        ResourceLoader::CACHE_MODE_REUSE);
-    if (status == OK || status == ERR_BUSY)
-    {
-        regional_backdrop_prewarm_requested_ = true;
-    }
-}
-
-void Gs1GodotDirectorControl::poll_background_resource_prewarms()
-{
-    if (!regional_backdrop_prewarm_requested_ || !retained_regional_backdrop_scene_.is_null())
-    {
-        return;
-    }
-
-    ResourceLoader* resource_loader = ResourceLoader::get_singleton();
-    if (resource_loader == nullptr)
-    {
-        return;
-    }
-
-    const ResourceLoader::ThreadLoadStatus status =
-        resource_loader->load_threaded_get_status(regional_map_backdrop_scene_path_);
-    if (status == ResourceLoader::THREAD_LOAD_IN_PROGRESS)
-    {
-        return;
-    }
-
-    if (status == ResourceLoader::THREAD_LOAD_LOADED)
-    {
-        Ref<Resource> resource = resource_loader->load_threaded_get(regional_map_backdrop_scene_path_);
-        Ref<PackedScene> packed_scene = resource;
-        if (!packed_scene.is_null())
-        {
-            retained_regional_backdrop_scene_ = packed_scene;
-        }
-    }
-
-    regional_backdrop_prewarm_requested_ = false;
 }
 
 void Gs1GodotDirectorControl::ensure_active_scene()
@@ -214,7 +156,7 @@ void Gs1GodotDirectorControl::begin_async_scene_switch(ScreenKind kind)
         "PackedScene",
         true,
         ResourceLoader::CACHE_MODE_REUSE);
-    if (status != OK)
+    if (status != OK && status != ERR_BUSY)
     {
         switch_to_scene(kind);
         if (submit_site_scene_ready && !adapter_service_.submit_site_scene_ready())
@@ -554,6 +496,7 @@ void Gs1GodotDirectorControl::handle_engine_message(const Gs1EngineMessage& mess
 void Gs1GodotDirectorControl::handle_runtime_message_reset()
 {
     clear_async_scene_switch_state();
+    prewarm_manager_.clear();
     last_app_state_ = APP_STATE_BOOT;
 }
 
@@ -636,10 +579,20 @@ void Gs1GodotDirectorControl::switch_to_scene(ScreenKind kind, const Ref<PackedS
 
     active_scene_id_ = instance->get_instance_id();
     active_screen_kind_ = kind;
+    if (kind != GS1_GODOT_SCREEN_KIND_LOADING)
+    {
+        prewarm_manager_.set_current_screen(kind);
+    }
 }
 
 Node* Gs1GodotDirectorControl::instantiate_scene(const String& scene_path) const
 {
+    if (Ref<PackedScene> prefetched_scene = prewarm_manager_.find_retained_packed_scene(scene_path);
+        !prefetched_scene.is_null())
+    {
+        return instantiate_scene(prefetched_scene);
+    }
+
     ResourceLoader* resource_loader = ResourceLoader::get_singleton();
     if (resource_loader == nullptr)
     {

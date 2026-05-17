@@ -1,0 +1,101 @@
+[[group]]
+id = "regional_backdrop_core"
+
+  [[group.targets]]
+  kind = "scene"
+  path = "res://scenes/regional_map_backdrop.tscn"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/textures/g_pal_00_color.png"
+  resource_type = "Texture2D"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/textures/dirt (2).png"
+  resource_type = "Texture2D"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/textures/dirt (1).png"
+  resource_type = "Texture2D"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/textures/dirt (3).png"
+  resource_type = "Texture2D"
+
+[[group]]
+id = "main_menu_backdrop_core"
+
+  [[group.targets]]
+  kind = "scene"
+  path = "res://scenes/main_menu_backdrop.tscn"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/textures/g_pal_00_color.png"
+  resource_type = "Texture2D"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/textures/dirt (2).png"
+  resource_type = "Texture2D"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/textures/dirt (1).png"
+  resource_type = "Texture2D"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/textures/dirt (3).png"
+  resource_type = "Texture2D"
+
+[[group]]
+id = "site_terrain_core"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/textures/g_pal_00_color.png"
+  resource_type = "Texture2D"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/textures/dirt (2).png"
+  resource_type = "Texture2D"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/textures/dirt (1).png"
+  resource_type = "Texture2D"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/textures/dirt (3).png"
+  resource_type = "Texture2D"
+
+  [[group.targets]]
+  kind = "resource"
+  path = "res://assets/terrain/textures/road dirt.png"
+  resource_type = "Texture2D"
+
+[[transition]]
+from = "main_menu"
+to = "regional_map"
+groups = ["regional_backdrop_core"]
+
+[[transition]]
+from = "regional_map"
+to = "main_menu"
+groups = ["main_menu_backdrop_core"]
+
+[[transition]]
+from = "regional_map"
+to = "site_session"
+groups = ["site_terrain_core"]
+
+[[transition]]
+from = "site_session"
+to = "regional_map"
+groups = ["regional_backdrop_core"]

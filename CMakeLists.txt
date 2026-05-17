@@ -574,6 +574,8 @@ if(GS1_BUILD_GODOT_ADAPTER)
         engines/godot/native/gs1_godot_debug_http_protocol.cpp
         engines/godot/native/gs1_godot_debug_http_server.cpp
         engines/godot/native/godot_progression_resources.cpp
+        engines/godot/native/gs1_godot_prewarm_config.cpp
+        engines/godot/native/gs1_godot_prewarm_manager.cpp
         engines/godot/native/gs1_godot_director_control.cpp
         engines/godot/native/gs1_godot_main_menu_ui_controller.cpp
         engines/godot/native/gs1_godot_craft_panel_controller.cpp
