@@ -25,6 +25,7 @@ stretch = true
 handle_input_locally = false
 size = Vector2i(1600, 900)
 render_target_update_mode = 4
+use_taa = true
 
 [node name="RegionalMapWorld" parent="BackdropViewport/Viewport" unique_id=39603584 instance=ExtResource("4_backdrop")]
 
