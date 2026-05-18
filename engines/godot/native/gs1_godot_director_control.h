@@ -48,6 +48,8 @@ public:
 
     void set_loading_scene_path(const godot::String& path);
     [[nodiscard]] godot::String get_loading_scene_path() const;
+    void set_loading_reveal_delay_frames(int frames);
+    [[nodiscard]] int get_loading_reveal_delay_frames() const noexcept;
 
     [[nodiscard]] Gs1GodotAdapterService& adapter_service() noexcept { return adapter_service_; }
     [[nodiscard]] const Gs1GodotAdapterService& adapter_service() const noexcept { return adapter_service_; }
@@ -66,6 +68,8 @@ private:
     void ensure_active_scene();
     void begin_async_scene_switch(ScreenKind kind);
     void poll_async_scene_switch();
+    [[nodiscard]] bool stage_async_scene_switch(ScreenKind kind, const godot::Ref<godot::PackedScene>& packed_scene);
+    void reveal_staged_async_scene();
     void cache_loading_scene_nodes();
     void refresh_loading_scene_progress(godot::ResourceLoader& resource_loader);
     void begin_async_resource_preloads(ScreenKind kind);
@@ -101,6 +105,7 @@ private:
     godot::String main_menu_scene_path_ {"res://scenes/main_menu.tscn"};
     godot::String regional_map_scene_path_ {"res://scenes/regional_map.tscn"};
     godot::String site_session_scene_path_ {"res://scenes/site_session.tscn"};
+    int loading_reveal_delay_frames_ {2};
 
     Gs1GodotAdapterService adapter_service_ {};
     Gs1GodotPrewarmManager prewarm_manager_ {};
@@ -112,5 +117,7 @@ private:
     ScreenKind pending_async_target_kind_ {GS1_GODOT_SCREEN_KIND_NONE};
     godot::String pending_async_scene_path_ {};
     std::vector<godot::String> pending_async_resource_paths_ {};
+    godot::ObjectID staged_async_scene_id_ {};
+    int pending_loading_reveal_delay_frames_ {0};
     int last_app_state_ {-1};
 };
