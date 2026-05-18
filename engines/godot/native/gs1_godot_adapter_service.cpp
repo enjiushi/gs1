@@ -153,7 +153,7 @@ void Gs1GodotAdapterService::bump_ui_session_revision(std::uint32_t dirty_flags)
     payload.dirty_flags = dirty_flags;
     payload.reserved0 = 0U;
     payload.revision = ui_session_state_.revision;
-    dispatch_or_buffer_engine_message(std::move(message));
+    dispatch_engine_message(std::move(message));
 }
 
 void Gs1GodotAdapterService::sync_phone_badges_from_view(const Gs1GameStateView& view)
@@ -228,33 +228,6 @@ void Gs1GodotAdapterService::sync_ui_session_from_view(const Gs1GameStateView& v
         ui_session_state_.inventory.opened_storage_id = 0U;
         return;
     }
-}
-
-void Gs1GodotAdapterService::begin_engine_message_buffering()
-{
-    engine_message_buffering_active_ = true;
-}
-
-void Gs1GodotAdapterService::flush_buffered_engine_messages()
-{
-    engine_message_buffering_active_ = false;
-    if (buffered_engine_messages_.empty())
-    {
-        return;
-    }
-
-    std::vector<Gs1EngineMessage> buffered_messages {};
-    buffered_messages.swap(buffered_engine_messages_);
-    for (Gs1EngineMessage& message : buffered_messages)
-    {
-        dispatch_engine_message(std::move(message));
-    }
-}
-
-void Gs1GodotAdapterService::clear_buffered_engine_messages() noexcept
-{
-    engine_message_buffering_active_ = false;
-    buffered_engine_messages_.clear();
 }
 
 void Gs1GodotAdapterService::begin_frame(double delta_seconds)
@@ -556,7 +529,7 @@ bool Gs1GodotAdapterService::drain_projection_messages()
             return false;
         }
 
-        dispatch_or_buffer_engine_message(std::move(message));
+        dispatch_engine_message(std::move(message));
     }
 
     return true;
@@ -586,7 +559,7 @@ bool Gs1GodotAdapterService::poll_gameplay_state_notifications()
         app_state_message.type = GS1_ENGINE_MESSAGE_SET_APP_STATE;
         auto& payload = app_state_message.emplace_payload<Gs1EngineMessageSetAppStateData>();
         payload.app_state = view.app_state;
-        dispatch_or_buffer_engine_message(std::move(app_state_message));
+        dispatch_engine_message(std::move(app_state_message));
         last_dispatched_gameplay_app_state_ = view.app_state;
         has_dispatched_gameplay_app_state_ = true;
     }
@@ -598,7 +571,6 @@ bool Gs1GodotAdapterService::poll_gameplay_state_notifications()
 
 void Gs1GodotAdapterService::notify_runtime_message_reset()
 {
-    clear_buffered_engine_messages();
     phase2_pending_ = false;
     has_dispatched_gameplay_app_state_ = false;
     last_dispatched_gameplay_app_state_ = GS1_APP_STATE_BOOT;
@@ -610,17 +582,6 @@ void Gs1GodotAdapterService::notify_runtime_message_reset()
             subscriber->handle_runtime_message_reset();
         }
     }
-}
-
-void Gs1GodotAdapterService::dispatch_or_buffer_engine_message(Gs1EngineMessage&& message)
-{
-    if (engine_message_buffering_active_)
-    {
-        buffered_engine_messages_.push_back(std::move(message));
-        return;
-    }
-
-    dispatch_engine_message(std::move(message));
 }
 
 void Gs1GodotAdapterService::dispatch_engine_message(Gs1EngineMessage&& message)
@@ -769,18 +730,6 @@ bool Gs1GodotAdapterService::submit_site_inventory_slot_tap(
     event.payload.site_inventory_slot_tap.slot_index = static_cast<std::uint16_t>(slot_index);
     event.payload.site_inventory_slot_tap.item_instance_id = static_cast<std::uint32_t>(item_instance_id);
     event.payload.site_inventory_slot_tap.companion_storage_id = ui_session_state_.inventory.opened_storage_id;
-    if (!runtime_session_.submit_host_events(&event, 1U))
-    {
-        last_error_ = runtime_session_.last_error();
-        return false;
-    }
-    return true;
-}
-
-bool Gs1GodotAdapterService::submit_site_scene_ready()
-{
-    Gs1HostEvent event {};
-    event.type = GS1_HOST_EVENT_SITE_SCENE_READY;
     if (!runtime_session_.submit_host_events(&event, 1U))
     {
         last_error_ = runtime_session_.last_error();

@@ -95,9 +95,6 @@ public:
 
     void begin_frame(double delta_seconds);
     void finish_frame();
-    void begin_engine_message_buffering();
-    void flush_buffered_engine_messages();
-    void clear_buffered_engine_messages() noexcept;
 
     void subscribe(Gs1EngineMessageType type, IGs1GodotEngineMessageSubscriber& subscriber);
     void subscribe_matching_messages(IGs1GodotEngineMessageSubscriber& subscriber);
@@ -124,7 +121,6 @@ public:
         std::int64_t container_kind,
         std::int64_t slot_index,
         std::int64_t item_instance_id);
-    [[nodiscard]] bool submit_site_scene_ready();
     [[nodiscard]] bool get_game_state_view(Gs1GameStateView& out_view);
     [[nodiscard]] bool query_site_tile_view(std::uint32_t tile_index, Gs1SiteTileView& out_tile);
     [[nodiscard]] const Gs1GodotUiSessionState& ui_session_state() const noexcept
@@ -146,7 +142,6 @@ private:
     bool poll_gameplay_state_notifications();
     void notify_runtime_message_reset();
     void dispatch_engine_message(Gs1EngineMessage&& message);
-    void dispatch_or_buffer_engine_message(Gs1EngineMessage&& message);
     [[nodiscard]] bool submit_gameplay_action(const Gs1GameplayAction& action);
     [[nodiscard]] bool handle_local_gameplay_action(const Gs1GameplayAction& action);
     [[nodiscard]] bool handle_local_storage_view(
@@ -173,12 +168,10 @@ private:
     std::unordered_set<IGs1GodotEngineMessageSubscriber*> known_subscribers_ {};
     Gs1GodotDebugHttpServer debug_http_server_ {};
     bool debug_http_server_checked_ {false};
-    bool engine_message_buffering_active_ {false};
     bool phase2_pending_ {false};
     double pending_phase1_delta_seconds_ {1.0 / 60.0};
     std::mutex pending_debug_http_commands_mutex_ {};
     std::vector<Gs1GodotDebugHttpCommand> pending_debug_http_commands_ {};
-    std::vector<Gs1EngineMessage> buffered_engine_messages_ {};
     Gs1GodotUiSessionState ui_session_state_ {};
     Gs1AppState last_dispatched_gameplay_app_state_ {GS1_APP_STATE_BOOT};
     bool has_dispatched_gameplay_app_state_ {false};

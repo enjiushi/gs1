@@ -245,28 +245,8 @@ Gs1Status process_campaign_flow_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto& app_state = runtime_invocation_state_ref<RuntimeAppStateTag>(invocation);
-
     switch (message.type)
     {
-    case GS1_HOST_EVENT_SITE_SCENE_READY:
-        if (!runtime_invocation_has_campaign(invocation) ||
-            !runtime_invocation_has_active_site_run(invocation) ||
-            app_state != GS1_APP_STATE_SITE_LOADING)
-        {
-            return GS1_STATUS_OK;
-        }
-
-        app_state = GS1_APP_STATE_SITE_ACTIVE;
-        set_campaign_app_state(invocation, app_state);
-        {
-            GameMessage site_scene_activated {};
-            site_scene_activated.type = GameMessageType::SiteSceneActivated;
-            site_scene_activated.set_payload(SiteSceneActivatedMessage {});
-            invocation.push_game_message(site_scene_activated);
-        }
-        return GS1_STATUS_OK;
-
     case GS1_HOST_EVENT_GAMEPLAY_ACTION:
     {
         const auto& action = message.payload.gameplay_action.action;
@@ -355,8 +335,7 @@ GameMessageSubscriptionSpan CampaignFlowSystem::subscribed_game_messages() const
 HostMessageSubscriptionSpan CampaignFlowSystem::subscribed_host_messages() const noexcept
 {
     static constexpr Gs1HostMessageType subscriptions[] = {
-        GS1_HOST_EVENT_GAMEPLAY_ACTION,
-        GS1_HOST_EVENT_SITE_SCENE_READY};
+        GS1_HOST_EVENT_GAMEPLAY_ACTION};
     return subscriptions;
 }
 
@@ -386,7 +365,25 @@ Gs1Status CampaignFlowSystem::process_host_message(
 
 void CampaignFlowSystem::run(RuntimeInvocation& invocation)
 {
-    (void)invocation;
+    if (!runtime_invocation_has_campaign(invocation) ||
+        !runtime_invocation_has_active_site_run(invocation))
+    {
+        return;
+    }
+
+    auto& app_state = runtime_invocation_state_ref<RuntimeAppStateTag>(invocation);
+    if (app_state != GS1_APP_STATE_SITE_LOADING)
+    {
+        return;
+    }
+
+    app_state = GS1_APP_STATE_SITE_ACTIVE;
+    set_campaign_app_state(invocation, app_state);
+
+    GameMessage site_scene_activated {};
+    site_scene_activated.type = GameMessageType::SiteSceneActivated;
+    site_scene_activated.set_payload(SiteSceneActivatedMessage {});
+    invocation.push_game_message(site_scene_activated);
 }
 
 Gs1Status process_campaign_flow_message(

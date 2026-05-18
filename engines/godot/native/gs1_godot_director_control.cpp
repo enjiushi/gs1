@@ -135,19 +135,9 @@ void Gs1GodotDirectorControl::begin_async_scene_switch(ScreenKind kind)
 {
     ResourceLoader* resource_loader = ResourceLoader::get_singleton();
     const String scene_path = scene_path_for(kind);
-    const bool buffer_engine_messages =
-        kind == GS1_GODOT_SCREEN_KIND_REGIONAL_MAP &&
-        active_screen_kind_ == GS1_GODOT_SCREEN_KIND_MAIN_MENU;
-    const bool submit_site_scene_ready =
-        kind == GS1_GODOT_SCREEN_KIND_SITE_SESSION &&
-        active_screen_kind_ == GS1_GODOT_SCREEN_KIND_REGIONAL_MAP;
     if (resource_loader == nullptr || scene_path.is_empty())
     {
         switch_to_scene(kind);
-        if (submit_site_scene_ready && !adapter_service_.submit_site_scene_ready())
-        {
-            UtilityFunctions::push_warning("GS1 Godot director could not acknowledge site scene readiness.");
-        }
         return;
     }
 
@@ -159,22 +149,12 @@ void Gs1GodotDirectorControl::begin_async_scene_switch(ScreenKind kind)
     if (status != OK && status != ERR_BUSY)
     {
         switch_to_scene(kind);
-        if (submit_site_scene_ready && !adapter_service_.submit_site_scene_ready())
-        {
-            UtilityFunctions::push_warning("GS1 Godot director could not acknowledge site scene readiness.");
-        }
         return;
     }
 
     pending_async_target_kind_ = kind;
     pending_async_scene_path_ = scene_path;
     begin_async_resource_preloads(kind);
-    pending_async_transition_buffers_engine_messages_ = buffer_engine_messages;
-    pending_async_transition_submits_site_scene_ready_ = submit_site_scene_ready;
-    if (pending_async_transition_buffers_engine_messages_)
-    {
-        adapter_service_.begin_engine_message_buffering();
-    }
     switch_to_scene(GS1_GODOT_SCREEN_KIND_LOADING);
 }
 
@@ -189,18 +169,8 @@ void Gs1GodotDirectorControl::poll_async_scene_switch()
     if (resource_loader == nullptr)
     {
         const ScreenKind target_kind = pending_async_target_kind_;
-        const bool buffer_engine_messages = pending_async_transition_buffers_engine_messages_;
-        const bool submit_site_scene_ready = pending_async_transition_submits_site_scene_ready_;
         clear_async_scene_switch_state();
         switch_to_scene(target_kind);
-        if (buffer_engine_messages)
-        {
-            adapter_service_.flush_buffered_engine_messages();
-        }
-        if (submit_site_scene_ready && !adapter_service_.submit_site_scene_ready())
-        {
-            UtilityFunctions::push_warning("GS1 Godot director could not acknowledge site scene readiness.");
-        }
         return;
     }
 
@@ -219,21 +189,11 @@ void Gs1GodotDirectorControl::poll_async_scene_switch()
 
     const ScreenKind target_kind = pending_async_target_kind_;
     const String target_path = pending_async_scene_path_;
-    const bool buffer_engine_messages = pending_async_transition_buffers_engine_messages_;
-    const bool submit_site_scene_ready = pending_async_transition_submits_site_scene_ready_;
     clear_async_scene_switch_state();
 
     if (status != ResourceLoader::THREAD_LOAD_LOADED)
     {
         switch_to_scene(target_kind);
-        if (buffer_engine_messages)
-        {
-            adapter_service_.flush_buffered_engine_messages();
-        }
-        if (submit_site_scene_ready && !adapter_service_.submit_site_scene_ready())
-        {
-            UtilityFunctions::push_warning("GS1 Godot director could not acknowledge site scene readiness.");
-        }
         return;
     }
 
@@ -242,26 +202,10 @@ void Gs1GodotDirectorControl::poll_async_scene_switch()
     if (packed_scene.is_null())
     {
         switch_to_scene(target_kind);
-        if (buffer_engine_messages)
-        {
-            adapter_service_.flush_buffered_engine_messages();
-        }
-        if (submit_site_scene_ready && !adapter_service_.submit_site_scene_ready())
-        {
-            UtilityFunctions::push_warning("GS1 Godot director could not acknowledge site scene readiness.");
-        }
         return;
     }
 
     switch_to_scene(target_kind, packed_scene);
-    if (buffer_engine_messages)
-    {
-        adapter_service_.flush_buffered_engine_messages();
-    }
-    if (submit_site_scene_ready && !adapter_service_.submit_site_scene_ready())
-    {
-        UtilityFunctions::push_warning("GS1 Godot director could not acknowledge site scene readiness.");
-    }
 }
 
 void Gs1GodotDirectorControl::cache_loading_scene_nodes()
@@ -465,8 +409,6 @@ void Gs1GodotDirectorControl::clear_async_scene_switch_state() noexcept
     pending_async_target_kind_ = GS1_GODOT_SCREEN_KIND_NONE;
     pending_async_scene_path_ = String();
     pending_async_resource_paths_.clear();
-    pending_async_transition_buffers_engine_messages_ = false;
-    pending_async_transition_submits_site_scene_ready_ = false;
 }
 
 bool Gs1GodotDirectorControl::should_async_load_transition(ScreenKind kind) const noexcept
