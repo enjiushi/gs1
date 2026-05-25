@@ -148,7 +148,6 @@ Gs1Status TechnologySystem::process_host_message(
     }
 
     const auto& action = message.payload.gameplay_action.action;
-    GameMessage gameplay_message {};
     switch (action.type)
     {
     case GS1_GAMEPLAY_ACTION_CLAIM_TECHNOLOGY_NODE:
@@ -156,11 +155,6 @@ Gs1Status TechnologySystem::process_host_message(
         {
             return GS1_STATUS_INVALID_ARGUMENT;
         }
-        gameplay_message.type = GameMessageType::TechnologyNodeClaimRequested;
-        gameplay_message.set_payload(TechnologyNodeClaimRequestedMessage {
-            action.target_id,
-            static_cast<std::uint32_t>(action.arg0)});
-        invocation.push_game_message(gameplay_message);
         return GS1_STATUS_OK;
 
     case GS1_GAMEPLAY_ACTION_REFUND_TECHNOLOGY_NODE:
@@ -168,9 +162,6 @@ Gs1Status TechnologySystem::process_host_message(
         {
             return GS1_STATUS_INVALID_ARGUMENT;
         }
-        gameplay_message.type = GameMessageType::TechnologyNodeRefundRequested;
-        gameplay_message.set_payload(TechnologyNodeRefundRequestedMessage {action.target_id});
-        invocation.push_game_message(gameplay_message);
         return GS1_STATUS_OK;
 
     default:
@@ -532,6 +523,28 @@ Gs1Status process_technology_message(
         }
 
         runtime_invocation_state_ref<RuntimeCampaignTechnologyTag>(invocation).total_reputation += payload.delta;
+        return GS1_STATUS_OK;
+    }
+
+    case GameMessageType::TechnologyNodeClaimRequested:
+    {
+        const auto& payload = message.payload_as<TechnologyNodeClaimRequestedMessage>();
+        if (payload.tech_node_id == 0U || payload.reputation_faction_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+
+        return GS1_STATUS_OK;
+    }
+
+    case GameMessageType::TechnologyNodeRefundRequested:
+    {
+        const auto& payload = message.payload_as<TechnologyNodeRefundRequestedMessage>();
+        if (payload.tech_node_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+
         return GS1_STATUS_OK;
     }
 

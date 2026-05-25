@@ -1266,10 +1266,7 @@ Gs1Status ModifierSystem::process_host_message(
         return GS1_STATUS_INVALID_ARGUMENT;
     }
 
-    GameMessage gameplay_message {};
-    gameplay_message.type = GameMessageType::SiteModifierEndRequested;
-    gameplay_message.set_payload(SiteModifierEndRequestedMessage {action.target_id});
-    invocation.push_game_message(gameplay_message);
+    handle_site_modifier_end_requested(invocation, SiteModifierEndRequestedMessage {action.target_id});
     return GS1_STATUS_OK;
 }
 

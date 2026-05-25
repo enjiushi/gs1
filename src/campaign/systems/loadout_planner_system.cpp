@@ -149,8 +149,6 @@ const char* LoadoutPlannerSystem::name() const noexcept
 GameMessageSubscriptionSpan LoadoutPlannerSystem::subscribed_game_messages() const noexcept
 {
     static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::SelectDeploymentSite,
-        GameMessageType::ClearDeploymentSiteSelection,
         GameMessageType::DeploymentSiteSelectionChanged,
     };
     return subscriptions;
@@ -230,14 +228,6 @@ Gs1Status process_loadout_planner_message(
     std::uint32_t selected_site_id = 0U;
     switch (message.type)
     {
-    case GameMessageType::SelectDeploymentSite:
-        selected_site_id = message.payload_as<SelectDeploymentSiteMessage>().site_id;
-        break;
-
-    case GameMessageType::ClearDeploymentSiteSelection:
-        selected_site_id = 0U;
-        break;
-
     case GameMessageType::DeploymentSiteSelectionChanged:
         selected_site_id = message.payload_as<DeploymentSiteSelectionChangedMessage>().selected_site_id;
         break;

@@ -225,6 +225,240 @@ SiteMetaState* find_site_mut(std::vector<SiteMetaState>& sites, std::uint32_t si
 
     return nullptr;
 }
+
+Gs1Status handle_open_main_menu(RuntimeInvocation& invocation) noexcept
+{
+    set_campaign_app_state(invocation, GS1_APP_STATE_MAIN_MENU);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status handle_start_new_campaign(
+    RuntimeInvocation& invocation,
+    const StartNewCampaignMessage& payload)
+{
+    const CampaignState next_campaign =
+        CampaignFactory::create_prototype_campaign(payload.campaign_seed, payload.campaign_days);
+    clear_site_run_state_sets(invocation);
+    invocation.state_manager()->state<StateSetId::CampaignCore>(*invocation.owned_state()) =
+        CampaignCoreState {
+            next_campaign.campaign_id,
+            next_campaign.campaign_seed,
+            next_campaign.campaign_clock_minutes_elapsed,
+            next_campaign.campaign_days_total,
+            next_campaign.campaign_days_remaining,
+            next_campaign.app_state,
+            next_campaign.active_site_id};
+    store_regional_map_state(invocation, next_campaign.regional_map_state);
+    invocation.state_manager()->state<StateSetId::CampaignFactionProgress>(*invocation.owned_state()) =
+        next_campaign.faction_progress;
+    invocation.state_manager()->state<StateSetId::CampaignTechnology>(*invocation.owned_state()) =
+        next_campaign.technology_state;
+    write_loadout_planner_state_to_state_sets(
+        next_campaign.loadout_planner_state,
+        *invocation.owned_state(),
+        *invocation.state_manager());
+    store_campaign_sites(invocation, next_campaign.sites);
+    auto regional_map = load_regional_map_state(invocation);
+    const auto sites = load_campaign_sites(invocation);
+    set_campaign_app_state(invocation, GS1_APP_STATE_REGIONAL_MAP);
+    rebuild_regional_map_caches(regional_map, sites);
+    store_regional_map_state(invocation, regional_map);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status handle_deployment_site_selection(
+    RuntimeInvocation& invocation,
+    std::optional<std::uint32_t> selected_site_id)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    auto regional_map = load_regional_map_state(invocation);
+    auto sites = load_campaign_sites(invocation);
+    if (selected_site_id.has_value())
+    {
+        auto* site = find_site_mut(sites, selected_site_id.value());
+        if (site == nullptr)
+        {
+            return GS1_STATUS_NOT_FOUND;
+        }
+
+        if (site->site_state != GS1_SITE_STATE_AVAILABLE)
+        {
+            return GS1_STATUS_INVALID_STATE;
+        }
+    }
+
+    auto& selection = regional_map.selected_site_id;
+    if (!selected_site_id.has_value())
+    {
+        if (!selection.has_value())
+        {
+            return GS1_STATUS_OK;
+        }
+
+        selection.reset();
+    }
+    else if (selection.has_value() && selection->value == selected_site_id.value())
+    {
+        return GS1_STATUS_OK;
+    }
+    else
+    {
+        selection = SiteId {selected_site_id.value()};
+    }
+
+    GameMessage selection_changed {};
+    selection_changed.type = GameMessageType::DeploymentSiteSelectionChanged;
+    selection_changed.set_payload(DeploymentSiteSelectionChangedMessage {selected_site_id.value_or(0U)});
+    invocation.push_game_message(selection_changed);
+    store_regional_map_state(invocation, regional_map);
+    store_campaign_sites(invocation, sites);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status handle_start_site_attempt(
+    RuntimeInvocation& invocation,
+    std::uint32_t site_id)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    auto& faction_progress = runtime_invocation_state_ref<RuntimeCampaignFactionProgressTag>(invocation);
+    auto sites = load_campaign_sites(invocation);
+    auto* site = find_site_mut(sites, site_id);
+    if (site == nullptr)
+    {
+        return GS1_STATUS_NOT_FOUND;
+    }
+
+    if (site->site_state != GS1_SITE_STATE_AVAILABLE)
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    site->attempt_count += 1U;
+    SiteRunState active_site_run =
+        SiteRunFactory::create_site_run(campaign_seed(invocation), faction_progress, *site);
+    invocation.set_site_world(active_site_run.site_world);
+    if (invocation.runtime() != nullptr)
+    {
+        invocation.runtime()->set_site_world(active_site_run.site_world);
+    }
+    write_site_run_split_state(invocation, active_site_run);
+    store_campaign_sites(invocation, sites);
+    set_campaign_active_site_id(invocation, SiteId {site_id});
+    set_campaign_app_state(invocation, GS1_APP_STATE_SITE_LOADING);
+
+    GameMessage site_run_started {};
+    site_run_started.type = GameMessageType::SiteRunStarted;
+    site_run_started.set_payload(SiteRunStartedMessage {
+        active_site_run.site_id.value,
+        active_site_run.site_run_id.value,
+        active_site_run.site_archetype_id,
+        active_site_run.attempt_index,
+        active_site_run.site_attempt_seed});
+    invocation.push_game_message(site_run_started);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status handle_return_to_regional_map(RuntimeInvocation& invocation)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    auto regional_map = load_regional_map_state(invocation);
+    const auto sites = load_campaign_sites(invocation);
+    clear_site_run_state_sets(invocation);
+    invocation.set_site_world(nullptr);
+    if (invocation.runtime() != nullptr)
+    {
+        invocation.runtime()->set_site_world(nullptr);
+    }
+    set_campaign_active_site_id(invocation, std::nullopt);
+    set_campaign_app_state(invocation, GS1_APP_STATE_REGIONAL_MAP);
+    rebuild_regional_map_caches(regional_map, sites);
+    store_regional_map_state(invocation, regional_map);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status handle_site_attempt_ended(
+    RuntimeInvocation& invocation,
+    const SiteAttemptEndedMessage& payload)
+{
+    if (!runtime_invocation_has_campaign(invocation) ||
+        !runtime_invocation_has_active_site_run(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    auto regional_map = load_regional_map_state(invocation);
+    auto sites = load_campaign_sites(invocation);
+    auto* site = find_site_mut(sites, payload.site_id);
+    if (site == nullptr)
+    {
+        return GS1_STATUS_NOT_FOUND;
+    }
+
+    auto& site_run_meta =
+        invocation.state_manager()->state<StateSetId::SiteRunMeta>(*invocation.owned_state()).value();
+    site_run_meta.run_status =
+        payload.result == GS1_SITE_ATTEMPT_RESULT_COMPLETED
+            ? SiteRunStatus::Completed
+            : SiteRunStatus::Failed;
+    site_run_meta.result_newly_revealed_site_count = 0U;
+
+    if (payload.result == GS1_SITE_ATTEMPT_RESULT_COMPLETED)
+    {
+        site->site_state = GS1_SITE_STATE_COMPLETED;
+
+        for (const auto adjacent_site_id : site->adjacent_site_ids)
+        {
+            auto* adjacent_site = find_site_mut(sites, adjacent_site_id.value);
+            if (adjacent_site != nullptr && adjacent_site->site_state == GS1_SITE_STATE_LOCKED)
+            {
+                adjacent_site->site_state = GS1_SITE_STATE_AVAILABLE;
+                if (!contains_site_id(regional_map.revealed_site_ids, adjacent_site_id))
+                {
+                    regional_map.revealed_site_ids.push_back(adjacent_site_id);
+                    site_run_meta.result_newly_revealed_site_count += 1U;
+                }
+            }
+        }
+
+        if (site->completion_reputation_reward > 0)
+        {
+            GameMessage reputation_award {};
+            reputation_award.type = GameMessageType::CampaignReputationAwardRequested;
+            reputation_award.set_payload(CampaignReputationAwardRequestedMessage {
+                site->completion_reputation_reward});
+            invocation.push_game_message(reputation_award);
+        }
+
+        if (site->featured_faction_id.value != 0U &&
+            site->completion_faction_reputation_reward > 0)
+        {
+            GameMessage faction_award {};
+            faction_award.type = GameMessageType::FactionReputationAwardRequested;
+            faction_award.set_payload(FactionReputationAwardRequestedMessage {
+                site->featured_faction_id.value,
+                site->completion_faction_reputation_reward});
+            invocation.push_game_message(faction_award);
+        }
+    }
+
+    set_campaign_app_state(invocation, GS1_APP_STATE_SITE_RESULT);
+    rebuild_regional_map_caches(regional_map, sites);
+    store_regional_map_state(invocation, regional_map);
+    store_campaign_sites(invocation, sites);
+    return GS1_STATUS_OK;
+}
 }  // namespace
 
 Gs1Status process_campaign_flow_host_message(
@@ -250,49 +484,32 @@ Gs1Status process_campaign_flow_host_message(
     case GS1_HOST_EVENT_GAMEPLAY_ACTION:
     {
         const auto& action = message.payload.gameplay_action.action;
-        GameMessage gameplay_message {};
-
         switch (action.type)
         {
         case GS1_GAMEPLAY_ACTION_START_NEW_CAMPAIGN:
-            gameplay_message.type = GameMessageType::StartNewCampaign;
-            gameplay_message.set_payload(StartNewCampaignMessage {
-                action.arg0,
-                static_cast<std::uint32_t>(action.arg1)});
-            invocation.push_game_message(gameplay_message);
-            return GS1_STATUS_OK;
+            return handle_start_new_campaign(
+                invocation,
+                StartNewCampaignMessage {action.arg0, static_cast<std::uint32_t>(action.arg1)});
 
         case GS1_GAMEPLAY_ACTION_SELECT_DEPLOYMENT_SITE:
             if (action.target_id == 0U)
             {
                 return GS1_STATUS_INVALID_ARGUMENT;
             }
-            gameplay_message.type = GameMessageType::SelectDeploymentSite;
-            gameplay_message.set_payload(SelectDeploymentSiteMessage {action.target_id});
-            invocation.push_game_message(gameplay_message);
-            return GS1_STATUS_OK;
+            return handle_deployment_site_selection(invocation, action.target_id);
 
         case GS1_GAMEPLAY_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
-            gameplay_message.type = GameMessageType::ClearDeploymentSiteSelection;
-            gameplay_message.set_payload(ClearDeploymentSiteSelectionMessage {});
-            invocation.push_game_message(gameplay_message);
-            return GS1_STATUS_OK;
+            return handle_deployment_site_selection(invocation, std::nullopt);
 
         case GS1_GAMEPLAY_ACTION_START_SITE_ATTEMPT:
             if (action.target_id == 0U)
             {
                 return GS1_STATUS_INVALID_ARGUMENT;
             }
-            gameplay_message.type = GameMessageType::StartSiteAttempt;
-            gameplay_message.set_payload(StartSiteAttemptMessage {action.target_id});
-            invocation.push_game_message(gameplay_message);
-            return GS1_STATUS_OK;
+            return handle_start_site_attempt(invocation, action.target_id);
 
         case GS1_GAMEPLAY_ACTION_RETURN_TO_REGIONAL_MAP:
-            gameplay_message.type = GameMessageType::ReturnToRegionalMap;
-            gameplay_message.set_payload(ReturnToRegionalMapMessage {});
-            invocation.push_game_message(gameplay_message);
-            return GS1_STATUS_OK;
+            return handle_return_to_regional_map(invocation);
 
         case GS1_GAMEPLAY_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
         case GS1_GAMEPLAY_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
@@ -390,251 +607,30 @@ Gs1Status process_campaign_flow_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto& app_state = runtime_invocation_state_ref<RuntimeAppStateTag>(invocation);
-
     switch (message.type)
     {
     case GameMessageType::OpenMainMenu:
-        app_state = GS1_APP_STATE_MAIN_MENU;
-        return GS1_STATUS_OK;
+        return handle_open_main_menu(invocation);
 
     case GameMessageType::StartNewCampaign:
-    {
-        const auto& payload = message.payload_as<StartNewCampaignMessage>();
-        const CampaignState next_campaign =
-            CampaignFactory::create_prototype_campaign(payload.campaign_seed, payload.campaign_days);
-        clear_site_run_state_sets(invocation);
-        invocation.state_manager()->state<StateSetId::CampaignCore>(*invocation.owned_state()) =
-            CampaignCoreState {
-                next_campaign.campaign_id,
-                next_campaign.campaign_seed,
-                next_campaign.campaign_clock_minutes_elapsed,
-                next_campaign.campaign_days_total,
-                next_campaign.campaign_days_remaining,
-                next_campaign.app_state,
-                next_campaign.active_site_id};
-        store_regional_map_state(invocation, next_campaign.regional_map_state);
-        invocation.state_manager()->state<StateSetId::CampaignFactionProgress>(*invocation.owned_state()) =
-            next_campaign.faction_progress;
-        invocation.state_manager()->state<StateSetId::CampaignTechnology>(*invocation.owned_state()) =
-            next_campaign.technology_state;
-        write_loadout_planner_state_to_state_sets(
-            next_campaign.loadout_planner_state,
-            *invocation.owned_state(),
-            *invocation.state_manager());
-        store_campaign_sites(invocation, next_campaign.sites);
-        app_state = GS1_APP_STATE_REGIONAL_MAP;
-        auto regional_map = load_regional_map_state(invocation);
-        const auto sites = load_campaign_sites(invocation);
-        set_campaign_app_state(invocation, app_state);
-        rebuild_regional_map_caches(regional_map, sites);
-        store_regional_map_state(invocation, regional_map);
-        return GS1_STATUS_OK;
-    }
+        return handle_start_new_campaign(invocation, message.payload_as<StartNewCampaignMessage>());
 
     case GameMessageType::SelectDeploymentSite:
-    {
-        if (!runtime_invocation_has_campaign(invocation))
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        auto regional_map = load_regional_map_state(invocation);
-        auto sites = load_campaign_sites(invocation);
-        const auto& payload = message.payload_as<SelectDeploymentSiteMessage>();
-        auto* site = find_site_mut(sites, payload.site_id);
-        if (site == nullptr)
-        {
-            return GS1_STATUS_NOT_FOUND;
-        }
-
-        if (site->site_state != GS1_SITE_STATE_AVAILABLE)
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        auto& selection = regional_map.selected_site_id;
-        if (selection.has_value() && selection->value == payload.site_id)
-        {
-            return GS1_STATUS_OK;
-        }
-
-        selection = SiteId {payload.site_id};
-
-        GameMessage selection_changed {};
-        selection_changed.type = GameMessageType::DeploymentSiteSelectionChanged;
-        selection_changed.set_payload(DeploymentSiteSelectionChangedMessage {payload.site_id});
-        invocation.push_game_message(selection_changed);
-        store_regional_map_state(invocation, regional_map);
-        store_campaign_sites(invocation, sites);
-        return GS1_STATUS_OK;
-    }
+        return handle_deployment_site_selection(
+            invocation,
+            message.payload_as<SelectDeploymentSiteMessage>().site_id);
 
     case GameMessageType::ClearDeploymentSiteSelection:
-    {
-        if (!runtime_invocation_has_campaign(invocation))
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        auto regional_map = load_regional_map_state(invocation);
-        auto& selection = regional_map.selected_site_id;
-        if (!selection.has_value())
-        {
-            return GS1_STATUS_OK;
-        }
-
-        selection.reset();
-
-        GameMessage selection_changed {};
-        selection_changed.type = GameMessageType::DeploymentSiteSelectionChanged;
-        selection_changed.set_payload(DeploymentSiteSelectionChangedMessage {0U});
-        invocation.push_game_message(selection_changed);
-        store_regional_map_state(invocation, regional_map);
-        return GS1_STATUS_OK;
-    }
+        return handle_deployment_site_selection(invocation, std::nullopt);
 
     case GameMessageType::StartSiteAttempt:
-    {
-        if (!runtime_invocation_has_campaign(invocation))
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        auto& faction_progress = runtime_invocation_state_ref<RuntimeCampaignFactionProgressTag>(invocation);
-        auto sites = load_campaign_sites(invocation);
-        const auto& payload = message.payload_as<StartSiteAttemptMessage>();
-        auto* site = find_site_mut(sites, payload.site_id);
-        if (site == nullptr)
-        {
-            return GS1_STATUS_NOT_FOUND;
-        }
-
-        if (site->site_state != GS1_SITE_STATE_AVAILABLE)
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        site->attempt_count += 1U;
-        SiteRunState active_site_run =
-            SiteRunFactory::create_site_run(campaign_seed(invocation), faction_progress, *site);
-        invocation.set_site_world(active_site_run.site_world);
-        if (invocation.runtime() != nullptr)
-        {
-            invocation.runtime()->set_site_world(active_site_run.site_world);
-        }
-        write_site_run_split_state(invocation, active_site_run);
-        store_campaign_sites(invocation, sites);
-        set_campaign_active_site_id(invocation, SiteId {payload.site_id});
-        app_state = GS1_APP_STATE_SITE_LOADING;
-        set_campaign_app_state(invocation, app_state);
-
-        GameMessage site_run_started {};
-        site_run_started.type = GameMessageType::SiteRunStarted;
-        site_run_started.set_payload(SiteRunStartedMessage {
-            active_site_run.site_id.value,
-            active_site_run.site_run_id.value,
-            active_site_run.site_archetype_id,
-            active_site_run.attempt_index,
-            active_site_run.site_attempt_seed});
-        invocation.push_game_message(site_run_started);
-        return GS1_STATUS_OK;
-    }
+        return handle_start_site_attempt(invocation, message.payload_as<StartSiteAttemptMessage>().site_id);
 
     case GameMessageType::ReturnToRegionalMap:
-    {
-        if (!runtime_invocation_has_campaign(invocation))
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        auto regional_map = load_regional_map_state(invocation);
-        const auto sites = load_campaign_sites(invocation);
-        clear_site_run_state_sets(invocation);
-        invocation.set_site_world(nullptr);
-        if (invocation.runtime() != nullptr)
-        {
-            invocation.runtime()->set_site_world(nullptr);
-        }
-        set_campaign_active_site_id(invocation, std::nullopt);
-        app_state = GS1_APP_STATE_REGIONAL_MAP;
-        set_campaign_app_state(invocation, app_state);
-        rebuild_regional_map_caches(regional_map, sites);
-        store_regional_map_state(invocation, regional_map);
-        return GS1_STATUS_OK;
-    }
+        return handle_return_to_regional_map(invocation);
 
     case GameMessageType::SiteAttemptEnded:
-    {
-        if (!runtime_invocation_has_campaign(invocation) ||
-            !runtime_invocation_has_active_site_run(invocation))
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        auto regional_map = load_regional_map_state(invocation);
-        auto sites = load_campaign_sites(invocation);
-        const auto& payload = message.payload_as<SiteAttemptEndedMessage>();
-        auto* site = find_site_mut(sites, payload.site_id);
-        if (site == nullptr)
-        {
-            return GS1_STATUS_NOT_FOUND;
-        }
-
-        auto& site_run_meta =
-            invocation.state_manager()->state<StateSetId::SiteRunMeta>(*invocation.owned_state()).value();
-        site_run_meta.run_status =
-            payload.result == GS1_SITE_ATTEMPT_RESULT_COMPLETED
-                ? SiteRunStatus::Completed
-                : SiteRunStatus::Failed;
-        site_run_meta.result_newly_revealed_site_count = 0U;
-
-        if (payload.result == GS1_SITE_ATTEMPT_RESULT_COMPLETED)
-        {
-            site->site_state = GS1_SITE_STATE_COMPLETED;
-
-            for (const auto adjacent_site_id : site->adjacent_site_ids)
-            {
-                auto* adjacent_site = find_site_mut(sites, adjacent_site_id.value);
-                if (adjacent_site != nullptr && adjacent_site->site_state == GS1_SITE_STATE_LOCKED)
-                {
-                    adjacent_site->site_state = GS1_SITE_STATE_AVAILABLE;
-                    if (!contains_site_id(regional_map.revealed_site_ids, adjacent_site_id))
-                    {
-                        regional_map.revealed_site_ids.push_back(adjacent_site_id);
-                        site_run_meta.result_newly_revealed_site_count += 1U;
-                    }
-                }
-            }
-
-            if (site->completion_reputation_reward > 0)
-            {
-                GameMessage reputation_award {};
-                reputation_award.type = GameMessageType::CampaignReputationAwardRequested;
-                reputation_award.set_payload(CampaignReputationAwardRequestedMessage {
-                    site->completion_reputation_reward});
-                invocation.push_game_message(reputation_award);
-            }
-
-            if (site->featured_faction_id.value != 0U &&
-                site->completion_faction_reputation_reward > 0)
-            {
-                GameMessage faction_award {};
-                faction_award.type = GameMessageType::FactionReputationAwardRequested;
-                faction_award.set_payload(FactionReputationAwardRequestedMessage {
-                    site->featured_faction_id.value,
-                    site->completion_faction_reputation_reward});
-                invocation.push_game_message(faction_award);
-            }
-        }
-
-        app_state = GS1_APP_STATE_SITE_RESULT;
-        set_campaign_app_state(invocation, app_state);
-        rebuild_regional_map_caches(regional_map, sites);
-        store_regional_map_state(invocation, regional_map);
-        store_campaign_sites(invocation, sites);
-        return GS1_STATUS_OK;
-    }
+        return handle_site_attempt_ended(invocation, message.payload_as<SiteAttemptEndedMessage>());
 
     case GameMessageType::DeploymentSiteSelectionChanged:
     case GameMessageType::CampaignReputationAwardRequested:

@@ -37,7 +37,9 @@ public:
                 SiteComponent::TileLayout,
                 SiteComponent::TileEcology,
                 SiteComponent::Objective),
-            0U};
+            site_component_mask_of(
+                SiteComponent::Counters,
+                SiteComponent::Objective)};
     }
 
 };

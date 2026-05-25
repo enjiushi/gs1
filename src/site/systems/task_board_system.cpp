@@ -2895,7 +2895,6 @@ Gs1Status TaskBoardSystem::process_host_message(
     }
 
     const auto& action = message.payload.gameplay_action.action;
-    GameMessage gameplay_message {};
     switch (action.type)
     {
     case GS1_GAMEPLAY_ACTION_ACCEPT_TASK:
@@ -2903,9 +2902,7 @@ Gs1Status TaskBoardSystem::process_host_message(
         {
             return GS1_STATUS_INVALID_ARGUMENT;
         }
-        gameplay_message.type = GameMessageType::TaskAcceptRequested;
-        gameplay_message.set_payload(TaskAcceptRequestedMessage {action.target_id});
-        invocation.push_game_message(gameplay_message);
+        handle_task_accept_requested(invocation, TaskAcceptRequestedMessage {action.target_id});
         return GS1_STATUS_OK;
 
     case GS1_GAMEPLAY_ACTION_CLAIM_TASK_REWARD:
@@ -2914,11 +2911,11 @@ Gs1Status TaskBoardSystem::process_host_message(
         {
             return GS1_STATUS_INVALID_ARGUMENT;
         }
-        gameplay_message.type = GameMessageType::TaskRewardClaimRequested;
-        gameplay_message.set_payload(TaskRewardClaimRequestedMessage {
-            action.target_id,
-            static_cast<std::uint32_t>(action.arg0)});
-        invocation.push_game_message(gameplay_message);
+        handle_task_reward_claim_requested(
+            invocation,
+            TaskRewardClaimRequestedMessage {
+                action.target_id,
+                static_cast<std::uint32_t>(action.arg0)});
         return GS1_STATUS_OK;
 
     default:

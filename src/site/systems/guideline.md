@@ -38,7 +38,7 @@ The current conversion slices now wire camp durability, site flow/time, failure/
 - `placement_validation_system.h`: Placement validation system interface.
 - `placement_validation_system.cpp`: Validates structure placement requests against tile/world constraints.
 - `site_completion_system.h`: Site completion system interface.
-- `site_completion_system.cpp`: Determines site success/failure outcomes for the active site objective mode, including pure-survival time completion, cash-target survival goal completion from site money, and green-wall hold/timer-pause evaluation.
+- `site_completion_system.cpp`: Determines site success/failure outcomes for the active site objective mode, including pure-survival time completion, cash-target survival goal completion from site money, and green-wall hold/timer-pause evaluation, while now explicitly declaring ownership of the counters/objective slices it mutates.
 - `site_flow_system.h`: Site flow system interface.
 - `site_flow_system.cpp`: Coordinates major site flow transitions during a run, including worker motion and approach/interaction movement handling.
 - `site_time_system.h`: Site time system interface.
