@@ -2,6 +2,7 @@
 
 #include "gs1_godot_adapter_service.h"
 #include "gs1_godot_projection_types.h"
+#include "support/packed_id_index.h"
 
 #include <godot_cpp/classes/button.hpp>
 #include <godot_cpp/classes/control.hpp>
@@ -68,6 +69,7 @@ private:
     [[nodiscard]] const Gs1RuntimeInventoryStorageProjection* find_worker_pack_storage() const;
     [[nodiscard]] const Gs1RuntimeInventorySlotProjection* find_slot(
         const std::vector<Gs1RuntimeInventorySlotProjection>& slots,
+        const gs1::PackedIdIndex<std::uint16_t>& slot_lookup,
         std::uint16_t slot_index) const;
     void reconcile_slot_grid(
         godot::GridContainer* grid,
@@ -75,7 +77,8 @@ private:
         Gs1InventoryContainerKind container_kind,
         std::uint32_t storage_id,
         std::uint16_t slot_count,
-        const std::vector<Gs1RuntimeInventorySlotProjection>& slots);
+        const std::vector<Gs1RuntimeInventorySlotProjection>& slots,
+        const gs1::PackedIdIndex<std::uint16_t>& slot_lookup);
     void apply_panel_visibility();
     void rebuild_panel_contents();
     [[nodiscard]] godot::Button* upsert_slot_button(
@@ -101,9 +104,13 @@ private:
     std::vector<Gs1RuntimeInventoryStorageProjection> inventory_storages_ {};
     std::vector<Gs1RuntimeInventorySlotProjection> worker_pack_slots_ {};
     std::optional<Gs1RuntimeInventoryViewProjection> opened_storage_ {};
+    gs1::PackedIdIndex<std::uint32_t> inventory_storage_index_ {};
+    gs1::PackedIdIndex<std::uint16_t> worker_pack_slot_index_ {};
+    gs1::PackedIdIndex<std::uint16_t> opened_storage_slot_index_ {};
     std::unordered_map<std::uint64_t, SlotButtonRecord> worker_pack_slot_buttons_ {};
     std::unordered_map<std::uint64_t, SlotButtonRecord> opened_storage_slot_buttons_ {};
     mutable std::unordered_map<std::string, godot::Ref<godot::Texture2D>> texture_cache_ {};
     SubmitInventorySlotTapFn submit_inventory_slot_tap_ {};
+    std::uint32_t worker_pack_storage_id_ {0U};
     bool worker_pack_open_ {false};
 };

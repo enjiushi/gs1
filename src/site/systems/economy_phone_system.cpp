@@ -184,13 +184,9 @@ bool onboarding_chain_effective(RuntimeInvocation& invocation) noexcept
             continue;
         }
 
-        for (const auto& seed_def : all_site_onboarding_task_seed_defs())
+        if (find_site_onboarding_task_seed_def(world.site_id(), task.task_template_id) != nullptr)
         {
-            if (seed_def.site_id == world.site_id() &&
-                seed_def.task_template_id == task.task_template_id)
-            {
-                return true;
-            }
+            return true;
         }
     }
 

@@ -55,6 +55,7 @@ inline constexpr std::uint32_t k_recipe_craft_herbal_poultice = 23U;
 inline constexpr std::uint32_t k_recipe_craft_chemistry_station = 24U;
 
 [[nodiscard]] std::span<const CraftRecipeDef> all_craft_recipe_defs() noexcept;
+[[nodiscard]] std::span<const std::size_t> craft_recipe_indices_for_output_item(ItemId item_id) noexcept;
 
 [[nodiscard]] const CraftRecipeDef* find_craft_recipe_def(
     StructureId station_structure_id,

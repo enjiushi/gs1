@@ -883,16 +883,7 @@ const SiteOnboardingTaskSeedDef* find_onboarding_seed_def(
     SiteId site_id,
     TaskTemplateId task_template_id) noexcept
 {
-    for (const auto& seed_def : all_site_onboarding_task_seed_defs())
-    {
-        if (seed_def.site_id == site_id &&
-            seed_def.task_template_id == task_template_id)
-        {
-            return &seed_def;
-        }
-    }
-
-    return nullptr;
+    return find_site_onboarding_task_seed_def(site_id, task_template_id);
 }
 
 const SiteOnboardingTaskSeedDef* find_root_onboarding_seed(SiteId site_id) noexcept
@@ -931,15 +922,7 @@ const SiteOnboardingTaskSeedDef* find_root_onboarding_seed(SiteId site_id) noexc
 
 bool task_template_is_onboarding_only(TaskTemplateId task_template_id) noexcept
 {
-    for (const auto& seed_def : all_site_onboarding_task_seed_defs())
-    {
-        if (seed_def.task_template_id == task_template_id)
-        {
-            return true;
-        }
-    }
-
-    return false;
+    return has_site_onboarding_task_seed(task_template_id);
 }
 
 bool onboarding_chain_effective(

@@ -160,9 +160,15 @@ inline constexpr std::uint8_t k_initial_unlocked_plant_count = 2U;
 [[nodiscard]] const TechnologyTierDef* find_technology_tier_def(std::uint8_t tier_index) noexcept;
 [[nodiscard]] const ReputationUnlockDef* find_reputation_unlock_def(
     std::uint32_t unlock_id) noexcept;
+[[nodiscard]] const ReputationUnlockDef* find_reputation_unlock_def(
+    ReputationUnlockKind unlock_kind,
+    std::uint32_t content_id) noexcept;
 [[nodiscard]] const TechnologyNodeDef* find_technology_node_def(
     TechNodeId tech_node_id) noexcept;
 [[nodiscard]] const TechnologyNodeDef* find_faction_technology_node_def(
     FactionId faction_id,
     std::uint8_t tier_index) noexcept;
+[[nodiscard]] const TechnologyNodeDef* find_technology_node_grant_def(
+    TechnologyGrantedContentKind granted_content_kind,
+    std::uint32_t granted_content_id) noexcept;
 }  // namespace gs1

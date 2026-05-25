@@ -59,16 +59,7 @@ const FactionProgressState* find_faction_progress(
     ReputationUnlockKind unlock_kind,
     std::uint32_t content_id) noexcept
 {
-    for (const auto& unlock_def : all_reputation_unlock_defs())
-    {
-        if (unlock_def.unlock_kind == unlock_kind &&
-            unlock_def.content_id == content_id)
-        {
-            return true;
-        }
-    }
-
-    return false;
+    return find_reputation_unlock_def(unlock_kind, content_id) != nullptr;
 }
 
 [[nodiscard]] bool reputation_unlock_ready(
@@ -76,37 +67,15 @@ const FactionProgressState* find_faction_progress(
     ReputationUnlockKind unlock_kind,
     std::uint32_t content_id) noexcept
 {
-    for (const auto& unlock_def : all_reputation_unlock_defs())
-    {
-        if (unlock_def.unlock_kind != unlock_kind ||
-            unlock_def.content_id != content_id)
-        {
-            continue;
-        }
-
-        if (technology.total_reputation >= unlock_def.reputation_requirement)
-        {
-            return true;
-        }
-    }
-
-    return false;
+    const auto* unlock_def = find_reputation_unlock_def(unlock_kind, content_id);
+    return unlock_def != nullptr && technology.total_reputation >= unlock_def->reputation_requirement;
 }
 
 [[nodiscard]] bool has_technology_grant(
     TechnologyGrantedContentKind granted_content_kind,
     std::uint32_t granted_content_id) noexcept
 {
-    for (const auto& node_def : all_technology_node_defs())
-    {
-        if (node_def.granted_content_kind == granted_content_kind &&
-            node_def.granted_content_id == granted_content_id)
-        {
-            return true;
-        }
-    }
-
-    return false;
+    return find_technology_node_grant_def(granted_content_kind, granted_content_id) != nullptr;
 }
 
 [[nodiscard]] bool technology_grant_unlocked(
@@ -114,21 +83,8 @@ const FactionProgressState* find_faction_progress(
     TechnologyGrantedContentKind granted_content_kind,
     std::uint32_t granted_content_id) noexcept
 {
-    for (const auto& node_def : all_technology_node_defs())
-    {
-        if (node_def.granted_content_kind != granted_content_kind ||
-            node_def.granted_content_id != granted_content_id)
-        {
-            continue;
-        }
-
-        if (TechnologySystem::node_purchased(faction_progress, node_def.tech_node_id))
-        {
-            return true;
-        }
-    }
-
-    return false;
+    const auto* node_def = find_technology_node_grant_def(granted_content_kind, granted_content_id);
+    return node_def != nullptr && TechnologySystem::node_purchased(faction_progress, node_def->tech_node_id);
 }
 
 }  // namespace
@@ -469,10 +425,17 @@ bool TechnologySystem::craft_output_unlocked(
         return false;
     }
 
-    for (const auto& recipe_def : all_craft_recipe_defs())
+    const auto recipe_indices = craft_recipe_indices_for_output_item(item_id);
+    if (recipe_indices.empty())
     {
-        if (recipe_def.output_item_id == item_id &&
-            recipe_unlocked(faction_progress, technology, recipe_def.recipe_id))
+        return false;
+    }
+
+    const auto recipe_defs = all_craft_recipe_defs();
+    for (const std::size_t recipe_index : recipe_indices)
+    {
+        if (recipe_index < recipe_defs.size() &&
+            recipe_unlocked(faction_progress, technology, recipe_defs[recipe_index].recipe_id))
         {
             return true;
         }

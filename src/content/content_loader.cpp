@@ -2248,6 +2248,28 @@ ContentDatabase ContentLoader::load_prototype_content(const std::filesystem::pat
             return def.recipe_id.value;
         });
     index_defs(
+        craft_recipes_path,
+        "craft recipe station/output",
+        content.craft_recipe_defs,
+        content.index.craft_recipe_by_station_output,
+        [](const CraftRecipeDef& def) {
+            return make_craft_recipe_station_output_key(def.station_structure_id, def.output_item_id);
+        });
+    content.index.craft_recipe_indices_by_output_item.reserve(content.craft_recipe_defs.size());
+    for (std::size_t index = 0U; index < content.craft_recipe_defs.size(); ++index)
+    {
+        const auto& def = content.craft_recipe_defs[index];
+        content.index.craft_recipe_indices_by_output_item[def.output_item_id.value].push_back(index);
+    }
+    index_defs(
+        excavation_tables_path,
+        "excavation depth",
+        content.excavation_depth_defs,
+        content.index.excavation_depth_by_value,
+        [](const ExcavationDepthDef& def) {
+            return static_cast<std::uint32_t>(def.depth);
+        });
+    index_defs(
         modifier_presets_path,
         "modifier",
         content.modifier_defs,
@@ -2264,6 +2286,20 @@ ContentDatabase ContentLoader::load_prototype_content(const std::filesystem::pat
             return def.task_template_id.value;
         });
     index_defs(
+        site_onboarding_task_seeds_path,
+        "site onboarding task seed",
+        content.site_onboarding_task_seed_defs,
+        content.index.site_onboarding_task_seed_by_site_and_template,
+        [](const SiteOnboardingTaskSeedDef& def) {
+            return make_site_onboarding_task_seed_key(def.site_id, def.task_template_id);
+        });
+    for (const auto& seed_def : content.site_onboarding_task_seed_defs)
+    {
+        (void)content.index.site_onboarding_task_seed_by_task_template.emplace(
+            seed_def.task_template_id.value,
+            0U);
+    }
+    index_defs(
         reward_candidates_path,
         "reward candidate",
         content.reward_candidate_defs,
@@ -2278,6 +2314,54 @@ ContentDatabase ContentLoader::load_prototype_content(const std::filesystem::pat
         content.index.site_action_by_kind,
         [](const SiteActionDef& def) {
             return static_cast<std::uint32_t>(def.action_kind);
+        });
+    index_defs(
+        technology_tiers_path,
+        "technology tier",
+        content.technology_tier_defs,
+        content.index.technology_tier_by_index,
+        [](const TechnologyTierDef& def) {
+            return static_cast<std::uint32_t>(def.tier_index);
+        });
+    index_defs(
+        reputation_unlocks_path,
+        "reputation unlock",
+        content.reputation_unlock_defs,
+        content.index.reputation_unlock_by_id,
+        [](const ReputationUnlockDef& def) {
+            return def.unlock_id;
+        });
+    index_defs(
+        reputation_unlocks_path,
+        "reputation unlock kind/content",
+        content.reputation_unlock_defs,
+        content.index.reputation_unlock_by_kind_and_content,
+        [](const ReputationUnlockDef& def) {
+            return make_reputation_unlock_kind_content_key(def.unlock_kind, def.content_id);
+        });
+    index_defs(
+        technology_nodes_path,
+        "technology node",
+        content.technology_node_defs,
+        content.index.technology_node_by_id,
+        [](const TechnologyNodeDef& def) {
+            return def.tech_node_id.value;
+        });
+    index_defs(
+        technology_nodes_path,
+        "faction technology node",
+        content.technology_node_defs,
+        content.index.faction_technology_node_by_key,
+        [](const TechnologyNodeDef& def) {
+            return make_faction_technology_node_key(def.faction_id, def.tier_index);
+        });
+    index_defs(
+        technology_nodes_path,
+        "technology granted content",
+        content.technology_node_defs,
+        content.index.technology_node_by_granted_content,
+        [](const TechnologyNodeDef& def) {
+            return make_technology_granted_content_key(def.granted_content_kind, def.granted_content_id);
         });
 
     const auto issues = validate_content_database(content);

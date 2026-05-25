@@ -115,4 +115,8 @@ inline constexpr std::uint32_t k_task_template_site1_onboarding_cook_ephedra_ste
 [[nodiscard]] std::span<const TaskTemplateDef> all_task_template_defs() noexcept;
 [[nodiscard]] const TaskTemplateDef* find_task_template_def(TaskTemplateId task_template_id) noexcept;
 [[nodiscard]] std::span<const SiteOnboardingTaskSeedDef> all_site_onboarding_task_seed_defs() noexcept;
+[[nodiscard]] const SiteOnboardingTaskSeedDef* find_site_onboarding_task_seed_def(
+    SiteId site_id,
+    TaskTemplateId task_template_id) noexcept;
+[[nodiscard]] bool has_site_onboarding_task_seed(TaskTemplateId task_template_id) noexcept;
 }  // namespace gs1

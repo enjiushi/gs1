@@ -207,8 +207,12 @@ void Gs1GodotInventoryPanelController::handle_engine_message(const Gs1EngineMess
 void Gs1GodotInventoryPanelController::handle_runtime_message_reset()
 {
     inventory_storages_.clear();
+    inventory_storage_index_.clear();
     worker_pack_slots_.clear();
+    worker_pack_slot_index_.clear();
     opened_storage_.reset();
+    opened_storage_slot_index_.clear();
+    worker_pack_storage_id_ = 0U;
     prune_slot_registry(worker_pack_slot_buttons_, {});
     prune_slot_registry(opened_storage_slot_buttons_, {});
     worker_pack_open_ = false;
@@ -228,8 +232,12 @@ void Gs1GodotInventoryPanelController::refresh_from_game_state_view()
         view.active_site == nullptr)
     {
         inventory_storages_.clear();
+        inventory_storage_index_.clear();
         worker_pack_slots_.clear();
+        worker_pack_slot_index_.clear();
         opened_storage_.reset();
+        opened_storage_slot_index_.clear();
+        worker_pack_storage_id_ = 0U;
         worker_pack_open_ = false;
         return;
     }
@@ -239,7 +247,13 @@ void Gs1GodotInventoryPanelController::refresh_from_game_state_view()
     worker_pack_open_ = inventory_session.worker_pack_open;
     inventory_storages_.clear();
     inventory_storages_.reserve(site.storage_count);
+    inventory_storage_index_.clear();
+    inventory_storage_index_.reserve(site.storage_count);
     worker_pack_slots_.clear();
+    worker_pack_slot_index_.clear();
+    worker_pack_slot_index_.reserve(site.storage_slot_count);
+    opened_storage_slot_index_.clear();
+    worker_pack_storage_id_ = 0U;
 
     for (std::uint32_t index = 0; index < site.storage_count; ++index)
     {
@@ -251,6 +265,11 @@ void Gs1GodotInventoryPanelController::refresh_from_game_state_view()
         storage.tile_y = static_cast<std::int16_t>(storage_view.tile_y);
         storage.container_kind = storage_view.container_kind;
         storage.flags = static_cast<std::uint8_t>(storage_view.flags & 0xFFU);
+        if (storage.container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK)
+        {
+            worker_pack_storage_id_ = storage.storage_id;
+        }
+        inventory_storage_index_.emplace(storage.storage_id, inventory_storages_.size());
         inventory_storages_.push_back(storage);
     }
 
@@ -269,6 +288,7 @@ void Gs1GodotInventoryPanelController::refresh_from_game_state_view()
         slot.freshness = slot_view.freshness;
         if (slot.container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK)
         {
+            worker_pack_slot_index_.emplace(slot.slot_index, worker_pack_slots_.size());
             worker_pack_slots_.push_back(slot);
         }
     }
@@ -286,6 +306,8 @@ void Gs1GodotInventoryPanelController::refresh_from_game_state_view()
     if (opened_storage_.has_value())
     {
         opened_storage_->slots.clear();
+        opened_storage_slot_index_.clear();
+        opened_storage_slot_index_.reserve(site.storage_slot_count);
         for (std::uint32_t index = 0; index < site.storage_slot_count; ++index)
         {
             const Gs1InventorySlotView& slot_view = site.storage_slots[index];
@@ -305,6 +327,7 @@ void Gs1GodotInventoryPanelController::refresh_from_game_state_view()
             slot.quantity = static_cast<std::uint16_t>(std::min<std::uint32_t>(slot_view.quantity, 65535U));
             slot.condition = slot_view.condition;
             slot.freshness = slot_view.freshness;
+            opened_storage_slot_index_.emplace(slot.slot_index, opened_storage_->slots.size());
             opened_storage_->slots.push_back(slot);
         }
     }
@@ -361,7 +384,8 @@ void Gs1GodotInventoryPanelController::rebuild_panel_contents()
         GS1_INVENTORY_CONTAINER_WORKER_PACK,
         worker_pack_storage != nullptr ? worker_pack_storage->storage_id : 0U,
         worker_pack_slot_count,
-        worker_pack_slots_);
+        worker_pack_slots_,
+        worker_pack_slot_index_);
 
     if (opened_storage_.has_value())
     {
@@ -385,7 +409,8 @@ void Gs1GodotInventoryPanelController::rebuild_panel_contents()
             GS1_INVENTORY_CONTAINER_DEVICE_STORAGE,
             opened_storage_->storage_id,
             opened_storage_->slot_count,
-            opened_storage_->slots);
+            opened_storage_->slots,
+            opened_storage_slot_index_);
     }
     else
     {
@@ -500,31 +525,20 @@ std::uint64_t Gs1GodotInventoryPanelController::slot_key(
 
 const Gs1RuntimeInventoryStorageProjection* Gs1GodotInventoryPanelController::find_storage(std::uint32_t storage_id) const
 {
-    const auto found = std::find_if(
-        inventory_storages_.begin(),
-        inventory_storages_.end(),
-        [&](const auto& storage) { return storage.storage_id == storage_id; });
-    return found == inventory_storages_.end() ? nullptr : &*found;
+    return inventory_storage_index_.find_value(inventory_storages_, storage_id);
 }
 
 const Gs1RuntimeInventoryStorageProjection* Gs1GodotInventoryPanelController::find_worker_pack_storage() const
 {
-    const auto found = std::find_if(
-        inventory_storages_.begin(),
-        inventory_storages_.end(),
-        [](const auto& storage) { return storage.container_kind == GS1_INVENTORY_CONTAINER_WORKER_PACK; });
-    return found == inventory_storages_.end() ? nullptr : &*found;
+    return worker_pack_storage_id_ == 0U ? nullptr : find_storage(worker_pack_storage_id_);
 }
 
 const Gs1RuntimeInventorySlotProjection* Gs1GodotInventoryPanelController::find_slot(
     const std::vector<Gs1RuntimeInventorySlotProjection>& slots,
+    const gs1::PackedIdIndex<std::uint16_t>& slot_lookup,
     std::uint16_t slot_index) const
 {
-    const auto found = std::find_if(
-        slots.begin(),
-        slots.end(),
-        [&](const auto& slot) { return slot.slot_index == slot_index; });
-    return found == slots.end() ? nullptr : &*found;
+    return slot_lookup.find_value(slots, slot_index);
 }
 
 void Gs1GodotInventoryPanelController::reconcile_slot_grid(
@@ -533,7 +547,8 @@ void Gs1GodotInventoryPanelController::reconcile_slot_grid(
     Gs1InventoryContainerKind container_kind,
     std::uint32_t storage_id,
     std::uint16_t slot_count,
-    const std::vector<Gs1RuntimeInventorySlotProjection>& slots)
+    const std::vector<Gs1RuntimeInventorySlotProjection>& slots,
+    const gs1::PackedIdIndex<std::uint16_t>& slot_lookup)
 {
     if (grid == nullptr || storage_id == 0U)
     {
@@ -560,7 +575,7 @@ void Gs1GodotInventoryPanelController::reconcile_slot_grid(
             continue;
         }
 
-        const auto* slot = find_slot(slots, slot_index);
+        const auto* slot = find_slot(slots, slot_lookup, slot_index);
         const bool occupied = slot != nullptr &&
             (slot->flags & k_inventory_slot_flag_occupied) != 0U &&
             slot->item_id != 0U &&
