@@ -359,10 +359,10 @@ void campaign_flow_completed_attempt_unblocks_visible_adjacent_sites(gs1::testin
             SiteId {2U}) != campaign->regional_map_state.available_site_ids.end());
     GS1_SYSTEM_TEST_CHECK(
         context,
-        count_messages(queue, GameMessageType::CampaignReputationAwardRequested) == 1U);
+        count_messages(queue, GameMessageType::CampaignReputationAwardRequested) == 0U);
     GS1_SYSTEM_TEST_CHECK(
         context,
-        count_messages(queue, GameMessageType::FactionReputationAwardRequested) == 1U);
+        count_messages(queue, GameMessageType::FactionReputationAwardRequested) == 0U);
 }
 
 void campaign_flow_failed_attempt_preserves_locked_neighbors(gs1::testing::SystemTestExecutionContext& context)

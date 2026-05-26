@@ -1322,10 +1322,6 @@ void load_prototype_campaign_sites(ContentDatabase& content, const std::filesyst
             cash_points_from_cash(require_toml_signed<std::int32_t>(path, entry, "objective_target_cash"));
         site.highway_max_average_sand_cover =
             require_toml_float(path, entry, "highway_max_average_sand_cover");
-        site.completion_reputation_reward =
-            require_toml_signed<std::int32_t>(path, entry, "completion_reputation_reward");
-        site.completion_faction_reputation_reward =
-            require_toml_signed<std::int32_t>(path, entry, "completion_faction_reputation_reward");
         site.camp_anchor_tile.x = require_toml_signed<std::int32_t>(path, entry, "camp_anchor_x");
         site.camp_anchor_tile.y = require_toml_signed<std::int32_t>(path, entry, "camp_anchor_y");
         site.default_weather_heat = require_toml_float(path, entry, "default_weather_heat");
@@ -2169,6 +2165,34 @@ void index_defs(
         }
     }
 }
+
+template <typename DefVector, typename MapType, typename IdAccessor, typename Predicate>
+void index_defs(
+    const std::filesystem::path& path,
+    std::string_view label,
+    const DefVector& defs,
+    MapType& index_map,
+    IdAccessor id_accessor,
+    Predicate predicate)
+{
+    for (std::size_t index = 0U; index < defs.size(); ++index)
+    {
+        if (!predicate(defs[index]))
+        {
+            continue;
+        }
+
+        const auto id = id_accessor(defs[index]);
+        const auto [_, inserted] = index_map.emplace(id, index);
+        if (!inserted)
+        {
+            std::string message = "duplicate ";
+            message += label;
+            message += " id";
+            fail_load(path, 0U, message);
+        }
+    }
+}
 }  // namespace
 
 ContentDatabase ContentLoader::load_prototype_content(const std::filesystem::path& content_root)
@@ -2362,6 +2386,10 @@ ContentDatabase ContentLoader::load_prototype_content(const std::filesystem::pat
         content.index.technology_node_by_granted_content,
         [](const TechnologyNodeDef& def) {
             return make_technology_granted_content_key(def.granted_content_kind, def.granted_content_id);
+        },
+        [](const TechnologyNodeDef& def) {
+            return def.granted_content_kind != TechnologyGrantedContentKind::None &&
+                def.granted_content_id != 0U;
         });
 
     const auto issues = validate_content_database(content);

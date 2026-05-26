@@ -205,8 +205,6 @@ void rebuild_campaign_view(
             id_value(site.featured_faction_id),
             site.attempt_count,
             site.support_package_id,
-            static_cast<std::uint32_t>(site.completion_reputation_reward),
-            site.completion_faction_reputation_reward,
             adjacency_offset,
             site.adjacent_site_count,
             support_offset,
@@ -583,6 +581,8 @@ void rebuild_site_view(
             objective.paused_main_timer_minutes,
             objective.last_evaluated_world_time_minutes,
             objective.target_cash_points,
+            objective.objective_progress_normalized,
+            objective.highway_average_sand_cover,
             objective.highway_max_average_sand_cover,
             objective.last_target_average_sand_level},
         Gs1WorkerStateView {

@@ -285,8 +285,6 @@ inline void write_campaign_state_to_state_sets(
         site.attempt_count = entry.attempt_count;
         site.support_package_id = entry.support_package_id;
         site.has_support_package_id = entry.has_support_package_id;
-        site.completion_reputation_reward = entry.completion_reputation_reward;
-        site.completion_faction_reputation_reward = entry.completion_faction_reputation_reward;
 
         if (adjacent.has_value() &&
             entry.adjacent_site_offset <= adjacent->size())
@@ -375,8 +373,6 @@ inline void write_sites_state_to_state_sets(
             static_cast<std::uint32_t>(site.exported_support_items.size()),
             aura_offset,
             static_cast<std::uint32_t>(site.nearby_aura_modifier_ids.size()),
-            site.completion_reputation_reward,
-            site.completion_faction_reputation_reward,
             site.has_support_package_id});
     }
 
@@ -1003,6 +999,8 @@ inline void write_action_state_to_state_sets(
         objective.target_cash_points = meta->target_cash_points;
         objective.target_edge = meta->target_edge;
         objective.target_band_width = meta->target_band_width;
+        objective.objective_progress_normalized = meta->objective_progress_normalized;
+        objective.highway_average_sand_cover = meta->highway_average_sand_cover;
         objective.highway_max_average_sand_cover = meta->highway_max_average_sand_cover;
         objective.last_target_average_sand_level = meta->last_target_average_sand_level;
         objective.has_hold_baseline = meta->has_hold_baseline;
@@ -1050,6 +1048,8 @@ inline void write_site_objective_state_to_state_sets(
         objective.target_cash_points,
         objective.target_edge,
         objective.target_band_width,
+        objective.objective_progress_normalized,
+        objective.highway_average_sand_cover,
         objective.highway_max_average_sand_cover,
         objective.last_target_average_sand_level,
         objective.has_hold_baseline};

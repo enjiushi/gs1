@@ -32,8 +32,6 @@ struct SiteMetaEntryState final
     std::uint32_t exported_support_item_count {0};
     std::uint32_t nearby_aura_modifier_offset {0};
     std::uint32_t nearby_aura_modifier_count {0};
-    std::int32_t completion_reputation_reward {0};
-    std::int32_t completion_faction_reputation_reward {0};
     bool has_support_package_id {false};
 };
 
@@ -50,8 +48,6 @@ struct SiteMetaState final
     bool has_support_package_id {false};
     std::vector<LoadoutSlot> exported_support_items {};
     std::vector<ModifierId> nearby_aura_modifier_ids {};
-    std::int32_t completion_reputation_reward {0};
-    std::int32_t completion_faction_reputation_reward {0};
 };
 
 struct RegionalMapState final

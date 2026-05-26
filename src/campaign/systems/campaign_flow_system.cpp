@@ -311,25 +311,6 @@ Gs1Status handle_site_attempt_ended(
             }
         }
 
-        if (site->completion_reputation_reward > 0)
-        {
-            GameMessage reputation_award {};
-            reputation_award.type = GameMessageType::CampaignReputationAwardRequested;
-            reputation_award.set_payload(CampaignReputationAwardRequestedMessage {
-                site->completion_reputation_reward});
-            invocation.push_game_message(reputation_award);
-        }
-
-        if (site->featured_faction_id.value != 0U &&
-            site->completion_faction_reputation_reward > 0)
-        {
-            GameMessage faction_award {};
-            faction_award.type = GameMessageType::FactionReputationAwardRequested;
-            faction_award.set_payload(FactionReputationAwardRequestedMessage {
-                site->featured_faction_id.value,
-                site->completion_faction_reputation_reward});
-            invocation.push_game_message(faction_award);
-        }
     }
 
     set_campaign_app_state(invocation, GS1_APP_STATE_SITE_RESULT);

@@ -35,8 +35,6 @@ struct Gs1CampaignSiteView
     std::uint32_t featured_faction_id;
     std::uint32_t attempt_count;
     std::uint32_t support_package_id;
-    std::uint32_t completion_reputation_reward;
-    std::int32_t completion_faction_reputation_reward;
     std::uint32_t adjacent_site_id_offset;
     std::uint32_t adjacent_site_id_count;
     std::uint32_t exported_support_item_offset;
@@ -330,6 +328,8 @@ struct Gs1SiteObjectiveView
     double paused_main_timer_minutes;
     double last_evaluated_world_time_minutes;
     std::int32_t target_cash_points;
+    float objective_progress_normalized;
+    float highway_average_sand_cover;
     float highway_max_average_sand_cover;
     float last_target_average_sand_level;
 };

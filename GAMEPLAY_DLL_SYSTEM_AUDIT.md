@@ -8,6 +8,7 @@ Scope:
 - "Subscribed message" means internal `GameMessage` subscriptions.
 - "Subscribed host message" means `Gs1HostMessage` subscriptions at the DLL boundary.
 - "Sends" lists internal `GameMessage` traffic emitted by the system implementation.
+- Some subscribed `GameMessage` entries do not currently have a normal gameplay-system producer path in `src/`; `OpenMainMenu` is queued by `GameRuntime` during first boot, while several campaign-flow messages are only exercised by tests or manual queue injection and are bypassed in the live adapter path by direct host-message handling.
 - For site systems, "ECS data" below uses the authoritative `SiteSystemAccess` contract from [src/site/systems/site_system_context.h](/D:/testgame/gs1_upstream/src/site/systems/site_system_context.h:24). Where the implementation obviously uses sparse flecs data, that is called out briefly.
 - No gameplay system in the current `src/` tree directly calls `push_runtime_message(...)`; host-visible output is primarily produced through owned state, the exported game-state view, and runtime-managed queues.
 
@@ -48,25 +49,32 @@ Registered gameplay systems:
 - Subscribed game messages:
   - `OpenMainMenu`
     - Description: internal campaign-flow request to leave the active campaign surface and return to the main menu.
-    - Usage: handled by resetting app flow back to main menu.
+    - Usage: consumes the runtime boot message queued by `GameRuntime` on first boot, and resets app flow back to main menu.
+    - Producer note: no gameplay-system sender found in `src/`; the only live producer is runtime bootstrap in `GameRuntime`.
   - `StartNewCampaign`
     - Description: internal request to create and install a fresh campaign snapshot.
     - Usage: seeds the campaign through lifecycle helpers, clears the active site-run snapshot, and transitions to the regional map.
+    - Producer note: no gameplay-system sender found in `src/`; the live adapter path handles start-new-campaign through `GS1_HOST_EVENT_GAMEPLAY_ACTION` instead of queuing this `GameMessage`.
   - `SelectDeploymentSite`
     - Description: internal request to pick the active deployment target on the regional map.
     - Usage: validates and stores the selected site, then emits `DeploymentSiteSelectionChanged`.
+    - Producer note: no gameplay-system sender found in `src/`; the live adapter path handles deployment-site selection through `GS1_HOST_EVENT_GAMEPLAY_ACTION` instead of queuing this `GameMessage`.
   - `ClearDeploymentSiteSelection`
     - Description: internal request to clear the currently selected deployment target.
     - Usage: clears the selection and emits `DeploymentSiteSelectionChanged`.
+    - Producer note: no gameplay-system sender found in `src/`; the live adapter path handles clear-selection through `GS1_HOST_EVENT_GAMEPLAY_ACTION` instead of queuing this `GameMessage`.
   - `StartSiteAttempt`
     - Description: internal request to create and activate a site run from the current campaign selection.
     - Usage: installs the new `SiteRun` through lifecycle helpers and emits `SiteRunStarted`.
+    - Producer note: no gameplay-system sender found in `src/`; the live adapter path handles start-site-attempt through `GS1_HOST_EVENT_GAMEPLAY_ACTION` instead of queuing this `GameMessage`.
   - `ReturnToRegionalMap`
     - Description: internal request to leave the active site run and return to the campaign map.
     - Usage: tears the site run down through lifecycle helpers and switches app flow back to the regional map.
+    - Producer note: no gameplay-system sender found in `src/`; the live adapter path handles return-to-map through `GS1_HOST_EVENT_GAMEPLAY_ACTION` instead of queuing this `GameMessage`.
   - `SiteAttemptEnded`
     - Description: internal completion/failure message for the active site attempt.
-    - Usage: resolves result handling, unlocks adjacent sites, emits campaign and faction rewards, and transitions to site-result state.
+    - Usage: resolves result handling, unlocks adjacent sites, and transitions to site-result state.
+    - Design note: completed sites remain non-reenterable, and the broader intended direction is to eventually replace the "attempt" framing with a simpler enter/leave site-session model that does not use failure as a core player-facing concept.
 - Subscribed host messages:
   - `GS1_HOST_EVENT_GAMEPLAY_ACTION`
     - Description: DLL-boundary gameplay action input covering campaign/menu/site-flow UI actions.
@@ -83,10 +91,10 @@ Registered gameplay systems:
     - Usage: emitted after a site attempt begins so site systems seed their run-local state.
   - `CampaignReputationAwardRequested`
     - Description: internal request to award total campaign reputation.
-    - Usage: emitted from site-attempt result resolution when campaign-level rewards should be applied.
+    - Usage: no longer emitted from site-attempt result resolution; task rewards remain the active producer path in the current codebase.
   - `FactionReputationAwardRequested`
     - Description: internal request to award faction-specific reputation.
-    - Usage: emitted from site-attempt result resolution when faction rewards should be applied.
+    - Usage: no longer emitted from site-attempt result resolution; task rewards remain the active producer path in the current codebase.
 - Owns game state: `AppState`, `CampaignCore`, `CampaignRegionalMapMeta`, `CampaignRegionalMapRevealedSites`, `CampaignRegionalMapAvailableSites`, `CampaignRegionalMapCompletedSites`, `CampaignSiteMetaEntries`, `CampaignSiteAdjacentIds`, `CampaignSiteExportedSupportItems`, `CampaignSiteNearbyAuraModifierIds`
 - Accesses game state: `RuntimeAppStateTag`, `RuntimeCampaignFactionProgressTag`; installs and resets campaign/site lifecycle state through narrow runtime lifecycle helpers and owns `SiteRunMeta` for active site flow bookkeeping.
 - ECS data: none directly; it bootstraps and swaps the active `SiteWorld` handle.
@@ -745,6 +753,7 @@ Registered gameplay systems:
 - `CampaignFlowSystem` is the practical root owner for app/campaign flow and also the boot/teardown bridge for all active site split-state sets.
 - `CampaignTimeSystem` no longer mutates `CampaignCore` directly; it emits `CampaignTimeDeltaRequested` so the declared owner applies the mutation.
 - `DeviceMaintenanceSystem` now updates device tile/runtime state through owner-scoped `SiteWorldAccess` helpers rather than raw tile-device writes.
+- Current design tension to resolve: the runtime still models site entry as a `StartSiteAttempt` / `SiteAttemptEnded` loop with success/failure/result handling, while the intended direction is closer to "enter site / leave site", with completed sites remaining non-reenterable and without "attempt" as the core player-facing framing.
 - The weather pipeline is intentionally split:
   - `WeatherEventSystem` owns global site weather/event state.
   - `PlantWeatherContributionSystem` owns plant contribution fields.

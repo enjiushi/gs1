@@ -84,8 +84,6 @@ CampaignState CampaignFactory::create_prototype_campaign(
         site.featured_faction_id = site_content.featured_faction_id;
         site.support_package_id = site_content.support_package_id;
         site.has_support_package_id = site.support_package_id != 0U;
-        site.completion_reputation_reward = site_content.completion_reputation_reward;
-        site.completion_faction_reputation_reward = site_content.completion_faction_reputation_reward;
         site.exported_support_items.reserve(site_content.exported_support_items.size());
         for (const auto& item : site_content.exported_support_items)
         {
