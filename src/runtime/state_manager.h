@@ -10,6 +10,9 @@
 namespace gs1
 {
 class IRuntimeSystem;
+class GameRuntime;
+class RuntimeInvocation;
+class RuntimePrivilegedStateMutation;
 
 class StateManager final
 {
@@ -26,7 +29,7 @@ public:
     [[nodiscard]] const typename state_traits<Id>::type& query(const struct GameState& state) const noexcept;
 
     template <StateSetId Id>
-    [[nodiscard]] typename state_traits<Id>::type& state(struct GameState& state) const noexcept;
+    [[nodiscard]] typename state_traits<Id>::type& state(struct GameState& state) const;
 
     [[nodiscard]] IRuntimeSystem* active_resolver(StateSetId state_set) const noexcept
     {
@@ -38,15 +41,44 @@ public:
         return default_resolver_by_state_set_[index(state_set)];
     }
 
+    [[nodiscard]] IRuntimeSystem* current_mutating_system() const noexcept
+    {
+        return current_mutating_system_;
+    }
+
 private:
+    friend class GameRuntime;
+    friend class RuntimeInvocation;
+    friend class RuntimePrivilegedStateMutation;
+
     static constexpr std::size_t index(StateSetId state_set) noexcept
     {
         return static_cast<std::size_t>(state_set);
     }
 
+    void set_current_mutating_system(IRuntimeSystem* system) noexcept
+    {
+        current_mutating_system_ = system;
+    }
+
+    void push_privileged_mutation() noexcept
+    {
+        ++privileged_mutation_depth_;
+    }
+
+    void pop_privileged_mutation() noexcept
+    {
+        if (privileged_mutation_depth_ > 0U)
+        {
+            --privileged_mutation_depth_;
+        }
+    }
+
     GameState state_ {};
     std::array<IRuntimeSystem*, static_cast<std::size_t>(StateSetId::Count)> default_resolver_by_state_set_ {};
     std::array<IRuntimeSystem*, static_cast<std::size_t>(StateSetId::Count)> active_resolver_by_state_set_ {};
+    IRuntimeSystem* current_mutating_system_ {nullptr};
+    std::size_t privileged_mutation_depth_ {0U};
 };
 
 template <StateSetId Id>
@@ -345,8 +377,17 @@ template <StateSetId Id>
 
 template <StateSetId Id>
 [[nodiscard]] inline typename state_traits<Id>::type& StateManager::state(
-    GameState& state) const noexcept
+    GameState& state) const
 {
+    if (privileged_mutation_depth_ == 0U && current_mutating_system_ != nullptr)
+    {
+        const auto* owner = active_resolver_by_state_set_[index(Id)];
+        if (owner != nullptr && owner != current_mutating_system_)
+        {
+            throw std::logic_error("State set mutated outside its owning system.");
+        }
+    }
+
     if constexpr (Id == StateSetId::AppState)
     {
         return state.app_state.get();

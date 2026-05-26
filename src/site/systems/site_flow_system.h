@@ -9,9 +9,11 @@ namespace gs1
 class SiteFlowSystem final : public IRuntimeSystem
 {
 public:
+    static constexpr std::array<StateSetId, 1> k_owned_state_sets {
+        StateSetId::MoveDirection};
     [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
     {
-        return site_access_owned_state_sets<SiteFlowSystem>();
+        return k_owned_state_sets;
     }
 
     [[nodiscard]] const char* name() const noexcept override;

@@ -85,6 +85,9 @@ private:
     [[nodiscard]] Gs1Status dispatch_queued_messages();
     [[nodiscard]] Gs1Status dispatch_subscribed_host_message(const Gs1HostMessage& message);
     [[nodiscard]] Gs1Status dispatch_subscribed_message(const GameMessage& message);
+    void install_campaign_state(const CampaignState& campaign);
+    void install_site_run_state(const SiteRunState& site_run);
+    void clear_site_run_state();
     void run_fixed_step();
     void copy_timing_snapshot(
         const TimingAccumulator& source,

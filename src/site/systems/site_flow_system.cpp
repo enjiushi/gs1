@@ -96,8 +96,9 @@ Gs1Status SiteFlowSystem::process_host_message(
         return GS1_STATUS_OK;
     }
 
+    auto access = make_game_state_access<SiteFlowSystem>(invocation);
     const auto& payload = message.payload.site_move_direction;
-    auto& move_direction = runtime_invocation_state_ref<RuntimeMoveDirectionTag>(invocation);
+    auto& move_direction = access.template write<RuntimeMoveDirectionTag>();
     move_direction.world_move_x = payload.world_move_x;
     move_direction.world_move_y = payload.world_move_y;
     move_direction.world_move_z = payload.world_move_z;

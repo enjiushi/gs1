@@ -9,11 +9,6 @@ namespace gs1
 {
 namespace
 {
-using CampaignFlowSystemTags =
-    type_list<
-        RuntimeAppStateTag,
-        RuntimeCampaignFactionProgressTag>;
-
 [[nodiscard]] RegionalMapState load_regional_map_state(RuntimeInvocation& invocation)
 {
     return assemble_regional_map_state_from_state_sets(
@@ -39,110 +34,6 @@ void store_campaign_sites(RuntimeInvocation& invocation, const std::vector<SiteM
     write_sites_state_to_state_sets(sites, *invocation.owned_state(), *invocation.state_manager());
 }
 
-void clear_site_run_state_sets(RuntimeInvocation& invocation)
-{
-    auto& state = *invocation.owned_state();
-    auto& state_manager = *invocation.state_manager();
-    state_manager.state<StateSetId::SiteRunMeta>(state).reset();
-    state_manager.state<StateSetId::SiteClock>(state).reset();
-    state_manager.state<StateSetId::SiteCamp>(state).reset();
-    state_manager.state<StateSetId::SiteInventoryMeta>(state).reset();
-    state_manager.state<StateSetId::SiteInventoryStorageContainers>(state).reset();
-    state_manager.state<StateSetId::SiteInventoryStorageSlotItemIds>(state).reset();
-    state_manager.state<StateSetId::SiteInventoryWorkerPackSlots>(state).reset();
-    state_manager.state<StateSetId::SiteInventoryPendingDeliveries>(state).reset();
-    state_manager.state<StateSetId::SiteInventoryPendingDeliveryItemStacks>(state).reset();
-    state_manager.state<StateSetId::SiteContractorMeta>(state).reset();
-    state_manager.state<StateSetId::SiteContractorWorkOrders>(state).reset();
-    state_manager.state<StateSetId::SiteWeather>(state).reset();
-    state_manager.state<StateSetId::SiteEvent>(state).reset();
-    state_manager.state<StateSetId::SiteTaskBoardMeta>(state).reset();
-    state_manager.state<StateSetId::SiteTaskBoardVisibleTasks>(state).reset();
-    state_manager.state<StateSetId::SiteTaskBoardRewardDraftOptions>(state).reset();
-    state_manager.state<StateSetId::SiteTaskBoardTrackedTiles>(state).reset();
-    state_manager.state<StateSetId::SiteTaskBoardAcceptedTaskIds>(state).reset();
-    state_manager.state<StateSetId::SiteTaskBoardCompletedTaskIds>(state).reset();
-    state_manager.state<StateSetId::SiteTaskBoardClaimedTaskIds>(state).reset();
-    state_manager.state<StateSetId::SiteModifierMeta>(state).reset();
-    state_manager.state<StateSetId::SiteModifierNearbyAuraIds>(state).reset();
-    state_manager.state<StateSetId::SiteModifierActiveSiteModifiers>(state).reset();
-    state_manager.state<StateSetId::SiteEconomyMeta>(state).reset();
-    state_manager.state<StateSetId::SiteEconomyRevealedUnlockableIds>(state).reset();
-    state_manager.state<StateSetId::SiteEconomyDirectPurchaseUnlockableIds>(state).reset();
-    state_manager.state<StateSetId::SiteEconomyPhoneListings>(state).reset();
-    state_manager.state<StateSetId::SiteCraftDeviceCacheRuntime>(state).reset();
-    state_manager.state<StateSetId::SiteCraftDeviceCaches>(state).reset();
-    state_manager.state<StateSetId::SiteCraftNearbyItems>(state).reset();
-    state_manager.state<StateSetId::SiteCraftPhoneCacheMeta>(state).reset();
-    state_manager.state<StateSetId::SiteCraftPhoneItems>(state).reset();
-    state_manager.state<StateSetId::SiteCraftContextMeta>(state).reset();
-    state_manager.state<StateSetId::SiteCraftContextOptions>(state).reset();
-    state_manager.state<StateSetId::SiteActionMeta>(state).reset();
-    state_manager.state<StateSetId::SiteActionReservedInputItemStacks>(state).reset();
-    state_manager.state<StateSetId::SiteActionResolvedHarvestOutputs>(state).reset();
-    state_manager.state<StateSetId::SiteCounters>(state).reset();
-    state_manager.state<StateSetId::SiteObjectiveMeta>(state).reset();
-    state_manager.state<StateSetId::SiteObjectiveTargetTileIndices>(state).reset();
-    state_manager.state<StateSetId::SiteObjectiveTargetTileMask>(state).reset();
-    state_manager.state<StateSetId::SiteObjectiveConnectionStartTileIndices>(state).reset();
-    state_manager.state<StateSetId::SiteObjectiveConnectionStartTileMask>(state).reset();
-    state_manager.state<StateSetId::SiteObjectiveConnectionGoalTileIndices>(state).reset();
-    state_manager.state<StateSetId::SiteObjectiveConnectionGoalTileMask>(state).reset();
-    state_manager.state<StateSetId::SiteLocalWeatherResolveMeta>(state).reset();
-    state_manager.state<StateSetId::SiteLocalWeatherResolveLastTotalContributions>(state).reset();
-    state_manager.state<StateSetId::SitePlantWeatherContributionMeta>(state).reset();
-    state_manager.state<StateSetId::SitePlantWeatherContributionDirtyTileIndices>(state).reset();
-    state_manager.state<StateSetId::SitePlantWeatherContributionDirtyTileMask>(state).reset();
-    state_manager.state<StateSetId::SiteDeviceWeatherContributionMeta>(state).reset();
-    state_manager.state<StateSetId::SiteDeviceWeatherContributionDirtyTileIndices>(state).reset();
-    state_manager.state<StateSetId::SiteDeviceWeatherContributionDirtyTileMask>(state).reset();
-    state_manager.state<StateSetId::MoveDirection>(state) = RuntimeMoveDirectionSnapshot {};
-}
-
-void write_site_run_split_state(RuntimeInvocation& invocation, const SiteRunState& site_run)
-{
-    auto& state = *invocation.owned_state();
-    auto& state_manager = *invocation.state_manager();
-    state_manager.state<StateSetId::SiteRunMeta>(state) = SiteRunMetaState {
-        site_run.site_run_id,
-        site_run.site_id,
-        site_run.site_archetype_id,
-        site_run.attempt_index,
-        site_run.site_attempt_seed,
-        site_run.run_status,
-        site_run.result_newly_revealed_site_count};
-    state_manager.state<StateSetId::SiteClock>(state) = site_run.clock;
-    state_manager.state<StateSetId::SiteCamp>(state) = site_run.camp;
-    write_inventory_state_to_state_sets(site_run.inventory, state, state_manager);
-    write_contractor_state_to_state_sets(site_run.contractor, state, state_manager);
-    state_manager.state<StateSetId::SiteWeather>(state) = site_run.weather;
-    state_manager.state<StateSetId::SiteEvent>(state) = site_run.event;
-    write_task_board_state_to_state_sets(site_run.task_board, state, state_manager);
-    write_modifier_state_to_state_sets(site_run.modifier, state, state_manager);
-    write_economy_state_to_state_sets(site_run.economy, state, state_manager);
-    write_craft_state_to_state_sets(site_run.craft, state, state_manager);
-    write_action_state_to_state_sets(site_run.site_action, state, state_manager);
-    state_manager.state<StateSetId::SiteCounters>(state) = site_run.counters;
-    write_site_objective_state_to_state_sets(site_run.objective, state, state_manager);
-    write_local_weather_resolve_state_to_state_sets(
-        site_run.local_weather_resolve,
-        state,
-        state_manager);
-    write_plant_weather_contribution_state_to_state_sets(
-        site_run.plant_weather_contribution,
-        state,
-        state_manager);
-    write_device_weather_contribution_state_to_state_sets(
-        site_run.device_weather_contribution,
-        state,
-        state_manager);
-    state_manager.state<StateSetId::MoveDirection>(state) = RuntimeMoveDirectionSnapshot {
-        site_run.host_move_direction.world_move_x,
-        site_run.host_move_direction.world_move_y,
-        site_run.host_move_direction.world_move_z,
-        site_run.host_move_direction.present};
-}
-
 void set_campaign_app_state(RuntimeInvocation& invocation, Gs1AppState app_state)
 {
     invocation.state_manager()->state<StateSetId::CampaignCore>(*invocation.owned_state())->app_state =
@@ -153,6 +44,21 @@ void set_campaign_active_site_id(RuntimeInvocation& invocation, std::optional<Si
 {
     invocation.state_manager()->state<StateSetId::CampaignCore>(*invocation.owned_state())->active_site_id =
         site_id;
+}
+
+void apply_campaign_time_delta(RuntimeInvocation& invocation, double elapsed_minutes)
+{
+    auto& campaign_core =
+        invocation.state_manager()->state<StateSetId::CampaignCore>(*invocation.owned_state()).value();
+    campaign_core.campaign_clock_minutes_elapsed += elapsed_minutes;
+
+    const auto elapsed_days =
+        static_cast<std::uint32_t>(
+            campaign_core.campaign_clock_minutes_elapsed / k_runtime_minutes_per_day);
+    campaign_core.campaign_days_remaining =
+        (elapsed_days >= campaign_core.campaign_days_total)
+            ? 0U
+            : (campaign_core.campaign_days_total - elapsed_days);
 }
 
 [[nodiscard]] std::uint64_t campaign_seed(RuntimeInvocation& invocation)
@@ -238,26 +144,8 @@ Gs1Status handle_start_new_campaign(
 {
     const CampaignState next_campaign =
         CampaignFactory::create_prototype_campaign(payload.campaign_seed, payload.campaign_days);
-    clear_site_run_state_sets(invocation);
-    invocation.state_manager()->state<StateSetId::CampaignCore>(*invocation.owned_state()) =
-        CampaignCoreState {
-            next_campaign.campaign_id,
-            next_campaign.campaign_seed,
-            next_campaign.campaign_clock_minutes_elapsed,
-            next_campaign.campaign_days_total,
-            next_campaign.campaign_days_remaining,
-            next_campaign.app_state,
-            next_campaign.active_site_id};
-    store_regional_map_state(invocation, next_campaign.regional_map_state);
-    invocation.state_manager()->state<StateSetId::CampaignFactionProgress>(*invocation.owned_state()) =
-        next_campaign.faction_progress;
-    invocation.state_manager()->state<StateSetId::CampaignTechnology>(*invocation.owned_state()) =
-        next_campaign.technology_state;
-    write_loadout_planner_state_to_state_sets(
-        next_campaign.loadout_planner_state,
-        *invocation.owned_state(),
-        *invocation.state_manager());
-    store_campaign_sites(invocation, next_campaign.sites);
+    invocation.install_campaign_state(next_campaign);
+    invocation.clear_site_run_state();
     auto regional_map = load_regional_map_state(invocation);
     const auto sites = load_campaign_sites(invocation);
     set_campaign_app_state(invocation, GS1_APP_STATE_REGIONAL_MAP);
@@ -328,7 +216,8 @@ Gs1Status handle_start_site_attempt(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    auto& faction_progress = runtime_invocation_state_ref<RuntimeCampaignFactionProgressTag>(invocation);
+    const auto& faction_progress = make_game_state_access<CampaignFlowSystem>(invocation)
+        .template read<RuntimeCampaignFactionProgressTag>();
     auto sites = load_campaign_sites(invocation);
     auto* site = find_site_mut(sites, site_id);
     if (site == nullptr)
@@ -344,12 +233,7 @@ Gs1Status handle_start_site_attempt(
     site->attempt_count += 1U;
     SiteRunState active_site_run =
         SiteRunFactory::create_site_run(campaign_seed(invocation), faction_progress, *site);
-    invocation.set_site_world(active_site_run.site_world);
-    if (invocation.runtime() != nullptr)
-    {
-        invocation.runtime()->set_site_world(active_site_run.site_world);
-    }
-    write_site_run_split_state(invocation, active_site_run);
+    invocation.install_site_run_state(active_site_run);
     store_campaign_sites(invocation, sites);
     set_campaign_active_site_id(invocation, SiteId {site_id});
     set_campaign_app_state(invocation, GS1_APP_STATE_SITE_LOADING);
@@ -375,12 +259,7 @@ Gs1Status handle_return_to_regional_map(RuntimeInvocation& invocation)
 
     auto regional_map = load_regional_map_state(invocation);
     const auto sites = load_campaign_sites(invocation);
-    clear_site_run_state_sets(invocation);
-    invocation.set_site_world(nullptr);
-    if (invocation.runtime() != nullptr)
-    {
-        invocation.runtime()->set_site_world(nullptr);
-    }
+    invocation.clear_site_run_state();
     set_campaign_active_site_id(invocation, std::nullopt);
     set_campaign_app_state(invocation, GS1_APP_STATE_REGIONAL_MAP);
     rebuild_regional_map_caches(regional_map, sites);
@@ -468,12 +347,6 @@ Gs1Status process_campaign_flow_host_message(
 Gs1Status process_campaign_flow_message(
     RuntimeInvocation& invocation,
     const GameMessage& message);
-
-template <>
-struct system_state_tags<CampaignFlowSystem>
-{
-    using type = CampaignFlowSystemTags;
-};
 
 Gs1Status process_campaign_flow_host_message(
     RuntimeInvocation& invocation,
@@ -588,7 +461,8 @@ void CampaignFlowSystem::run(RuntimeInvocation& invocation)
         return;
     }
 
-    auto& app_state = runtime_invocation_state_ref<RuntimeAppStateTag>(invocation);
+    auto access = make_game_state_access<CampaignFlowSystem>(invocation);
+    auto& app_state = access.template write<RuntimeAppStateTag>();
     if (app_state != GS1_APP_STATE_SITE_LOADING)
     {
         return;
@@ -631,6 +505,12 @@ Gs1Status process_campaign_flow_message(
 
     case GameMessageType::SiteAttemptEnded:
         return handle_site_attempt_ended(invocation, message.payload_as<SiteAttemptEndedMessage>());
+
+    case GameMessageType::CampaignTimeDeltaRequested:
+        apply_campaign_time_delta(
+            invocation,
+            message.payload_as<CampaignTimeDeltaRequestedMessage>().elapsed_minutes);
+        return GS1_STATUS_OK;
 
     case GameMessageType::DeploymentSiteSelectionChanged:
     case GameMessageType::CampaignReputationAwardRequested:

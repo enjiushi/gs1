@@ -13,7 +13,7 @@ namespace gs1
 class CampaignFlowSystem final : public IRuntimeSystem
 {
 public:
-    static constexpr std::array<StateSetId, 10> k_owned_state_sets {
+    static constexpr std::array<StateSetId, 11> k_owned_state_sets {
         StateSetId::AppState,
         StateSetId::CampaignCore,
         StateSetId::CampaignRegionalMapMeta,
@@ -23,7 +23,8 @@ public:
         StateSetId::CampaignSiteMetaEntries,
         StateSetId::CampaignSiteAdjacentIds,
         StateSetId::CampaignSiteExportedSupportItems,
-        StateSetId::CampaignSiteNearbyAuraModifierIds};
+        StateSetId::CampaignSiteNearbyAuraModifierIds,
+        StateSetId::SiteRunMeta};
     [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
     {
         return k_owned_state_sets;
@@ -41,5 +42,11 @@ public:
         RuntimeInvocation& invocation,
         const Gs1HostMessage& message) override;
     void run(RuntimeInvocation& invocation) override;
+};
+
+template <>
+struct system_state_tags<CampaignFlowSystem>
+{
+    using type = type_list<RuntimeAppStateTag, RuntimeCampaignFactionProgressTag>;
 };
 }  // namespace gs1

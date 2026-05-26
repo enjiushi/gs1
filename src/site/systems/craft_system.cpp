@@ -105,8 +105,8 @@ Gs1Status handle_craft_context_requested(
     const CraftContextRequestedMessage& payload) noexcept
 {
     auto access = make_game_state_access<CraftSystem>(invocation);
-    auto& faction_progress = access.template read<RuntimeCampaignFactionProgressTag>();
-    auto& technology = access.template read<RuntimeCampaignTechnologyTag>();
+    const auto& faction_progress = access.template read<RuntimeCampaignFactionProgressTag>();
+    const auto& technology = access.template read<RuntimeCampaignTechnologyTag>();
 
     SiteWorldAccess<CraftSystem> world {invocation};
     auto& context_meta = world.own_craft_context_meta();

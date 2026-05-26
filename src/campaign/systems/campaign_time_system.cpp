@@ -62,17 +62,10 @@ void CampaignTimeSystem::run(RuntimeInvocation& invocation)
 
     const double fixed_step_seconds =
         make_game_state_access<CampaignTimeSystem>(invocation).template read<RuntimeFixedStepSecondsTag>();
-    auto& campaign_core =
-        invocation.state_manager()->state<StateSetId::CampaignCore>(*invocation.owned_state()).value();
-    campaign_core.campaign_clock_minutes_elapsed +=
-        runtime_minutes_from_real_seconds(fixed_step_seconds);
-
-    const auto elapsed_days =
-        static_cast<std::uint32_t>(
-            campaign_core.campaign_clock_minutes_elapsed / k_runtime_minutes_per_day);
-    campaign_core.campaign_days_remaining =
-        (elapsed_days >= campaign_core.campaign_days_total)
-            ? 0U
-            : (campaign_core.campaign_days_total - elapsed_days);
+    GameMessage message {};
+    message.type = GameMessageType::CampaignTimeDeltaRequested;
+    message.set_payload(CampaignTimeDeltaRequestedMessage {
+        runtime_minutes_from_real_seconds(fixed_step_seconds)});
+    invocation.push_game_message(message);
 }
 }  // namespace gs1

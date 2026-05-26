@@ -6,6 +6,7 @@
 #include "campaign/systems/loadout_planner_system.h"
 #include "campaign/systems/technology_system.h"
 #include "content/content_loader.h"
+#include "runtime/runtime_split_state_compat.h"
 #include "site/systems/action_execution_system.h"
 #include "site/systems/camp_durability_system.h"
 #include "site/systems/craft_system.h"
@@ -39,6 +40,30 @@
 
 namespace gs1
 {
+class RuntimePrivilegedStateMutation final
+{
+public:
+    explicit RuntimePrivilegedStateMutation(StateManager& state_manager) noexcept
+        : state_manager_(&state_manager)
+    {
+        state_manager_->push_privileged_mutation();
+    }
+
+    ~RuntimePrivilegedStateMutation()
+    {
+        if (state_manager_ != nullptr)
+        {
+            state_manager_->pop_privileged_mutation();
+        }
+    }
+
+    RuntimePrivilegedStateMutation(const RuntimePrivilegedStateMutation&) = delete;
+    RuntimePrivilegedStateMutation& operator=(const RuntimePrivilegedStateMutation&) = delete;
+
+private:
+    StateManager* state_manager_ {nullptr};
+};
+
 namespace
 {
 [[nodiscard]] std::string unescape_json_string(std::string_view value)
@@ -280,6 +305,46 @@ void RuntimeInvocation::push_game_message(const GameMessage& message)
     game_messages_->push_back(message);
 }
 
+void RuntimeInvocation::install_campaign_state(const CampaignState& campaign)
+{
+    if (runtime_ != nullptr)
+    {
+        runtime_->install_campaign_state(campaign);
+        return;
+    }
+
+    RuntimePrivilegedStateMutation privileged {*state_manager_};
+    write_campaign_state_to_state_sets(campaign, *owned_state_, *state_manager_);
+}
+
+void RuntimeInvocation::install_site_run_state(const SiteRunState& site_run)
+{
+    if (runtime_ != nullptr)
+    {
+        runtime_->install_site_run_state(site_run);
+        site_world_ = runtime_->site_world_;
+        return;
+    }
+
+    RuntimePrivilegedStateMutation privileged {*state_manager_};
+    write_site_run_state_to_state_sets(site_run, *owned_state_, *state_manager_);
+    site_world_ = site_run.site_world;
+}
+
+void RuntimeInvocation::clear_site_run_state()
+{
+    if (runtime_ != nullptr)
+    {
+        runtime_->clear_site_run_state();
+        site_world_ = runtime_->site_world_;
+        return;
+    }
+
+    RuntimePrivilegedStateMutation privileged {*state_manager_};
+    write_site_run_state_to_state_sets(std::optional<SiteRunState> {}, *owned_state_, *state_manager_);
+    site_world_ = nullptr;
+}
+
 void RuntimeInvocation::push_runtime_message(const Gs1RuntimeMessage& message)
 {
     runtime_messages_->push_back(message);
@@ -387,6 +452,26 @@ void GameRuntime::copy_timing_snapshot(
     destination.last_elapsed_ms = source.last_elapsed_ms;
     destination.total_elapsed_ms = source.total_elapsed_ms;
     destination.max_elapsed_ms = source.max_elapsed_ms;
+}
+
+void GameRuntime::install_campaign_state(const CampaignState& campaign)
+{
+    RuntimePrivilegedStateMutation privileged {state_manager_};
+    write_campaign_state_to_state_sets(campaign, state(), state_manager_);
+}
+
+void GameRuntime::install_site_run_state(const SiteRunState& site_run)
+{
+    RuntimePrivilegedStateMutation privileged {state_manager_};
+    write_site_run_state_to_state_sets(site_run, state(), state_manager_);
+    site_world_ = site_run.site_world;
+}
+
+void GameRuntime::clear_site_run_state()
+{
+    RuntimePrivilegedStateMutation privileged {state_manager_};
+    write_site_run_state_to_state_sets(std::optional<SiteRunState> {}, state(), state_manager_);
+    site_world_ = nullptr;
 }
 
 void GameRuntime::initialize_system_registry()
@@ -711,6 +796,7 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
             continue;
         }
 
+        state_manager_.set_current_mutating_system(system);
         const auto profile_id = system->profile_system_id();
         const auto status = profile_id.has_value()
             ? dispatch_profiled_message(
@@ -720,6 +806,7 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
                     return system->process_game_message(invocation, message);
                 })
             : system->process_game_message(invocation, message);
+        state_manager_.set_current_mutating_system(nullptr);
         if (status != GS1_STATUS_OK)
         {
             return status;
@@ -771,7 +858,9 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
             continue;
         }
 
+        state_manager_.set_current_mutating_system(system);
         const auto status = system->process_host_message(invocation, message);
+        state_manager_.set_current_mutating_system(nullptr);
         if (status != GS1_STATUS_OK)
         {
             return status;
@@ -811,10 +900,12 @@ void GameRuntime::run_fixed_step()
             continue;
         }
 
+        state_manager_.set_current_mutating_system(system);
         const auto profile_id = system->profile_system_id();
         if (!profile_id.has_value())
         {
             system->run(invocation);
+            state_manager_.set_current_mutating_system(nullptr);
             continue;
         }
 
@@ -824,6 +915,7 @@ void GameRuntime::run_fixed_step()
             {
                 system->run(invocation);
             });
+        state_manager_.set_current_mutating_system(nullptr);
     }
 
     record_timing_sample(fixed_step_timing_, elapsed_milliseconds_since(fixed_step_started_at));

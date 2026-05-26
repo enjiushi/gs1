@@ -198,8 +198,8 @@ bool phone_buy_stock_item_available(
     ItemId item_id) noexcept
 {
     auto access = make_game_state_access<EconomyPhoneSystem>(invocation);
-    auto& faction_progress = access.template read<RuntimeCampaignFactionProgressTag>();
-    auto& technology = access.template read<RuntimeCampaignTechnologyTag>();
+    const auto& faction_progress = access.template read<RuntimeCampaignFactionProgressTag>();
+    const auto& technology = access.template read<RuntimeCampaignTechnologyTag>();
     const auto* item_def = find_item_def(item_id);
     if (item_def == nullptr)
     {

@@ -61,6 +61,35 @@ struct system_state_tags;
 template <class Tag>
 struct state_owner;
 
+class CampaignFlowSystem;
+class FactionReputationSystem;
+class TechnologySystem;
+class SiteFlowSystem;
+
+template <>
+struct state_owner<RuntimeAppStateTag>
+{
+    using type = CampaignFlowSystem;
+};
+
+template <>
+struct state_owner<RuntimeCampaignFactionProgressTag>
+{
+    using type = FactionReputationSystem;
+};
+
+template <>
+struct state_owner<RuntimeCampaignTechnologyTag>
+{
+    using type = TechnologySystem;
+};
+
+template <>
+struct state_owner<RuntimeMoveDirectionTag>
+{
+    using type = SiteFlowSystem;
+};
+
 class RuntimeInvocation final
 {
 public:
@@ -102,12 +131,17 @@ public:
         return *runtime_messages_;
     }
 
+    void install_campaign_state(const CampaignState& campaign);
+    void install_site_run_state(const SiteRunState& site_run);
+    void clear_site_run_state();
     void push_game_message(const GameMessage& message);
     void push_runtime_message(const Gs1RuntimeMessage& message);
 
 private:
     template <class Tag>
     friend decltype(auto) runtime_invocation_state_ref(RuntimeInvocation& invocation);
+    template <class Tag>
+    friend decltype(auto) runtime_invocation_state_cref(const RuntimeInvocation& invocation);
 
     GameRuntime* runtime_ {nullptr};
     GameState* owned_state_ {nullptr};
@@ -123,6 +157,9 @@ private:
 template <class Tag>
 decltype(auto) runtime_invocation_state_ref(RuntimeInvocation& invocation);
 
+template <class Tag>
+decltype(auto) runtime_invocation_state_cref(const RuntimeInvocation& invocation);
+
 template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeAppStateTag>(RuntimeInvocation& invocation)
 {
@@ -135,6 +172,18 @@ inline decltype(auto) runtime_invocation_state_ref<RuntimeAppStateTag>(RuntimeIn
 }
 
 template <>
+inline decltype(auto) runtime_invocation_state_cref<RuntimeAppStateTag>(
+    const RuntimeInvocation& invocation)
+{
+    if (invocation.app_state_ != nullptr)
+    {
+        return std::as_const(*invocation.app_state_);
+    }
+
+    return invocation.state_manager_->query<StateSetId::AppState>(*invocation.owned_state_);
+}
+
+template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeCampaignFactionProgressTag>(
     RuntimeInvocation& invocation)
 {
@@ -142,9 +191,23 @@ inline decltype(auto) runtime_invocation_state_ref<RuntimeCampaignFactionProgres
 }
 
 template <>
+inline decltype(auto) runtime_invocation_state_cref<RuntimeCampaignFactionProgressTag>(
+    const RuntimeInvocation& invocation)
+{
+    return invocation.state_manager_->query<StateSetId::CampaignFactionProgress>(*invocation.owned_state_).value();
+}
+
+template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeCampaignTechnologyTag>(RuntimeInvocation& invocation)
 {
     return invocation.state_manager_->state<StateSetId::CampaignTechnology>(*invocation.owned_state_).value();
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_cref<RuntimeCampaignTechnologyTag>(
+    const RuntimeInvocation& invocation)
+{
+    return invocation.state_manager_->query<StateSetId::CampaignTechnology>(*invocation.owned_state_).value();
 }
 
 template <>
@@ -159,6 +222,18 @@ inline decltype(auto) runtime_invocation_state_ref<RuntimeFixedStepSecondsTag>(R
 }
 
 template <>
+inline decltype(auto) runtime_invocation_state_cref<RuntimeFixedStepSecondsTag>(
+    const RuntimeInvocation& invocation)
+{
+    if (invocation.fixed_step_seconds_ != nullptr)
+    {
+        return std::as_const(*invocation.fixed_step_seconds_);
+    }
+
+    return invocation.state_manager_->query<StateSetId::FixedStepSeconds>(*invocation.owned_state_);
+}
+
+template <>
 inline decltype(auto) runtime_invocation_state_ref<RuntimeMoveDirectionTag>(RuntimeInvocation& invocation)
 {
     if (invocation.move_direction_.present)
@@ -168,10 +243,27 @@ inline decltype(auto) runtime_invocation_state_ref<RuntimeMoveDirectionTag>(Runt
 
     if (invocation.state_manager_ != nullptr && invocation.owned_state_ != nullptr)
     {
-    return invocation.state_manager_->state<StateSetId::MoveDirection>(*invocation.owned_state_);
-}
+        return invocation.state_manager_->state<StateSetId::MoveDirection>(*invocation.owned_state_);
+    }
 
     return (invocation.move_direction_);
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_cref<RuntimeMoveDirectionTag>(
+    const RuntimeInvocation& invocation)
+{
+    if (invocation.move_direction_.present)
+    {
+        return std::as_const(invocation.move_direction_);
+    }
+
+    if (invocation.state_manager_ != nullptr && invocation.owned_state_ != nullptr)
+    {
+        return invocation.state_manager_->query<StateSetId::MoveDirection>(*invocation.owned_state_);
+    }
+
+    return std::as_const(invocation.move_direction_);
 }
 
 [[nodiscard]] inline bool runtime_invocation_uses_split_state_sets(
@@ -208,7 +300,7 @@ public:
     {
         using tags = typename system_state_tags<System>::type;
         static_assert(type_list_contains_v<Tag, tags>, "System cannot read this state tag.");
-        return runtime_invocation_state_ref<Tag>(*invocation_);
+        return runtime_invocation_state_cref<Tag>(*invocation_);
     }
 
     template <class Tag>

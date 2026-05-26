@@ -11,6 +11,11 @@
 
 namespace gs1
 {
+inline void write_sites_state_to_state_sets(
+    const std::vector<SiteMetaState>& sites,
+    GameState& state,
+    const StateManager& state_manager);
+
 [[nodiscard]] inline CraftState assemble_craft_state_from_state_sets(
     const GameState& state,
     const StateManager& state_manager)
@@ -228,6 +233,26 @@ inline void write_loadout_planner_state_to_state_sets(
         planner.selected_loadout_slots;
     state_manager.state<StateSetId::CampaignLoadoutPlannerNearbyAuraModifiers>(state) =
         planner.active_nearby_aura_modifier_ids;
+}
+
+inline void write_campaign_state_to_state_sets(
+    const CampaignState& campaign,
+    GameState& state,
+    const StateManager& state_manager)
+{
+    state_manager.state<StateSetId::CampaignCore>(state) = CampaignCoreState {
+        campaign.campaign_id,
+        campaign.campaign_seed,
+        campaign.campaign_clock_minutes_elapsed,
+        campaign.campaign_days_total,
+        campaign.campaign_days_remaining,
+        campaign.app_state,
+        campaign.active_site_id};
+    write_regional_map_state_to_state_sets(campaign.regional_map_state, state, state_manager);
+    state_manager.state<StateSetId::CampaignFactionProgress>(state) = campaign.faction_progress;
+    state_manager.state<StateSetId::CampaignTechnology>(state) = campaign.technology_state;
+    write_loadout_planner_state_to_state_sets(campaign.loadout_planner_state, state, state_manager);
+    write_sites_state_to_state_sets(campaign.sites, state, state_manager);
 }
 
 [[nodiscard]] inline std::vector<SiteMetaState> assemble_sites_state_from_state_sets(
@@ -1160,6 +1185,108 @@ inline void write_device_weather_contribution_state_to_state_sets(
         contribution.dirty_tile_indices;
     state_manager.state<StateSetId::SiteDeviceWeatherContributionDirtyTileMask>(state) =
         contribution.dirty_tile_mask;
+}
+
+inline void write_site_run_state_to_state_sets(
+    const std::optional<SiteRunState>& site_run,
+    GameState& state,
+    const StateManager& state_manager)
+{
+    if (!site_run.has_value())
+    {
+        state_manager.state<StateSetId::SiteRunMeta>(state).reset();
+        state_manager.state<StateSetId::SiteClock>(state).reset();
+        state_manager.state<StateSetId::SiteCamp>(state).reset();
+        state_manager.state<StateSetId::SiteInventoryMeta>(state).reset();
+        state_manager.state<StateSetId::SiteInventoryStorageContainers>(state).reset();
+        state_manager.state<StateSetId::SiteInventoryStorageSlotItemIds>(state).reset();
+        state_manager.state<StateSetId::SiteInventoryWorkerPackSlots>(state).reset();
+        state_manager.state<StateSetId::SiteInventoryPendingDeliveries>(state).reset();
+        state_manager.state<StateSetId::SiteInventoryPendingDeliveryItemStacks>(state).reset();
+        state_manager.state<StateSetId::SiteContractorMeta>(state).reset();
+        state_manager.state<StateSetId::SiteContractorWorkOrders>(state).reset();
+        state_manager.state<StateSetId::SiteWeather>(state).reset();
+        state_manager.state<StateSetId::SiteEvent>(state).reset();
+        state_manager.state<StateSetId::SiteTaskBoardMeta>(state).reset();
+        state_manager.state<StateSetId::SiteTaskBoardVisibleTasks>(state).reset();
+        state_manager.state<StateSetId::SiteTaskBoardRewardDraftOptions>(state).reset();
+        state_manager.state<StateSetId::SiteTaskBoardTrackedTiles>(state).reset();
+        state_manager.state<StateSetId::SiteTaskBoardAcceptedTaskIds>(state).reset();
+        state_manager.state<StateSetId::SiteTaskBoardCompletedTaskIds>(state).reset();
+        state_manager.state<StateSetId::SiteTaskBoardClaimedTaskIds>(state).reset();
+        state_manager.state<StateSetId::SiteModifierMeta>(state).reset();
+        state_manager.state<StateSetId::SiteModifierNearbyAuraIds>(state).reset();
+        state_manager.state<StateSetId::SiteModifierActiveSiteModifiers>(state).reset();
+        state_manager.state<StateSetId::SiteEconomyMeta>(state).reset();
+        state_manager.state<StateSetId::SiteEconomyRevealedUnlockableIds>(state).reset();
+        state_manager.state<StateSetId::SiteEconomyDirectPurchaseUnlockableIds>(state).reset();
+        state_manager.state<StateSetId::SiteEconomyPhoneListings>(state).reset();
+        state_manager.state<StateSetId::SiteCraftDeviceCacheRuntime>(state).reset();
+        state_manager.state<StateSetId::SiteCraftDeviceCaches>(state).reset();
+        state_manager.state<StateSetId::SiteCraftNearbyItems>(state).reset();
+        state_manager.state<StateSetId::SiteCraftPhoneCacheMeta>(state).reset();
+        state_manager.state<StateSetId::SiteCraftPhoneItems>(state).reset();
+        state_manager.state<StateSetId::SiteCraftContextMeta>(state).reset();
+        state_manager.state<StateSetId::SiteCraftContextOptions>(state).reset();
+        state_manager.state<StateSetId::SiteActionMeta>(state).reset();
+        state_manager.state<StateSetId::SiteActionReservedInputItemStacks>(state).reset();
+        state_manager.state<StateSetId::SiteActionResolvedHarvestOutputs>(state).reset();
+        state_manager.state<StateSetId::SiteCounters>(state).reset();
+        state_manager.state<StateSetId::SiteObjectiveMeta>(state).reset();
+        state_manager.state<StateSetId::SiteObjectiveTargetTileIndices>(state).reset();
+        state_manager.state<StateSetId::SiteObjectiveTargetTileMask>(state).reset();
+        state_manager.state<StateSetId::SiteObjectiveConnectionStartTileIndices>(state).reset();
+        state_manager.state<StateSetId::SiteObjectiveConnectionStartTileMask>(state).reset();
+        state_manager.state<StateSetId::SiteObjectiveConnectionGoalTileIndices>(state).reset();
+        state_manager.state<StateSetId::SiteObjectiveConnectionGoalTileMask>(state).reset();
+        state_manager.state<StateSetId::SiteLocalWeatherResolveMeta>(state).reset();
+        state_manager.state<StateSetId::SiteLocalWeatherResolveLastTotalContributions>(state).reset();
+        state_manager.state<StateSetId::SitePlantWeatherContributionMeta>(state).reset();
+        state_manager.state<StateSetId::SitePlantWeatherContributionDirtyTileIndices>(state).reset();
+        state_manager.state<StateSetId::SitePlantWeatherContributionDirtyTileMask>(state).reset();
+        state_manager.state<StateSetId::SiteDeviceWeatherContributionMeta>(state).reset();
+        state_manager.state<StateSetId::SiteDeviceWeatherContributionDirtyTileIndices>(state).reset();
+        state_manager.state<StateSetId::SiteDeviceWeatherContributionDirtyTileMask>(state).reset();
+        state_manager.state<StateSetId::MoveDirection>(state) = RuntimeMoveDirectionSnapshot {};
+        return;
+    }
+
+    const auto& run = *site_run;
+    state_manager.state<StateSetId::SiteRunMeta>(state) = SiteRunMetaState {
+        run.site_run_id,
+        run.site_id,
+        run.site_archetype_id,
+        run.attempt_index,
+        run.site_attempt_seed,
+        run.run_status,
+        run.result_newly_revealed_site_count};
+    state_manager.state<StateSetId::SiteClock>(state) = run.clock;
+    state_manager.state<StateSetId::SiteCamp>(state) = run.camp;
+    write_inventory_state_to_state_sets(run.inventory, state, state_manager);
+    write_contractor_state_to_state_sets(run.contractor, state, state_manager);
+    state_manager.state<StateSetId::SiteWeather>(state) = run.weather;
+    state_manager.state<StateSetId::SiteEvent>(state) = run.event;
+    write_task_board_state_to_state_sets(run.task_board, state, state_manager);
+    write_modifier_state_to_state_sets(run.modifier, state, state_manager);
+    write_economy_state_to_state_sets(run.economy, state, state_manager);
+    write_craft_state_to_state_sets(run.craft, state, state_manager);
+    write_action_state_to_state_sets(run.site_action, state, state_manager);
+    state_manager.state<StateSetId::SiteCounters>(state) = run.counters;
+    write_site_objective_state_to_state_sets(run.objective, state, state_manager);
+    write_local_weather_resolve_state_to_state_sets(run.local_weather_resolve, state, state_manager);
+    write_plant_weather_contribution_state_to_state_sets(
+        run.plant_weather_contribution,
+        state,
+        state_manager);
+    write_device_weather_contribution_state_to_state_sets(
+        run.device_weather_contribution,
+        state,
+        state_manager);
+    state_manager.state<StateSetId::MoveDirection>(state) = RuntimeMoveDirectionSnapshot {
+        run.host_move_direction.world_move_x,
+        run.host_move_direction.world_move_y,
+        run.host_move_direction.world_move_z,
+        run.host_move_direction.present};
 }
 
 }  // namespace gs1

@@ -71,7 +71,7 @@ Gs1Status process_message(
     auto& message_queue = invocation.game_message_queue();
     if (message.type == gs1::GameMessageType::SiteRunStarted)
     {
-        auto* site_world = world.own_site_world();
+        auto* site_world = world.read_site_world();
         if (!world.has_world() || site_world == nullptr)
         {
             return GS1_STATUS_OK;
@@ -109,13 +109,12 @@ Gs1Status process_message(
     {
         const auto& payload = message.payload_as<gs1::SiteDeviceRepairedMessage>();
         const gs1::TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
-        auto* site_world = world.own_site_world();
-        if (!world.tile_coord_in_bounds(target_tile) || site_world == nullptr)
+        if (!world.tile_coord_in_bounds(target_tile))
         {
             return GS1_STATUS_INVALID_ARGUMENT;
         }
 
-        const auto anchor_device = site_world->tile_device(target_tile);
+        const auto anchor_device = world.read_tile_device(target_tile);
         if (anchor_device.structure_id.value == 0U)
         {
             return GS1_STATUS_OK;
@@ -130,14 +129,14 @@ Gs1Status process_message(
                     return;
                 }
 
-                auto device = site_world->tile_device(footprint_coord);
+                auto device = world.read_tile_device(footprint_coord);
                 if (device.structure_id != anchor_device.structure_id)
                 {
                     return;
                 }
 
                 device.device_integrity = 1.0f;
-                site_world->set_tile_device(footprint_coord, device);
+                world.write_tile_device(footprint_coord, device);
                 emit_device_condition_changed_message(
                     message_queue,
                     footprint_coord,
@@ -154,8 +153,7 @@ Gs1Status process_message(
 
     const auto& payload = message.payload_as<gs1::SiteDevicePlacedMessage>();
     const gs1::TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
-    auto* site_world = world.own_site_world();
-    if (!world.tile_coord_in_bounds(target_tile) || site_world == nullptr)
+    if (!world.tile_coord_in_bounds(target_tile))
     {
         return GS1_STATUS_INVALID_ARGUMENT;
     }
@@ -169,7 +167,7 @@ Gs1Status process_message(
                 return;
             }
 
-            site_world->set_tile_device(
+            world.write_tile_device(
                 footprint_coord,
                 gs1::SiteWorld::TileDeviceData {
                     gs1::StructureId {payload.structure_id},
@@ -208,15 +206,18 @@ void run_system(gs1::RuntimeInvocation& invocation)
         std::fabs(world.read_weather().weather_wind),
         std::fabs(world.read_weather().weather_dust)});
     const float weather_factor = std::clamp(max_weather_meter / k_weather_meter_max, 0.0f, 1.0f);
-    auto* site_world = world.own_site_world();
-    if (site_world == nullptr)
+    if (!world.has_world())
     {
         return;
     }
 
-    auto& ecs_world = site_world->ecs_world();
+    auto* ecs_world = world.ecs_world_ptr();
+    if (ecs_world == nullptr)
+    {
+        return;
+    }
     auto device_query =
-        ecs_world.query_builder<
+        ecs_world->query_builder<
             const gs1::site_ecs::TileCoordComponent,
             const gs1::site_ecs::DeviceStructureId,
             const gs1::site_ecs::DeviceIntegrity,
@@ -280,7 +281,7 @@ void run_system(gs1::RuntimeInvocation& invocation)
 
     for (const BrokenDeviceEntry& broken : broken_devices)
     {
-        site_world->set_tile_device(
+        world.write_tile_device(
             broken.coord,
             gs1::SiteWorld::TileDeviceData {});
         emit_device_condition_changed_message(
