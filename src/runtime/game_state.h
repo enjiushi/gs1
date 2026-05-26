@@ -16,6 +16,7 @@ struct GameState final
     RuntimeMoveDirectionStateSet move_direction {};
 
     RuntimeCampaignCoreStateSet campaign_core {};
+    RuntimeCampaignTimeStateSet campaign_time {};
     RuntimeCampaignRegionalMapMetaStateSet campaign_regional_map_meta {};
     RuntimeCampaignRegionalMapRevealedSitesStateSet campaign_regional_map_revealed_sites {};
     RuntimeCampaignRegionalMapAvailableSitesStateSet campaign_regional_map_available_sites {};

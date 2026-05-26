@@ -7,43 +7,6 @@
 
 namespace gs1
 {
-inline void populate_campaign_state_from_state_sets(
-    CampaignState& campaign,
-    const GameState& state,
-    const StateManager& state_manager)
-{
-    campaign = {};
-    const auto& core = state_manager.query<StateSetId::CampaignCore>(state);
-    const auto& faction_progress =
-        state_manager.query<StateSetId::CampaignFactionProgress>(state);
-    const auto& technology = state_manager.query<StateSetId::CampaignTechnology>(state);
-
-    if (!core.has_value())
-    {
-        return;
-    }
-
-    campaign.campaign_id = core->campaign_id;
-    campaign.campaign_seed = core->campaign_seed;
-    campaign.campaign_clock_minutes_elapsed = core->campaign_clock_minutes_elapsed;
-    campaign.campaign_days_total = core->campaign_days_total;
-    campaign.campaign_days_remaining = core->campaign_days_remaining;
-    campaign.app_state = core->app_state;
-    campaign.active_site_id = core->active_site_id;
-    campaign.regional_map_state = assemble_regional_map_state_from_state_sets(state, state_manager);
-    if (faction_progress.has_value())
-    {
-        campaign.faction_progress = *faction_progress;
-    }
-    if (technology.has_value())
-    {
-        campaign.technology_state = *technology;
-    }
-    campaign.loadout_planner_state =
-        assemble_loadout_planner_state_from_state_sets(state, state_manager);
-    campaign.sites = assemble_sites_state_from_state_sets(state, state_manager);
-}
-
 inline void apply_campaign_state_from_state_sets(
     CampaignState& campaign,
     const GameState& state,
@@ -69,6 +32,7 @@ inline void write_campaign_state_to_state_sets(
     if (!campaign.has_value())
     {
         state_manager.state<StateSetId::CampaignCore>(state).reset();
+        state_manager.state<StateSetId::CampaignTime>(state).reset();
         state_manager.state<StateSetId::CampaignRegionalMapMeta>(state).reset();
         state_manager.state<StateSetId::CampaignRegionalMapRevealedSites>(state).reset();
         state_manager.state<StateSetId::CampaignRegionalMapAvailableSites>(state).reset();
@@ -90,11 +54,12 @@ inline void write_campaign_state_to_state_sets(
     state_manager.state<StateSetId::CampaignCore>(state) = CampaignCoreState {
         campaign->campaign_id,
         campaign->campaign_seed,
-        campaign->campaign_clock_minutes_elapsed,
-        campaign->campaign_days_total,
-        campaign->campaign_days_remaining,
         campaign->app_state,
         campaign->active_site_id};
+    state_manager.state<StateSetId::CampaignTime>(state) = CampaignTimeState {
+        campaign->campaign_clock_minutes_elapsed,
+        campaign->campaign_days_total,
+        campaign->campaign_days_remaining};
     write_regional_map_state_to_state_sets(campaign->regional_map_state, state, state_manager);
     state_manager.state<StateSetId::CampaignFactionProgress>(state) = campaign->faction_progress;
     state_manager.state<StateSetId::CampaignTechnology>(state) = campaign->technology_state;

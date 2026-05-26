@@ -15,6 +15,175 @@ inline void write_sites_state_to_state_sets(
     const std::vector<SiteMetaState>& sites,
     GameState& state,
     const StateManager& state_manager);
+[[nodiscard]] inline RegionalMapState assemble_regional_map_state_from_state_sets(
+    const GameState& state,
+    const StateManager& state_manager);
+[[nodiscard]] inline LoadoutPlannerState assemble_loadout_planner_state_from_state_sets(
+    const GameState& state,
+    const StateManager& state_manager);
+[[nodiscard]] inline std::vector<SiteMetaState> assemble_sites_state_from_state_sets(
+    const GameState& state,
+    const StateManager& state_manager);
+
+inline void populate_campaign_state_from_state_sets(
+    CampaignState& campaign,
+    const GameState& state,
+    const StateManager& state_manager)
+{
+    campaign = {};
+    const auto& core = state_manager.query<StateSetId::CampaignCore>(state);
+    const auto& time = state_manager.query<StateSetId::CampaignTime>(state);
+    const auto& faction_progress =
+        state_manager.query<StateSetId::CampaignFactionProgress>(state);
+    const auto& technology = state_manager.query<StateSetId::CampaignTechnology>(state);
+
+    if (!core.has_value())
+    {
+        return;
+    }
+
+    campaign.campaign_id = core->campaign_id;
+    campaign.campaign_seed = core->campaign_seed;
+    campaign.app_state = core->app_state;
+    campaign.active_site_id = core->active_site_id;
+    if (time.has_value())
+    {
+        campaign.campaign_clock_minutes_elapsed = time->campaign_clock_minutes_elapsed;
+        campaign.campaign_days_total = time->campaign_days_total;
+        campaign.campaign_days_remaining = time->campaign_days_remaining;
+    }
+    {
+        const auto& meta = state_manager.query<StateSetId::CampaignRegionalMapMeta>(state);
+        const auto& revealed = state_manager.query<StateSetId::CampaignRegionalMapRevealedSites>(state);
+        const auto& available = state_manager.query<StateSetId::CampaignRegionalMapAvailableSites>(state);
+        const auto& completed = state_manager.query<StateSetId::CampaignRegionalMapCompletedSites>(state);
+
+        if (meta.has_value() && meta->has_selected_site_id)
+        {
+            campaign.regional_map_state.selected_site_id = meta->selected_site_id;
+        }
+        if (revealed.has_value())
+        {
+            campaign.regional_map_state.revealed_site_ids = *revealed;
+        }
+        if (available.has_value())
+        {
+            campaign.regional_map_state.available_site_ids = *available;
+        }
+        if (completed.has_value())
+        {
+            campaign.regional_map_state.completed_site_ids = *completed;
+        }
+    }
+    if (faction_progress.has_value())
+    {
+        campaign.faction_progress = *faction_progress;
+    }
+    if (technology.has_value())
+    {
+        campaign.technology_state = *technology;
+    }
+    {
+        const auto& meta = state_manager.query<StateSetId::CampaignLoadoutPlannerMeta>(state);
+        const auto& baseline =
+            state_manager.query<StateSetId::CampaignLoadoutPlannerBaselineItems>(state);
+        const auto& available_support =
+            state_manager.query<StateSetId::CampaignLoadoutPlannerAvailableSupportItems>(state);
+        const auto& selected_slots =
+            state_manager.query<StateSetId::CampaignLoadoutPlannerSelectedSlots>(state);
+        const auto& nearby_aura =
+            state_manager.query<StateSetId::CampaignLoadoutPlannerNearbyAuraModifiers>(state);
+
+        if (meta.has_value())
+        {
+            if (meta->has_selected_target_site_id)
+            {
+                campaign.loadout_planner_state.selected_target_site_id = meta->selected_target_site_id;
+            }
+            campaign.loadout_planner_state.support_quota_per_contributor =
+                meta->support_quota_per_contributor;
+            campaign.loadout_planner_state.support_quota = meta->support_quota;
+        }
+        if (baseline.has_value())
+        {
+            campaign.loadout_planner_state.baseline_deployment_items = *baseline;
+        }
+        if (available_support.has_value())
+        {
+            campaign.loadout_planner_state.available_exported_support_items = *available_support;
+        }
+        if (selected_slots.has_value())
+        {
+            campaign.loadout_planner_state.selected_loadout_slots = *selected_slots;
+        }
+        if (nearby_aura.has_value())
+        {
+            campaign.loadout_planner_state.active_nearby_aura_modifier_ids = *nearby_aura;
+        }
+    }
+    {
+        const auto& entries = state_manager.query<StateSetId::CampaignSiteMetaEntries>(state);
+        const auto& adjacent = state_manager.query<StateSetId::CampaignSiteAdjacentIds>(state);
+        const auto& support_items =
+            state_manager.query<StateSetId::CampaignSiteExportedSupportItems>(state);
+        const auto& aura_ids =
+            state_manager.query<StateSetId::CampaignSiteNearbyAuraModifierIds>(state);
+
+        if (entries.has_value())
+        {
+            campaign.sites.reserve(entries->size());
+            for (const auto& entry : *entries)
+            {
+                SiteMetaState site {};
+                site.site_id = entry.site_id;
+                site.site_state = entry.site_state;
+                site.regional_map_tile = entry.regional_map_tile;
+                site.site_archetype_id = entry.site_archetype_id;
+                site.featured_faction_id = entry.featured_faction_id;
+                site.attempt_count = entry.attempt_count;
+                site.support_package_id = entry.support_package_id;
+                site.has_support_package_id = entry.has_support_package_id;
+
+                if (adjacent.has_value() && entry.adjacent_site_offset <= adjacent->size())
+                {
+                    const auto offset = static_cast<std::size_t>(entry.adjacent_site_offset);
+                    const auto count = static_cast<std::size_t>(entry.adjacent_site_count);
+                    const auto safe_count = std::min(count, adjacent->size() - offset);
+                    site.adjacent_site_ids.insert(
+                        site.adjacent_site_ids.end(),
+                        adjacent->begin() + static_cast<std::ptrdiff_t>(offset),
+                        adjacent->begin() + static_cast<std::ptrdiff_t>(offset + safe_count));
+                }
+
+                if (support_items.has_value() &&
+                    entry.exported_support_item_offset <= support_items->size())
+                {
+                    const auto offset = static_cast<std::size_t>(entry.exported_support_item_offset);
+                    const auto count = static_cast<std::size_t>(entry.exported_support_item_count);
+                    const auto safe_count = std::min(count, support_items->size() - offset);
+                    site.exported_support_items.insert(
+                        site.exported_support_items.end(),
+                        support_items->begin() + static_cast<std::ptrdiff_t>(offset),
+                        support_items->begin() + static_cast<std::ptrdiff_t>(offset + safe_count));
+                }
+
+                if (aura_ids.has_value() &&
+                    entry.nearby_aura_modifier_offset <= aura_ids->size())
+                {
+                    const auto offset = static_cast<std::size_t>(entry.nearby_aura_modifier_offset);
+                    const auto count = static_cast<std::size_t>(entry.nearby_aura_modifier_count);
+                    const auto safe_count = std::min(count, aura_ids->size() - offset);
+                    site.nearby_aura_modifier_ids.insert(
+                        site.nearby_aura_modifier_ids.end(),
+                        aura_ids->begin() + static_cast<std::ptrdiff_t>(offset),
+                        aura_ids->begin() + static_cast<std::ptrdiff_t>(offset + safe_count));
+                }
+
+                campaign.sites.push_back(std::move(site));
+            }
+        }
+    }
+}
 
 [[nodiscard]] inline CraftState assemble_craft_state_from_state_sets(
     const GameState& state,
@@ -243,11 +412,12 @@ inline void write_campaign_state_to_state_sets(
     state_manager.state<StateSetId::CampaignCore>(state) = CampaignCoreState {
         campaign.campaign_id,
         campaign.campaign_seed,
-        campaign.campaign_clock_minutes_elapsed,
-        campaign.campaign_days_total,
-        campaign.campaign_days_remaining,
         campaign.app_state,
         campaign.active_site_id};
+    state_manager.state<StateSetId::CampaignTime>(state) = CampaignTimeState {
+        campaign.campaign_clock_minutes_elapsed,
+        campaign.campaign_days_total,
+        campaign.campaign_days_remaining};
     write_regional_map_state_to_state_sets(campaign.regional_map_state, state, state_manager);
     state_manager.state<StateSetId::CampaignFactionProgress>(state) = campaign.faction_progress;
     state_manager.state<StateSetId::CampaignTechnology>(state) = campaign.technology_state;

@@ -45,11 +45,15 @@ struct CampaignCoreState final
 {
     CampaignId campaign_id {};
     std::uint64_t campaign_seed {0};
+    Gs1AppState app_state {GS1_APP_STATE_BOOT};
+    std::optional<SiteId> active_site_id {};
+};
+
+struct CampaignTimeState final
+{
     double campaign_clock_minutes_elapsed {0.0};
     std::uint32_t campaign_days_total {0};
     std::uint32_t campaign_days_remaining {0};
-    Gs1AppState app_state {GS1_APP_STATE_BOOT};
-    std::optional<SiteId> active_site_id {};
 };
 
 struct SiteRunMetaState final
@@ -69,6 +73,7 @@ enum class StateSetId : std::uint8_t
     FixedStepSeconds,
     MoveDirection,
     CampaignCore,
+    CampaignTime,
     CampaignRegionalMapMeta,
     CampaignRegionalMapRevealedSites,
     CampaignRegionalMapAvailableSites,
@@ -320,6 +325,7 @@ using RuntimeFixedStepSecondsStateSet = CacheAlignedStateSet<double>;
 using RuntimeMoveDirectionStateSet = CacheAlignedStateSet<RuntimeMoveDirectionSnapshot>;
 
 using RuntimeCampaignCoreStateSet = CacheAlignedStateSet<std::optional<CampaignCoreState>>;
+using RuntimeCampaignTimeStateSet = CacheAlignedStateSet<std::optional<CampaignTimeState>>;
 using RuntimeCampaignRegionalMapMetaStateSet =
     CacheAlignedStateSet<std::optional<RegionalMapMetaState>>;
 using RuntimeCampaignRegionalMapRevealedSitesStateSet =
@@ -471,6 +477,11 @@ GS1_DEFINE_STATE_TRAITS(
     StateSetId::CampaignCore,
     std::optional<CampaignCoreState>,
     RuntimeCampaignCoreStateSet,
+    false);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::CampaignTime,
+    std::optional<CampaignTimeState>,
+    RuntimeCampaignTimeStateSet,
     false);
 GS1_DEFINE_STATE_TRAITS(
     StateSetId::CampaignRegionalMapMeta,
@@ -865,6 +876,7 @@ static_assert(state_contract_is_valid<StateSetId::AppState>());
 static_assert(state_contract_is_valid<StateSetId::FixedStepSeconds>());
 static_assert(state_contract_is_valid<StateSetId::MoveDirection>());
 static_assert(state_contract_is_valid<StateSetId::CampaignCore>());
+static_assert(state_contract_is_valid<StateSetId::CampaignTime>());
 static_assert(state_contract_is_valid<StateSetId::CampaignRegionalMapMeta>());
 static_assert(state_contract_is_valid<StateSetId::CampaignRegionalMapRevealedSites>());
 static_assert(state_contract_is_valid<StateSetId::CampaignRegionalMapAvailableSites>());

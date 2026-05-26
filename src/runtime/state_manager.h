@@ -101,6 +101,10 @@ template <StateSetId Id>
     {
         return state.campaign_core.get();
     }
+    else if constexpr (Id == StateSetId::CampaignTime)
+    {
+        return state.campaign_time.get();
+    }
     else if constexpr (Id == StateSetId::CampaignRegionalMapMeta)
     {
         return state.campaign_regional_map_meta.get();
@@ -403,6 +407,10 @@ template <StateSetId Id>
     else if constexpr (Id == StateSetId::CampaignCore)
     {
         return state.campaign_core.get();
+    }
+    else if constexpr (Id == StateSetId::CampaignTime)
+    {
+        return state.campaign_time.get();
     }
     else if constexpr (Id == StateSetId::CampaignRegionalMapMeta)
     {

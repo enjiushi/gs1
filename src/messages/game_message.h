@@ -33,7 +33,6 @@ enum class GameMessageType : std::uint8_t
     ClearDeploymentSiteSelection,
     DeploymentSiteSelectionChanged,
     CampaignCashDeltaRequested,
-    CampaignTimeDeltaRequested,
     CampaignReputationAwardRequested,
     FactionReputationAwardRequested,
     TechnologyNodeClaimRequested,
@@ -199,11 +198,6 @@ struct DeploymentSiteSelectionChangedMessage final
 struct CampaignCashDeltaRequestedMessage final
 {
     std::int32_t delta;
-};
-
-struct CampaignTimeDeltaRequestedMessage final
-{
-    double elapsed_minutes;
 };
 
 struct CampaignReputationAwardRequestedMessage final

@@ -36,6 +36,8 @@ void store_campaign_sites(RuntimeInvocation& invocation, const std::vector<SiteM
 
 void set_campaign_app_state(RuntimeInvocation& invocation, Gs1AppState app_state)
 {
+    make_game_state_access<CampaignFlowSystem>(invocation).template write<RuntimeAppStateTag>() =
+        app_state;
     invocation.state_manager()->state<StateSetId::CampaignCore>(*invocation.owned_state())->app_state =
         app_state;
 }
@@ -44,21 +46,6 @@ void set_campaign_active_site_id(RuntimeInvocation& invocation, std::optional<Si
 {
     invocation.state_manager()->state<StateSetId::CampaignCore>(*invocation.owned_state())->active_site_id =
         site_id;
-}
-
-void apply_campaign_time_delta(RuntimeInvocation& invocation, double elapsed_minutes)
-{
-    auto& campaign_core =
-        invocation.state_manager()->state<StateSetId::CampaignCore>(*invocation.owned_state()).value();
-    campaign_core.campaign_clock_minutes_elapsed += elapsed_minutes;
-
-    const auto elapsed_days =
-        static_cast<std::uint32_t>(
-            campaign_core.campaign_clock_minutes_elapsed / k_runtime_minutes_per_day);
-    campaign_core.campaign_days_remaining =
-        (elapsed_days >= campaign_core.campaign_days_total)
-            ? 0U
-            : (campaign_core.campaign_days_total - elapsed_days);
 }
 
 [[nodiscard]] std::uint64_t campaign_seed(RuntimeInvocation& invocation)
@@ -486,12 +473,6 @@ Gs1Status process_campaign_flow_message(
 
     case GameMessageType::SiteAttemptEnded:
         return handle_site_attempt_ended(invocation, message.payload_as<SiteAttemptEndedMessage>());
-
-    case GameMessageType::CampaignTimeDeltaRequested:
-        apply_campaign_time_delta(
-            invocation,
-            message.payload_as<CampaignTimeDeltaRequestedMessage>().elapsed_minutes);
-        return GS1_STATUS_OK;
 
     case GameMessageType::DeploymentSiteSelectionChanged:
     case GameMessageType::CampaignReputationAwardRequested:

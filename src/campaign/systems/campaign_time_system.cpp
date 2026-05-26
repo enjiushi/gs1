@@ -7,7 +7,7 @@ namespace gs1
 template <>
 struct system_state_tags<CampaignTimeSystem>
 {
-    using type = type_list<RuntimeFixedStepSecondsTag>;
+    using type = type_list<RuntimeCampaignTimeTag, RuntimeFixedStepSecondsTag>;
 };
 
 const char* CampaignTimeSystem::name() const noexcept
@@ -60,12 +60,18 @@ void CampaignTimeSystem::run(RuntimeInvocation& invocation)
         return;
     }
 
-    const double fixed_step_seconds =
-        make_game_state_access<CampaignTimeSystem>(invocation).template read<RuntimeFixedStepSecondsTag>();
-    GameMessage message {};
-    message.type = GameMessageType::CampaignTimeDeltaRequested;
-    message.set_payload(CampaignTimeDeltaRequestedMessage {
-        runtime_minutes_from_real_seconds(fixed_step_seconds)});
-    invocation.push_game_message(message);
+    auto access = make_game_state_access<CampaignTimeSystem>(invocation);
+    auto& campaign_time = access.template write<RuntimeCampaignTimeTag>();
+    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    campaign_time.campaign_clock_minutes_elapsed +=
+        runtime_minutes_from_real_seconds(fixed_step_seconds);
+
+    const auto elapsed_days =
+        static_cast<std::uint32_t>(
+            campaign_time.campaign_clock_minutes_elapsed / k_runtime_minutes_per_day);
+    campaign_time.campaign_days_remaining =
+        (elapsed_days >= campaign_time.campaign_days_total)
+            ? 0U
+            : (campaign_time.campaign_days_total - elapsed_days);
 }
 }  // namespace gs1

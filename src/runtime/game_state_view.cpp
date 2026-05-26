@@ -104,6 +104,7 @@ void rebuild_campaign_progression_entries(
 
 void rebuild_campaign_view(
     const CampaignCoreState& campaign_core,
+    const CampaignTimeState& campaign_time,
     const RegionalMapMetaState& regional_map,
     std::span<const SiteId> revealed_site_ids,
     std::span<const SiteId> available_site_ids,
@@ -238,9 +239,9 @@ void rebuild_campaign_view(
     cache.campaign = Gs1CampaignStateView {
         id_value(campaign_core.campaign_id),
         campaign_core.campaign_seed,
-        campaign_core.campaign_clock_minutes_elapsed,
-        campaign_core.campaign_days_total,
-        campaign_core.campaign_days_remaining,
+        campaign_time.campaign_clock_minutes_elapsed,
+        campaign_time.campaign_days_total,
+        campaign_time.campaign_days_remaining,
         static_cast<std::uint32_t>(std::max(0, technology.total_reputation)),
         regional_map.has_selected_site_id
             ? static_cast<std::int32_t>(id_value(regional_map.selected_site_id))
@@ -646,6 +647,8 @@ void rebuild_game_state_view_cache(
     {
         const auto& regional_map =
             *state_manager.query<StateSetId::CampaignRegionalMapMeta>(state);
+        const auto& campaign_time =
+            *state_manager.query<StateSetId::CampaignTime>(state);
         const auto& revealed_site_ids =
             *state_manager.query<StateSetId::CampaignRegionalMapRevealedSites>(state);
         const auto& available_site_ids =
@@ -672,6 +675,7 @@ void rebuild_game_state_view_cache(
             *state_manager.query<StateSetId::CampaignSiteNearbyAuraModifierIds>(state);
         rebuild_campaign_view(
             *state_manager.query<StateSetId::CampaignCore>(state),
+            campaign_time,
             regional_map,
             revealed_site_ids,
             available_site_ids,

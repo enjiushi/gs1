@@ -43,6 +43,10 @@ struct RuntimeCampaignFactionProgressTag
 {
 };
 
+struct RuntimeCampaignTimeTag
+{
+};
+
 struct RuntimeCampaignTechnologyTag
 {
 };
@@ -62,6 +66,7 @@ template <class Tag>
 struct state_owner;
 
 class CampaignFlowSystem;
+class CampaignTimeSystem;
 class FactionReputationSystem;
 class TechnologySystem;
 class SiteFlowSystem;
@@ -70,6 +75,12 @@ template <>
 struct state_owner<RuntimeAppStateTag>
 {
     using type = CampaignFlowSystem;
+};
+
+template <>
+struct state_owner<RuntimeCampaignTimeTag>
+{
+    using type = CampaignTimeSystem;
 };
 
 template <>
@@ -181,6 +192,19 @@ inline decltype(auto) runtime_invocation_state_cref<RuntimeAppStateTag>(
     }
 
     return invocation.state_manager_->query<StateSetId::AppState>(*invocation.owned_state_);
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimeCampaignTimeTag>(RuntimeInvocation& invocation)
+{
+    return invocation.state_manager_->state<StateSetId::CampaignTime>(*invocation.owned_state_).value();
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_cref<RuntimeCampaignTimeTag>(
+    const RuntimeInvocation& invocation)
+{
+    return invocation.state_manager_->query<StateSetId::CampaignTime>(*invocation.owned_state_).value();
 }
 
 template <>
