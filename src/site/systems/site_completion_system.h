@@ -33,12 +33,10 @@ public:
             site_component_mask_of(
                 SiteComponent::RunMeta,
                 SiteComponent::Time,
-                SiteComponent::Counters,
                 SiteComponent::TileLayout,
                 SiteComponent::TileEcology,
                 SiteComponent::Objective),
             site_component_mask_of(
-                SiteComponent::Counters,
                 SiteComponent::Objective)};
     }
 

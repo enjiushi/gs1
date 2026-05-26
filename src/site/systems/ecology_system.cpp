@@ -1127,6 +1127,7 @@ void update_restoration_progress(
     std::uint32_t new_count)
 {
     auto& counters = world.own_counters();
+    auto objective = world.own_objective();
     const auto previous_count = counters.fully_grown_tile_count;
     if (previous_count == new_count)
     {
@@ -1142,6 +1143,7 @@ void update_restoration_progress(
         normalized_progress = std::clamp(normalized_progress, 0.0f, 1.0f);
     }
     counters.objective_progress_normalized = normalized_progress;
+    objective.objective_progress_normalized = normalized_progress;
 
     GameMessage progress_message {};
     progress_message.type = GameMessageType::RestorationProgressChanged;
@@ -1168,9 +1170,9 @@ void update_highway_protection_progress(
     float average_sand_cover)
 {
     auto& counters = world.own_counters();
-    const auto& objective = world.read_objective();
+    auto objective = world.own_objective();
     const float clamped_average = std::clamp(average_sand_cover, 0.0f, k_meter_scale);
-    const float previous_average = counters.highway_average_sand_cover;
+    const float previous_average = objective.highway_average_sand_cover;
     float normalized_progress = 1.0f;
     const float cover_threshold =
         objective.highway_max_average_sand_cover > 0.0f &&
@@ -1185,13 +1187,15 @@ void update_highway_protection_progress(
     }
 
     if (std::fabs(previous_average - clamped_average) <= k_density_epsilon &&
-        std::fabs(counters.objective_progress_normalized - normalized_progress) <= k_density_epsilon)
+        std::fabs(objective.objective_progress_normalized - normalized_progress) <= k_density_epsilon)
     {
         return;
     }
 
     counters.highway_average_sand_cover = clamped_average;
     counters.objective_progress_normalized = normalized_progress;
+    objective.highway_average_sand_cover = clamped_average;
+    objective.objective_progress_normalized = normalized_progress;
 }
 
 void update_living_plant_stability(

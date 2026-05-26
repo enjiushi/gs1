@@ -140,6 +140,50 @@ enum Gs1GameplayActionType : std::uint8_t
     GS1_GAMEPLAY_ACTION_END_SITE_MODIFIER = 27
 };
 
+using Gs1UiActionType = Gs1GameplayActionType;
+
+inline constexpr Gs1UiActionType GS1_UI_ACTION_NONE = GS1_GAMEPLAY_ACTION_NONE;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_START_NEW_CAMPAIGN = GS1_GAMEPLAY_ACTION_START_NEW_CAMPAIGN;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_SELECT_DEPLOYMENT_SITE = GS1_GAMEPLAY_ACTION_SELECT_DEPLOYMENT_SITE;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_START_SITE_ATTEMPT = GS1_GAMEPLAY_ACTION_START_SITE_ATTEMPT;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_RETURN_TO_REGIONAL_MAP = GS1_GAMEPLAY_ACTION_RETURN_TO_REGIONAL_MAP;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION =
+    GS1_GAMEPLAY_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_ACCEPT_TASK = GS1_GAMEPLAY_ACTION_ACCEPT_TASK;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_CLAIM_TASK_REWARD = GS1_GAMEPLAY_ACTION_CLAIM_TASK_REWARD;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_BUY_PHONE_LISTING = GS1_GAMEPLAY_ACTION_BUY_PHONE_LISTING;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_SELL_PHONE_LISTING = GS1_GAMEPLAY_ACTION_SELL_PHONE_LISTING;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_HIRE_CONTRACTOR = GS1_GAMEPLAY_ACTION_HIRE_CONTRACTOR;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_PURCHASE_SITE_UNLOCKABLE =
+    GS1_GAMEPLAY_ACTION_PURCHASE_SITE_UNLOCKABLE;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_ADD_PHONE_LISTING_TO_CART =
+    GS1_GAMEPLAY_ACTION_ADD_PHONE_LISTING_TO_CART;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_REMOVE_PHONE_LISTING_FROM_CART =
+    GS1_GAMEPLAY_ACTION_REMOVE_PHONE_LISTING_FROM_CART;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_CHECKOUT_PHONE_CART = GS1_GAMEPLAY_ACTION_CHECKOUT_PHONE_CART;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_SET_PHONE_PANEL_SECTION = GS1_GAMEPLAY_ACTION_SET_PHONE_PANEL_SECTION;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_OPEN_REGIONAL_MAP_TECH_TREE =
+    GS1_GAMEPLAY_ACTION_OPEN_REGIONAL_MAP_TECH_TREE;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE =
+    GS1_GAMEPLAY_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_CLAIM_TECHNOLOGY_NODE = GS1_GAMEPLAY_ACTION_CLAIM_TECHNOLOGY_NODE;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_SELECT_TECH_TREE_FACTION_TAB =
+    GS1_GAMEPLAY_ACTION_SELECT_TECH_TREE_FACTION_TAB;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_CLOSE_PHONE_PANEL = GS1_GAMEPLAY_ACTION_CLOSE_PHONE_PANEL;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_OPEN_SITE_PROTECTION_SELECTOR =
+    GS1_GAMEPLAY_ACTION_OPEN_SITE_PROTECTION_SELECTOR;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_CLOSE_SITE_PROTECTION_UI =
+    GS1_GAMEPLAY_ACTION_CLOSE_SITE_PROTECTION_UI;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE =
+    GS1_GAMEPLAY_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE;
+inline constexpr Gs1UiActionType GS1_UI_ACTION_END_SITE_MODIFIER = GS1_GAMEPLAY_ACTION_END_SITE_MODIFIER;
+
+enum Gs1ProgressionViewId : std::uint8_t
+{
+    GS1_PROGRESSION_VIEW_NONE = 0,
+    GS1_PROGRESSION_VIEW_REGIONAL_MAP_TECH_TREE = 1
+};
+
 enum Gs1SiteActionKind : std::uint8_t
 {
     GS1_SITE_ACTION_NONE = 0,
@@ -224,6 +268,32 @@ enum Gs1PhoneListingPresentationKind : std::uint8_t
     GS1_PHONE_LISTING_PRESENTATION_SELL_ITEM = 1,
     GS1_PHONE_LISTING_PRESENTATION_HIRE_CONTRACTOR = 2,
     GS1_PHONE_LISTING_PRESENTATION_PURCHASE_UNLOCKABLE = 3
+};
+
+enum Gs1PhonePanelSection : std::uint8_t
+{
+    GS1_PHONE_PANEL_SECTION_HOME = 0,
+    GS1_PHONE_PANEL_SECTION_TASKS = 1,
+    GS1_PHONE_PANEL_SECTION_BUY = 2,
+    GS1_PHONE_PANEL_SECTION_SELL = 3,
+    GS1_PHONE_PANEL_SECTION_HIRE = 4,
+    GS1_PHONE_PANEL_SECTION_CART = 5
+};
+
+inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_OPEN = 1u << 0;
+inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE = 1u << 1;
+inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_TASKS_BADGE = 1u << 2;
+inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_BUY_BADGE = 1u << 3;
+inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_SELL_BADGE = 1u << 4;
+inline constexpr std::uint32_t GS1_PHONE_PANEL_FLAG_HIRE_BADGE = 1u << 5;
+
+enum Gs1SiteProtectionOverlayMode : std::uint8_t
+{
+    GS1_SITE_PROTECTION_OVERLAY_NONE = 0,
+    GS1_SITE_PROTECTION_OVERLAY_WIND = 1,
+    GS1_SITE_PROTECTION_OVERLAY_HEAT = 2,
+    GS1_SITE_PROTECTION_OVERLAY_DUST = 3,
+    GS1_SITE_PROTECTION_OVERLAY_OCCUPANT_CONDITION = 4
 };
 
 enum Gs1NotificationKind : std::uint8_t
@@ -444,6 +514,8 @@ struct Gs1GameplayAction
     std::uint64_t arg1;
 };
 
+using Gs1UiAction = Gs1GameplayAction;
+
 struct Gs1HostEventGameplayActionData
 {
     Gs1GameplayAction action;
@@ -521,6 +593,7 @@ struct Gs1HostEventEmptyData
 union Gs1HostEventPayload
 {
     Gs1HostEventGameplayActionData gameplay_action;
+    Gs1HostEventGameplayActionData ui_action;
     Gs1HostEventSiteMoveDirectionData site_move_direction;
     Gs1HostEventSiteActionRequestData site_action_request;
     Gs1HostEventSiteActionCancelData site_action_cancel;
@@ -533,6 +606,7 @@ union Gs1HostEventPayload
 
 using Gs1HostMessageType = Gs1HostEventType;
 using Gs1HostMessageGameplayActionData = Gs1HostEventGameplayActionData;
+using Gs1HostMessageUiActionData = Gs1HostEventGameplayActionData;
 using Gs1HostMessageSiteMoveDirectionData = Gs1HostEventSiteMoveDirectionData;
 using Gs1HostMessageSiteActionRequestData = Gs1HostEventSiteActionRequestData;
 using Gs1HostMessageSiteActionCancelData = Gs1HostEventSiteActionCancelData;
@@ -542,6 +616,8 @@ using Gs1HostMessageSiteInventorySlotTapData = Gs1HostEventSiteInventorySlotTapD
 using Gs1HostMessageSiteSceneReadyData = Gs1HostEventSiteSceneReadyData;
 using Gs1HostMessageEmptyData = Gs1HostEventEmptyData;
 using Gs1HostMessagePayload = Gs1HostEventPayload;
+
+inline constexpr Gs1HostMessageType GS1_HOST_EVENT_UI_ACTION = GS1_HOST_EVENT_GAMEPLAY_ACTION;
 
 struct Gs1HostMessage
 {
@@ -853,6 +929,21 @@ struct Gs1EngineMessagePhoneListingData
     std::uint8_t flags;
 };
 
+struct Gs1EngineMessagePhonePanelData
+{
+    Gs1PhonePanelSection active_section;
+    std::uint8_t reserved0[3];
+    std::uint32_t visible_task_count;
+    std::uint32_t accepted_task_count;
+    std::uint32_t completed_task_count;
+    std::uint32_t claimed_task_count;
+    std::uint32_t buy_listing_count;
+    std::uint32_t sell_listing_count;
+    std::uint32_t service_listing_count;
+    std::uint32_t cart_item_count;
+    std::uint32_t flags;
+};
+
 struct Gs1EngineMessageSiteModifierListData
 {
     Gs1ProjectionMode mode;
@@ -866,6 +957,26 @@ struct Gs1EngineMessageSiteModifierData
     std::uint16_t remaining_game_hours;
     std::uint8_t flags;
     std::uint8_t reserved0;
+};
+
+struct Gs1EngineMessageProgressionViewData
+{
+    Gs1ProgressionViewId view_id;
+    std::uint32_t context_id;
+    std::uint16_t entry_count;
+    std::uint16_t reserved0;
+};
+
+struct Gs1EngineMessageCloseProgressionViewData
+{
+    Gs1ProgressionViewId view_id;
+    std::uint32_t reserved0;
+};
+
+struct Gs1EngineMessageSiteProtectionOverlayData
+{
+    Gs1SiteProtectionOverlayMode mode;
+    std::uint8_t reserved0[3];
 };
 
 inline constexpr std::uint8_t GS1_SITE_MODIFIER_FLAG_TIMED = 1U << 0U;

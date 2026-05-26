@@ -18,6 +18,8 @@ struct SiteObjectiveMetaState final
     std::int32_t target_cash_points {0};
     SiteObjectiveTargetEdge target_edge {SiteObjectiveTargetEdge::East};
     std::uint8_t target_band_width {0U};
+    float objective_progress_normalized {0.0f};
+    float highway_average_sand_cover {0.0f};
     float highway_max_average_sand_cover {0.0f};
     float last_target_average_sand_level {0.0f};
     bool has_hold_baseline {false};
@@ -34,6 +36,8 @@ struct SiteObjectiveState final
     std::int32_t target_cash_points {0};
     SiteObjectiveTargetEdge target_edge {SiteObjectiveTargetEdge::East};
     std::uint8_t target_band_width {0U};
+    float objective_progress_normalized {0.0f};
+    float highway_average_sand_cover {0.0f};
     float highway_max_average_sand_cover {0.0f};
     float last_target_average_sand_level {0.0f};
     bool has_hold_baseline {false};

@@ -1664,6 +1664,10 @@ int main()
         assert((payload.flags & GS1_PHONE_PANEL_FLAG_LAUNCHER_BADGE) != 0U);
         assert((payload.flags & GS1_PHONE_PANEL_FLAG_SELL_BADGE) != 0U);
     }
+    {
+        const auto& objective = phone_panel_site_run.objective;
+        assert(objective.objective_progress_normalized >= 0.0f);
+    }
 
     Gs1UiAction open_tasks_action {};
     open_tasks_action.type = GS1_UI_ACTION_SET_PHONE_PANEL_SECTION;

@@ -130,7 +130,7 @@ void SiteFlowSystem::run(RuntimeInvocation& invocation)
     }
 
     auto worker = world.read_worker();
-    const auto action_state = world.read_action();
+    const auto action_state = static_cast<ConstActionStateRef>(world.read_action());
     const float movement_step =
         k_worker_move_speed_tiles_per_second * static_cast<float>(fixed_step_seconds);
 

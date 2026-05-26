@@ -545,6 +545,8 @@ struct SiteObjectiveStateRef final
     std::int32_t& target_cash_points;
     SiteObjectiveTargetEdge& target_edge;
     std::uint8_t& target_band_width;
+    float& objective_progress_normalized;
+    float& highway_average_sand_cover;
     float& highway_max_average_sand_cover;
     float& last_target_average_sand_level;
     bool& has_hold_baseline;
@@ -567,6 +569,8 @@ struct ConstSiteObjectiveStateRef final
     const std::int32_t& target_cash_points;
     const SiteObjectiveTargetEdge& target_edge;
     const std::uint8_t& target_band_width;
+    const float& objective_progress_normalized;
+    const float& highway_average_sand_cover;
     const float& highway_max_average_sand_cover;
     const float& last_target_average_sand_level;
     const bool& has_hold_baseline;
@@ -1587,6 +1591,8 @@ public:
             objective_meta_state().target_cash_points,
             objective_meta_state().target_edge,
             objective_meta_state().target_band_width,
+            objective_meta_state().objective_progress_normalized,
+            objective_meta_state().highway_average_sand_cover,
             objective_meta_state().highway_max_average_sand_cover,
             objective_meta_state().last_target_average_sand_level,
             objective_meta_state().has_hold_baseline,
@@ -1609,6 +1615,8 @@ public:
             own_objective_meta_state().target_cash_points,
             own_objective_meta_state().target_edge,
             own_objective_meta_state().target_band_width,
+            own_objective_meta_state().objective_progress_normalized,
+            own_objective_meta_state().highway_average_sand_cover,
             own_objective_meta_state().highway_max_average_sand_cover,
             own_objective_meta_state().last_target_average_sand_level,
             own_objective_meta_state().has_hold_baseline,
