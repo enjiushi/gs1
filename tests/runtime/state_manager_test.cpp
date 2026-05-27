@@ -21,6 +21,19 @@ using gs1::RuntimeInvocation;
 using gs1::StateManager;
 using gs1::StateSetId;
 
+struct StateManagerTestAccess
+{
+    static void push_current_mutating_system(StateManager& state_manager, IRuntimeSystem& system)
+    {
+        state_manager.push_current_mutating_system(&system);
+    }
+
+    static void pop_current_mutating_system(StateManager& state_manager)
+    {
+        state_manager.pop_current_mutating_system();
+    }
+};
+
 struct StubSystemBase : IRuntimeSystem
 {
     [[nodiscard]] const char* name() const noexcept override { return "StubSystem"; }
@@ -119,6 +132,16 @@ int main()
     assert(state_manager.active_resolver(StateSetId::CampaignCore) == &campaign_core_owner);
     assert(state_manager.default_resolver(StateSetId::SiteRunMeta) == nullptr);
     assert(state_manager.active_resolver(StateSetId::SiteRunMeta) == nullptr);
+    assert(state_manager.current_mutating_system() == nullptr);
+
+    StateManagerTestAccess::push_current_mutating_system(state_manager, campaign_core_owner);
+    assert(state_manager.current_mutating_system() == &campaign_core_owner);
+    StateManagerTestAccess::push_current_mutating_system(state_manager, campaign_technology_owner);
+    assert(state_manager.current_mutating_system() == &campaign_technology_owner);
+    StateManagerTestAccess::pop_current_mutating_system(state_manager);
+    assert(state_manager.current_mutating_system() == &campaign_core_owner);
+    StateManagerTestAccess::pop_current_mutating_system(state_manager);
+    assert(state_manager.current_mutating_system() == nullptr);
 
     Gs1RuntimeCreateDesc create_desc {};
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);

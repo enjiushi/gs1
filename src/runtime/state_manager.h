@@ -5,6 +5,7 @@
 
 #include <array>
 #include <cstddef>
+#include <vector>
 #include <stdexcept>
 
 namespace gs1
@@ -13,6 +14,7 @@ class IRuntimeSystem;
 class GameRuntime;
 class RuntimeInvocation;
 class RuntimePrivilegedStateMutation;
+struct StateManagerTestAccess;
 
 class StateManager final
 {
@@ -43,22 +45,33 @@ public:
 
     [[nodiscard]] IRuntimeSystem* current_mutating_system() const noexcept
     {
-        return current_mutating_system_;
+        return current_mutating_system_stack_.empty()
+            ? nullptr
+            : current_mutating_system_stack_.back();
     }
 
 private:
     friend class GameRuntime;
     friend class RuntimeInvocation;
     friend class RuntimePrivilegedStateMutation;
+    friend struct StateManagerTestAccess;
 
     static constexpr std::size_t index(StateSetId state_set) noexcept
     {
         return static_cast<std::size_t>(state_set);
     }
 
-    void set_current_mutating_system(IRuntimeSystem* system) noexcept
+    void push_current_mutating_system(IRuntimeSystem* system)
     {
-        current_mutating_system_ = system;
+        current_mutating_system_stack_.push_back(system);
+    }
+
+    void pop_current_mutating_system() noexcept
+    {
+        if (!current_mutating_system_stack_.empty())
+        {
+            current_mutating_system_stack_.pop_back();
+        }
     }
 
     void push_privileged_mutation() noexcept
@@ -77,7 +90,7 @@ private:
     GameState state_ {};
     std::array<IRuntimeSystem*, static_cast<std::size_t>(StateSetId::Count)> default_resolver_by_state_set_ {};
     std::array<IRuntimeSystem*, static_cast<std::size_t>(StateSetId::Count)> active_resolver_by_state_set_ {};
-    IRuntimeSystem* current_mutating_system_ {nullptr};
+    std::vector<IRuntimeSystem*> current_mutating_system_stack_ {};
     std::size_t privileged_mutation_depth_ {0U};
 };
 
@@ -383,10 +396,11 @@ template <StateSetId Id>
 [[nodiscard]] inline typename state_traits<Id>::type& StateManager::state(
     GameState& state) const
 {
-    if (privileged_mutation_depth_ == 0U && current_mutating_system_ != nullptr)
+    const auto* current_mutating_system = current_mutating_system();
+    if (privileged_mutation_depth_ == 0U && current_mutating_system != nullptr)
     {
         const auto* owner = active_resolver_by_state_set_[index(Id)];
-        if (owner != nullptr && owner != current_mutating_system_)
+        if (owner != nullptr && owner != current_mutating_system)
         {
             throw std::logic_error("State set mutated outside its owning system.");
         }

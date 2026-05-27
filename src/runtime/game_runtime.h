@@ -89,6 +89,7 @@ private:
     void install_site_run_state(const SiteRunState& site_run);
     void clear_site_run_state();
     void run_fixed_step();
+    [[nodiscard]] Gs1Status dispatch_game_message_inline(const GameMessage& message);
     void copy_timing_snapshot(
         const TimingAccumulator& source,
         Gs1RuntimeTimingStats& destination) const noexcept;
@@ -108,6 +109,7 @@ private:
     TimingAccumulator phase1_timing_ {};
     TimingAccumulator phase2_timing_ {};
     TimingAccumulator fixed_step_timing_ {};
+    std::uint32_t inline_game_message_depth_ {0U};
     std::array<ProfiledSystemState, static_cast<std::size_t>(GS1_RUNTIME_PROFILE_SYSTEM_COUNT)>
         profiled_systems_ {};
     bool boot_initialized_ {false};

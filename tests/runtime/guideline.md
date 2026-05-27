@@ -9,8 +9,8 @@ Runtime-level tests and probes that validate split runtime flow, exported state-
 
 ## Contents
 - `game_runtime_projection_test.cpp`: Broad runtime projection/state-view regression covering campaign, regional-map, site, inventory, phone, tech-tree, task, weather, protection-overlay, and onboarding output seen by hosts and adapters.
-- `game_runtime_message_chain_test.cpp`: Runtime message-chain regression covering multi-system gameplay message dispatch, task-claim ordering, cue emission, crafted-output follow-up, and host-facing runtime message ordering.
-- `state_manager_test.cpp`: Focused resolver-registration coverage for `StateManager`, including default/active owner assignment, idempotent re-registration, duplicate-owner rejection, and untouched never-registered state sets.
+- `game_runtime_message_chain_test.cpp`: Runtime message-chain regression covering multi-system gameplay message dispatch, task-claim ordering, cue emission, crafted-output follow-up, and host-facing runtime message ordering, and it is the natural home for future inline nested-gameplay-message behavior coverage as the runtime moves away from deferred internal drains.
+- `state_manager_test.cpp`: Focused resolver-registration coverage for `StateManager`, including default/active owner assignment, idempotent re-registration, duplicate-owner rejection, untouched never-registered state sets, and the mutating-system stack behavior used to preserve correct owner tracking across nested inline gameplay-message dispatch.
 - `timed_modifier_projection_test.cpp`: Focused regression covering active site-modifier projection and remaining-game-hour bucketing behavior.
 - `site_system_message_flow_test.cpp`: Verifies cross-system site gameplay coordination through subscribed `GameMessage` flow on the real runtime path, including split-state fixture refreshes that preserve the live `SiteWorld` contract for active site runs without rebuilding temporary aggregates.
 - `game_runtime_performance_test.cpp`: Runtime performance-oriented coverage for deterministic mixed-site seeding and update cost.

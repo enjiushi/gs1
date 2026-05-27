@@ -64,8 +64,58 @@ private:
     StateManager* state_manager_ {nullptr};
 };
 
+class RuntimeMutationScope final
+{
+public:
+    RuntimeMutationScope(StateManager& state_manager, IRuntimeSystem& system)
+        : state_manager_(&state_manager)
+    {
+        state_manager_->push_current_mutating_system(&system);
+    }
+
+    ~RuntimeMutationScope()
+    {
+        if (state_manager_ != nullptr)
+        {
+            state_manager_->pop_current_mutating_system();
+        }
+    }
+
+    RuntimeMutationScope(const RuntimeMutationScope&) = delete;
+    RuntimeMutationScope& operator=(const RuntimeMutationScope&) = delete;
+
+private:
+    StateManager* state_manager_ {nullptr};
+};
+
+class RuntimeInlineGameMessageScope final
+{
+public:
+    explicit RuntimeInlineGameMessageScope(GameRuntime& runtime) noexcept
+        : runtime_(&runtime)
+    {
+        ++runtime_->inline_game_message_depth_;
+    }
+
+    ~RuntimeInlineGameMessageScope()
+    {
+        if (runtime_ != nullptr && runtime_->inline_game_message_depth_ > 0U)
+        {
+            --runtime_->inline_game_message_depth_;
+        }
+    }
+
+    RuntimeInlineGameMessageScope(const RuntimeInlineGameMessageScope&) = delete;
+    RuntimeInlineGameMessageScope& operator=(const RuntimeInlineGameMessageScope&) = delete;
+
+private:
+    GameRuntime* runtime_ {nullptr};
+};
+
 namespace
 {
+inline constexpr std::uint32_t k_inline_game_message_warn_depth = 4U;
+
 [[nodiscard]] std::string unescape_json_string(std::string_view value)
 {
     std::string result;
@@ -302,6 +352,14 @@ RuntimeInvocation::RuntimeInvocation(
 
 void RuntimeInvocation::push_game_message(const GameMessage& message)
 {
+    if (runtime_ != nullptr)
+    {
+        const auto status = runtime_->dispatch_game_message_inline(message);
+        assert(status == GS1_STATUS_OK);
+        (void)status;
+        return;
+    }
+
     game_messages_->push_back(message);
 }
 
@@ -742,8 +800,7 @@ Gs1Status GameRuntime::query_site_tile_view(std::uint32_t tile_index, Gs1SiteTil
 
 Gs1Status GameRuntime::handle_message(const GameMessage& message)
 {
-    state().message_queue.push_back(message);
-    return dispatch_queued_messages();
+    return dispatch_game_message_inline(message);
 }
 
 Gs1Status GameRuntime::dispatch_queued_messages()
@@ -762,6 +819,26 @@ Gs1Status GameRuntime::dispatch_queued_messages()
     }
 
     return GS1_STATUS_OK;
+}
+
+Gs1Status GameRuntime::dispatch_game_message_inline(const GameMessage& message)
+{
+    RuntimeInlineGameMessageScope depth_scope {*this};
+
+    if (inline_game_message_depth_ == k_inline_game_message_warn_depth)
+    {
+        std::fprintf(
+            stderr,
+            "Warning: internal GameMessage inline dispatch depth reached %u for type=%u.\n",
+            inline_game_message_depth_,
+            static_cast<unsigned>(message.type));
+    }
+
+    assert(
+        inline_game_message_depth_ <= k_inline_game_message_warn_depth &&
+        "Internal GameMessage inline dispatch depth exceeded limit 4.");
+
+    return dispatch_subscribed_message(message);
 }
 
 Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
@@ -796,7 +873,7 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
             continue;
         }
 
-        state_manager_.set_current_mutating_system(system);
+        RuntimeMutationScope mutation_scope {state_manager_, *system};
         const auto profile_id = system->profile_system_id();
         const auto status = profile_id.has_value()
             ? dispatch_profiled_message(
@@ -806,7 +883,6 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
                     return system->process_game_message(invocation, message);
                 })
             : system->process_game_message(invocation, message);
-        state_manager_.set_current_mutating_system(nullptr);
         if (status != GS1_STATUS_OK)
         {
             return status;
@@ -858,9 +934,8 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
             continue;
         }
 
-        state_manager_.set_current_mutating_system(system);
+        RuntimeMutationScope mutation_scope {state_manager_, *system};
         const auto status = system->process_host_message(invocation, message);
-        state_manager_.set_current_mutating_system(nullptr);
         if (status != GS1_STATUS_OK)
         {
             return status;
@@ -900,12 +975,11 @@ void GameRuntime::run_fixed_step()
             continue;
         }
 
-        state_manager_.set_current_mutating_system(system);
+        RuntimeMutationScope mutation_scope {state_manager_, *system};
         const auto profile_id = system->profile_system_id();
         if (!profile_id.has_value())
         {
             system->run(invocation);
-            state_manager_.set_current_mutating_system(nullptr);
             continue;
         }
 
@@ -915,7 +989,6 @@ void GameRuntime::run_fixed_step()
             {
                 system->run(invocation);
             });
-        state_manager_.set_current_mutating_system(nullptr);
     }
 
     record_timing_sample(fixed_step_timing_, elapsed_milliseconds_since(fixed_step_started_at));
