@@ -5,25 +5,6 @@
 
 namespace gs1
 {
-namespace
-{
-bool has_pending_site_transition_message(
-    const GameMessageQueue& message_queue,
-    std::uint32_t site_id)
-{
-    for (const auto& message : message_queue)
-    {
-        if (message.type == GameMessageType::SiteAttemptEnded &&
-            message.payload_as<SiteAttemptEndedMessage>().site_id == site_id)
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
-}  // namespace
-
 const char* FailureRecoverySystem::name() const noexcept
 {
     return access().system_name.data();
@@ -31,7 +12,9 @@ const char* FailureRecoverySystem::name() const noexcept
 
 GameMessageSubscriptionSpan FailureRecoverySystem::subscribed_game_messages() const noexcept
 {
-    return {};
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::SiteAttemptEnded};
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan FailureRecoverySystem::subscribed_host_messages() const noexcept
@@ -53,9 +36,12 @@ Gs1Status FailureRecoverySystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    (void)message;
-    (void)invocation;
-    return GS1_STATUS_OK;
+    if (message.type != GameMessageType::SiteAttemptEnded)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    return handle(invocation, message.payload_as<SiteAttemptEndedMessage>());
 }
 
 Gs1Status FailureRecoverySystem::process_host_message(
@@ -67,10 +53,18 @@ Gs1Status FailureRecoverySystem::process_host_message(
     return GS1_STATUS_OK;
 }
 
+Gs1Status FailureRecoverySystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteAttemptEndedMessage& message)
+{
+    (void)invocation;
+    (void)message;
+    return GS1_STATUS_OK;
+}
+
 void FailureRecoverySystem::run(RuntimeInvocation& invocation)
 {
     SiteWorldAccess<FailureRecoverySystem> world {invocation};
-    auto& message_queue = invocation.game_message_queue();
     if (!world.has_world())
     {
         return;
@@ -79,18 +73,14 @@ void FailureRecoverySystem::run(RuntimeInvocation& invocation)
     const auto worker = world.read_worker();
     const float worker_health = worker.conditions.health;
     if (world.run_status() != SiteRunStatus::Active ||
-        worker_health > 0.0f ||
-        has_pending_site_transition_message(message_queue, world.site_id_value()))
+        worker_health > 0.0f)
     {
         return;
     }
 
-    GameMessage message {};
-    message.type = GameMessageType::SiteAttemptEnded;
-    message.set_payload(SiteAttemptEndedMessage {
+    invocation.emit_game_message(SiteAttemptEndedMessage {
         world.site_id_value(),
         GS1_SITE_ATTEMPT_RESULT_FAILED});
-    message_queue.push_back(message);
 }
 }  // namespace gs1
 

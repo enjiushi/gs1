@@ -9,6 +9,8 @@ namespace gs1
 class LoadoutPlannerSystem final : public IRuntimeSystem
 {
 public:
+    using subscribed_messages = type_list<DeploymentSiteSelectionChangedMessage>;
+
     static constexpr std::array<StateSetId, 5> k_owned_state_sets {
         StateSetId::CampaignLoadoutPlannerMeta,
         StateSetId::CampaignLoadoutPlannerBaselineItems,
@@ -31,6 +33,9 @@ public:
     [[nodiscard]] Gs1Status process_host_message(
         RuntimeInvocation& invocation,
         const Gs1HostMessage& message) override;
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const DeploymentSiteSelectionChangedMessage& message);
     void run(RuntimeInvocation& invocation) override;
 
     static void initialize_campaign_state(CampaignState& campaign);

@@ -7,6 +7,7 @@
 #include "campaign/systems/loadout_planner_system.h"
 #include "campaign/systems/technology_system.h"
 #include "content/content_loader.h"
+#include "runtime/game_systems.h"
 #include "runtime/runtime_split_state_compat.h"
 #include "site/systems/action_execution_system.h"
 #include "site/systems/camp_durability_system.h"
@@ -116,6 +117,7 @@ private:
 namespace
 {
 inline constexpr std::uint32_t k_inline_game_message_warn_depth = 4U;
+static_assert(GameSystems::size == 25U, "Update GameSystems when the runtime system list changes.");
 
 [[nodiscard]] std::string unescape_json_string(std::string_view value)
 {
@@ -409,6 +411,25 @@ void RuntimeInvocation::push_runtime_message(const Gs1RuntimeMessage& message)
     runtime_messages_->push_back(message);
 }
 
+void RuntimeInvocation::push_log_message(Gs1LogLevel level, const char* text)
+{
+    if (text == nullptr)
+    {
+        return;
+    }
+
+    Gs1RuntimeMessage message {};
+    message.type = GS1_ENGINE_MESSAGE_LOG_TEXT;
+    auto& payload = message.emplace_payload<Gs1EngineMessageLogTextData>();
+    payload.level = level;
+    std::memset(payload.text, 0, sizeof(payload.text));
+    const auto copy_length = std::min<std::size_t>(
+        std::strlen(text),
+        sizeof(payload.text) - 1U);
+    std::memcpy(payload.text, text, copy_length);
+    push_runtime_message(message);
+}
+
 GameRuntime::GameRuntime(Gs1RuntimeCreateDesc create_desc)
     : create_desc_(create_desc)
     , state_(state_manager_.game_state())
@@ -517,7 +538,6 @@ void GameRuntime::install_campaign_state(const CampaignState& campaign)
 {
     RuntimePrivilegedStateMutation privileged {state_manager_};
     write_campaign_state_to_state_sets(campaign, state(), state_manager_);
-    compatibility_campaign_state_ = campaign;
 }
 
 void GameRuntime::install_site_run_state(const SiteRunState& site_run)
@@ -525,7 +545,6 @@ void GameRuntime::install_site_run_state(const SiteRunState& site_run)
     RuntimePrivilegedStateMutation privileged {state_manager_};
     write_site_run_state_to_state_sets(site_run, state(), state_manager_);
     site_world_ = site_run.site_world;
-    compatibility_site_run_state_ = site_run;
 }
 
 void GameRuntime::clear_site_run_state()
@@ -533,53 +552,6 @@ void GameRuntime::clear_site_run_state()
     RuntimePrivilegedStateMutation privileged {state_manager_};
     write_site_run_state_to_state_sets(std::optional<SiteRunState> {}, state(), state_manager_);
     site_world_ = nullptr;
-    compatibility_site_run_state_.reset();
-}
-
-void GameRuntime::flush_compatibility_state_to_split_state()
-{
-    if (compatibility_campaign_state_.has_value())
-    {
-        RuntimePrivilegedStateMutation privileged {state_manager_};
-        write_campaign_state_to_state_sets(compatibility_campaign_state_.value(), state(), state_manager_);
-    }
-
-    if (compatibility_site_run_state_.has_value())
-    {
-        RuntimePrivilegedStateMutation privileged {state_manager_};
-        write_site_run_state_to_state_sets(compatibility_site_run_state_.value(), state(), state_manager_);
-        site_world_ = compatibility_site_run_state_->site_world;
-    }
-}
-
-void GameRuntime::refresh_compatibility_state_from_split_state()
-{
-    if (state().campaign_core.has_value())
-    {
-        compatibility_campaign_state_.emplace();
-        populate_campaign_state_from_state_sets(
-            compatibility_campaign_state_.value(),
-            state(),
-            state_manager_);
-    }
-    else
-    {
-        compatibility_campaign_state_.reset();
-    }
-
-    if (state().site_run_meta.has_value())
-    {
-        compatibility_site_run_state_.emplace();
-        populate_site_run_state_from_state_sets(
-            compatibility_site_run_state_.value(),
-            state(),
-            state_manager_,
-            site_world_);
-    }
-    else
-    {
-        compatibility_site_run_state_.reset();
-    }
 }
 
 void GameRuntime::initialize_system_registry()
@@ -626,6 +598,7 @@ void GameRuntime::initialize_system_registry()
 
     systems_.clear();
     fixed_step_systems_.clear();
+    systems_by_pack_index_.fill(nullptr);
     for (auto& subscribers : host_message_subscribers_)
     {
         subscribers.clear();
@@ -635,31 +608,40 @@ void GameRuntime::initialize_system_registry()
         subscribers.clear();
     }
 
-    systems_.push_back(std::make_unique<CampaignFlowSystem>());
-    systems_.push_back(std::make_unique<LoadoutPlannerSystem>());
-    systems_.push_back(std::make_unique<CampaignProgressionSystem>());
-    systems_.push_back(std::make_unique<TechnologySystem>());
-    systems_.push_back(std::make_unique<ActionExecutionSystem>());
-    systems_.push_back(std::make_unique<WeatherEventSystem>());
-    systems_.push_back(std::make_unique<WorkerConditionSystem>());
-    systems_.push_back(std::make_unique<EcologySystem>());
-    systems_.push_back(std::make_unique<PlantWeatherContributionSystem>());
-    systems_.push_back(std::make_unique<DeviceWeatherContributionSystem>());
-    systems_.push_back(std::make_unique<TaskBoardSystem>());
-    systems_.push_back(std::make_unique<PlacementValidationSystem>());
-    systems_.push_back(std::make_unique<LocalWeatherResolveSystem>());
-    systems_.push_back(std::make_unique<DeviceMaintenanceSystem>());
-    systems_.push_back(std::make_unique<InventorySystem>());
-    systems_.push_back(std::make_unique<CraftSystem>());
-    systems_.push_back(std::make_unique<EconomyPhoneSystem>());
-    systems_.push_back(std::make_unique<CampDurabilitySystem>());
-    systems_.push_back(std::make_unique<DeviceSupportSystem>());
-    systems_.push_back(std::make_unique<ModifierSystem>());
-    systems_.push_back(std::make_unique<CampaignTimeSystem>());
-    systems_.push_back(std::make_unique<SiteTimeSystem>());
-    systems_.push_back(std::make_unique<SiteFlowSystem>());
-    systems_.push_back(std::make_unique<FailureRecoverySystem>());
-    systems_.push_back(std::make_unique<SiteCompletionSystem>());
+    const auto append_system = [this]<typename System>()
+    {
+        auto system = std::make_unique<System>();
+        constexpr std::size_t system_index = system_pack_index_v<System, GameSystems>;
+        static_assert(system_index < GameSystems::size, "Registered runtime system must exist in GameSystems.");
+        systems_by_pack_index_[system_index] = system.get();
+        systems_.push_back(std::move(system));
+    };
+
+    append_system.template operator()<CampaignFlowSystem>();
+    append_system.template operator()<LoadoutPlannerSystem>();
+    append_system.template operator()<CampaignProgressionSystem>();
+    append_system.template operator()<TechnologySystem>();
+    append_system.template operator()<ActionExecutionSystem>();
+    append_system.template operator()<WeatherEventSystem>();
+    append_system.template operator()<WorkerConditionSystem>();
+    append_system.template operator()<EcologySystem>();
+    append_system.template operator()<PlantWeatherContributionSystem>();
+    append_system.template operator()<DeviceWeatherContributionSystem>();
+    append_system.template operator()<TaskBoardSystem>();
+    append_system.template operator()<PlacementValidationSystem>();
+    append_system.template operator()<LocalWeatherResolveSystem>();
+    append_system.template operator()<DeviceMaintenanceSystem>();
+    append_system.template operator()<InventorySystem>();
+    append_system.template operator()<CraftSystem>();
+    append_system.template operator()<EconomyPhoneSystem>();
+    append_system.template operator()<CampDurabilitySystem>();
+    append_system.template operator()<DeviceSupportSystem>();
+    append_system.template operator()<ModifierSystem>();
+    append_system.template operator()<CampaignTimeSystem>();
+    append_system.template operator()<SiteTimeSystem>();
+    append_system.template operator()<SiteFlowSystem>();
+    append_system.template operator()<FailureRecoverySystem>();
+    append_system.template operator()<SiteCompletionSystem>();
     for (const auto& system : systems_)
     {
         state_manager_.register_resolver(*system);
@@ -713,18 +695,12 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
 
     out_result = {};
     out_result.struct_size = sizeof(Gs1Phase1Result);
-    flush_compatibility_state_to_split_state();
     auto status = GS1_STATUS_OK;
     if (!boot_initialized_)
     {
         if (!state().campaign_core.has_value() && !state().site_run_meta.has_value())
         {
-            GameMessage boot_message {};
-            boot_message.type = GameMessageType::OpenMainMenu;
-            boot_message.set_payload(OpenMainMenuMessage {});
-            state().message_queue.push_back(boot_message);
-
-            status = dispatch_queued_messages();
+            status = dispatch_game_message_inline(OpenMainMenuMessage {});
             if (status != GS1_STATUS_OK)
             {
                 finish_phase();
@@ -774,7 +750,6 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
 
     status = dispatch_queued_messages();
     state().move_direction = RuntimeMoveDirectionSnapshot {};
-    refresh_compatibility_state_from_split_state();
     out_result.runtime_messages_queued = static_cast<std::uint32_t>(state().runtime_messages.size());
     finish_phase();
     return status;
@@ -795,7 +770,6 @@ Gs1Status GameRuntime::run_phase2(const Gs1Phase2Request& request, Gs1Phase2Resu
 
     out_result = {};
     out_result.struct_size = sizeof(Gs1Phase2Result);
-    flush_compatibility_state_to_split_state();
     auto status = dispatch_host_messages(out_result.processed_host_message_count);
     if (status != GS1_STATUS_OK)
     {
@@ -810,7 +784,6 @@ Gs1Status GameRuntime::run_phase2(const Gs1Phase2Request& request, Gs1Phase2Resu
         return status;
     }
 
-    refresh_compatibility_state_from_split_state();
     out_result.runtime_messages_queued = static_cast<std::uint32_t>(state().runtime_messages.size());
     finish_phase();
     return status;
@@ -854,10 +827,7 @@ Gs1Status GameRuntime::query_site_tile_view(std::uint32_t tile_index, Gs1SiteTil
 
 Gs1Status GameRuntime::handle_message(const GameMessage& message)
 {
-    flush_compatibility_state_to_split_state();
-    const auto status = dispatch_game_message_inline(message);
-    refresh_compatibility_state_from_split_state();
-    return status;
+    return dispatch_game_message_inline(message);
 }
 
 Gs1Status GameRuntime::dispatch_queued_messages()

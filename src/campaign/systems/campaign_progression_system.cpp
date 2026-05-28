@@ -107,15 +107,12 @@ void emit_threshold_grants(
 
         mark_threshold_fired(progression, def.threshold_unlock_id);
 
-        GameMessage grant {};
-        grant.type = GameMessageType::TargetGranted;
-        grant.set_payload(TargetGrantedMessage {
+        invocation.emit_game_message(TargetGrantedMessage {
             def.target_kind_id,
             def.target_id,
             def.scope_id,
             static_cast<std::uint8_t>(def.grant_kind),
             {0U, 0U, 0U}});
-        invocation.push_game_message(grant);
     }
 }
 
@@ -258,15 +255,12 @@ Gs1Status process_purchase_entry(
         return GS1_STATUS_OK;
     }
 
-    GameMessage grant {};
-    grant.type = GameMessageType::TargetGranted;
-    grant.set_payload(TargetGrantedMessage {
+    invocation.emit_game_message(TargetGrantedMessage {
         purchase_def->target_kind_id,
         purchase_def->target_id,
         purchase_def->scope_id,
         static_cast<std::uint8_t>(purchase_def->grant_kind),
         {0U, 0U, 0U}});
-    invocation.push_game_message(grant);
     return GS1_STATUS_OK;
 }
 }  // namespace
@@ -319,28 +313,16 @@ Gs1Status CampaignProgressionSystem::process_game_message(
     switch (message.type)
     {
     case GameMessageType::ProgressionEventOccurred:
-        return process_progression_event(
-            invocation,
-            message.payload_as<ProgressionEventOccurredMessage>());
+        return handle(invocation, message.payload_as<ProgressionEventOccurredMessage>());
 
     case GameMessageType::PurchaseEntrySelected:
-        return process_purchase_entry(
-            invocation,
-            message.payload_as<PurchaseEntrySelectedMessage>());
+        return handle(invocation, message.payload_as<PurchaseEntrySelectedMessage>());
 
     case GameMessageType::CampaignReputationAwardRequested:
-    {
-        const auto& payload = message.payload_as<CampaignReputationAwardRequestedMessage>();
-        apply_total_reputation_delta(invocation, payload.delta);
-        return GS1_STATUS_OK;
-    }
+        return handle(invocation, message.payload_as<CampaignReputationAwardRequestedMessage>());
 
     case GameMessageType::FactionReputationAwardRequested:
-    {
-        const auto& payload = message.payload_as<FactionReputationAwardRequestedMessage>();
-        apply_faction_reputation_delta(invocation, FactionId {payload.faction_id}, payload.delta);
-        return GS1_STATUS_OK;
-    }
+        return handle(invocation, message.payload_as<FactionReputationAwardRequestedMessage>());
 
     default:
         return GS1_STATUS_OK;
@@ -353,6 +335,56 @@ Gs1Status CampaignProgressionSystem::process_host_message(
 {
     (void)invocation;
     (void)message;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status CampaignProgressionSystem::handle(
+    RuntimeInvocation& invocation,
+    const ProgressionEventOccurredMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return process_progression_event(invocation, message);
+}
+
+Gs1Status CampaignProgressionSystem::handle(
+    RuntimeInvocation& invocation,
+    const PurchaseEntrySelectedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return process_purchase_entry(invocation, message);
+}
+
+Gs1Status CampaignProgressionSystem::handle(
+    RuntimeInvocation& invocation,
+    const CampaignReputationAwardRequestedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    apply_total_reputation_delta(invocation, message.delta);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status CampaignProgressionSystem::handle(
+    RuntimeInvocation& invocation,
+    const FactionReputationAwardRequestedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    apply_faction_reputation_delta(invocation, FactionId {message.faction_id}, message.delta);
     return GS1_STATUS_OK;
 }
 

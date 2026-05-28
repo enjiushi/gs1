@@ -36,7 +36,7 @@ bool is_site_one_probe_tile(gs1::TileCoord coord) noexcept
 
 void emit_site_one_local_weather_probe_log(
     const gs1::SiteWorldAccess<gs1::LocalWeatherResolveSystem>& world,
-    gs1::GameMessageQueue& message_queue,
+    gs1::RuntimeInvocation& invocation,
     gs1::TileCoord coord,
     const BaseLocalWeather& base_weather,
     const gs1::SiteWorld::TileLocalWeatherData& resolved_weather,
@@ -50,12 +50,10 @@ void emit_site_one_local_weather_probe_log(
         return;
     }
 
-    gs1::GameMessage message {};
-    gs1::PresentLogMessage payload {};
-    payload.level = GS1_LOG_LEVEL_DEBUG;
+    char text[64] {};
     std::snprintf(
-        payload.text,
-        sizeof(payload.text),
+        text,
+        sizeof(text),
         "S1 lw (%d,%d) b%.0f/%.0f/%.0f l%.0f/%.0f/%.0f d%.1f",
         coord.x,
         coord.y,
@@ -66,22 +64,18 @@ void emit_site_one_local_weather_probe_log(
         resolved_weather.wind,
         resolved_weather.dust,
         plant_density);
-    message.type = gs1::GameMessageType::PresentLog;
-    message.set_payload(payload);
-    message_queue.push_back(message);
+    invocation.push_log_message(GS1_LOG_LEVEL_DEBUG, text);
 
-    payload.level = GS1_LOG_LEVEL_DEBUG;
     std::snprintf(
-        payload.text,
-        sizeof(payload.text),
+        text,
+        sizeof(text),
         "S1 sup (%d,%d) w%.1f h%.1f z%.1f",
         coord.x,
         coord.y,
         total_contribution.wind_protection,
         total_contribution.heat_protection,
         total_contribution.dust_protection);
-    message.set_payload(payload);
-    message_queue.push_back(message);
+    invocation.push_log_message(GS1_LOG_LEVEL_DEBUG, text);
 }
 
 void ensure_local_weather_runtime_buffers(
@@ -118,7 +112,7 @@ gs1::SiteWorld::TileWeatherContributionData weather_contribution_from_component(
 }
 
 void emit_site_tile_state_changed(
-    gs1::GameMessageQueue& message_queue,
+    gs1::RuntimeInvocation& invocation,
     gs1::TileCoord coord,
     gs1::PlantId plant_id,
     float plant_density,
@@ -142,9 +136,7 @@ void emit_site_tile_state_changed(
         return;
     }
 
-    gs1::GameMessage message {};
-    message.type = gs1::GameMessageType::SiteTileStateChanged;
-    message.set_payload(gs1::SiteTileStateChangedMessage {
+    invocation.emit_game_message(gs1::SiteTileStateChangedMessage {
         coord.x,
         coord.y,
         changed_mask,
@@ -156,7 +148,6 @@ void emit_site_tile_state_changed(
         total_contribution.wind_protection,
         total_contribution.heat_protection,
         total_contribution.dust_protection});
-    message_queue.push_back(message);
 }
 
 gs1::SiteWorld::TileLocalWeatherData resolve_local_weather(
@@ -180,9 +171,8 @@ BaseLocalWeather compute_base_local_weather(
         std::clamp(weather.weather_dust * (1.0f + modifiers.dust), 0.0f, 100.0f)};
 }
 
-Gs1Status process_message(
-    gs1::RuntimeInvocation& invocation,
-    const gs1::GameMessage& message)
+Gs1Status handle_site_run_started(
+    gs1::RuntimeInvocation& invocation)
 {
     gs1::SiteWorldAccess<gs1::LocalWeatherResolveSystem> world {invocation};
     if (!world.has_world())
@@ -190,11 +180,7 @@ Gs1Status process_message(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    if (message.type == gs1::GameMessageType::SiteRunStarted)
-    {
-        world.own_local_weather_runtime_meta().emit_full_snapshot_on_next_run = true;
-    }
-
+    world.own_local_weather_runtime_meta().emit_full_snapshot_on_next_run = true;
     return GS1_STATUS_OK;
 }
 
@@ -221,7 +207,6 @@ void run_system(gs1::RuntimeInvocation& invocation)
     }
 
     auto& ecs_world = *ecs_world_ptr;
-    auto& message_queue = invocation.game_message_queue();
     auto tile_query =
         ecs_world.query_builder<
             const gs1::site_ecs::TileIndex,
@@ -294,7 +279,7 @@ void run_system(gs1::RuntimeInvocation& invocation)
                     : previous_local_weather;
 
                 emit_site_tile_state_changed(
-                    message_queue,
+                    invocation,
                     coord_component.value,
                     plant_slot.plant_id,
                     density_component.value,
@@ -310,7 +295,7 @@ void run_system(gs1::RuntimeInvocation& invocation)
             {
                 emit_site_one_local_weather_probe_log(
                     world,
-                    message_queue,
+                    invocation,
                     coord_component.value,
                     base_weather,
                     resolved_weather,
@@ -355,7 +340,20 @@ Gs1Status LocalWeatherResolveSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    return process_message(invocation, message);
+    if (message.type != GameMessageType::SiteRunStarted)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    return handle(invocation, message.payload_as<SiteRunStartedMessage>());
+}
+
+Gs1Status LocalWeatherResolveSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteRunStartedMessage& message)
+{
+    (void)message;
+    return handle_site_run_started(invocation);
 }
 
 Gs1Status LocalWeatherResolveSystem::process_host_message(

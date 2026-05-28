@@ -239,4 +239,19 @@ template <typename System>
         return {};
     }
 }
+
+template <typename System, typename = void>
+struct runtime_subscribed_messages
+{
+    using type = type_list<>;
+};
+
+template <typename System>
+struct runtime_subscribed_messages<System, std::void_t<typename System::subscribed_messages>>
+{
+    using type = typename System::subscribed_messages;
+};
+
+template <typename System>
+using runtime_subscribed_messages_t = typename runtime_subscribed_messages<System>::type;
 }  // namespace gs1

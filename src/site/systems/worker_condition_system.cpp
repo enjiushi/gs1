@@ -280,14 +280,14 @@ void ensure_memory_for_run(
     }
 }
 
-void emit_worker_meters_changed_if_needed(
-    SiteWorldAccess<WorkerConditionSystem>& world,
-    GameMessageQueue& message_queue) noexcept
+Gs1Status emit_worker_meters_changed_if_needed(
+    RuntimeInvocation& invocation,
+    SiteWorldAccess<WorkerConditionSystem>& world)
 {
     ensure_memory_for_run(world);
     if (!world.has_world())
     {
-        return;
+        return GS1_STATUS_OK;
     }
 
     auto& memory = g_worker_memory;
@@ -299,9 +299,7 @@ void emit_worker_meters_changed_if_needed(
 
     if (is_initial || actual_mask != WORKER_METER_CHANGED_NONE)
     {
-        GameMessage message {};
-        message.type = GameMessageType::WorkerMetersChanged;
-        message.set_payload(WorkerMetersChangedMessage {
+        invocation.emit_game_message(WorkerMetersChangedMessage {
             actual_mask,
             snapshot.health,
             snapshot.hydration,
@@ -310,9 +308,10 @@ void emit_worker_meters_changed_if_needed(
             snapshot.energy,
             snapshot.morale,
             snapshot.work_efficiency});
-        message_queue.push_back(message);
         memory.last_reported_snapshot = snapshot;
     }
+
+    return GS1_STATUS_OK;
 }
 
 WorkerMeterDeltas deltas_from_message(const WorkerMeterDeltaRequestedMessage& payload) noexcept
@@ -487,7 +486,6 @@ float resolve_energy_background_delta(
 
 void accumulate_passive_deltas(
     WorkerMeterDeltas& deltas,
-    const SiteWorld::WorkerConditionData& previous,
     const SiteWorld::TileLocalWeatherData& local_weather,
     bool is_sheltered,
     ConstModifierStateRef modifier_state,
@@ -632,6 +630,33 @@ bool worker_is_sheltered(const SiteWorldAccess<WorkerConditionSystem>& world) no
     const auto* site_world = world.read_site_world();
     return site_world != nullptr && site_world->worker_is_sheltered(world.read_weather());
 }
+
+Gs1Status apply_worker_condition_deltas(
+    RuntimeInvocation& invocation,
+    const WorkerMeterDeltas& deltas)
+{
+    SiteWorldAccess<WorkerConditionSystem> world {invocation};
+    if (!world.has_world())
+    {
+        return GS1_STATUS_OK;
+    }
+
+    auto worker = world.read_worker();
+    const auto previous = worker.conditions;
+    worker.conditions = resolve_worker_conditions(
+        previous,
+        deltas,
+        world.read_modifier().resolved_channel_totals,
+        0.0f,
+        0.0f);
+    if (worker_conditions_changed(previous, worker.conditions))
+    {
+        world.write_worker(worker);
+        return emit_worker_meters_changed_if_needed(invocation, world);
+    }
+
+    return GS1_STATUS_OK;
+}
 }  // namespace
 
 const char* WorkerConditionSystem::name() const noexcept
@@ -668,16 +693,9 @@ Gs1Status WorkerConditionSystem::process_game_message(
     const GameMessage& message)
 {
     SiteWorldAccess<WorkerConditionSystem> world {invocation};
-    auto& message_queue = invocation.game_message_queue();
     if (message.type == GameMessageType::SiteRunStarted)
     {
-        if (!world.has_world())
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        emit_worker_meters_changed_if_needed(world, message_queue);
-        return GS1_STATUS_OK;
+        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
     }
 
     if (message.type != GameMessageType::WorkerMeterDeltaRequested &&
@@ -693,7 +711,6 @@ Gs1Status WorkerConditionSystem::process_game_message(
 
     auto worker = world.read_worker();
     const auto previous = worker.conditions;
-    const bool is_sheltered = worker_is_sheltered(world);
     const auto deltas =
         message.type == GameMessageType::WorkerMeterDeltaRequested
         ? deltas_from_message(message.payload_as<WorkerMeterDeltaRequestedMessage>())
@@ -709,9 +726,37 @@ Gs1Status WorkerConditionSystem::process_game_message(
     if (modified)
     {
         world.write_worker(worker);
-        emit_worker_meters_changed_if_needed(world, message_queue);
+        return emit_worker_meters_changed_if_needed(invocation, world);
     }
     return GS1_STATUS_OK;
+}
+
+Gs1Status WorkerConditionSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteRunStartedMessage& message)
+{
+    (void)message;
+    SiteWorldAccess<WorkerConditionSystem> world {invocation};
+    if (!world.has_world())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return emit_worker_meters_changed_if_needed(invocation, world);
+}
+
+Gs1Status WorkerConditionSystem::handle(
+    RuntimeInvocation& invocation,
+    const WorkerMeterDeltaRequestedMessage& message)
+{
+    return apply_worker_condition_deltas(invocation, deltas_from_message(message));
+}
+
+Gs1Status WorkerConditionSystem::handle(
+    RuntimeInvocation& invocation,
+    const InventoryItemUseCompletedMessage& message)
+{
+    return apply_worker_condition_deltas(invocation, deltas_from_item_use_completed(message));
 }
 
 Gs1Status WorkerConditionSystem::process_host_message(
@@ -727,7 +772,6 @@ void WorkerConditionSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<WorkerConditionSystem>(invocation);
     SiteWorldAccess<WorkerConditionSystem> world {invocation};
-    auto& message_queue = invocation.game_message_queue();
     const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
     if (!world.has_world())
     {
@@ -742,7 +786,6 @@ void WorkerConditionSystem::run(RuntimeInvocation& invocation)
     const bool is_sheltered = worker_is_sheltered(world);
     accumulate_passive_deltas(
         deltas,
-        previous,
         world.read_tile_local_weather(worker.position.tile_coord),
         is_sheltered,
         world.read_modifier(),
@@ -762,7 +805,9 @@ void WorkerConditionSystem::run(RuntimeInvocation& invocation)
     if (modified)
     {
         world.write_worker(worker);
-        emit_worker_meters_changed_if_needed(world, message_queue);
+        const auto status = emit_worker_meters_changed_if_needed(invocation, world);
+        assert(status == GS1_STATUS_OK);
+        (void)status;
     }
 }
 }  // namespace gs1

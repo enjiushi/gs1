@@ -58,11 +58,6 @@ struct TaskBoardCampaignReadSlices final
     return SiteWorldAccess<TaskBoardSystem> {invocation};
 }
 
-[[nodiscard]] GameMessageQueue& task_board_message_queue(RuntimeInvocation& invocation)
-{
-    return invocation.game_message_queue();
-}
-
 constexpr double k_progress_epsilon = 0.0001;
 constexpr std::uint32_t k_cash_points_per_in_game_hour = 25U;
 constexpr std::uint32_t k_reward_budget_multiplier_percent = 115U;
@@ -1259,8 +1254,6 @@ bool queue_reward_message(
     RuntimeInvocation& invocation,
     const RewardCandidateDef& reward_candidate_def)
 {
-    GameMessage reward_message {};
-
     switch (reward_candidate_def.effect_kind)
     {
     case RewardEffectKind::Money:
@@ -1268,73 +1261,64 @@ bool queue_reward_message(
         {
             return false;
         }
-        reward_message.type = GameMessageType::EconomyMoneyAwardRequested;
-        reward_message.set_payload(EconomyMoneyAwardRequestedMessage {
+        invocation.emit_game_message(EconomyMoneyAwardRequestedMessage {
             reward_candidate_def.money_delta_cash_points});
-        break;
+        return true;
 
     case RewardEffectKind::ItemDelivery:
         if (reward_candidate_def.item_id.value == 0U || reward_candidate_def.quantity == 0U)
         {
             return false;
         }
-        reward_message.type = GameMessageType::InventoryDeliveryRequested;
-        reward_message.set_payload(InventoryDeliveryRequestedMessage {
+        invocation.emit_game_message(InventoryDeliveryRequestedMessage {
             reward_candidate_def.item_id.value,
             static_cast<std::uint16_t>(std::min<std::uint32_t>(reward_candidate_def.quantity, 65535U)),
             reward_candidate_def.delivery_minutes});
-        break;
+        return true;
 
     case RewardEffectKind::RevealUnlockable:
         if (reward_candidate_def.unlockable_id == 0U)
         {
             return false;
         }
-        reward_message.type = GameMessageType::SiteUnlockableRevealRequested;
-        reward_message.set_payload(SiteUnlockableRevealRequestedMessage {
+        invocation.emit_game_message(SiteUnlockableRevealRequestedMessage {
             reward_candidate_def.unlockable_id});
-        break;
+        return true;
 
     case RewardEffectKind::RunModifier:
         if (reward_candidate_def.modifier_id.value == 0U)
         {
             return false;
         }
-        reward_message.type = GameMessageType::RunModifierAwardRequested;
-        reward_message.set_payload(RunModifierAwardRequestedMessage {
+        invocation.emit_game_message(RunModifierAwardRequestedMessage {
             reward_candidate_def.modifier_id.value});
-        break;
+        return true;
 
     case RewardEffectKind::CampaignReputation:
         if (reward_candidate_def.reputation_delta == 0)
         {
             return false;
         }
-        reward_message.type = GameMessageType::ProgressionEventOccurred;
-        reward_message.set_payload(ProgressionEventOccurredMessage {
+        invocation.emit_game_message(ProgressionEventOccurredMessage {
             k_progression_event_campaign_reputation_reward,
             0U,
             reward_candidate_def.reputation_delta});
-        break;
+        return true;
     case RewardEffectKind::FactionReputation:
         if (reward_candidate_def.faction_id.value == 0U ||
             reward_candidate_def.reputation_delta == 0)
         {
             return false;
         }
-        reward_message.type = GameMessageType::ProgressionEventOccurred;
-        reward_message.set_payload(ProgressionEventOccurredMessage {
+        invocation.emit_game_message(ProgressionEventOccurredMessage {
             k_progression_event_faction_reputation_reward,
             reward_candidate_def.faction_id.value,
             reward_candidate_def.reputation_delta});
-        break;
+        return true;
     case RewardEffectKind::None:
     default:
         return false;
     }
-
-    task_board_message_queue(invocation).push_back(reward_message);
-    return true;
 }
 
 bool complete_task(
@@ -2781,6 +2765,260 @@ std::optional<std::uint32_t> TaskBoardSystem::fixed_step_order() const noexcept
     return 16U;
 }
 
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteRunStartedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_site_run_started(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteRefreshTickMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    if ((message.refresh_mask & SITE_REFRESH_TICK_TASK_BOARD) != 0U &&
+        !onboarding_chain_effective(
+            task_board_world(invocation).site_id(),
+            task_board_world(invocation).read_task_board()))
+    {
+        (void)refresh_normal_task_pool(invocation, true);
+    }
+
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const RestorationProgressChangedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_restoration_progress(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const TileEcologyChangedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_tile_ecology_changed(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const TileEcologyBatchChangedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_tile_ecology_batch_changed(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const LivingPlantStabilityChangedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_living_plant_stability_changed(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteTileStateChangedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_site_tile_state_changed(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const WorkerMetersChangedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_worker_meters_changed(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const PhoneListingPurchasedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_phone_listing_purchased(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const PhoneListingSoldMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_phone_listing_sold(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const InventoryTransferCompletedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_inventory_transfer_completed(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const InventoryItemSubmittedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_inventory_item_submitted(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const InventoryItemUseCompletedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_inventory_item_use_completed(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const InventoryCraftCompletedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_inventory_craft_completed(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteTilePlantingCompletedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_site_tile_planting_completed(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteActionCompletedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_site_action_completed(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteDevicePlacedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_site_device_placed(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteDeviceConditionChangedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_site_device_condition_changed(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const EconomyMoneyAwardRequestedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_money_award_requested(invocation, message);
+    return GS1_STATUS_OK;
+}
+
 Gs1Status TaskBoardSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
@@ -2793,18 +3031,9 @@ Gs1Status TaskBoardSystem::process_game_message(
     switch (message.type)
     {
     case GameMessageType::SiteRunStarted:
-        handle_site_run_started(invocation, message.payload_as<SiteRunStartedMessage>());
-        break;
+        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
     case GameMessageType::SiteRefreshTick:
-        if ((message.payload_as<SiteRefreshTickMessage>().refresh_mask &
-                SITE_REFRESH_TICK_TASK_BOARD) != 0U &&
-            !onboarding_chain_effective(
-                task_board_world(invocation).site_id(),
-                task_board_world(invocation).read_task_board()))
-        {
-            (void)refresh_normal_task_pool(invocation, true);
-        }
-        break;
+        return handle(invocation, message.payload_as<SiteRefreshTickMessage>());
     case GameMessageType::TaskAcceptRequested:
         handle_task_accept_requested(invocation, message.payload_as<TaskAcceptRequestedMessage>());
         break;
@@ -2814,27 +3043,17 @@ Gs1Status TaskBoardSystem::process_game_message(
             message.payload_as<TaskRewardClaimRequestedMessage>());
         break;
     case GameMessageType::RestorationProgressChanged:
-        handle_restoration_progress(invocation, message.payload_as<RestorationProgressChangedMessage>());
-        break;
+        return handle(invocation, message.payload_as<RestorationProgressChangedMessage>());
     case GameMessageType::TileEcologyChanged:
-        handle_tile_ecology_changed(invocation, message.payload_as<TileEcologyChangedMessage>());
-        break;
+        return handle(invocation, message.payload_as<TileEcologyChangedMessage>());
     case GameMessageType::TileEcologyBatchChanged:
-        handle_tile_ecology_batch_changed(
-            invocation,
-            message.payload_as<TileEcologyBatchChangedMessage>());
-        break;
+        return handle(invocation, message.payload_as<TileEcologyBatchChangedMessage>());
     case GameMessageType::LivingPlantStabilityChanged:
-        handle_living_plant_stability_changed(
-            invocation,
-            message.payload_as<LivingPlantStabilityChangedMessage>());
-        break;
+        return handle(invocation, message.payload_as<LivingPlantStabilityChangedMessage>());
     case GameMessageType::SiteTileStateChanged:
-        handle_site_tile_state_changed(invocation, message.payload_as<SiteTileStateChangedMessage>());
-        break;
+        return handle(invocation, message.payload_as<SiteTileStateChangedMessage>());
     case GameMessageType::WorkerMetersChanged:
-        handle_worker_meters_changed(invocation, message.payload_as<WorkerMetersChangedMessage>());
-        break;
+        return handle(invocation, message.payload_as<WorkerMetersChangedMessage>());
     case GameMessageType::PhoneListingPurchased:
         handle_phone_listing_purchased(invocation, message.payload_as<PhoneListingPurchasedMessage>());
         break;
@@ -2862,21 +3081,14 @@ Gs1Status TaskBoardSystem::process_game_message(
             message.payload_as<InventoryCraftCompletedMessage>());
         break;
     case GameMessageType::SiteTilePlantingCompleted:
-        handle_site_tile_planting_completed(
-            invocation,
-            message.payload_as<SiteTilePlantingCompletedMessage>());
-        break;
+        return handle(invocation, message.payload_as<SiteTilePlantingCompletedMessage>());
     case GameMessageType::SiteActionCompleted:
         handle_site_action_completed(invocation, message.payload_as<SiteActionCompletedMessage>());
         break;
     case GameMessageType::SiteDevicePlaced:
-        handle_site_device_placed(invocation, message.payload_as<SiteDevicePlacedMessage>());
-        break;
+        return handle(invocation, message.payload_as<SiteDevicePlacedMessage>());
     case GameMessageType::SiteDeviceConditionChanged:
-        handle_site_device_condition_changed(
-            invocation,
-            message.payload_as<SiteDeviceConditionChangedMessage>());
-        break;
+        return handle(invocation, message.payload_as<SiteDeviceConditionChangedMessage>());
     case GameMessageType::EconomyMoneyAwardRequested:
         handle_money_award_requested(
             invocation,

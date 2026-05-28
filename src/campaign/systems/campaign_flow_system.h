@@ -13,6 +13,15 @@ namespace gs1
 class CampaignFlowSystem final : public IRuntimeSystem
 {
 public:
+    using subscribed_messages = type_list<
+        OpenMainMenuMessage,
+        StartNewCampaignMessage,
+        SelectDeploymentSiteMessage,
+        ClearDeploymentSiteSelectionMessage,
+        StartSiteAttemptMessage,
+        ReturnToRegionalMapMessage,
+        SiteAttemptEndedMessage>;
+
     static constexpr std::array<StateSetId, 11> k_owned_state_sets {
         StateSetId::AppState,
         StateSetId::CampaignCore,
@@ -41,6 +50,27 @@ public:
     [[nodiscard]] Gs1Status process_host_message(
         RuntimeInvocation& invocation,
         const Gs1HostMessage& message) override;
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const OpenMainMenuMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const StartNewCampaignMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SelectDeploymentSiteMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const ClearDeploymentSiteSelectionMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const StartSiteAttemptMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const ReturnToRegionalMapMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteAttemptEndedMessage& message);
     void run(RuntimeInvocation& invocation) override;
 };
 

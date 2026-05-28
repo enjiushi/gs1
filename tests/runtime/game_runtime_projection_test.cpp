@@ -5,6 +5,7 @@
 #include "content/defs/progression_defs.h"
 #include "messages/game_message.h"
 #include "site/site_world_access.h"
+#include "../system/source/split_state_test_helpers.h"
 
 #include <cassert>
 #include <cstdint>
@@ -14,15 +15,27 @@ namespace gs1
 {
 struct GameRuntimeProjectionTestAccess
 {
-    static std::optional<SiteRunState>& active_site_run(GameRuntime& runtime)
+    [[nodiscard]] static std::optional<SiteRunState> active_site_run(GameRuntime& runtime)
     {
-        return runtime.compatibility_site_run_state_;
+        if (!runtime.state().site_run_meta.has_value())
+        {
+            return std::nullopt;
+        }
+
+        return assemble_site_run_state_from_state_sets(
+            runtime.state(),
+            runtime.state_manager(),
+            runtime.site_world_);
     }
 
-    static void flush_compatibility_state(GameRuntime& runtime)
+    template <typename Func>
+    static void mutate_active_site_run(GameRuntime& runtime, Func&& func)
     {
-        runtime.flush_compatibility_state_to_split_state();
-        runtime.refresh_compatibility_state_from_split_state();
+        auto site_run = active_site_run(runtime);
+        assert(site_run.has_value());
+        func(site_run.value());
+        write_site_run_state_to_state_sets(site_run.value(), runtime.state(), runtime.state_manager());
+        runtime.site_world_ = site_run->site_world;
     }
 };
 }  // namespace gs1
@@ -104,19 +117,21 @@ void campaign_and_site_state_view_exposes_current_runtime_state()
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
 
-    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
-    site_run.inventory.worker_pack_slots[0].occupied = true;
-    site_run.inventory.worker_pack_slots[0].item_id = gs1::ItemId {gs1::k_item_medicine_pack};
-    site_run.inventory.worker_pack_slots[0].item_quantity = 2U;
-    site_run.inventory.worker_pack_slots[0].item_condition = 0.75f;
-    site_run.inventory.worker_pack_slots[0].item_freshness = 0.9f;
+    gs1::GameRuntimeProjectionTestAccess::mutate_active_site_run(
+        runtime,
+        [](SiteRunState& site_run)
+        {
+            site_run.inventory.worker_pack_slots[0].occupied = true;
+            site_run.inventory.worker_pack_slots[0].item_id = gs1::ItemId {gs1::k_item_medicine_pack};
+            site_run.inventory.worker_pack_slots[0].item_quantity = 2U;
+            site_run.inventory.worker_pack_slots[0].item_condition = 0.75f;
+            site_run.inventory.worker_pack_slots[0].item_freshness = 0.9f;
 
-    auto ecology = gs1::site_world_access::tile_ecology(site_run, TileCoord {0, 0});
-    ecology.plant_id = gs1::PlantId {gs1::k_plant_ordos_wormwood};
-    ecology.plant_density = 66.0f;
-    gs1::site_world_access::set_tile_ecology(site_run, TileCoord {0, 0}, ecology);
-
-    gs1::GameRuntimeProjectionTestAccess::flush_compatibility_state(runtime);
+            auto ecology = gs1::site_world_access::tile_ecology(site_run, TileCoord {0, 0});
+            ecology.plant_id = gs1::PlantId {gs1::k_plant_ordos_wormwood};
+            ecology.plant_density = 66.0f;
+            gs1::site_world_access::set_tile_ecology(site_run, TileCoord {0, 0}, ecology);
+        });
 
     const auto view = read_view(runtime);
     assert(view.app_state == GS1_APP_STATE_SITE_ACTIVE);

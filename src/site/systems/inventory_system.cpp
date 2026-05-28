@@ -46,11 +46,6 @@ constexpr std::uint32_t k_delivery_box_storage_flags =
     return SiteWorldAccess<InventorySystem> {invocation};
 }
 
-[[nodiscard]] GameMessageQueue& inventory_message_queue(RuntimeInvocation& invocation)
-{
-    return invocation.game_message_queue();
-}
-
 std::uint32_t normalize_quantity(std::uint32_t quantity) noexcept
 {
     return quantity == 0U ? 1U : quantity;
@@ -359,13 +354,10 @@ void emit_item_use_completed(
     ItemId item_id,
     std::uint32_t quantity) noexcept
 {
-    GameMessage completed_message {};
-    completed_message.type = GameMessageType::InventoryItemUseCompleted;
-    completed_message.set_payload(InventoryItemUseCompletedMessage {
+    invocation.emit_game_message(InventoryItemUseCompletedMessage {
         item_id.value,
         static_cast<std::uint16_t>(std::min<std::uint32_t>(quantity, 65535U)),
         0U});
-    inventory_message_queue(invocation).push_back(completed_message);
 }
 
 void emit_item_use_action_request(
@@ -377,9 +369,7 @@ void emit_item_use_action_request(
     const auto worker = inventory_world(invocation).read_worker();
     const auto tile = worker.position.tile_coord;
 
-    GameMessage message {};
-    message.type = GameMessageType::StartSiteAction;
-    message.set_payload(StartSiteActionMessage {
+    invocation.emit_game_message(StartSiteActionMessage {
         static_cast<Gs1SiteActionKind>(action_kind),
         GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM,
         quantity == 0U ? 1U : quantity,
@@ -388,7 +378,6 @@ void emit_item_use_action_request(
         0U,
         0U,
         item_def.item_id.value});
-    inventory_message_queue(invocation).push_back(message);
 }
 
 std::uint32_t allocate_delivery_id() noexcept
@@ -845,15 +834,12 @@ Gs1Status handle_inventory_craft_commit(
             return GS1_STATUS_INVALID_STATE;
         }
 
-        GameMessage completed_message {};
-        completed_message.type = GameMessageType::InventoryCraftCompleted;
-        completed_message.set_payload(InventoryCraftCompletedMessage {
+        invocation.emit_game_message(InventoryCraftCompletedMessage {
             recipe_def->recipe_id.value,
             recipe_def->output_item_id.value,
             recipe_def->output_quantity,
             0U,
             inventory_storage::storage_id_for_container(inventory, output_container)});
-        inventory_message_queue(invocation).push_back(completed_message);
         return GS1_STATUS_OK;
     });
 }
@@ -1005,15 +991,12 @@ Gs1Status resolve_inventory_transfer(
             return GS1_STATUS_INVALID_STATE;
         }
 
-        GameMessage completed_message {};
-        completed_message.type = GameMessageType::InventoryTransferCompleted;
-        completed_message.set_payload(InventoryTransferCompletedMessage {
+        invocation.emit_game_message(InventoryTransferCompletedMessage {
             payload.source_storage_id,
             payload.destination_storage_id,
             source_stack->item_id.value,
             static_cast<std::uint16_t>(transferred_quantity),
             payload.flags});
-        inventory_message_queue(invocation).push_back(completed_message);
         return GS1_STATUS_OK;
     }
 
@@ -1068,15 +1051,12 @@ Gs1Status resolve_inventory_transfer(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    GameMessage completed_message {};
-    completed_message.type = GameMessageType::InventoryTransferCompleted;
-    completed_message.set_payload(InventoryTransferCompletedMessage {
+    invocation.emit_game_message(InventoryTransferCompletedMessage {
         payload.source_storage_id,
         payload.destination_storage_id,
         source_stack->item_id.value,
         static_cast<std::uint16_t>(transferred_quantity),
         payload.flags});
-    inventory_message_queue(invocation).push_back(completed_message);
     return GS1_STATUS_OK;
 }
 
@@ -1257,13 +1237,10 @@ Gs1Status handle_inventory_item_submit(
             return GS1_STATUS_INVALID_STATE;
         }
 
-        GameMessage completed_message {};
-        completed_message.type = GameMessageType::InventoryItemSubmitted;
-        completed_message.set_payload(InventoryItemSubmittedMessage {
+        invocation.emit_game_message(InventoryItemSubmittedMessage {
             source_stack->item_id.value,
             static_cast<std::uint16_t>(requested_quantity),
             0U});
-        inventory_message_queue(invocation).push_back(completed_message);
         return GS1_STATUS_OK;
     });
 }
@@ -1486,6 +1463,11 @@ Gs1Status InventorySystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
+    if (message.type == GameMessageType::SiteRunStarted)
+    {
+        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
+    }
+
     if (!inventory_runtime_ready(invocation))
     {
         return GS1_STATUS_INVALID_STATE;
@@ -1493,44 +1475,26 @@ Gs1Status InventorySystem::process_game_message(
 
     switch (message.type)
     {
-    case GameMessageType::SiteRunStarted:
-        seed_inventory_from_loadout(invocation);
-        return GS1_STATUS_OK;
-
     case GameMessageType::SiteDevicePlaced:
-        (void)ensure_inventory_storage_initialized(invocation);
-        (void)ensure_device_storage_containers(invocation);
-        return GS1_STATUS_OK;
+        return handle(invocation, message.payload_as<SiteDevicePlacedMessage>());
 
     case GameMessageType::SiteDeviceBroken:
-        return handle_site_device_broken(
-            invocation,
-            message.payload_as<SiteDeviceBrokenMessage>());
+        return handle(invocation, message.payload_as<SiteDeviceBrokenMessage>());
 
     case GameMessageType::InventoryDeliveryRequested:
-        return handle_inventory_delivery_requested(
-            invocation,
-            message.payload_as<InventoryDeliveryRequestedMessage>());
+        return handle(invocation, message.payload_as<InventoryDeliveryRequestedMessage>());
 
     case GameMessageType::InventoryDeliveryBatchRequested:
-        return handle_inventory_delivery_batch_requested(
-            invocation,
-            message.payload_as<InventoryDeliveryBatchRequestedMessage>());
+        return handle(invocation, message.payload_as<InventoryDeliveryBatchRequestedMessage>());
 
     case GameMessageType::InventoryWorkerPackInsertRequested:
-        return handle_inventory_worker_pack_insert_requested(
-            invocation,
-            message.payload_as<InventoryWorkerPackInsertRequestedMessage>());
+        return handle(invocation, message.payload_as<InventoryWorkerPackInsertRequestedMessage>());
 
     case GameMessageType::InventoryItemUseRequested:
-        return handle_inventory_item_use(
-            invocation,
-            message.payload_as<InventoryItemUseRequestedMessage>());
+        return handle(invocation, message.payload_as<InventoryItemUseRequestedMessage>());
 
     case GameMessageType::InventoryItemConsumeRequested:
-        return handle_inventory_item_consume(
-            invocation,
-            message.payload_as<InventoryItemConsumeRequestedMessage>());
+        return handle(invocation, message.payload_as<InventoryItemConsumeRequestedMessage>());
 
     case GameMessageType::InventoryGlobalItemConsumeRequested:
         return handle_inventory_global_item_consume(
@@ -1538,14 +1502,10 @@ Gs1Status InventorySystem::process_game_message(
             message.payload_as<InventoryGlobalItemConsumeRequestedMessage>());
 
     case GameMessageType::InventoryTransferRequested:
-        return handle_inventory_transfer(
-            invocation,
-            message.payload_as<InventoryTransferRequestedMessage>());
+        return handle(invocation, message.payload_as<InventoryTransferRequestedMessage>());
 
     case GameMessageType::InventoryItemSubmitRequested:
-        return handle_inventory_item_submit(
-            invocation,
-            message.payload_as<InventoryItemSubmitRequestedMessage>());
+        return handle(invocation, message.payload_as<InventoryItemSubmitRequestedMessage>());
 
     case GameMessageType::InventorySlotTapped:
         return handle_inventory_slot_tapped(
@@ -1553,13 +1513,160 @@ Gs1Status InventorySystem::process_game_message(
             message.payload_as<InventorySlotTappedMessage>());
 
     case GameMessageType::InventoryCraftCommitRequested:
-        return handle_inventory_craft_commit(
-            invocation,
-            message.payload_as<InventoryCraftCommitRequestedMessage>());
+        return handle(invocation, message.payload_as<InventoryCraftCommitRequestedMessage>());
 
     default:
         return GS1_STATUS_OK;
     }
+}
+
+Gs1Status InventorySystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteRunStartedMessage& message)
+{
+    (void)message;
+    if (!inventory_runtime_ready(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    seed_inventory_from_loadout(invocation);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status InventorySystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteDevicePlacedMessage& message)
+{
+    (void)message;
+    if (!inventory_runtime_ready(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    (void)ensure_inventory_storage_initialized(invocation);
+    (void)ensure_device_storage_containers(invocation);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status InventorySystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteDeviceBrokenMessage& message)
+{
+    if (!inventory_runtime_ready(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return handle_site_device_broken(invocation, message);
+}
+
+Gs1Status InventorySystem::handle(
+    RuntimeInvocation& invocation,
+    const InventoryDeliveryRequestedMessage& message)
+{
+    if (!inventory_runtime_ready(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return handle_inventory_delivery_requested(invocation, message);
+}
+
+Gs1Status InventorySystem::handle(
+    RuntimeInvocation& invocation,
+    const InventoryDeliveryBatchRequestedMessage& message)
+{
+    if (!inventory_runtime_ready(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return handle_inventory_delivery_batch_requested(invocation, message);
+}
+
+Gs1Status InventorySystem::handle(
+    RuntimeInvocation& invocation,
+    const InventoryWorkerPackInsertRequestedMessage& message)
+{
+    if (!inventory_runtime_ready(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return handle_inventory_worker_pack_insert_requested(invocation, message);
+}
+
+Gs1Status InventorySystem::handle(
+    RuntimeInvocation& invocation,
+    const InventoryItemUseRequestedMessage& message)
+{
+    if (!inventory_runtime_ready(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return handle_inventory_item_use(invocation, message);
+}
+
+Gs1Status InventorySystem::handle(
+    RuntimeInvocation& invocation,
+    const InventoryItemConsumeRequestedMessage& message)
+{
+    if (!inventory_runtime_ready(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return handle_inventory_item_consume(invocation, message);
+}
+
+Gs1Status InventorySystem::handle(
+    RuntimeInvocation& invocation,
+    const InventoryGlobalItemConsumeRequestedMessage& message)
+{
+    if (!inventory_runtime_ready(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return handle_inventory_global_item_consume(invocation, message);
+}
+
+Gs1Status InventorySystem::handle(
+    RuntimeInvocation& invocation,
+    const InventoryTransferRequestedMessage& message)
+{
+    if (!inventory_runtime_ready(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return handle_inventory_transfer(invocation, message);
+}
+
+Gs1Status InventorySystem::handle(
+    RuntimeInvocation& invocation,
+    const InventoryItemSubmitRequestedMessage& message)
+{
+    if (!inventory_runtime_ready(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return handle_inventory_item_submit(invocation, message);
+}
+
+Gs1Status InventorySystem::handle(
+    RuntimeInvocation& invocation,
+    const InventoryCraftCommitRequestedMessage& message)
+{
+    if (!inventory_runtime_ready(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return handle_inventory_craft_commit(invocation, message);
 }
 
 Gs1Status InventorySystem::process_host_message(

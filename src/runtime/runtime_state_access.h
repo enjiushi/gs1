@@ -1,13 +1,16 @@
 #pragma once
 
 #include "runtime/game_state.h"
+#include "runtime/gameplay_message_traits.h"
 #include "runtime/runtime_split_state_compat.h"
 #include "runtime/state_manager.h"
+#include "runtime/type_list.h"
 #include "gs1/status.h"
 
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <deque>
 #include <optional>
 #include <span>
@@ -18,22 +21,6 @@ namespace gs1
 class GameRuntime;
 struct SiteWorldHandle;
 struct SiteMoveDirectionInput;
-
-template <class... Ts>
-struct type_list
-{
-};
-
-template <class T, class List>
-struct type_list_contains;
-
-template <class T, class... Ts>
-struct type_list_contains<T, type_list<Ts...>> : std::bool_constant<(std::same_as<T, Ts> || ...)>
-{
-};
-
-template <class T, class List>
-inline constexpr bool type_list_contains_v = type_list_contains<T, List>::value;
 
 struct RuntimeAppStateTag
 {
@@ -157,7 +144,10 @@ public:
     void install_site_run_state(const SiteRunState& site_run);
     void clear_site_run_state();
     void push_game_message(const GameMessage& message);
+    template <typename Message>
+    void emit_game_message(const Message& message);
     void push_runtime_message(const Gs1RuntimeMessage& message);
+    void push_log_message(Gs1LogLevel level, const char* text);
 
 private:
     template <class Tag>
@@ -370,4 +360,5 @@ template <class System>
 {
     return GameStateAccess<System> {invocation};
 }
+
 }  // namespace gs1

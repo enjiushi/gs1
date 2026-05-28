@@ -9,6 +9,8 @@ namespace gs1
 class LocalWeatherResolveSystem final : public IRuntimeSystem
 {
 public:
+    using subscribed_messages = type_list<SiteRunStartedMessage>;
+
     [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
     {
         return site_access_owned_state_sets<LocalWeatherResolveSystem>();
@@ -25,6 +27,9 @@ public:
     [[nodiscard]] Gs1Status process_host_message(
         RuntimeInvocation& invocation,
         const Gs1HostMessage& message) override;
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteRunStartedMessage& message);
     void run(RuntimeInvocation& invocation) override;
 
     [[nodiscard]] static constexpr SiteSystemAccess access() noexcept

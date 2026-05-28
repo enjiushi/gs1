@@ -123,9 +123,9 @@ void rebuild_selected_loadout(
 
 }  // namespace
 
-Gs1Status process_loadout_planner_message(
+Gs1Status process_loadout_planner_selection_changed(
     RuntimeInvocation& invocation,
-    const GameMessage& message);
+    const DeploymentSiteSelectionChangedMessage& message);
 
 void LoadoutPlannerSystem::initialize_campaign_state(CampaignState& campaign)
 {
@@ -178,7 +178,12 @@ Gs1Status LoadoutPlannerSystem::process_game_message(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    return process_loadout_planner_message(invocation, message);
+    if (message.type != GameMessageType::DeploymentSiteSelectionChanged)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    return handle(invocation, message.payload_as<DeploymentSiteSelectionChangedMessage>());
 }
 
 Gs1Status LoadoutPlannerSystem::process_host_message(
@@ -190,14 +195,26 @@ Gs1Status LoadoutPlannerSystem::process_host_message(
     return GS1_STATUS_OK;
 }
 
+Gs1Status LoadoutPlannerSystem::handle(
+    RuntimeInvocation& invocation,
+    const DeploymentSiteSelectionChangedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return process_loadout_planner_selection_changed(invocation, message);
+}
+
 void LoadoutPlannerSystem::run(RuntimeInvocation& invocation)
 {
     (void)invocation;
 }
 
-Gs1Status process_loadout_planner_message(
+Gs1Status process_loadout_planner_selection_changed(
     RuntimeInvocation& invocation,
-    const GameMessage& message)
+    const DeploymentSiteSelectionChangedMessage& message)
 {
     if (!runtime_invocation_has_campaign(invocation))
     {
@@ -225,16 +242,7 @@ Gs1Status process_loadout_planner_message(
                                 .value();
     auto sites = assemble_sites_state_from_state_sets(*invocation.owned_state(), *invocation.state_manager());
 
-    std::uint32_t selected_site_id = 0U;
-    switch (message.type)
-    {
-    case GameMessageType::DeploymentSiteSelectionChanged:
-        selected_site_id = message.payload_as<DeploymentSiteSelectionChangedMessage>().selected_site_id;
-        break;
-
-    default:
-        return GS1_STATUS_OK;
-    }
+    const std::uint32_t selected_site_id = message.selected_site_id;
 
     if (selected_site_id == 0U)
     {

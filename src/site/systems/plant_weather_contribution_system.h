@@ -9,6 +9,11 @@ namespace gs1
 class PlantWeatherContributionSystem final : public IRuntimeSystem
 {
 public:
+    using subscribed_messages = type_list<
+        SiteRunStartedMessage,
+        TileEcologyChangedMessage,
+        TileEcologyBatchChangedMessage>;
+
     [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
     {
         return site_access_owned_state_sets<PlantWeatherContributionSystem>();
@@ -25,6 +30,15 @@ public:
     [[nodiscard]] Gs1Status process_host_message(
         RuntimeInvocation& invocation,
         const Gs1HostMessage& message) override;
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteRunStartedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const TileEcologyChangedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const TileEcologyBatchChangedMessage& message);
     void run(RuntimeInvocation& invocation) override;
 
     [[nodiscard]] static constexpr SiteSystemAccess access() noexcept

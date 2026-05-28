@@ -1214,35 +1214,82 @@ Gs1Status ModifierSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<ModifierSystem>(invocation);
-    if (!runtime_invocation_has_campaign(invocation))
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
     if (message.type == GameMessageType::SiteRunStarted)
     {
-        handle_site_run_started(invocation, message.payload_as<SiteRunStartedMessage>());
+        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
     }
     else if (message.type == GameMessageType::RunModifierAwardRequested)
     {
-        handle_run_modifier_award_requested(
+        return handle(
             invocation,
             message.payload_as<RunModifierAwardRequestedMessage>());
     }
     else if (message.type == GameMessageType::InventoryItemUseCompleted)
     {
-        handle_inventory_item_use_completed(
+        return handle(
             invocation,
             message.payload_as<InventoryItemUseCompletedMessage>());
     }
     else if (message.type == GameMessageType::SiteModifierEndRequested)
     {
-        handle_site_modifier_end_requested(
+        return handle(
             invocation,
             message.payload_as<SiteModifierEndRequestedMessage>());
     }
 
+    return GS1_STATUS_OK;
+}
+
+Gs1Status ModifierSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteRunStartedMessage& message)
+{
+    (void)message;
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_site_run_started(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status ModifierSystem::handle(
+    RuntimeInvocation& invocation,
+    const RunModifierAwardRequestedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_run_modifier_award_requested(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status ModifierSystem::handle(
+    RuntimeInvocation& invocation,
+    const InventoryItemUseCompletedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_inventory_item_use_completed(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status ModifierSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteModifierEndRequestedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_site_modifier_end_requested(invocation, message);
     return GS1_STATUS_OK;
 }
 

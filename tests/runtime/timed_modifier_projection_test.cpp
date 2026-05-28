@@ -1,5 +1,5 @@
 #include "runtime/game_runtime.h"
-#include "runtime/runtime_split_state_compat.h"
+#include "../system/source/split_state_test_helpers.h"
 #include "content/defs/item_defs.h"
 
 #include <cassert>
@@ -23,20 +23,37 @@ namespace gs1
 {
 struct GameRuntimeProjectionTestAccess
 {
-    static std::optional<CampaignState>& campaign(GameRuntime& runtime)
+    [[nodiscard]] static std::optional<CampaignState> campaign(GameRuntime& runtime)
     {
-        return runtime.compatibility_campaign_state_;
+        if (!runtime.state().campaign_core.has_value())
+        {
+            return std::nullopt;
+        }
+
+        return assemble_campaign_state_from_state_sets(runtime.state(), runtime.state_manager());
     }
 
-    static std::optional<SiteRunState>& active_site_run(GameRuntime& runtime)
+    [[nodiscard]] static std::optional<SiteRunState> active_site_run(GameRuntime& runtime)
     {
-        return runtime.compatibility_site_run_state_;
+        if (!runtime.state().site_run_meta.has_value())
+        {
+            return std::nullopt;
+        }
+
+        return assemble_site_run_state_from_state_sets(
+            runtime.state(),
+            runtime.state_manager(),
+            runtime.site_world_);
     }
 
-    static void flush_projection(GameRuntime& runtime)
+    template <typename Func>
+    static void mutate_active_site_run(GameRuntime& runtime, Func&& func)
     {
-        runtime.flush_compatibility_state_to_split_state();
-        runtime.refresh_compatibility_state_from_split_state();
+        auto site_run = active_site_run(runtime);
+        assert(site_run.has_value());
+        func(site_run.value());
+        write_site_run_state_to_state_sets(site_run.value(), runtime.state(), runtime.state_manager());
+        runtime.site_world_ = site_run->site_world;
     }
 };
 }  // namespace gs1
@@ -136,7 +153,7 @@ const Gs1RuntimeMessage* find_site_modifier_message(
 void bootstrap_site_one(GameRuntime& runtime)
 {
     assert(runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);
-    auto& campaign = gs1::GameRuntimeProjectionTestAccess::campaign(runtime);
+    const auto campaign = gs1::GameRuntimeProjectionTestAccess::campaign(runtime);
     assert(campaign.has_value());
     assert(!campaign->sites.empty());
 
@@ -161,21 +178,23 @@ void timed_modifier_projection_only_republishes_on_game_hour_boundaries()
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
 
-    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    gs1::GameRuntimeProjectionTestAccess::mutate_active_site_run(
+        runtime,
+        [](SiteRunState& site_run)
+        {
+            site_run.inventory.worker_pack_slots[0].occupied = true;
+            site_run.inventory.worker_pack_slots[0].item_id = gs1::ItemId {gs1::k_item_focus_tonic};
+            site_run.inventory.worker_pack_slots[0].item_quantity = 1U;
+            site_run.inventory.worker_pack_slots[0].item_condition = 1.0f;
+            site_run.inventory.worker_pack_slots[0].item_freshness = 1.0f;
+        });
     drain_runtime_messages(runtime);
-
-    site_run.inventory.worker_pack_slots[0].occupied = true;
-    site_run.inventory.worker_pack_slots[0].item_id = gs1::ItemId {gs1::k_item_focus_tonic};
-    site_run.inventory.worker_pack_slots[0].item_quantity = 1U;
-    site_run.inventory.worker_pack_slots[0].item_condition = 1.0f;
-    site_run.inventory.worker_pack_slots[0].item_freshness = 1.0f;
 
     assert(runtime.handle_message(make_inventory_use_message(
                gs1::k_item_focus_tonic,
                1U,
-               site_run.inventory.worker_pack_storage_id,
+               gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime)->inventory.worker_pack_storage_id,
                0U)) == GS1_STATUS_OK);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
 
     const auto activation_messages = drain_runtime_messages(runtime);
     const auto* activation_modifier_message =

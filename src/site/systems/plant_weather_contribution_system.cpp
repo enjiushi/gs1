@@ -547,9 +547,9 @@ void write_tile_contribution(
         contribution.irrigation});
 }
 
-Gs1Status process_message(
+Gs1Status handle_tile_ecology_changed(
     gs1::RuntimeInvocation& invocation,
-    const gs1::GameMessage& message)
+    const gs1::TileEcologyChangedMessage& payload)
 {
     gs1::SiteWorldAccess<gs1::PlantWeatherContributionSystem> world {invocation};
     if (!world.has_world())
@@ -561,54 +561,51 @@ Gs1Status process_message(
     auto& dirty_tile_indices = world.own_plant_weather_dirty_tile_indices();
     auto& dirty_tile_mask = world.own_plant_weather_dirty_tile_mask();
     ensure_runtime_buffers(runtime_meta, dirty_tile_indices, dirty_tile_mask, world.tile_count());
-
-    switch (message.type)
+    if ((payload.changed_mask &
+            (gs1::TILE_ECOLOGY_CHANGED_OCCUPANCY | gs1::TILE_ECOLOGY_CHANGED_DENSITY)) == 0U)
     {
-    case gs1::GameMessageType::SiteRunStarted:
-        runtime_meta.full_rebuild_pending = true;
         return GS1_STATUS_OK;
+    }
 
-    case gs1::GameMessageType::TileEcologyChanged:
+    mark_tiles_affected_by_source(
+        world,
+        dirty_tile_indices,
+        dirty_tile_mask,
+        gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
+    return GS1_STATUS_OK;
+}
+
+Gs1Status handle_tile_ecology_batch_changed(
+    gs1::RuntimeInvocation& invocation,
+    const gs1::TileEcologyBatchChangedMessage& payload)
+{
+    gs1::SiteWorldAccess<gs1::PlantWeatherContributionSystem> world {invocation};
+    if (!world.has_world())
     {
-        const auto& payload = message.payload_as<gs1::TileEcologyChangedMessage>();
-        if ((payload.changed_mask &
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    auto& runtime_meta = world.own_plant_weather_runtime_meta();
+    auto& dirty_tile_indices = world.own_plant_weather_dirty_tile_indices();
+    auto& dirty_tile_mask = world.own_plant_weather_dirty_tile_mask();
+    ensure_runtime_buffers(runtime_meta, dirty_tile_indices, dirty_tile_mask, world.tile_count());
+    for (std::uint32_t index = 0U; index < payload.entry_count; ++index)
+    {
+        const auto& entry = payload.entries[index];
+        if ((entry.changed_mask &
                 (gs1::TILE_ECOLOGY_CHANGED_OCCUPANCY | gs1::TILE_ECOLOGY_CHANGED_DENSITY)) == 0U)
         {
-            return GS1_STATUS_OK;
+            continue;
         }
 
-            mark_tiles_affected_by_source(
-                world,
-                dirty_tile_indices,
-                dirty_tile_mask,
-                gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
-        return GS1_STATUS_OK;
+        mark_tiles_affected_by_source(
+            world,
+            dirty_tile_indices,
+            dirty_tile_mask,
+            gs1::TileCoord {entry.target_tile_x, entry.target_tile_y});
     }
 
-    case gs1::GameMessageType::TileEcologyBatchChanged:
-    {
-        const auto& payload = message.payload_as<gs1::TileEcologyBatchChangedMessage>();
-        for (std::uint32_t index = 0U; index < payload.entry_count; ++index)
-        {
-            const auto& entry = payload.entries[index];
-            if ((entry.changed_mask &
-                    (gs1::TILE_ECOLOGY_CHANGED_OCCUPANCY | gs1::TILE_ECOLOGY_CHANGED_DENSITY)) == 0U)
-            {
-                continue;
-            }
-
-            mark_tiles_affected_by_source(
-                world,
-                dirty_tile_indices,
-                dirty_tile_mask,
-                gs1::TileCoord {entry.target_tile_x, entry.target_tile_y});
-        }
-        return GS1_STATUS_OK;
-    }
-
-    default:
-        return GS1_STATUS_OK;
-    }
+    return GS1_STATUS_OK;
 }
 
 void run_system(gs1::RuntimeInvocation& invocation)
@@ -694,7 +691,53 @@ Gs1Status PlantWeatherContributionSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    return process_message(invocation, message);
+    if (message.type == GameMessageType::SiteRunStarted)
+    {
+        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
+    }
+
+    switch (message.type)
+    {
+    case GameMessageType::TileEcologyChanged:
+        return handle(invocation, message.payload_as<TileEcologyChangedMessage>());
+    case GameMessageType::TileEcologyBatchChanged:
+        return handle(invocation, message.payload_as<TileEcologyBatchChangedMessage>());
+    default:
+        return GS1_STATUS_OK;
+    }
+}
+
+Gs1Status PlantWeatherContributionSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteRunStartedMessage& message)
+{
+    (void)message;
+    SiteWorldAccess<PlantWeatherContributionSystem> world {invocation};
+    if (!world.has_world())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    auto& runtime_meta = world.own_plant_weather_runtime_meta();
+    auto& dirty_tile_indices = world.own_plant_weather_dirty_tile_indices();
+    auto& dirty_tile_mask = world.own_plant_weather_dirty_tile_mask();
+    ensure_runtime_buffers(runtime_meta, dirty_tile_indices, dirty_tile_mask, world.tile_count());
+    runtime_meta.full_rebuild_pending = true;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status PlantWeatherContributionSystem::handle(
+    RuntimeInvocation& invocation,
+    const TileEcologyChangedMessage& message)
+{
+    return handle_tile_ecology_changed(invocation, message);
+}
+
+Gs1Status PlantWeatherContributionSystem::handle(
+    RuntimeInvocation& invocation,
+    const TileEcologyBatchChangedMessage& message)
+{
+    return handle_tile_ecology_batch_changed(invocation, message);
 }
 
 Gs1Status PlantWeatherContributionSystem::process_host_message(

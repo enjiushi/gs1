@@ -25,15 +25,6 @@ struct PlacementReservationRecord final
 std::vector<PlacementReservationRecord> g_reservations {};
 std::uint32_t g_next_reservation_token = 1U;
 
-template <typename Payload>
-void enqueue_message(GameMessageQueue& queue, GameMessageType type, const Payload& payload)
-{
-    GameMessage message {};
-    message.type = type;
-    message.set_payload(payload);
-    queue.push_back(message);
-}
-
 void prune_reservations_for_run(SiteRunId site_run_id) noexcept
 {
     g_reservations.erase(
@@ -165,7 +156,6 @@ void handle_reservation_requested(
         return;
     }
 
-    auto& message_queue = invocation.game_message_queue();
     const TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
     const TileFootprint footprint = resolve_placement_reservation_footprint(
         payload.occupancy_layer,
@@ -180,15 +170,12 @@ void handle_reservation_requested(
         footprint);
     if (rejection_reason != PlacementReservationRejectionReason::None)
     {
-        enqueue_message(
-            message_queue,
-            GameMessageType::PlacementReservationRejected,
-            PlacementReservationRejectedMessage {
-                payload.action_id,
-                payload.target_tile_x,
-                payload.target_tile_y,
-                rejection_reason,
-                {0U, 0U, 0U}});
+        invocation.emit_game_message(PlacementReservationRejectedMessage {
+            payload.action_id,
+            payload.target_tile_x,
+            payload.target_tile_y,
+            rejection_reason,
+            {0U, 0U, 0U}});
         return;
     }
 
@@ -206,14 +193,11 @@ void handle_reservation_requested(
                 payload.subject_id});
         });
 
-    enqueue_message(
-        message_queue,
-        GameMessageType::PlacementReservationAccepted,
-        PlacementReservationAcceptedMessage {
-            payload.action_id,
-            payload.target_tile_x,
-            payload.target_tile_y,
-            reservation_token});
+    invocation.emit_game_message(PlacementReservationAcceptedMessage {
+        payload.action_id,
+        payload.target_tile_x,
+        payload.target_tile_y,
+        reservation_token});
 }
 
 void handle_reservation_released(const PlacementReservationReleasedMessage& payload) noexcept
@@ -263,6 +247,49 @@ std::optional<std::uint32_t> PlacementValidationSystem::fixed_step_order() const
     return std::nullopt;
 }
 
+Gs1Status PlacementValidationSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteRunStartedMessage& message)
+{
+    (void)message;
+    SiteWorldAccess<PlacementValidationSystem> world {invocation};
+    if (!world.has_world())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_site_run_started(invocation);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status PlacementValidationSystem::handle(
+    RuntimeInvocation& invocation,
+    const PlacementReservationRequestedMessage& message)
+{
+    SiteWorldAccess<PlacementValidationSystem> world {invocation};
+    if (!world.has_world())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_reservation_requested(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status PlacementValidationSystem::handle(
+    RuntimeInvocation& invocation,
+    const PlacementReservationReleasedMessage& message)
+{
+    SiteWorldAccess<PlacementValidationSystem> world {invocation};
+    if (!world.has_world())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_reservation_released(message);
+    return GS1_STATUS_OK;
+}
+
 Gs1Status PlacementValidationSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
@@ -276,18 +303,13 @@ Gs1Status PlacementValidationSystem::process_game_message(
     switch (message.type)
     {
     case GameMessageType::SiteRunStarted:
-        handle_site_run_started(invocation);
-        break;
+        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
 
     case GameMessageType::PlacementReservationRequested:
-        handle_reservation_requested(
-            invocation,
-            message.payload_as<PlacementReservationRequestedMessage>());
-        break;
+        return handle(invocation, message.payload_as<PlacementReservationRequestedMessage>());
 
     case GameMessageType::PlacementReservationReleased:
-        handle_reservation_released(message.payload_as<PlacementReservationReleasedMessage>());
-        break;
+        return handle(invocation, message.payload_as<PlacementReservationReleasedMessage>());
 
     default:
         break;

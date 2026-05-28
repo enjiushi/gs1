@@ -9,6 +9,14 @@ namespace gs1
 class EcologySystem final : public IRuntimeSystem
 {
 public:
+    using subscribed_messages = type_list<
+        SiteRunStartedMessage,
+        SiteGroundCoverPlacedMessage,
+        SiteTilePlantingCompletedMessage,
+        SiteTileWateredMessage,
+        SiteTileBurialClearedMessage,
+        SiteTileHarvestedMessage>;
+
     [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
     {
         return site_access_owned_state_sets<EcologySystem>();
@@ -25,6 +33,24 @@ public:
     [[nodiscard]] Gs1Status process_host_message(
         RuntimeInvocation& invocation,
         const Gs1HostMessage& message) override;
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteRunStartedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteGroundCoverPlacedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteTilePlantingCompletedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteTileWateredMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteTileBurialClearedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteTileHarvestedMessage& message);
     void run(RuntimeInvocation& invocation) override;
 
     [[nodiscard]] static constexpr SiteSystemAccess access() noexcept

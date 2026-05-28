@@ -84,7 +84,6 @@ void SiteTimeSystem::run(RuntimeInvocation& invocation)
         return;
     }
 
-    auto& message_queue = invocation.game_message_queue();
     const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
     auto& clock = world.own_time();
     const double step_minutes =
@@ -106,11 +105,8 @@ void SiteTimeSystem::run(RuntimeInvocation& invocation)
     {
         clock.task_refresh_accumulator =
             std::max(0.0, clock.task_refresh_accumulator - refresh_interval_minutes);
-        GameMessage refresh_message {};
-        refresh_message.type = GameMessageType::SiteRefreshTick;
-        refresh_message.set_payload(SiteRefreshTickMessage {
+        invocation.emit_game_message(SiteRefreshTickMessage {
             SITE_REFRESH_TICK_TASK_BOARD | SITE_REFRESH_TICK_PHONE_BUY_STOCK});
-        message_queue.push_back(refresh_message);
     }
 }
 }  // namespace gs1

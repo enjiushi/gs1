@@ -244,9 +244,9 @@ void write_tile_contribution(
         contribution.irrigation});
 }
 
-Gs1Status process_message(
+Gs1Status handle_site_device_placed(
     gs1::RuntimeInvocation& invocation,
-    const gs1::GameMessage& message)
+    const gs1::SiteDevicePlacedMessage& payload)
 {
     gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem> world {invocation};
     if (!world.has_world())
@@ -258,60 +258,78 @@ Gs1Status process_message(
     auto& dirty_tile_indices = world.own_device_weather_dirty_tile_indices();
     auto& dirty_tile_mask = world.own_device_weather_dirty_tile_mask();
     ensure_runtime_buffers(runtime_meta, dirty_tile_indices, dirty_tile_mask, world.tile_count());
+    mark_tiles_affected_by_source(
+        world,
+        dirty_tile_indices,
+        dirty_tile_mask,
+        gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
+    return GS1_STATUS_OK;
+}
 
-    switch (message.type)
+Gs1Status handle_site_device_broken(
+    gs1::RuntimeInvocation& invocation,
+    const gs1::SiteDeviceBrokenMessage& payload)
+{
+    gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem> world {invocation};
+    if (!world.has_world())
     {
-    case gs1::GameMessageType::SiteRunStarted:
-        runtime_meta.full_rebuild_pending = true;
-        return GS1_STATUS_OK;
-
-    case gs1::GameMessageType::SiteDevicePlaced:
-    {
-        const auto& payload = message.payload_as<gs1::SiteDevicePlacedMessage>();
-        mark_tiles_affected_by_source(
-            world,
-            dirty_tile_indices,
-            dirty_tile_mask,
-            gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
-        return GS1_STATUS_OK;
+        return GS1_STATUS_INVALID_STATE;
     }
 
-    case gs1::GameMessageType::SiteDeviceBroken:
+    auto& runtime_meta = world.own_device_weather_runtime_meta();
+    auto& dirty_tile_indices = world.own_device_weather_dirty_tile_indices();
+    auto& dirty_tile_mask = world.own_device_weather_dirty_tile_mask();
+    ensure_runtime_buffers(runtime_meta, dirty_tile_indices, dirty_tile_mask, world.tile_count());
+    mark_tiles_affected_by_source(
+        world,
+        dirty_tile_indices,
+        dirty_tile_mask,
+        gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
+    return GS1_STATUS_OK;
+}
+
+Gs1Status handle_site_device_repaired(
+    gs1::RuntimeInvocation& invocation,
+    const gs1::SiteDeviceRepairedMessage& payload)
+{
+    gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem> world {invocation};
+    if (!world.has_world())
     {
-        const auto& payload = message.payload_as<gs1::SiteDeviceBrokenMessage>();
-        mark_tiles_affected_by_source(
-            world,
-            dirty_tile_indices,
-            dirty_tile_mask,
-            gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
-        return GS1_STATUS_OK;
+        return GS1_STATUS_INVALID_STATE;
     }
 
-    case gs1::GameMessageType::SiteDeviceRepaired:
+    auto& runtime_meta = world.own_device_weather_runtime_meta();
+    auto& dirty_tile_indices = world.own_device_weather_dirty_tile_indices();
+    auto& dirty_tile_mask = world.own_device_weather_dirty_tile_mask();
+    ensure_runtime_buffers(runtime_meta, dirty_tile_indices, dirty_tile_mask, world.tile_count());
+    mark_tiles_affected_by_source(
+        world,
+        dirty_tile_indices,
+        dirty_tile_mask,
+        gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
+    return GS1_STATUS_OK;
+}
+
+Gs1Status handle_site_device_condition_changed(
+    gs1::RuntimeInvocation& invocation,
+    const gs1::SiteDeviceConditionChangedMessage& payload)
+{
+    gs1::SiteWorldAccess<gs1::DeviceWeatherContributionSystem> world {invocation};
+    if (!world.has_world())
     {
-        const auto& payload = message.payload_as<gs1::SiteDeviceRepairedMessage>();
-        mark_tiles_affected_by_source(
-            world,
-            dirty_tile_indices,
-            dirty_tile_mask,
-            gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
-        return GS1_STATUS_OK;
+        return GS1_STATUS_INVALID_STATE;
     }
 
-    case gs1::GameMessageType::SiteDeviceConditionChanged:
-    {
-        const auto& payload = message.payload_as<gs1::SiteDeviceConditionChangedMessage>();
-        mark_tiles_affected_by_source(
-            world,
-            dirty_tile_indices,
-            dirty_tile_mask,
-            gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
-        return GS1_STATUS_OK;
-    }
-
-    default:
-        return GS1_STATUS_OK;
-    }
+    auto& runtime_meta = world.own_device_weather_runtime_meta();
+    auto& dirty_tile_indices = world.own_device_weather_dirty_tile_indices();
+    auto& dirty_tile_mask = world.own_device_weather_dirty_tile_mask();
+    ensure_runtime_buffers(runtime_meta, dirty_tile_indices, dirty_tile_mask, world.tile_count());
+    mark_tiles_affected_by_source(
+        world,
+        dirty_tile_indices,
+        dirty_tile_mask,
+        gs1::TileCoord {payload.target_tile_x, payload.target_tile_y});
+    return GS1_STATUS_OK;
 }
 
 void run_system(gs1::RuntimeInvocation& invocation)
@@ -398,7 +416,71 @@ Gs1Status DeviceWeatherContributionSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    return process_message(invocation, message);
+    if (message.type == GameMessageType::SiteRunStarted)
+    {
+        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
+    }
+
+    switch (message.type)
+    {
+    case GameMessageType::SiteDevicePlaced:
+        return handle(invocation, message.payload_as<SiteDevicePlacedMessage>());
+    case GameMessageType::SiteDeviceBroken:
+        return handle(invocation, message.payload_as<SiteDeviceBrokenMessage>());
+    case GameMessageType::SiteDeviceRepaired:
+        return handle(invocation, message.payload_as<SiteDeviceRepairedMessage>());
+    case GameMessageType::SiteDeviceConditionChanged:
+        return handle(invocation, message.payload_as<SiteDeviceConditionChangedMessage>());
+    default:
+        return GS1_STATUS_OK;
+    }
+}
+
+Gs1Status DeviceWeatherContributionSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteRunStartedMessage& message)
+{
+    (void)message;
+    SiteWorldAccess<DeviceWeatherContributionSystem> world {invocation};
+    if (!world.has_world())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    auto& runtime_meta = world.own_device_weather_runtime_meta();
+    auto& dirty_tile_indices = world.own_device_weather_dirty_tile_indices();
+    auto& dirty_tile_mask = world.own_device_weather_dirty_tile_mask();
+    ensure_runtime_buffers(runtime_meta, dirty_tile_indices, dirty_tile_mask, world.tile_count());
+    runtime_meta.full_rebuild_pending = true;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status DeviceWeatherContributionSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteDevicePlacedMessage& message)
+{
+    return handle_site_device_placed(invocation, message);
+}
+
+Gs1Status DeviceWeatherContributionSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteDeviceBrokenMessage& message)
+{
+    return handle_site_device_broken(invocation, message);
+}
+
+Gs1Status DeviceWeatherContributionSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteDeviceRepairedMessage& message)
+{
+    return handle_site_device_repaired(invocation, message);
+}
+
+Gs1Status DeviceWeatherContributionSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteDeviceConditionChangedMessage& message)
+{
+    return handle_site_device_condition_changed(invocation, message);
 }
 
 Gs1Status DeviceWeatherContributionSystem::process_host_message(

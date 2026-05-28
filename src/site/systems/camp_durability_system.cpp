@@ -145,8 +145,14 @@ Gs1Status CampDurabilitySystem::process_game_message(
         return GS1_STATUS_OK;
     }
 
-    auto access = make_game_state_access<CampDurabilitySystem>(invocation);
-    const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
+    return handle(invocation, message.payload_as<SiteRunStartedMessage>());
+}
+
+Gs1Status CampDurabilitySystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteRunStartedMessage& message)
+{
+    (void)message;
     SiteWorldAccess<CampDurabilitySystem> world {invocation};
     if (!world.has_world())
     {
@@ -161,7 +167,6 @@ Gs1Status CampDurabilitySystem::process_game_message(
     refresh_memory_with_current_state(invocation);
     return GS1_STATUS_OK;
 }
-
 Gs1Status CampDurabilitySystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)

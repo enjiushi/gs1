@@ -9,6 +9,29 @@ namespace gs1
 class TaskBoardSystem final : public IRuntimeSystem
 {
 public:
+    using subscribed_messages = type_list<
+        SiteRunStartedMessage,
+        SiteRefreshTickMessage,
+        TaskAcceptRequestedMessage,
+        TaskRewardClaimRequestedMessage,
+        RestorationProgressChangedMessage,
+        TileEcologyChangedMessage,
+        TileEcologyBatchChangedMessage,
+        LivingPlantStabilityChangedMessage,
+        SiteTileStateChangedMessage,
+        WorkerMetersChangedMessage,
+        PhoneListingPurchasedMessage,
+        PhoneListingSoldMessage,
+        InventoryTransferCompletedMessage,
+        InventoryItemSubmittedMessage,
+        InventoryItemUseCompletedMessage,
+        InventoryCraftCompletedMessage,
+        SiteTilePlantingCompletedMessage,
+        SiteActionCompletedMessage,
+        SiteDevicePlacedMessage,
+        SiteDeviceConditionChangedMessage,
+        EconomyMoneyAwardRequestedMessage>;
+
     [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
     {
         return site_access_owned_state_sets<TaskBoardSystem>();
@@ -25,6 +48,63 @@ public:
     [[nodiscard]] Gs1Status process_host_message(
         RuntimeInvocation& invocation,
         const Gs1HostMessage& message) override;
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteRunStartedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteRefreshTickMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const RestorationProgressChangedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const TileEcologyChangedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const TileEcologyBatchChangedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const LivingPlantStabilityChangedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteTileStateChangedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const WorkerMetersChangedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const PhoneListingPurchasedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const PhoneListingSoldMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const InventoryTransferCompletedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const InventoryItemSubmittedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const InventoryItemUseCompletedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const InventoryCraftCompletedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteTilePlantingCompletedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteActionCompletedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteDevicePlacedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteDeviceConditionChangedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const EconomyMoneyAwardRequestedMessage& message);
     void run(RuntimeInvocation& invocation) override;
 
     [[nodiscard]] static constexpr SiteSystemAccess access() noexcept

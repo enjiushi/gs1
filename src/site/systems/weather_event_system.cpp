@@ -26,25 +26,9 @@ constexpr double k_min_wave_delay_minutes = 4.0;
 constexpr double k_max_wave_delay_minutes = 8.0;
 constexpr float k_weather_meter_max = 100.0f;
 
-bool has_pending_site_transition_message(
-    const GameMessageQueue& message_queue,
-    std::uint32_t site_id)
-{
-    for (const auto& message : message_queue)
-    {
-        if (message.type == GameMessageType::SiteAttemptEnded &&
-            message.payload_as<SiteAttemptEndedMessage>().site_id == site_id)
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 void emit_site_one_weather_probe_log(
     const SiteWorldAccess<WeatherEventSystem>& world,
-    GameMessageQueue& message_queue,
+    RuntimeInvocation& invocation,
     const char* label,
     float heat,
     float wind,
@@ -56,7 +40,6 @@ void emit_site_one_weather_probe_log(
         return;
     }
 
-    GameMessage message {};
     PresentLogMessage payload {};
     payload.level = GS1_LOG_LEVEL_DEBUG;
     std::snprintf(
@@ -68,9 +51,7 @@ void emit_site_one_weather_probe_log(
         wind,
         dust,
         wind_direction_degrees);
-    message.type = GameMessageType::PresentLog;
-    message.set_payload(payload);
-    message_queue.push_back(message);
+    invocation.push_log_message(payload.level, payload.text);
 }
 
 struct SiteBaselineWeather final
@@ -413,18 +394,30 @@ Gs1Status WeatherEventSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    if (message.type != GameMessageType::SiteRunStarted)
+    if (message.type == GameMessageType::SiteRunStarted)
     {
-        return GS1_STATUS_OK;
+        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
     }
 
+    if (message.type == GameMessageType::SiteAttemptEnded)
+    {
+        return handle(invocation, message.payload_as<SiteAttemptEndedMessage>());
+    }
+
+    return GS1_STATUS_OK;
+}
+
+Gs1Status WeatherEventSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteRunStartedMessage& message)
+{
+    (void)message;
     SiteWorldAccess<WeatherEventSystem> world {invocation};
     if (!world.has_world())
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
-    auto& message_queue = invocation.game_message_queue();
     auto& weather = world.own_weather();
     auto& event = world.own_event();
     const auto& objective = world.read_objective();
@@ -449,7 +442,7 @@ Gs1Status WeatherEventSystem::process_game_message(
             baseline_weather.wind_direction_degrees);
         emit_site_one_weather_probe_log(
             world,
-            message_queue,
+            invocation,
             "start",
             baseline_weather.heat,
             baseline_weather.wind,
@@ -472,13 +465,30 @@ Gs1Status WeatherEventSystem::process_game_message(
         baseline_weather.wind_direction_degrees);
     emit_site_one_weather_probe_log(
         world,
-        message_queue,
+        invocation,
         "start",
         baseline_weather.heat,
         baseline_weather.wind,
         baseline_weather.dust,
         baseline_weather.wind_direction_degrees);
 
+    return GS1_STATUS_OK;
+}
+
+Gs1Status WeatherEventSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteAttemptEndedMessage& message)
+{
+    (void)message;
+    SiteWorldAccess<WeatherEventSystem> world {invocation};
+    if (!world.has_world())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    auto& event = world.own_event();
+    clear_event_timeline(event);
+    event.minutes_until_next_wave = 0.0;
     return GS1_STATUS_OK;
 }
 
@@ -500,7 +510,6 @@ void WeatherEventSystem::run(RuntimeInvocation& invocation)
         return;
     }
 
-    auto& message_queue = invocation.game_message_queue();
     const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
     const double step_minutes =
         runtime_minutes_from_real_seconds(fixed_step_seconds);
@@ -527,10 +536,7 @@ void WeatherEventSystem::run(RuntimeInvocation& invocation)
     if (!has_active_event(event))
     {
         clear_event_timeline(event);
-        if (objective_wave_window_is_active(objective, world_time_minutes) &&
-            !has_pending_site_transition_message(
-                message_queue,
-                world.site_id_value()))
+        if (objective_wave_window_is_active(objective, world_time_minutes))
         {
             event.minutes_until_next_wave =
                 std::max(0.0, event.minutes_until_next_wave - step_minutes);
@@ -555,10 +561,7 @@ void WeatherEventSystem::run(RuntimeInvocation& invocation)
     if (world_time_minutes >= end_time_minutes)
     {
         clear_event_timeline(event);
-        if (objective_wave_window_is_active(objective, world_time_minutes) &&
-            !has_pending_site_transition_message(
-                message_queue,
-                world.site_id_value()))
+        if (objective_wave_window_is_active(objective, world_time_minutes))
         {
             event.minutes_until_next_wave =
                 resolve_next_wave_delay_minutes(world, event.wave_sequence_index);

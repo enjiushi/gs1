@@ -234,33 +234,66 @@ Gs1Status CraftSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    SiteWorldAccess<CraftSystem> world {invocation};
-
     switch (message.type)
     {
     case GameMessageType::SiteRunStarted:
-        world.own_craft_device_cache_runtime() = CraftDeviceCacheRuntimeState {};
-        world.own_craft_device_caches().clear();
-        world.own_craft_nearby_items().clear();
-        world.own_craft_phone_cache_meta() = PhoneInventoryCacheMetaState {};
-        world.own_craft_phone_items().clear();
-        world.own_craft_context_meta() = CraftContextMetaState {};
-        world.own_craft_context_options().clear();
-        return GS1_STATUS_OK;
+        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
 
     case GameMessageType::SiteDevicePlaced:
+        return handle(invocation, message.payload_as<SiteDevicePlacedMessage>());
+
     case GameMessageType::SiteDeviceBroken:
-        world.own_craft_device_cache_runtime().device_caches_dirty = true;
-        return GS1_STATUS_OK;
+        return handle(invocation, message.payload_as<SiteDeviceBrokenMessage>());
 
     case GameMessageType::InventoryCraftContextRequested:
-        return handle_craft_context_requested(
-            invocation,
-            message.payload_as<CraftContextRequestedMessage>());
+        return handle(invocation, message.payload_as<CraftContextRequestedMessage>());
 
     default:
         return GS1_STATUS_OK;
     }
+}
+
+Gs1Status CraftSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteRunStartedMessage& message)
+{
+    (void)message;
+    SiteWorldAccess<CraftSystem> world {invocation};
+    world.own_craft_device_cache_runtime() = CraftDeviceCacheRuntimeState {};
+    world.own_craft_device_caches().clear();
+    world.own_craft_nearby_items().clear();
+    world.own_craft_phone_cache_meta() = PhoneInventoryCacheMetaState {};
+    world.own_craft_phone_items().clear();
+    world.own_craft_context_meta() = CraftContextMetaState {};
+    world.own_craft_context_options().clear();
+    return GS1_STATUS_OK;
+}
+
+Gs1Status CraftSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteDevicePlacedMessage& message)
+{
+    (void)message;
+    SiteWorldAccess<CraftSystem> world {invocation};
+    world.own_craft_device_cache_runtime().device_caches_dirty = true;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status CraftSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteDeviceBrokenMessage& message)
+{
+    (void)message;
+    SiteWorldAccess<CraftSystem> world {invocation};
+    world.own_craft_device_cache_runtime().device_caches_dirty = true;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status CraftSystem::handle(
+    RuntimeInvocation& invocation,
+    const CraftContextRequestedMessage& message)
+{
+    return handle_craft_context_requested(invocation, message);
 }
 
 Gs1Status CraftSystem::process_host_message(

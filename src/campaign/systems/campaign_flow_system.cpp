@@ -185,12 +185,10 @@ Gs1Status handle_deployment_site_selection(
         selection = SiteId {selected_site_id.value()};
     }
 
-    GameMessage selection_changed {};
-    selection_changed.type = GameMessageType::DeploymentSiteSelectionChanged;
-    selection_changed.set_payload(DeploymentSiteSelectionChangedMessage {selected_site_id.value_or(0U)});
-    invocation.push_game_message(selection_changed);
     store_regional_map_state(invocation, regional_map);
     store_campaign_sites(invocation, sites);
+    invocation.emit_game_message(
+        DeploymentSiteSelectionChangedMessage {selected_site_id.value_or(0U)});
     return GS1_STATUS_OK;
 }
 
@@ -224,16 +222,12 @@ Gs1Status handle_start_site_attempt(
     store_campaign_sites(invocation, sites);
     set_campaign_active_site_id(invocation, SiteId {site_id});
     set_campaign_app_state(invocation, GS1_APP_STATE_SITE_LOADING);
-
-    GameMessage site_run_started {};
-    site_run_started.type = GameMessageType::SiteRunStarted;
-    site_run_started.set_payload(SiteRunStartedMessage {
+    invocation.emit_game_message(SiteRunStartedMessage {
         active_site_run.site_id.value,
         active_site_run.site_run_id.value,
         active_site_run.site_archetype_id,
         active_site_run.attempt_index,
         active_site_run.site_attempt_seed});
-    invocation.push_game_message(site_run_started);
     return GS1_STATUS_OK;
 }
 
@@ -328,29 +322,33 @@ Gs1Status process_campaign_flow_host_message(
         switch (action.type)
         {
         case GS1_GAMEPLAY_ACTION_START_NEW_CAMPAIGN:
-            return handle_start_new_campaign(
-                invocation,
+            invocation.emit_game_message(
                 StartNewCampaignMessage {action.arg0, static_cast<std::uint32_t>(action.arg1)});
+            return GS1_STATUS_OK;
 
         case GS1_GAMEPLAY_ACTION_SELECT_DEPLOYMENT_SITE:
             if (action.target_id == 0U)
             {
                 return GS1_STATUS_INVALID_ARGUMENT;
             }
-            return handle_deployment_site_selection(invocation, action.target_id);
+            invocation.emit_game_message(SelectDeploymentSiteMessage {action.target_id});
+            return GS1_STATUS_OK;
 
         case GS1_GAMEPLAY_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
-            return handle_deployment_site_selection(invocation, std::nullopt);
+            invocation.emit_game_message(ClearDeploymentSiteSelectionMessage {});
+            return GS1_STATUS_OK;
 
         case GS1_GAMEPLAY_ACTION_START_SITE_ATTEMPT:
             if (action.target_id == 0U)
             {
                 return GS1_STATUS_INVALID_ARGUMENT;
             }
-            return handle_start_site_attempt(invocation, action.target_id);
+            invocation.emit_game_message(StartSiteAttemptMessage {action.target_id});
+            return GS1_STATUS_OK;
 
         case GS1_GAMEPLAY_ACTION_RETURN_TO_REGIONAL_MAP:
-            return handle_return_to_regional_map(invocation);
+            invocation.emit_game_message(ReturnToRegionalMapMessage {});
+            return GS1_STATUS_OK;
 
         case GS1_GAMEPLAY_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
         case GS1_GAMEPLAY_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
@@ -421,6 +419,58 @@ Gs1Status CampaignFlowSystem::process_host_message(
     return process_campaign_flow_host_message(invocation, message);
 }
 
+Gs1Status CampaignFlowSystem::handle(
+    RuntimeInvocation& invocation,
+    const OpenMainMenuMessage& message)
+{
+    (void)message;
+    return handle_open_main_menu(invocation);
+}
+
+Gs1Status CampaignFlowSystem::handle(
+    RuntimeInvocation& invocation,
+    const StartNewCampaignMessage& message)
+{
+    return handle_start_new_campaign(invocation, message);
+}
+
+Gs1Status CampaignFlowSystem::handle(
+    RuntimeInvocation& invocation,
+    const SelectDeploymentSiteMessage& message)
+{
+    return handle_deployment_site_selection(invocation, message.site_id);
+}
+
+Gs1Status CampaignFlowSystem::handle(
+    RuntimeInvocation& invocation,
+    const ClearDeploymentSiteSelectionMessage& message)
+{
+    (void)message;
+    return handle_deployment_site_selection(invocation, std::nullopt);
+}
+
+Gs1Status CampaignFlowSystem::handle(
+    RuntimeInvocation& invocation,
+    const StartSiteAttemptMessage& message)
+{
+    return handle_start_site_attempt(invocation, message.site_id);
+}
+
+Gs1Status CampaignFlowSystem::handle(
+    RuntimeInvocation& invocation,
+    const ReturnToRegionalMapMessage& message)
+{
+    (void)message;
+    return handle_return_to_regional_map(invocation);
+}
+
+Gs1Status CampaignFlowSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteAttemptEndedMessage& message)
+{
+    return handle_site_attempt_ended(invocation, message);
+}
+
 void CampaignFlowSystem::run(RuntimeInvocation& invocation)
 {
     if (!runtime_invocation_has_campaign(invocation) ||
@@ -438,11 +488,7 @@ void CampaignFlowSystem::run(RuntimeInvocation& invocation)
 
     app_state = GS1_APP_STATE_SITE_ACTIVE;
     set_campaign_app_state(invocation, app_state);
-
-    GameMessage site_scene_activated {};
-    site_scene_activated.type = GameMessageType::SiteSceneActivated;
-    site_scene_activated.set_payload(SiteSceneActivatedMessage {});
-    invocation.push_game_message(site_scene_activated);
+    invocation.emit_game_message(SiteSceneActivatedMessage {});
 }
 
 Gs1Status process_campaign_flow_message(

@@ -9,6 +9,16 @@ namespace gs1
 class EconomyPhoneSystem final : public IRuntimeSystem
 {
 public:
+    using subscribed_messages = type_list<
+        SiteRunStartedMessage,
+        SiteRefreshTickMessage,
+        EconomyMoneyAwardRequestedMessage,
+        PhoneListingPurchaseRequestedMessage,
+        PhoneListingSaleRequestedMessage,
+        ContractorHireRequestedMessage,
+        SiteUnlockableRevealRequestedMessage,
+        SiteUnlockablePurchaseRequestedMessage>;
+
     [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
     {
         return site_access_owned_state_sets<EconomyPhoneSystem>();
@@ -25,6 +35,18 @@ public:
     [[nodiscard]] Gs1Status process_host_message(
         RuntimeInvocation& invocation,
         const Gs1HostMessage& message) override;
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteRunStartedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteRefreshTickMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const EconomyMoneyAwardRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteUnlockableRevealRequestedMessage& message);
     void run(RuntimeInvocation& invocation) override;
 
     [[nodiscard]] static constexpr SiteSystemAccess access() noexcept

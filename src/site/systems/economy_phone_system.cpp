@@ -38,11 +38,6 @@ constexpr std::uint32_t k_sell_listing_id_base = 1000U;
     return SiteWorldAccess<EconomyPhoneSystem> {invocation};
 }
 
-[[nodiscard]] GameMessageQueue& economy_phone_message_queue(RuntimeInvocation& invocation)
-{
-    return invocation.game_message_queue();
-}
-
 std::uint32_t normalize_quantity(std::uint16_t value) noexcept
 {
     return value == 0U ? 1U : static_cast<std::uint32_t>(value);
@@ -325,9 +320,7 @@ bool queue_delivery_batch_message(
         return false;
     }
 
-    GameMessage delivery_message {};
-    delivery_message.type = GameMessageType::InventoryDeliveryBatchRequested;
-    auto& payload = delivery_message.emplace_payload<InventoryDeliveryBatchRequestedMessage>();
+    InventoryDeliveryBatchRequestedMessage payload {};
     payload.minutes_until_arrival = economy_phone_world(invocation).read_economy().phone_delivery_minutes;
     payload.entry_count = entry_count;
     payload.reserved0 = 0U;
@@ -339,7 +332,7 @@ bool queue_delivery_batch_message(
     {
         payload.entries[index] = entries[index];
     }
-    economy_phone_message_queue(invocation).push_back(delivery_message);
+    invocation.emit_game_message(payload);
     return true;
 }
 
@@ -371,14 +364,11 @@ void queue_purchase_completed_message(
         return;
     }
 
-    GameMessage message {};
-    message.type = GameMessageType::PhoneListingPurchased;
-    message.set_payload(PhoneListingPurchasedMessage {
+    invocation.emit_game_message(PhoneListingPurchasedMessage {
         listing.listing_id,
         listing.item_id.value,
         static_cast<std::uint16_t>(std::min<std::uint32_t>(quantity, 65535U)),
         0U});
-    economy_phone_message_queue(invocation).push_back(message);
 }
 
 void queue_sale_completed_message(
@@ -391,14 +381,11 @@ void queue_sale_completed_message(
         return;
     }
 
-    GameMessage message {};
-    message.type = GameMessageType::PhoneListingSold;
-    message.set_payload(PhoneListingSoldMessage {
+    invocation.emit_game_message(PhoneListingSoldMessage {
         listing.listing_id,
         listing.item_id.value,
         static_cast<std::uint16_t>(std::min<std::uint32_t>(quantity, 65535U)),
         0U});
-    economy_phone_message_queue(invocation).push_back(message);
 }
 
 std::uint32_t resolved_stock_cash_points(
@@ -636,13 +623,10 @@ Gs1Status process_sell_listing(
 
     listing.quantity = effective_available - quantity_to_sell;
 
-    GameMessage consume_message {};
-    consume_message.type = GameMessageType::InventoryGlobalItemConsumeRequested;
-    consume_message.set_payload(InventoryGlobalItemConsumeRequestedMessage {
+    invocation.emit_game_message(InventoryGlobalItemConsumeRequestedMessage {
         listing.item_id.value,
         static_cast<std::uint16_t>(quantity_to_sell),
         0U});
-    economy_phone_message_queue(invocation).push_back(consume_message);
     queue_sale_completed_message(invocation, listing, quantity_to_sell);
 
     return GS1_STATUS_OK;
@@ -850,6 +834,49 @@ std::optional<std::uint32_t> EconomyPhoneSystem::fixed_step_order() const noexce
     return 17U;
 }
 
+Gs1Status EconomyPhoneSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteRunStartedMessage& message)
+{
+    seed_site_economy(invocation, message.site_id);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status EconomyPhoneSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteRefreshTickMessage& message)
+{
+    if ((message.refresh_mask & SITE_REFRESH_TICK_PHONE_BUY_STOCK) != 0U &&
+        !onboarding_chain_effective(invocation))
+    {
+        refresh_generated_buy_stock_listings(invocation, true);
+    }
+
+    return GS1_STATUS_OK;
+}
+
+Gs1Status EconomyPhoneSystem::handle(
+    RuntimeInvocation& invocation,
+    const EconomyMoneyAwardRequestedMessage& message)
+{
+    if (message.delta == 0)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    return apply_site_cash_delta(invocation, message.delta)
+        ? GS1_STATUS_OK
+        : GS1_STATUS_INVALID_STATE;
+}
+
+Gs1Status EconomyPhoneSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteUnlockableRevealRequestedMessage& message)
+{
+    reveal_unlockable_for_site(invocation, message.unlockable_id);
+    return GS1_STATUS_OK;
+}
+
 Gs1Status EconomyPhoneSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
@@ -857,36 +884,13 @@ Gs1Status EconomyPhoneSystem::process_game_message(
     switch (message.type)
     {
     case GameMessageType::SiteRunStarted:
-    {
-        const auto& payload = message.payload_as<SiteRunStartedMessage>();
-        seed_site_economy(invocation, payload.site_id);
-        return GS1_STATUS_OK;
-    }
+        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
 
     case GameMessageType::SiteRefreshTick:
-        if ((message.payload_as<SiteRefreshTickMessage>().refresh_mask &
-                SITE_REFRESH_TICK_PHONE_BUY_STOCK) != 0U &&
-            !onboarding_chain_effective(invocation))
-        {
-            refresh_generated_buy_stock_listings(invocation, true);
-        }
-        return GS1_STATUS_OK;
+        return handle(invocation, message.payload_as<SiteRefreshTickMessage>());
 
     case GameMessageType::EconomyMoneyAwardRequested:
-    {
-        const auto& payload = message.payload_as<EconomyMoneyAwardRequestedMessage>();
-        if (payload.delta == 0)
-        {
-            return GS1_STATUS_OK;
-        }
-
-        if (!apply_site_cash_delta(invocation, payload.delta))
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        return GS1_STATUS_OK;
-    }
+        return handle(invocation, message.payload_as<EconomyMoneyAwardRequestedMessage>());
 
     case GameMessageType::PhoneListingPurchaseRequested:
     {
@@ -945,11 +949,7 @@ Gs1Status EconomyPhoneSystem::process_game_message(
     }
 
     case GameMessageType::SiteUnlockableRevealRequested:
-    {
-        const auto& payload = message.payload_as<SiteUnlockableRevealRequestedMessage>();
-        reveal_unlockable_for_site(invocation, payload.unlockable_id);
-        return GS1_STATUS_OK;
-    }
+        return handle(invocation, message.payload_as<SiteUnlockableRevealRequestedMessage>());
 
     default:
         return GS1_STATUS_OK;

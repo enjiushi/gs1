@@ -1,7 +1,7 @@
 #include "content/defs/plant_defs.h"
 #include "runtime/game_runtime.h"
-#include "runtime/runtime_split_state_compat.h"
 #include "site/tile_footprint.h"
+#include "../system/source/split_state_test_helpers.h"
 
 #include <algorithm>
 #include <cassert>
@@ -60,14 +60,37 @@ namespace gs1
 
 struct GameRuntimeProjectionTestAccess
 {
-    static std::optional<CampaignState>& campaign(GameRuntime& runtime)
+    [[nodiscard]] static std::optional<CampaignState> campaign(GameRuntime& runtime)
     {
-        return runtime.compatibility_campaign_state_;
+        if (!runtime.state().campaign_core.has_value())
+        {
+            return std::nullopt;
+        }
+
+        return assemble_campaign_state_from_state_sets(runtime.state(), runtime.state_manager());
     }
 
-    static std::optional<SiteRunState>& active_site_run(GameRuntime& runtime)
+    [[nodiscard]] static std::optional<SiteRunState> active_site_run(GameRuntime& runtime)
     {
-        return runtime.compatibility_site_run_state_;
+        if (!runtime.state().site_run_meta.has_value())
+        {
+            return std::nullopt;
+        }
+
+        return assemble_site_run_state_from_state_sets(
+            runtime.state(),
+            runtime.state_manager(),
+            runtime.site_world_);
+    }
+
+    template <typename Func>
+    static void mutate_active_site_run(GameRuntime& runtime, Func&& func)
+    {
+        auto site_run = active_site_run(runtime);
+        require(site_run.has_value(), "active site run missing");
+        func(site_run.value());
+        write_site_run_state_to_state_sets(site_run.value(), runtime.state(), runtime.state_manager());
+        runtime.site_world_ = site_run->site_world;
     }
 };
 }  // namespace gs1
@@ -190,7 +213,7 @@ void drain_runtime_messages(GameRuntime& runtime)
 void bootstrap_site_one(GameRuntime& runtime)
 {
     require_ok(runtime.handle_message(make_start_campaign_message()), "starting prototype campaign");
-    auto& campaign = gs1::GameRuntimeProjectionTestAccess::campaign(runtime);
+    const auto campaign = gs1::GameRuntimeProjectionTestAccess::campaign(runtime);
     require(campaign.has_value(), "campaign state was not created");
     require(!campaign->sites.empty(), "prototype campaign has no sites");
 
@@ -303,11 +326,15 @@ ScenarioResult run_scenario(const ScenarioConfig& config)
     GameRuntime runtime {create_desc};
     run_boot_phase(runtime);
     bootstrap_site_one(runtime);
-    auto& active_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    auto active_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
     require(active_site_run.has_value(), "active site run missing after bootstrap");
-    auto& site_run = active_site_run.value();
-    seed_dense_cover(site_run);
-    seed_perf_plants(site_run);
+    gs1::GameRuntimeProjectionTestAccess::mutate_active_site_run(
+        runtime,
+        [](SiteRunState& site_run)
+        {
+            seed_dense_cover(site_run);
+            seed_perf_plants(site_run);
+        });
     drain_runtime_messages(runtime);
 
     for (const auto system_id : config.disabled_systems)

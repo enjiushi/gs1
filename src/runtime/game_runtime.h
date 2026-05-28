@@ -3,17 +3,22 @@
 #include "campaign/systems/campaign_flow_system.h"
 #include "campaign/systems/campaign_time_system.h"
 #include "messages/game_message.h"
+#include "runtime/gameplay_message_traits.h"
 #include "runtime/game_state.h"
 #include "runtime/state_manager.h"
 #include "runtime/game_state_view.h"
 #include "runtime/runtime_clock.h"
 #include "runtime/system_interface.h"
+#include "runtime/typed_gameplay_dispatch_traits.h"
 #include "site/site_world.h"
 #include "gs1/status.h"
 #include "gs1/types.h"
 
 #include <array>
+#include <cassert>
+#include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <deque>
 #include <memory>
 #include <utility>
@@ -61,6 +66,8 @@ public:
     [[nodiscard]] SiteWorld* site_world() noexcept { return site_world_.get(); }
     [[nodiscard]] const SiteWorld* site_world() const noexcept { return site_world_.get(); }
     [[nodiscard]] Gs1Status handle_message(const GameMessage& message);
+    template <typename Message>
+    [[nodiscard]] Gs1Status handle_message(const Message& message);
     friend struct GameRuntimeProjectionTestAccess;
     friend class RuntimeInvocation;
     friend class RuntimeInlineGameMessageScope;
@@ -86,13 +93,15 @@ private:
     [[nodiscard]] Gs1Status dispatch_queued_messages();
     [[nodiscard]] Gs1Status dispatch_subscribed_host_message(const Gs1HostMessage& message);
     [[nodiscard]] Gs1Status dispatch_subscribed_message(const GameMessage& message);
-    void flush_compatibility_state_to_split_state();
-    void refresh_compatibility_state_from_split_state();
     void install_campaign_state(const CampaignState& campaign);
     void install_site_run_state(const SiteRunState& site_run);
     void clear_site_run_state();
     void run_fixed_step();
     [[nodiscard]] Gs1Status dispatch_game_message_inline(const GameMessage& message);
+    template <typename Message>
+    [[nodiscard]] Gs1Status dispatch_game_message_inline(const Message& message);
+    template <typename System>
+    [[nodiscard]] System* find_system() noexcept;
     void copy_timing_snapshot(
         const TimingAccumulator& source,
         Gs1RuntimeTimingStats& destination) const noexcept;
@@ -109,16 +118,152 @@ private:
     std::vector<IRuntimeSystem*> fixed_step_systems_ {};
     RuntimeHostMessageSubscribers host_message_subscribers_ {};
     RuntimeGameMessageSubscribers message_subscribers_ {};
+    std::array<IRuntimeSystem*, GameSystems::size> systems_by_pack_index_ {};
     TimingAccumulator phase1_timing_ {};
     TimingAccumulator phase2_timing_ {};
     TimingAccumulator fixed_step_timing_ {};
     std::uint32_t inline_game_message_depth_ {0U};
-    std::optional<CampaignState> compatibility_campaign_state_ {};
-    std::optional<SiteRunState> compatibility_site_run_state_ {};
     std::array<ProfiledSystemState, static_cast<std::size_t>(GS1_RUNTIME_PROFILE_SYSTEM_COUNT)>
         profiled_systems_ {};
     bool boot_initialized_ {false};
 };
 
+template <typename Message>
+inline Gs1Status GameRuntime::handle_message(const Message& message)
+{
+    return dispatch_game_message_inline(message);
+}
+
+template <typename Message>
+inline Gs1Status GameRuntime::dispatch_game_message_inline(const Message& message)
+{
+    if constexpr (!typed_gameplay_dispatch_traits<Message>::enabled)
+    {
+        return dispatch_game_message_inline(make_game_message(message));
+    }
+    else
+    {
+        struct InlineDepthScope final
+        {
+            explicit InlineDepthScope(GameRuntime& runtime) noexcept
+                : runtime_(&runtime)
+            {
+                ++runtime_->inline_game_message_depth_;
+            }
+
+            ~InlineDepthScope()
+            {
+                if (runtime_ != nullptr && runtime_->inline_game_message_depth_ > 0U)
+                {
+                    --runtime_->inline_game_message_depth_;
+                }
+            }
+
+            GameRuntime* runtime_ {nullptr};
+        };
+
+        struct MutationScope final
+        {
+            MutationScope(StateManager& state_manager, IRuntimeSystem& system)
+                : state_manager_(&state_manager)
+            {
+                state_manager_->push_current_mutating_system(&system);
+            }
+
+            ~MutationScope()
+            {
+                if (state_manager_ != nullptr)
+                {
+                    state_manager_->pop_current_mutating_system();
+                }
+            }
+
+            StateManager* state_manager_ {nullptr};
+        };
+
+        InlineDepthScope depth_scope {*this};
+        constexpr std::uint32_t warn_depth = 4U;
+
+        if (inline_game_message_depth_ == warn_depth)
+        {
+            std::fprintf(
+                stderr,
+                "Warning: internal typed gameplay message inline dispatch depth reached %u.\n",
+                inline_game_message_depth_);
+        }
+
+        assert(
+            inline_game_message_depth_ <= warn_depth &&
+            "Internal typed gameplay message inline dispatch depth exceeded limit 4.");
+
+        RuntimeInvocation invocation {*this};
+        using subscriber_list = typename typed_gameplay_dispatch_traits<Message>::subscribers;
+        Gs1Status status = GS1_STATUS_OK;
+
+        for_each_type<subscriber_list>(
+            [&]<typename System>()
+            {
+                if (status != GS1_STATUS_OK)
+                {
+                    return;
+                }
+
+                auto* system = find_system<System>();
+                if (system == nullptr)
+                {
+                    status = GS1_STATUS_INVALID_STATE;
+                    return;
+                }
+
+                MutationScope mutation_scope {state_manager_, *system};
+                const auto profile_id = system->profile_system_id();
+                if (!profile_id.has_value() || !profiled_system_enabled(*profile_id))
+                {
+                    status = system->handle(invocation, message);
+                    return;
+                }
+
+                const auto started_at = std::chrono::steady_clock::now();
+                status = system->handle(invocation, message);
+                const double elapsed_ms =
+                    std::chrono::duration<double, std::milli>(
+                        std::chrono::steady_clock::now() - started_at)
+                        .count();
+                auto& accumulator =
+                    profiled_systems_[static_cast<std::size_t>(*profile_id)].message_timing;
+                accumulator.sample_count += 1U;
+                accumulator.last_elapsed_ms = elapsed_ms;
+                accumulator.total_elapsed_ms += elapsed_ms;
+                if (elapsed_ms > accumulator.max_elapsed_ms)
+                {
+                    accumulator.max_elapsed_ms = elapsed_ms;
+                }
+            });
+
+        return status;
+    }
+}
+
+template <typename System>
+inline System* GameRuntime::find_system() noexcept
+{
+    constexpr std::size_t system_index = system_pack_index_v<System, GameSystems>;
+    static_assert(system_index < GameSystems::size, "Requested system is not part of GameSystems.");
+    return static_cast<System*>(systems_by_pack_index_[system_index]);
+}
+
+template <typename Message>
+inline void RuntimeInvocation::emit_game_message(const Message& message)
+{
+    if (runtime_ != nullptr)
+    {
+        const auto status = runtime_->dispatch_game_message_inline(message);
+        assert(status == GS1_STATUS_OK);
+        (void)status;
+        return;
+    }
+
+    push_game_message(make_game_message(message));
+}
 }  // namespace gs1
 

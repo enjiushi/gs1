@@ -14,33 +14,6 @@ namespace
 {
 constexpr float k_objective_progress_epsilon = 0.0001f;
 
-bool has_pending_site_transition_message(
-    const GameMessageQueue& message_queue,
-    std::uint32_t site_id)
-{
-    for (const auto& message : message_queue)
-    {
-        if (message.type == GameMessageType::SiteAttemptEnded &&
-            message.payload_as<SiteAttemptEndedMessage>().site_id == site_id)
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-void enqueue_site_attempt_result(
-    GameMessageQueue& message_queue,
-    std::uint32_t site_id,
-    Gs1SiteAttemptResult result)
-{
-    GameMessage message {};
-    message.type = GameMessageType::SiteAttemptEnded;
-    message.set_payload(SiteAttemptEndedMessage {site_id, result});
-    message_queue.push_back(message);
-}
-
 bool tile_has_objective_occupant(const SiteWorld::TileData& tile) noexcept
 {
     return tile.ecology.plant_id.value != 0U || tile.ecology.ground_cover_type_id != 0U;
@@ -173,8 +146,8 @@ float normalized_cash_target_progress(
 }
 
 void run_green_wall_connection(
+    RuntimeInvocation& invocation,
     SiteWorldAccess<SiteCompletionSystem>& world,
-    GameMessageQueue& message_queue,
     const SiteClockState& clock)
 {
     auto objective = world.own_objective();
@@ -227,10 +200,9 @@ void run_green_wall_connection(
             objective.completion_hold_progress_minutes + k_objective_progress_epsilon >=
                 objective.completion_hold_minutes)
         {
-            enqueue_site_attempt_result(
-                message_queue,
+            invocation.emit_game_message(SiteAttemptEndedMessage {
                 world.site_id_value(),
-                GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+                GS1_SITE_ATTEMPT_RESULT_COMPLETED});
             return;
         }
     }
@@ -247,10 +219,9 @@ void run_green_wall_connection(
         return;
     }
 
-    enqueue_site_attempt_result(
-        message_queue,
+    invocation.emit_game_message(SiteAttemptEndedMessage {
         world.site_id_value(),
-        GS1_SITE_ATTEMPT_RESULT_FAILED);
+        GS1_SITE_ATTEMPT_RESULT_FAILED});
 }
 }  // namespace
 
@@ -261,7 +232,9 @@ const char* SiteCompletionSystem::name() const noexcept
 
 GameMessageSubscriptionSpan SiteCompletionSystem::subscribed_game_messages() const noexcept
 {
-    return {};
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::SiteAttemptEnded};
+    return subscriptions;
 }
 
 HostMessageSubscriptionSpan SiteCompletionSystem::subscribed_host_messages() const noexcept
@@ -283,14 +256,26 @@ Gs1Status SiteCompletionSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
+    if (message.type != GameMessageType::SiteAttemptEnded)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    return handle(invocation, message.payload_as<SiteAttemptEndedMessage>());
 }
 
 Gs1Status SiteCompletionSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
+{
+    (void)invocation;
+    (void)message;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status SiteCompletionSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteAttemptEndedMessage& message)
 {
     (void)invocation;
     (void)message;
@@ -305,14 +290,10 @@ void SiteCompletionSystem::run(RuntimeInvocation& invocation)
         return;
     }
 
-    auto& message_queue = invocation.game_message_queue();
     const auto& counters = world.read_counters();
     const auto& objective = world.read_objective();
     const auto& clock = world.read_time();
-    if (world.run_status() != SiteRunStatus::Active ||
-        has_pending_site_transition_message(
-            message_queue,
-            world.site_id_value()))
+    if (world.run_status() != SiteRunStatus::Active)
     {
         return;
     }
@@ -326,10 +307,9 @@ void SiteCompletionSystem::run(RuntimeInvocation& invocation)
             return;
         }
 
-        enqueue_site_attempt_result(
-            message_queue,
+        invocation.emit_game_message(SiteAttemptEndedMessage {
             world.site_id_value(),
-            GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+            GS1_SITE_ATTEMPT_RESULT_COMPLETED});
         return;
 
     case SiteObjectiveType::HighwayProtection:
@@ -348,10 +328,9 @@ void SiteCompletionSystem::run(RuntimeInvocation& invocation)
 
         if (counters.highway_average_sand_cover >= cover_threshold)
         {
-            enqueue_site_attempt_result(
-                message_queue,
+            invocation.emit_game_message(SiteAttemptEndedMessage {
                 world.site_id_value(),
-                GS1_SITE_ATTEMPT_RESULT_FAILED);
+                GS1_SITE_ATTEMPT_RESULT_FAILED});
             return;
         }
 
@@ -360,15 +339,14 @@ void SiteCompletionSystem::run(RuntimeInvocation& invocation)
             return;
         }
 
-        enqueue_site_attempt_result(
-            message_queue,
+        invocation.emit_game_message(SiteAttemptEndedMessage {
             world.site_id_value(),
-            GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+            GS1_SITE_ATTEMPT_RESULT_COMPLETED});
         return;
     }
 
     case SiteObjectiveType::GreenWallConnection:
-        run_green_wall_connection(world, message_queue, clock);
+        run_green_wall_connection(invocation, world, clock);
         return;
 
     case SiteObjectiveType::PureSurvival:
@@ -388,10 +366,9 @@ void SiteCompletionSystem::run(RuntimeInvocation& invocation)
             return;
         }
 
-        enqueue_site_attempt_result(
-            message_queue,
+        invocation.emit_game_message(SiteAttemptEndedMessage {
             world.site_id_value(),
-            GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+            GS1_SITE_ATTEMPT_RESULT_COMPLETED});
         return;
 
     case SiteObjectiveType::CashTargetSurvival:
@@ -406,10 +383,9 @@ void SiteCompletionSystem::run(RuntimeInvocation& invocation)
             return;
         }
 
-        enqueue_site_attempt_result(
-            message_queue,
+        invocation.emit_game_message(SiteAttemptEndedMessage {
             world.site_id_value(),
-            GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+            GS1_SITE_ATTEMPT_RESULT_COMPLETED});
         return;
     }
 

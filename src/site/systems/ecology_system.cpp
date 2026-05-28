@@ -530,7 +530,7 @@ std::uint16_t encode_density_centi(float density) noexcept
 }
 
 void flush_tile_ecology_batch_message(
-    GameMessageQueue& queue,
+    RuntimeInvocation& invocation,
     TileEcologyBatchChangedMessage& batch) noexcept
 {
     if (batch.entry_count == 0U)
@@ -538,15 +538,12 @@ void flush_tile_ecology_batch_message(
         return;
     }
 
-    GameMessage message {};
-    message.type = GameMessageType::TileEcologyBatchChanged;
-    message.set_payload(batch);
-    queue.push_back(message);
+    invocation.emit_game_message(batch);
     batch = {};
 }
 
 void append_tile_ecology_batch_entry(
-    GameMessageQueue& queue,
+    RuntimeInvocation& invocation,
     TileEcologyBatchChangedMessage& batch,
     TileCoord coord,
     std::uint32_t changed_mask,
@@ -559,7 +556,7 @@ void append_tile_ecology_batch_entry(
 
     if (batch.entry_count == k_tile_ecology_batch_entry_count)
     {
-        flush_tile_ecology_batch_message(queue, batch);
+        flush_tile_ecology_batch_message(invocation, batch);
     }
 
     auto& entry = batch.entries[batch.entry_count++];
@@ -675,8 +672,8 @@ std::vector<ActiveEcologyCoord> collect_active_ecology_coords(
 }
 
 void flush_dirty_tile_ecology_batches(
-    SiteWorldAccess<EcologySystem>& world,
-    GameMessageQueue& message_queue)
+    RuntimeInvocation& invocation,
+    SiteWorldAccess<EcologySystem>& world)
 {
     const auto* site_world = world.read_site_world();
     if (site_world == nullptr)
@@ -722,10 +719,7 @@ void flush_dirty_tile_ecology_batches(
     {
         if (batch.entry_count == k_tile_ecology_batch_entry_count)
         {
-            GameMessage message {};
-            message.type = GameMessageType::TileEcologyBatchChanged;
-            message.set_payload(batch);
-            message_queue.push_back(message);
+            invocation.emit_game_message(batch);
             batch = {};
         }
 
@@ -748,15 +742,12 @@ void flush_dirty_tile_ecology_batches(
 
     if (batch.entry_count != 0U)
     {
-        GameMessage message {};
-        message.type = GameMessageType::TileEcologyBatchChanged;
-        message.set_payload(batch);
-        message_queue.push_back(message);
+        invocation.emit_game_message(batch);
     }
 }
 
 void emit_plant_density_changed_log(
-    GameMessageQueue& message_queue,
+    RuntimeInvocation& invocation,
     TileCoord coord,
     PlantId plant_id,
     float previous_density,
@@ -770,7 +761,6 @@ void emit_plant_density_changed_log(
 
     const auto* plant_def = find_plant_def(plant_id);
     const char* plant_name = plant_def != nullptr ? plant_def->display_name : "Unknown Plant";
-    GameMessage message {};
     PresentLogMessage payload {};
     payload.level = GS1_LOG_LEVEL_INFO;
     std::snprintf(
@@ -782,14 +772,12 @@ void emit_plant_density_changed_log(
         coord.y,
         previous_density,
         next_density);
-    message.type = GameMessageType::PresentLog;
-    message.set_payload(payload);
-    message_queue.push_back(message);
+    invocation.push_log_message(payload.level, payload.text);
 }
 
 void emit_site_one_startup_probe_log(
     const SiteWorldAccess<EcologySystem>& world,
-    GameMessageQueue& message_queue,
+    RuntimeInvocation& invocation,
     TileCoord coord,
     const SiteWorld::TileEcologyData& ecology)
 {
@@ -800,7 +788,6 @@ void emit_site_one_startup_probe_log(
         return;
     }
 
-    GameMessage message {};
     PresentLogMessage payload {};
     payload.level = GS1_LOG_LEVEL_DEBUG;
     std::snprintf(
@@ -811,14 +798,12 @@ void emit_site_one_startup_probe_log(
         coord.y,
         ecology.plant_id.value,
         ecology.plant_density);
-    message.type = GameMessageType::PresentLog;
-    message.set_payload(payload);
-    message_queue.push_back(message);
+    invocation.push_log_message(payload.level, payload.text);
 }
 
 void emit_site_one_ecology_probe_log(
     const SiteWorldAccess<EcologySystem>& world,
-    GameMessageQueue& message_queue,
+    RuntimeInvocation& invocation,
     TileCoord coord,
     const SiteWorld::TileEcologyData& ecology,
     float density_delta,
@@ -830,7 +815,6 @@ void emit_site_one_ecology_probe_log(
         return;
     }
 
-    GameMessage message {};
     PresentLogMessage payload {};
     payload.level = GS1_LOG_LEVEL_DEBUG;
     std::snprintf(
@@ -843,9 +827,7 @@ void emit_site_one_ecology_probe_log(
         density_delta,
         growth_pressure,
         effective_wind);
-    message.type = GameMessageType::PresentLog;
-    message.set_payload(payload);
-    message_queue.push_back(message);
+    invocation.push_log_message(payload.level, payload.text);
 }
 
 bool density_crosses_report_threshold(
@@ -918,7 +900,7 @@ std::uint32_t apply_ground_cover(
 
 std::uint32_t apply_planting(
     SiteWorldAccess<EcologySystem>& world,
-    GameMessageQueue& message_queue,
+    RuntimeInvocation& invocation,
     TileCoord coord,
     const SiteTilePlantingCompletedMessage& payload)
 {
@@ -975,7 +957,7 @@ std::uint32_t apply_planting(
     {
         world.write_tile_ecology(coord, ecology);
         emit_plant_density_changed_log(
-            message_queue,
+            invocation,
             coord,
             requested_plant,
             previous_density,
@@ -1066,7 +1048,7 @@ std::uint32_t apply_burial_cleared(
 
 std::uint32_t apply_harvest(
     SiteWorldAccess<EcologySystem>& world,
-    GameMessageQueue& message_queue,
+    RuntimeInvocation& invocation,
     TileCoord coord,
     const SiteTileHarvestedMessage& payload)
 {
@@ -1113,7 +1095,7 @@ std::uint32_t apply_harvest(
 
     world.write_tile_ecology(coord, ecology);
     emit_plant_density_changed_log(
-        message_queue,
+        invocation,
         coord,
         previous_plant_id,
         previous_density,
@@ -1123,7 +1105,7 @@ std::uint32_t apply_harvest(
 
 void update_restoration_progress(
     SiteWorldAccess<EcologySystem>& world,
-    GameMessageQueue& message_queue,
+    RuntimeInvocation& invocation,
     std::uint32_t new_count)
 {
     auto& counters = world.own_counters();
@@ -1145,13 +1127,10 @@ void update_restoration_progress(
     counters.objective_progress_normalized = normalized_progress;
     objective.objective_progress_normalized = normalized_progress;
 
-    GameMessage progress_message {};
-    progress_message.type = GameMessageType::RestorationProgressChanged;
-    progress_message.set_payload(RestorationProgressChangedMessage {
+    invocation.emit_game_message(RestorationProgressChangedMessage {
         new_count,
         counters.site_completion_tile_threshold,
         normalized_progress});
-    message_queue.push_back(progress_message);
 }
 
 float compute_highway_sand_cover_delta(
@@ -1200,7 +1179,7 @@ void update_highway_protection_progress(
 
 void update_living_plant_stability(
     SiteWorldAccess<EcologySystem>& world,
-    GameMessageQueue& message_queue,
+    RuntimeInvocation& invocation,
     std::uint32_t tracked_living_plant_count,
     bool any_tracked_plant_withering)
 {
@@ -1226,17 +1205,14 @@ void update_living_plant_stability(
         status_flags |= LIVING_PLANT_STABILITY_ANY_TRACKED_PLANT_WITHERING;
     }
 
-    GameMessage message {};
-    message.type = GameMessageType::LivingPlantStabilityChanged;
-    message.set_payload(LivingPlantStabilityChangedMessage {
+    invocation.emit_game_message(LivingPlantStabilityChangedMessage {
         tracked_living_plant_count,
         status_flags});
-    message_queue.push_back(message);
 }
 
 void emit_startup_ecology_snapshots(
     SiteWorldAccess<EcologySystem>& world,
-    GameMessageQueue& message_queue) noexcept
+    RuntimeInvocation& invocation) noexcept
 {
     if (!world.has_world())
     {
@@ -1248,7 +1224,7 @@ void emit_startup_ecology_snapshots(
     for (const auto active : collect_active_ecology_coords(world))
     {
         const auto ecology = world.read_tile_ecology(active.coord);
-        emit_site_one_startup_probe_log(world, message_queue, active.coord, ecology);
+        emit_site_one_startup_probe_log(world, invocation, active.coord, ecology);
         mark_dirty_tile_ecology(
             world,
             active.coord,
@@ -1266,9 +1242,9 @@ void emit_startup_ecology_snapshots(
         }
     }
 
-    flush_dirty_tile_ecology_batches(world, message_queue);
-    update_living_plant_stability(world, message_queue, tracked_living_plant_count, false);
-    update_restoration_progress(world, message_queue, fully_grown_count);
+    flush_dirty_tile_ecology_batches(invocation, world);
+    update_living_plant_stability(world, invocation, tracked_living_plant_count, false);
+    update_restoration_progress(world, invocation, fully_grown_count);
 }
 }  // namespace
 
@@ -1277,7 +1253,11 @@ Gs1Status EcologySystem::process_game_message(
     const GameMessage& message)
 {
     SiteWorldAccess<EcologySystem> world {invocation};
-    auto& message_queue = invocation.game_message_queue();
+    if (message.type == GameMessageType::SiteRunStarted)
+    {
+        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
+    }
+
     if (!world.has_world())
     {
         return GS1_STATUS_INVALID_STATE;
@@ -1285,9 +1265,6 @@ Gs1Status EcologySystem::process_game_message(
 
     switch (message.type)
     {
-    case GameMessageType::SiteRunStarted:
-        emit_startup_ecology_snapshots(world, message_queue);
-        break;
     case GameMessageType::SiteGroundCoverPlaced:
     {
         const auto& payload = message.payload_as<SiteGroundCoverPlacedMessage>();
@@ -1312,7 +1289,7 @@ Gs1Status EcologySystem::process_game_message(
             footprint,
             [&](TileCoord footprint_coord) {
                 const std::uint32_t changed_mask =
-                    apply_planting(world, message_queue, footprint_coord, payload);
+                    apply_planting(world, invocation, footprint_coord, payload);
                 if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
                 {
                     mark_dirty_tile_ecology(world, footprint_coord, changed_mask);
@@ -1357,7 +1334,7 @@ Gs1Status EcologySystem::process_game_message(
             footprint,
             [&](TileCoord footprint_coord) {
                 const std::uint32_t changed_mask =
-                    apply_harvest(world, message_queue, footprint_coord, payload);
+                    apply_harvest(world, invocation, footprint_coord, payload);
                 if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
                 {
                     mark_dirty_tile_ecology(world, footprint_coord, changed_mask);
@@ -1370,7 +1347,145 @@ Gs1Status EcologySystem::process_game_message(
         break;
     }
 
-    flush_dirty_tile_ecology_batches(world, message_queue);
+    flush_dirty_tile_ecology_batches(invocation, world);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status EcologySystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteRunStartedMessage& message)
+{
+    (void)message;
+    SiteWorldAccess<EcologySystem> world {invocation};
+    if (!world.has_world())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    emit_startup_ecology_snapshots(world, invocation);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status EcologySystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteGroundCoverPlacedMessage& message)
+{
+    SiteWorldAccess<EcologySystem> world {invocation};
+    if (!world.has_world())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    const TileCoord coord {message.target_tile_x, message.target_tile_y};
+    const std::uint32_t changed_mask = apply_ground_cover(world, coord, message);
+    if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
+    {
+        mark_dirty_tile_ecology(world, coord, changed_mask);
+    }
+
+    flush_dirty_tile_ecology_batches(invocation, world);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status EcologySystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteTilePlantingCompletedMessage& message)
+{
+    SiteWorldAccess<EcologySystem> world {invocation};
+    if (!world.has_world())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    const TileCoord coord {message.target_tile_x, message.target_tile_y};
+    const TileFootprint footprint =
+        resolve_plant_tile_footprint(PlantId {message.plant_type_id});
+    const TileCoord anchor = align_tile_anchor_to_footprint(coord, footprint);
+    for_each_tile_in_footprint(
+        anchor,
+        footprint,
+        [&](TileCoord footprint_coord) {
+            const std::uint32_t changed_mask =
+                apply_planting(world, invocation, footprint_coord, message);
+            if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
+            {
+                mark_dirty_tile_ecology(world, footprint_coord, changed_mask);
+            }
+        });
+
+    flush_dirty_tile_ecology_batches(invocation, world);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status EcologySystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteTileWateredMessage& message)
+{
+    SiteWorldAccess<EcologySystem> world {invocation};
+    if (!world.has_world())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    const TileCoord coord {message.target_tile_x, message.target_tile_y};
+    const std::uint32_t changed_mask = apply_watering(world, coord, message);
+    if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
+    {
+        mark_dirty_tile_ecology(world, coord, changed_mask);
+    }
+
+    flush_dirty_tile_ecology_batches(invocation, world);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status EcologySystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteTileBurialClearedMessage& message)
+{
+    SiteWorldAccess<EcologySystem> world {invocation};
+    if (!world.has_world())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    const TileCoord coord {message.target_tile_x, message.target_tile_y};
+    const std::uint32_t changed_mask = apply_burial_cleared(world, coord, message);
+    if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
+    {
+        mark_dirty_tile_ecology(world, coord, changed_mask);
+    }
+
+    flush_dirty_tile_ecology_batches(invocation, world);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status EcologySystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteTileHarvestedMessage& message)
+{
+    SiteWorldAccess<EcologySystem> world {invocation};
+    if (!world.has_world())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    const TileCoord coord {message.target_tile_x, message.target_tile_y};
+    const TileFootprint footprint =
+        resolve_plant_tile_footprint(PlantId {message.plant_type_id});
+    const TileCoord anchor = align_tile_anchor_to_footprint(coord, footprint);
+    for_each_tile_in_footprint(
+        anchor,
+        footprint,
+        [&](TileCoord footprint_coord) {
+            const std::uint32_t changed_mask =
+                apply_harvest(world, invocation, footprint_coord, message);
+            if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
+            {
+                mark_dirty_tile_ecology(world, footprint_coord, changed_mask);
+            }
+        });
+
+    flush_dirty_tile_ecology_batches(invocation, world);
     return GS1_STATUS_OK;
 }
 
@@ -1388,7 +1503,6 @@ void EcologySystem::run(RuntimeInvocation& invocation)
     auto access = make_game_state_access<EcologySystem>(invocation);
     const double fixed_step_seconds = access.template read<RuntimeFixedStepSecondsTag>();
     SiteWorldAccess<EcologySystem> world {invocation};
-    auto& message_queue = invocation.game_message_queue();
     if (!world.has_world())
     {
         return;
@@ -1565,7 +1679,7 @@ void EcologySystem::run(RuntimeInvocation& invocation)
                 k_meter_scale);
             emit_site_one_ecology_probe_log(
                 world,
-                message_queue,
+                invocation,
                 coord,
                 previous_ecology,
                 density_delta,
@@ -1613,7 +1727,7 @@ void EcologySystem::run(RuntimeInvocation& invocation)
                 if (density_changed)
                 {
                     emit_plant_density_changed_log(
-                        message_queue,
+                        invocation,
                         coord,
                         previous_ecology.plant_id,
                         previous_ecology.plant_density,
@@ -1626,7 +1740,7 @@ void EcologySystem::run(RuntimeInvocation& invocation)
                     report_component.valid = 1U;
                 }
                 append_tile_ecology_batch_entry(
-                    message_queue,
+                    invocation,
                     run_batch,
                     coord,
                     changed_mask,
@@ -1678,7 +1792,7 @@ void EcologySystem::run(RuntimeInvocation& invocation)
                 ecology.soil_fertility = next_cover;
                 world.write_tile_ecology_at_index(index, ecology);
                 append_tile_ecology_batch_entry(
-                    message_queue,
+                    invocation,
                     run_batch,
                     coord,
                     TILE_ECOLOGY_CHANGED_FERTILITY,
@@ -1698,7 +1812,7 @@ void EcologySystem::run(RuntimeInvocation& invocation)
         entity.remove<site_ecs::TileEcologyReportState>();
     }
 
-    flush_tile_ecology_batch_message(message_queue, run_batch);
+    flush_tile_ecology_batch_message(invocation, run_batch);
 
     if (objective.type == SiteObjectiveType::HighwayProtection)
     {
@@ -1708,7 +1822,7 @@ void EcologySystem::run(RuntimeInvocation& invocation)
             : (highway_cover_sum / static_cast<float>(highway_tile_count));
         update_living_plant_stability(
             world,
-            message_queue,
+            invocation,
             tracked_living_plant_count,
             any_tracked_plant_withering);
         update_highway_protection_progress(world, average_cover);
@@ -1717,10 +1831,10 @@ void EcologySystem::run(RuntimeInvocation& invocation)
 
     update_living_plant_stability(
         world,
-        message_queue,
+        invocation,
         tracked_living_plant_count,
         any_tracked_plant_withering);
-    update_restoration_progress(world, message_queue, fully_grown_count);
+    update_restoration_progress(world, invocation, fully_grown_count);
 }
 }  // namespace gs1
 

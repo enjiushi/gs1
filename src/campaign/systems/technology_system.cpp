@@ -155,6 +155,18 @@ TechnologyGrantState grant_state_from_payload(std::uint8_t grant_kind) noexcept
 
 }  // namespace
 
+Gs1Status process_target_granted_message(
+    RuntimeInvocation& invocation,
+    const TargetGrantedMessage& message);
+
+Gs1Status process_progression_event_message(
+    RuntimeInvocation& invocation,
+    const ProgressionEventOccurredMessage& message);
+
+Gs1Status process_campaign_reputation_award_message(
+    RuntimeInvocation& invocation,
+    const CampaignReputationAwardRequestedMessage& message);
+
 Gs1Status process_technology_message(
     RuntimeInvocation& invocation,
     const GameMessage& message);
@@ -241,6 +253,27 @@ Gs1Status TechnologySystem::process_host_message(
 void TechnologySystem::run(RuntimeInvocation& invocation)
 {
     (void)invocation;
+}
+
+Gs1Status TechnologySystem::handle(
+    RuntimeInvocation& invocation,
+    const TargetGrantedMessage& message)
+{
+    return process_target_granted_message(invocation, message);
+}
+
+Gs1Status TechnologySystem::handle(
+    RuntimeInvocation& invocation,
+    const ProgressionEventOccurredMessage& message)
+{
+    return process_progression_event_message(invocation, message);
+}
+
+Gs1Status TechnologySystem::handle(
+    RuntimeInvocation& invocation,
+    const CampaignReputationAwardRequestedMessage& message)
+{
+    return process_campaign_reputation_award_message(invocation, message);
 }
 
 bool TechnologySystem::node_purchased(
@@ -572,6 +605,73 @@ bool TechnologySystem::node_claimable(
     return false;
 }
 
+Gs1Status process_target_granted_message(
+    RuntimeInvocation& invocation,
+    const TargetGrantedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    if (message.target_kind_id != k_progression_target_kind_technology_node ||
+        message.target_id == 0U)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    auto& technology = runtime_invocation_state_ref<RuntimeCampaignTechnologyTag>(invocation);
+    auto& grant = require_node_grant_state_mut(technology, TechNodeId {message.target_id});
+    const auto next_state = grant_state_from_payload(message.grant_kind);
+    assert(next_state != TechnologyGrantState::Locked);
+    assert(grant.grant_state != next_state);
+    assert(!(grant.grant_state == TechnologyGrantState::Effective &&
+        next_state == TechnologyGrantState::Available));
+    grant.grant_state = next_state;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status process_progression_event_message(
+    RuntimeInvocation& invocation,
+    const ProgressionEventOccurredMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    const auto* event_def = find_progression_event_def(message.progression_event_id);
+    if (event_def == nullptr ||
+        event_def->token_kind_id != k_progression_token_kind_total_reputation ||
+        message.amount <= 0)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    runtime_invocation_state_ref<RuntimeCampaignTechnologyTag>(invocation).total_reputation +=
+        message.amount;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status process_campaign_reputation_award_message(
+    RuntimeInvocation& invocation,
+    const CampaignReputationAwardRequestedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    if (message.delta <= 0)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    runtime_invocation_state_ref<RuntimeCampaignTechnologyTag>(invocation).total_reputation +=
+        message.delta;
+    return GS1_STATUS_OK;
+}
+
 Gs1Status process_technology_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
@@ -579,56 +679,17 @@ Gs1Status process_technology_message(
     switch (message.type)
     {
     case GameMessageType::TargetGranted:
-    {
-        const auto& payload = message.payload_as<TargetGrantedMessage>();
-        if (payload.target_kind_id != k_progression_target_kind_technology_node ||
-            payload.target_id == 0U)
-        {
-            return GS1_STATUS_OK;
-        }
-
-        auto& technology = runtime_invocation_state_ref<RuntimeCampaignTechnologyTag>(invocation);
-        auto& grant = require_node_grant_state_mut(technology, TechNodeId {payload.target_id});
-        const auto next_state = grant_state_from_payload(payload.grant_kind);
-        assert(next_state != TechnologyGrantState::Locked);
-        assert(grant.grant_state != next_state);
-        assert(!(grant.grant_state == TechnologyGrantState::Effective &&
-            next_state == TechnologyGrantState::Available));
-        grant.grant_state = next_state;
-        return GS1_STATUS_OK;
-    }
+        return process_target_granted_message(invocation, message.payload_as<TargetGrantedMessage>());
 
     case GameMessageType::ProgressionEventOccurred:
-    {
-        const auto& payload = message.payload_as<ProgressionEventOccurredMessage>();
-        const auto* event_def = find_progression_event_def(payload.progression_event_id);
-        if (event_def == nullptr ||
-            event_def->token_kind_id != k_progression_token_kind_total_reputation ||
-            payload.amount <= 0)
-        {
-            return GS1_STATUS_OK;
-        }
-
-        runtime_invocation_state_ref<RuntimeCampaignTechnologyTag>(invocation).total_reputation += payload.amount;
-        return GS1_STATUS_OK;
-    }
+        return process_progression_event_message(
+            invocation,
+            message.payload_as<ProgressionEventOccurredMessage>());
 
     case GameMessageType::CampaignReputationAwardRequested:
-    {
-        if (!runtime_invocation_has_campaign(invocation))
-        {
-            return GS1_STATUS_INVALID_STATE;
-        }
-
-        const auto& payload = message.payload_as<CampaignReputationAwardRequestedMessage>();
-        if (payload.delta <= 0)
-        {
-            return GS1_STATUS_OK;
-        }
-
-        runtime_invocation_state_ref<RuntimeCampaignTechnologyTag>(invocation).total_reputation += payload.delta;
-        return GS1_STATUS_OK;
-    }
+        return process_campaign_reputation_award_message(
+            invocation,
+            message.payload_as<CampaignReputationAwardRequestedMessage>());
 
     case GameMessageType::TechnologyNodeClaimRequested:
     {

@@ -9,6 +9,12 @@ namespace gs1
 class CampaignProgressionSystem final : public IRuntimeSystem
 {
 public:
+    using subscribed_messages = type_list<
+        ProgressionEventOccurredMessage,
+        PurchaseEntrySelectedMessage,
+        CampaignReputationAwardRequestedMessage,
+        FactionReputationAwardRequestedMessage>;
+
     static constexpr std::array<StateSetId, 2> k_owned_state_sets {
         StateSetId::CampaignFactionProgress,
         StateSetId::CampaignProgression};
@@ -28,6 +34,18 @@ public:
     [[nodiscard]] Gs1Status process_host_message(
         RuntimeInvocation& invocation,
         const Gs1HostMessage& message) override;
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const ProgressionEventOccurredMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const PurchaseEntrySelectedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const CampaignReputationAwardRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const FactionReputationAwardRequestedMessage& message);
     void run(RuntimeInvocation& invocation) override;
 };
 }  // namespace gs1

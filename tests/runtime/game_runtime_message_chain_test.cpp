@@ -1,5 +1,5 @@
 #include "runtime/game_runtime.h"
-#include "runtime/runtime_split_state_compat.h"
+#include "../system/source/split_state_test_helpers.h"
 #include "content/defs/faction_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/task_defs.h"
@@ -45,14 +45,27 @@ namespace gs1
 {
 struct GameRuntimeProjectionTestAccess
 {
-    static std::optional<CampaignState>& campaign(GameRuntime& runtime)
+    [[nodiscard]] static std::optional<CampaignState> campaign(GameRuntime& runtime)
     {
-        return runtime.compatibility_campaign_state_;
+        if (!runtime.state().campaign_core.has_value())
+        {
+            return std::nullopt;
+        }
+
+        return assemble_campaign_state_from_state_sets(runtime.state(), runtime.state_manager());
     }
 
-    static std::optional<SiteRunState>& active_site_run(GameRuntime& runtime)
+    [[nodiscard]] static std::optional<SiteRunState> active_site_run(GameRuntime& runtime)
     {
-        return runtime.compatibility_site_run_state_;
+        if (!runtime.state().site_run_meta.has_value())
+        {
+            return std::nullopt;
+        }
+
+        return assemble_site_run_state_from_state_sets(
+            runtime.state(),
+            runtime.state_manager(),
+            runtime.site_world_);
     }
 
     static Gs1AppState app_state(const GameRuntime& runtime)
@@ -60,10 +73,14 @@ struct GameRuntimeProjectionTestAccess
         return runtime.state().app_state;
     }
 
-    static void flush_projection(GameRuntime& runtime)
+    template <typename Func>
+    static void mutate_active_site_run(GameRuntime& runtime, Func&& func)
     {
-        runtime.flush_compatibility_state_to_split_state();
-        runtime.refresh_compatibility_state_from_split_state();
+        auto site_run = active_site_run(runtime);
+        assert(site_run.has_value());
+        func(site_run.value());
+        write_site_run_state_to_state_sets(site_run.value(), runtime.state(), runtime.state_manager());
+        runtime.site_world_ = site_run->site_world;
     }
 
     static void mark_tile_dirty(GameRuntime& runtime, TileCoord coord)
@@ -339,7 +356,7 @@ const Gs1RuntimeMessage* find_tile_message(
 void bootstrap_site_one(GameRuntime& runtime)
 {
     assert(runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);
-    auto& campaign = gs1::GameRuntimeProjectionTestAccess::campaign(runtime);
+    const auto campaign = gs1::GameRuntimeProjectionTestAccess::campaign(runtime);
     assert(campaign.has_value());
     assert(!campaign->sites.empty());
 
@@ -364,7 +381,7 @@ void site_loading_waits_for_scene_ready_before_bootstrap_and_fixed_steps()
 
     GameRuntime runtime {create_desc};
     assert(runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);
-    auto& campaign = gs1::GameRuntimeProjectionTestAccess::campaign(runtime);
+    const auto campaign = gs1::GameRuntimeProjectionTestAccess::campaign(runtime);
     assert(campaign.has_value());
     assert(!campaign->sites.empty());
     drain_runtime_messages(runtime);
@@ -385,13 +402,16 @@ void site_loading_waits_for_scene_ready_before_bootstrap_and_fixed_steps()
     assert(collect_messages_of_type(loading_messages, GS1_ENGINE_MESSAGE_HUD_STATE).empty());
     assert(collect_messages_of_type(loading_messages, GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES).empty());
 
-    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
-    assert(site_run.clock.accumulator_real_seconds == 0.0);
+    const auto site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
+    assert(site_run->clock.accumulator_real_seconds == 0.0);
 
     Gs1Phase1Result loading_result {};
     run_phase1(runtime, 60.0, loading_result);
     assert(loading_result.fixed_steps_executed == 0U);
-    assert(site_run.clock.accumulator_real_seconds == 0.0);
+    assert(
+        gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime)->clock.accumulator_real_seconds ==
+        0.0);
     assert(drain_runtime_messages(runtime).empty());
 
     const auto ready_event = make_site_scene_ready_event();
@@ -414,26 +434,24 @@ void site_loading_waits_for_scene_ready_before_bootstrap_and_fixed_steps()
 
 void seed_runtime_test_task(GameRuntime& runtime, std::uint32_t site_completion_target)
 {
-    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
-    site_run.task_board.visible_tasks.clear();
-    site_run.task_board.accepted_task_ids.clear();
-    site_run.task_board.completed_task_ids.clear();
-    site_run.task_board.claimed_task_ids.clear();
-    site_run.task_board.task_pool_size = 1U;
-    site_run.task_board.visible_tasks.push_back(gs1::TaskInstanceState {
-        gs1::TaskInstanceId {1U},
-        gs1::TaskTemplateId {gs1::k_task_template_site1_restore_patch},
-        gs1::FactionId {gs1::k_faction_forestry_bureau},
-        1U,
-        site_completion_target,
-        0U,
-        0U});
-    gs1::GameRuntimeProjectionTestAccess::mark_projection_dirty(
+    gs1::GameRuntimeProjectionTestAccess::mutate_active_site_run(
         runtime,
-        gs1::SITE_PROJECTION_UPDATE_TASKS |
-            gs1::SITE_PROJECTION_UPDATE_PHONE |
-            gs1::SITE_PROJECTION_UPDATE_HUD);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+        [site_completion_target](SiteRunState& site_run)
+        {
+            site_run.task_board.visible_tasks.clear();
+            site_run.task_board.accepted_task_ids.clear();
+            site_run.task_board.completed_task_ids.clear();
+            site_run.task_board.claimed_task_ids.clear();
+            site_run.task_board.task_pool_size = 1U;
+            site_run.task_board.visible_tasks.push_back(gs1::TaskInstanceState {
+                gs1::TaskInstanceId {1U},
+                gs1::TaskTemplateId {gs1::k_task_template_site1_restore_patch},
+                gs1::FactionId {gs1::k_faction_forestry_bureau},
+                1U,
+                site_completion_target,
+                0U,
+                0U});
+        });
 }
 
 void set_worker_hydration(SiteRunState& site_run, float hydration)
@@ -464,34 +482,44 @@ void inventory_item_use_updates_worker_and_projection()
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
 
-    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
-    assert(!site_run.inventory.worker_pack_slots[0].occupied);
+    auto site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
+    assert(!site_run->inventory.worker_pack_slots[0].occupied);
 
     drain_runtime_messages(runtime);
 
-    site_run.inventory.worker_pack_slots[4].occupied = true;
-    site_run.inventory.worker_pack_slots[4].item_id = gs1::ItemId {gs1::k_item_medicine_pack};
-    site_run.inventory.worker_pack_slots[4].item_quantity = 1U;
-    site_run.inventory.worker_pack_slots[4].item_condition = 1.0f;
-    site_run.inventory.worker_pack_slots[4].item_freshness = 1.0f;
+    const auto worker_pack_storage_id = site_run->inventory.worker_pack_storage_id;
+    gs1::GameRuntimeProjectionTestAccess::mutate_active_site_run(
+        runtime,
+        [](SiteRunState& active_site_run)
+        {
+            active_site_run.inventory.worker_pack_slots[4].occupied = true;
+            active_site_run.inventory.worker_pack_slots[4].item_id =
+                gs1::ItemId {gs1::k_item_medicine_pack};
+            active_site_run.inventory.worker_pack_slots[4].item_quantity = 1U;
+            active_site_run.inventory.worker_pack_slots[4].item_condition = 1.0f;
+            active_site_run.inventory.worker_pack_slots[4].item_freshness = 1.0f;
 
-    auto worker_conditions = gs1::site_world_access::worker_conditions(site_run);
-    worker_conditions.health = 70.0f;
-    gs1::site_world_access::set_worker_conditions(site_run, worker_conditions);
-    assert(approx_equal(gs1::site_world_access::worker_conditions(site_run).health, 70.0f));
+            auto worker_conditions = gs1::site_world_access::worker_conditions(active_site_run);
+            worker_conditions.health = 70.0f;
+            gs1::site_world_access::set_worker_conditions(active_site_run, worker_conditions);
+            assert(approx_equal(
+                gs1::site_world_access::worker_conditions(active_site_run).health,
+                70.0f));
+        });
 
     assert(runtime.handle_message(make_inventory_use_message(
                gs1::k_item_medicine_pack,
                1U,
-               site_run.inventory.worker_pack_storage_id,
+               worker_pack_storage_id,
                4U)) == GS1_STATUS_OK);
 
-    assert(!site_run.inventory.worker_pack_slots[4].occupied);
-
-    worker_conditions = gs1::site_world_access::worker_conditions(site_run);
+    site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
+    assert(!site_run->inventory.worker_pack_slots[4].occupied);
+    const auto worker_conditions = gs1::site_world_access::worker_conditions(site_run.value());
     assert(approx_equal(worker_conditions.health, 88.0f));
 
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     const auto messages = drain_runtime_messages(runtime);
     assert_singleton_projection_messages_do_not_repeat(messages);
 
@@ -508,7 +536,7 @@ void inventory_item_use_updates_worker_and_projection()
     assert(campaign_resource_messages.empty());
 
     const auto* slot_message =
-        find_inventory_slot_message(messages, site_run.inventory.worker_pack_storage_id, 4U);
+        find_inventory_slot_message(messages, worker_pack_storage_id, 4U);
     assert(slot_message != nullptr);
     {
         const auto& payload = slot_message->payload_as<Gs1EngineMessageInventorySlotData>();
@@ -549,8 +577,6 @@ void task_accept_request_does_not_emit_campaign_resource_projection()
     assert(runtime.handle_message(make_accept_task_message(1U)) == GS1_STATUS_OK);
 
     std::vector<Gs1RuntimeMessage> messages = drain_runtime_messages(runtime);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    append_messages(messages, drain_runtime_messages(runtime));
     assert_singleton_projection_messages_do_not_repeat(messages);
 
     const auto campaign_resource_messages =
@@ -568,18 +594,17 @@ void phone_purchase_request_emits_single_hud_and_campaign_resource_projection()
 
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
-    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    const auto site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
     drain_runtime_messages(runtime);
 
     GameMessage buy_listing {};
     buy_listing.type = GameMessageType::PhoneListingPurchaseRequested;
     buy_listing.set_payload(PhoneListingPurchaseRequestedMessage {1U, 1U, 0U});
     assert(runtime.handle_message(buy_listing) == GS1_STATUS_OK);
-    assert(site_run.economy.current_cash == 1280);
+    assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime)->economy.current_cash == 1280);
 
     std::vector<Gs1RuntimeMessage> messages = drain_runtime_messages(runtime);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    append_messages(messages, drain_runtime_messages(runtime));
     assert_singleton_projection_messages_do_not_repeat(messages);
 
     const auto hud_messages = collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_HUD_STATE);
@@ -622,8 +647,6 @@ void campaign_reputation_award_emits_campaign_resource_projection_and_unlock_cue
     assert(runtime.handle_message(reputation_award) == GS1_STATUS_OK);
 
     std::vector<Gs1RuntimeMessage> messages = drain_runtime_messages(runtime);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    append_messages(messages, drain_runtime_messages(runtime));
     assert_singleton_projection_messages_do_not_repeat(messages);
 
     const auto campaign_resource_messages =
@@ -656,24 +679,30 @@ void inventory_use_request_keeps_singleton_projections_singular_across_immediate
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
 
-    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    auto site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
     drain_runtime_messages(runtime);
 
-    site_run.inventory.worker_pack_slots[4].occupied = true;
-    site_run.inventory.worker_pack_slots[4].item_id = gs1::ItemId {gs1::k_item_medicine_pack};
-    site_run.inventory.worker_pack_slots[4].item_quantity = 1U;
-    site_run.inventory.worker_pack_slots[4].item_condition = 1.0f;
-    site_run.inventory.worker_pack_slots[4].item_freshness = 1.0f;
+    const auto worker_pack_storage_id = site_run->inventory.worker_pack_storage_id;
+    gs1::GameRuntimeProjectionTestAccess::mutate_active_site_run(
+        runtime,
+        [](SiteRunState& active_site_run)
+        {
+            active_site_run.inventory.worker_pack_slots[4].occupied = true;
+            active_site_run.inventory.worker_pack_slots[4].item_id =
+                gs1::ItemId {gs1::k_item_medicine_pack};
+            active_site_run.inventory.worker_pack_slots[4].item_quantity = 1U;
+            active_site_run.inventory.worker_pack_slots[4].item_condition = 1.0f;
+            active_site_run.inventory.worker_pack_slots[4].item_freshness = 1.0f;
+        });
 
     assert(runtime.handle_message(make_inventory_use_message(
                gs1::k_item_medicine_pack,
                1U,
-               site_run.inventory.worker_pack_storage_id,
+               worker_pack_storage_id,
                4U)) == GS1_STATUS_OK);
 
     std::vector<Gs1RuntimeMessage> messages = drain_runtime_messages(runtime);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
-    append_messages(messages, drain_runtime_messages(runtime));
     assert_singleton_projection_messages_do_not_repeat(messages);
 }
 
@@ -688,30 +717,37 @@ void ecology_growth_completes_task_and_site_attempt()
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
 
-    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
-    assert(site_run.counters.site_completion_tile_threshold == 10U);
-    assert(site_run.task_board.visible_tasks.size() == 1U);
-    assert(site_run.task_board.accepted_task_ids.size() == 1U);
-    site_run.counters.site_completion_tile_threshold = 1U;
+    auto site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
+    assert(site_run->counters.site_completion_tile_threshold == 10U);
+    assert(site_run->task_board.visible_tasks.size() == 1U);
+    assert(site_run->task_board.accepted_task_ids.size() == 1U);
+    gs1::GameRuntimeProjectionTestAccess::mutate_active_site_run(
+        runtime,
+        [](SiteRunState& active_site_run)
+        {
+            active_site_run.counters.site_completion_tile_threshold = 1U;
+        });
     seed_runtime_test_task(runtime, 10U);
-    assert(site_run.task_board.visible_tasks.front().target_amount == 10U);
+    assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime)->task_board.visible_tasks.front().target_amount == 10U);
 
     drain_runtime_messages(runtime);
 
     assert(runtime.handle_message(make_accept_task_message(1U)) == GS1_STATUS_OK);
-    assert(site_run.task_board.accepted_task_ids.size() == 1U);
+    assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime)->task_board.accepted_task_ids.size() == 1U);
 
     GameMessage restoration_message {};
     restoration_message.type = GameMessageType::RestorationProgressChanged;
     restoration_message.set_payload(gs1::RestorationProgressChangedMessage {10U, 1U, 1.0f});
     assert(runtime.handle_message(restoration_message) == GS1_STATUS_OK);
 
-    assert(site_run.task_board.accepted_task_ids.empty());
-    assert(site_run.task_board.completed_task_ids.size() == 1U);
-    assert(site_run.task_board.visible_tasks.front().runtime_list_kind == TaskRuntimeListKind::PendingClaim);
-    assert(site_run.task_board.visible_tasks.front().current_progress_amount == 10U);
+    site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
+    assert(site_run->task_board.accepted_task_ids.empty());
+    assert(site_run->task_board.completed_task_ids.size() == 1U);
+    assert(site_run->task_board.visible_tasks.front().runtime_list_kind == TaskRuntimeListKind::PendingClaim);
+    assert(site_run->task_board.visible_tasks.front().current_progress_amount == 10U);
 
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     const auto phase1_messages = drain_runtime_messages(runtime);
     const auto* completed_task_message = find_task_message(phase1_messages, 1U);
     assert(completed_task_message != nullptr);
@@ -722,7 +758,6 @@ void ecology_growth_completes_task_and_site_attempt()
         assert(payload.list_kind == GS1_TASK_PRESENTATION_LIST_PENDING_CLAIM);
     }
 
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
     (void)drain_runtime_messages(runtime);
 }
 
@@ -737,27 +772,33 @@ void task_reward_claim_emits_pending_claim_projection_then_reward_cue()
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
 
-    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    auto site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
     drain_runtime_messages(runtime);
 
-    auto& task = site_run.task_board.visible_tasks.front();
-    task.task_instance_id = gs1::TaskInstanceId {1U};
-    task.task_template_id = gs1::TaskTemplateId {gs1::k_task_template_site1_buy_water};
-    task.publisher_faction_id = gs1::FactionId {gs1::k_faction_village_committee};
-    task.target_amount = 1U;
-    task.current_progress_amount = 1U;
-    task.runtime_list_kind = TaskRuntimeListKind::PendingClaim;
-    task.reward_draft_option_offset = 0U;
-    task.reward_draft_option_count = 2U;
-    site_run.task_board.reward_draft_options.clear();
-    site_run.task_board.reward_draft_options.push_back(
-        gs1::TaskRewardDraftOption {gs1::RewardCandidateId {1U}, false});
-    site_run.task_board.reward_draft_options.push_back(
-        gs1::TaskRewardDraftOption {gs1::RewardCandidateId {2U}, false});
-    site_run.task_board.accepted_task_ids.clear();
-    site_run.task_board.completed_task_ids.clear();
-    site_run.task_board.completed_task_ids.push_back(task.task_instance_id);
-    site_run.task_board.claimed_task_ids.clear();
+    gs1::GameRuntimeProjectionTestAccess::mutate_active_site_run(
+        runtime,
+        [](SiteRunState& active_site_run)
+        {
+            auto& task = active_site_run.task_board.visible_tasks.front();
+            task.task_instance_id = gs1::TaskInstanceId {1U};
+            task.task_template_id = gs1::TaskTemplateId {gs1::k_task_template_site1_buy_water};
+            task.publisher_faction_id = gs1::FactionId {gs1::k_faction_village_committee};
+            task.target_amount = 1U;
+            task.current_progress_amount = 1U;
+            task.runtime_list_kind = TaskRuntimeListKind::PendingClaim;
+            task.reward_draft_option_offset = 0U;
+            task.reward_draft_option_count = 2U;
+            active_site_run.task_board.reward_draft_options.clear();
+            active_site_run.task_board.reward_draft_options.push_back(
+                gs1::TaskRewardDraftOption {gs1::RewardCandidateId {1U}, false});
+            active_site_run.task_board.reward_draft_options.push_back(
+                gs1::TaskRewardDraftOption {gs1::RewardCandidateId {2U}, false});
+            active_site_run.task_board.accepted_task_ids.clear();
+            active_site_run.task_board.completed_task_ids.clear();
+            active_site_run.task_board.completed_task_ids.push_back(task.task_instance_id);
+            active_site_run.task_board.claimed_task_ids.clear();
+        });
 
     GameMessage claim_message {};
     claim_message.type = GameMessageType::TaskRewardClaimRequested;
@@ -810,27 +851,33 @@ void task_reward_claim_ui_action_claims_pending_task_and_emits_reward_cue()
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
 
-    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    auto site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
     drain_runtime_messages(runtime);
 
-    auto& task = site_run.task_board.visible_tasks.front();
-    task.task_instance_id = gs1::TaskInstanceId {1U};
-    task.task_template_id = gs1::TaskTemplateId {gs1::k_task_template_site1_buy_water};
-    task.publisher_faction_id = gs1::FactionId {gs1::k_faction_village_committee};
-    task.target_amount = 1U;
-    task.current_progress_amount = 1U;
-    task.runtime_list_kind = TaskRuntimeListKind::PendingClaim;
-    task.reward_draft_option_offset = 0U;
-    task.reward_draft_option_count = 2U;
-    site_run.task_board.reward_draft_options.clear();
-    site_run.task_board.reward_draft_options.push_back(
-        gs1::TaskRewardDraftOption {gs1::RewardCandidateId {1U}, false});
-    site_run.task_board.reward_draft_options.push_back(
-        gs1::TaskRewardDraftOption {gs1::RewardCandidateId {2U}, false});
-    site_run.task_board.accepted_task_ids.clear();
-    site_run.task_board.completed_task_ids.clear();
-    site_run.task_board.completed_task_ids.push_back(task.task_instance_id);
-    site_run.task_board.claimed_task_ids.clear();
+    gs1::GameRuntimeProjectionTestAccess::mutate_active_site_run(
+        runtime,
+        [](SiteRunState& active_site_run)
+        {
+            auto& task = active_site_run.task_board.visible_tasks.front();
+            task.task_instance_id = gs1::TaskInstanceId {1U};
+            task.task_template_id = gs1::TaskTemplateId {gs1::k_task_template_site1_buy_water};
+            task.publisher_faction_id = gs1::FactionId {gs1::k_faction_village_committee};
+            task.target_amount = 1U;
+            task.current_progress_amount = 1U;
+            task.runtime_list_kind = TaskRuntimeListKind::PendingClaim;
+            task.reward_draft_option_offset = 0U;
+            task.reward_draft_option_count = 2U;
+            active_site_run.task_board.reward_draft_options.clear();
+            active_site_run.task_board.reward_draft_options.push_back(
+                gs1::TaskRewardDraftOption {gs1::RewardCandidateId {1U}, false});
+            active_site_run.task_board.reward_draft_options.push_back(
+                gs1::TaskRewardDraftOption {gs1::RewardCandidateId {2U}, false});
+            active_site_run.task_board.accepted_task_ids.clear();
+            active_site_run.task_board.completed_task_ids.clear();
+            active_site_run.task_board.completed_task_ids.push_back(task.task_instance_id);
+            active_site_run.task_board.claimed_task_ids.clear();
+        });
 
     Gs1UiAction claim_action {};
     claim_action.type = GS1_UI_ACTION_CLAIM_TASK_REWARD;
@@ -888,10 +935,11 @@ void inventory_craft_completed_opens_output_storage_and_emits_craft_output_cue()
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
 
-    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    auto site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
     drain_runtime_messages(runtime);
 
-    const auto storage_id = starter_storage_id(site_run);
+    const auto storage_id = starter_storage_id(site_run.value());
     GameMessage crafted_message {};
     crafted_message.type = GameMessageType::InventoryCraftCompleted;
     crafted_message.set_payload(gs1::InventoryCraftCompletedMessage {
@@ -928,16 +976,20 @@ void site_weather_changes_emit_hud_wind_warning_codes()
     GameRuntime runtime {create_desc};
     bootstrap_site_one(runtime);
 
-    auto& site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).value();
+    auto site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
     drain_runtime_messages(runtime);
 
-    const auto worker_position = gs1::site_world_access::worker_position(site_run);
-    gs1::site_world_access::set_tile_local_weather(
-        site_run,
-        worker_position.tile_coord,
-        gs1::SiteWorld::TileLocalWeatherData {8.0f, 36.0f, 6.0f});
-    gs1::GameRuntimeProjectionTestAccess::mark_projection_dirty(runtime, gs1::SITE_PROJECTION_UPDATE_WEATHER);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    const auto worker_position = gs1::site_world_access::worker_position(site_run.value());
+    gs1::GameRuntimeProjectionTestAccess::mutate_active_site_run(
+        runtime,
+        [worker_position](SiteRunState& active_site_run)
+        {
+            gs1::site_world_access::set_tile_local_weather(
+                active_site_run,
+                worker_position.tile_coord,
+                gs1::SiteWorld::TileLocalWeatherData {8.0f, 36.0f, 6.0f});
+        });
 
     const auto weather_messages = drain_runtime_messages(runtime);
     const auto weather_hud_messages =
@@ -948,11 +1000,14 @@ void site_weather_changes_emit_hud_wind_warning_codes()
         assert(payload.warning_code == k_hud_warning_wind_exposure);
     }
 
-    site_run.weather.weather_heat = 60.0f;
-    site_run.weather.weather_wind = 24.0f;
-    site_run.weather.weather_dust = 16.0f;
-    gs1::GameRuntimeProjectionTestAccess::mark_projection_dirty(runtime, gs1::SITE_PROJECTION_UPDATE_WORKER);
-    gs1::GameRuntimeProjectionTestAccess::flush_projection(runtime);
+    gs1::GameRuntimeProjectionTestAccess::mutate_active_site_run(
+        runtime,
+        [](SiteRunState& active_site_run)
+        {
+            active_site_run.weather.weather_heat = 60.0f;
+            active_site_run.weather.weather_wind = 24.0f;
+            active_site_run.weather.weather_dust = 16.0f;
+        });
 
     const auto sheltered_messages = drain_runtime_messages(runtime);
     const auto sheltered_hud_messages =

@@ -14,6 +14,11 @@ namespace gs1
 class TechnologySystem final : public IRuntimeSystem
 {
 public:
+    using subscribed_messages = type_list<
+        TargetGrantedMessage,
+        ProgressionEventOccurredMessage,
+        CampaignReputationAwardRequestedMessage>;
+
     static constexpr std::array<StateSetId, 1> k_owned_state_sets {StateSetId::CampaignTechnology};
     [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
     {
@@ -31,6 +36,15 @@ public:
     [[nodiscard]] Gs1Status process_host_message(
         RuntimeInvocation& invocation,
         const Gs1HostMessage& message) override;
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const TargetGrantedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const ProgressionEventOccurredMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const CampaignReputationAwardRequestedMessage& message);
     void run(RuntimeInvocation& invocation) override;
     [[nodiscard]] static bool node_purchased(
         const CampaignState& campaign,

@@ -30,128 +30,119 @@ struct BrokenDeviceEntry final
 };
 
 void emit_device_broken_message(
-    gs1::GameMessageQueue& queue,
+    gs1::RuntimeInvocation& invocation,
     std::uint64_t device_entity_id,
     gs1::TileCoord target_tile,
     gs1::StructureId structure_id)
 {
-    gs1::GameMessage message {};
-    message.type = gs1::GameMessageType::SiteDeviceBroken;
-    message.set_payload(gs1::SiteDeviceBrokenMessage {
+    invocation.emit_game_message(gs1::SiteDeviceBrokenMessage {
         device_entity_id,
         target_tile.x,
         target_tile.y,
         structure_id.value});
-    queue.push_back(message);
 }
 
 void emit_device_condition_changed_message(
-    gs1::GameMessageQueue& queue,
+    gs1::RuntimeInvocation& invocation,
     gs1::TileCoord target_tile,
     gs1::StructureId structure_id,
     float integrity,
     std::uint32_t flags = 0U)
 {
-    gs1::GameMessage message {};
-    message.type = gs1::GameMessageType::SiteDeviceConditionChanged;
-    message.set_payload(gs1::SiteDeviceConditionChangedMessage {
+    invocation.emit_game_message(gs1::SiteDeviceConditionChangedMessage {
         target_tile.x,
         target_tile.y,
         structure_id.value,
         integrity,
         flags});
-    queue.push_back(message);
 }
 
-Gs1Status process_message(
-    gs1::RuntimeInvocation& invocation,
-    const gs1::GameMessage& message)
+Gs1Status emit_startup_device_condition_snapshot(
+    gs1::RuntimeInvocation& invocation)
 {
     gs1::SiteWorldAccess<gs1::DeviceMaintenanceSystem> world {invocation};
-    auto& message_queue = invocation.game_message_queue();
-    if (message.type == gs1::GameMessageType::SiteRunStarted)
-    {
-        auto* site_world = world.read_site_world();
-        if (!world.has_world() || site_world == nullptr)
-        {
-            return GS1_STATUS_OK;
-        }
-
-        auto source_query =
-            site_world->ecs_world()
-                .query_builder<
-                    const gs1::site_ecs::TileCoordComponent,
-                    const gs1::site_ecs::DeviceStructureId,
-                    const gs1::site_ecs::DeviceIntegrity>()
-                .with<gs1::site_ecs::DeviceTag>()
-                .build();
-
-        source_query.each(
-            [&](flecs::entity,
-                const gs1::site_ecs::TileCoordComponent& coord_component,
-                const gs1::site_ecs::DeviceStructureId& structure_component,
-                const gs1::site_ecs::DeviceIntegrity& integrity_component) {
-                if (structure_component.structure_id.value == 0U)
-                {
-                    return;
-                }
-
-                emit_device_condition_changed_message(
-                    message_queue,
-                    coord_component.value,
-                    structure_component.structure_id,
-                    integrity_component.value);
-            });
-        return GS1_STATUS_OK;
-    }
-
-    if (message.type == gs1::GameMessageType::SiteDeviceRepaired)
-    {
-        const auto& payload = message.payload_as<gs1::SiteDeviceRepairedMessage>();
-        const gs1::TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
-        if (!world.tile_coord_in_bounds(target_tile))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-
-        const auto anchor_device = world.read_tile_device(target_tile);
-        if (anchor_device.structure_id.value == 0U)
-        {
-            return GS1_STATUS_OK;
-        }
-
-        gs1::for_each_tile_in_footprint(
-            target_tile,
-            gs1::resolve_structure_tile_footprint(anchor_device.structure_id),
-            [&](gs1::TileCoord footprint_coord) {
-                if (!world.tile_coord_in_bounds(footprint_coord))
-                {
-                    return;
-                }
-
-                auto device = world.read_tile_device(footprint_coord);
-                if (device.structure_id != anchor_device.structure_id)
-                {
-                    return;
-                }
-
-                device.device_integrity = 1.0f;
-                world.write_tile_device(footprint_coord, device);
-                emit_device_condition_changed_message(
-                    message_queue,
-                    footprint_coord,
-                    device.structure_id,
-                    device.device_integrity);
-            });
-        return GS1_STATUS_OK;
-    }
-
-    if (message.type != gs1::GameMessageType::SiteDevicePlaced)
+    auto* site_world = world.read_site_world();
+    if (!world.has_world() || site_world == nullptr)
     {
         return GS1_STATUS_OK;
     }
 
-    const auto& payload = message.payload_as<gs1::SiteDevicePlacedMessage>();
+    auto source_query =
+        site_world->ecs_world()
+            .query_builder<
+                const gs1::site_ecs::TileCoordComponent,
+                const gs1::site_ecs::DeviceStructureId,
+                const gs1::site_ecs::DeviceIntegrity>()
+            .with<gs1::site_ecs::DeviceTag>()
+            .build();
+
+    source_query.each(
+        [&](flecs::entity,
+            const gs1::site_ecs::TileCoordComponent& coord_component,
+            const gs1::site_ecs::DeviceStructureId& structure_component,
+            const gs1::site_ecs::DeviceIntegrity& integrity_component) {
+            if (structure_component.structure_id.value == 0U)
+            {
+                return;
+            }
+
+            emit_device_condition_changed_message(
+                invocation,
+                coord_component.value,
+                structure_component.structure_id,
+                integrity_component.value);
+        });
+    return GS1_STATUS_OK;
+}
+
+Gs1Status handle_site_device_repaired(
+    gs1::RuntimeInvocation& invocation,
+    const gs1::SiteDeviceRepairedMessage& payload)
+{
+    gs1::SiteWorldAccess<gs1::DeviceMaintenanceSystem> world {invocation};
+    const gs1::TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
+    if (!world.tile_coord_in_bounds(target_tile))
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    const auto anchor_device = world.read_tile_device(target_tile);
+    if (anchor_device.structure_id.value == 0U)
+    {
+        return GS1_STATUS_OK;
+    }
+
+    gs1::for_each_tile_in_footprint(
+        target_tile,
+        gs1::resolve_structure_tile_footprint(anchor_device.structure_id),
+        [&](gs1::TileCoord footprint_coord) {
+            if (!world.tile_coord_in_bounds(footprint_coord))
+            {
+                return;
+            }
+
+            auto device = world.read_tile_device(footprint_coord);
+            if (device.structure_id != anchor_device.structure_id)
+            {
+                return;
+            }
+
+            device.device_integrity = 1.0f;
+            world.write_tile_device(footprint_coord, device);
+            emit_device_condition_changed_message(
+                invocation,
+                footprint_coord,
+                device.structure_id,
+                device.device_integrity);
+        });
+    return GS1_STATUS_OK;
+}
+
+Gs1Status handle_site_device_placed(
+    gs1::RuntimeInvocation& invocation,
+    const gs1::SiteDevicePlacedMessage& payload)
+{
+    gs1::SiteWorldAccess<gs1::DeviceMaintenanceSystem> world {invocation};
     const gs1::TileCoord target_tile {payload.target_tile_x, payload.target_tile_y};
     if (!world.tile_coord_in_bounds(target_tile))
     {
@@ -176,7 +167,7 @@ Gs1Status process_message(
                     0.0f,
                     false});
             emit_device_condition_changed_message(
-                message_queue,
+                invocation,
                 footprint_coord,
                 gs1::StructureId {payload.structure_id},
                 1.0f);
@@ -188,7 +179,6 @@ void run_system(gs1::RuntimeInvocation& invocation)
 {
     auto access = gs1::make_game_state_access<gs1::DeviceMaintenanceSystem>(invocation);
     gs1::SiteWorldAccess<gs1::DeviceMaintenanceSystem> world {invocation};
-    auto& message_queue = invocation.game_message_queue();
     if (!world.has_world())
     {
         return;
@@ -273,7 +263,7 @@ void run_system(gs1::RuntimeInvocation& invocation)
 
             entity.set<gs1::site_ecs::DeviceIntegrity>({next_integrity});
             emit_device_condition_changed_message(
-                message_queue,
+                invocation,
                 coord,
                 structure_id,
                 next_integrity);
@@ -285,14 +275,14 @@ void run_system(gs1::RuntimeInvocation& invocation)
             broken.coord,
             gs1::SiteWorld::TileDeviceData {});
         emit_device_condition_changed_message(
-            message_queue,
+            invocation,
             broken.coord,
             gs1::StructureId {},
             0.0f);
         if (broken.device_entity_id != 0U)
         {
             emit_device_broken_message(
-                message_queue,
+                invocation,
                 broken.device_entity_id,
                 broken.coord,
                 broken.structure_id);
@@ -338,13 +328,60 @@ Gs1Status DeviceMaintenanceSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
+    if (message.type == GameMessageType::SiteRunStarted)
+    {
+        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
+    }
+
     SiteWorldAccess<DeviceMaintenanceSystem> world {invocation};
     if (!world.has_world())
     {
         return GS1_STATUS_INVALID_STATE;
     }
 
-    return process_message(invocation, message);
+    if (message.type == GameMessageType::SiteDevicePlaced)
+    {
+        return handle(invocation, message.payload_as<SiteDevicePlacedMessage>());
+    }
+
+    if (message.type == GameMessageType::SiteDeviceRepaired)
+    {
+        return handle(invocation, message.payload_as<SiteDeviceRepairedMessage>());
+    }
+
+    return GS1_STATUS_OK;
+}
+
+Gs1Status DeviceMaintenanceSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteRunStartedMessage& message)
+{
+    (void)message;
+    return emit_startup_device_condition_snapshot(invocation);
+}
+
+Gs1Status DeviceMaintenanceSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteDevicePlacedMessage& message)
+{
+    if (!SiteWorldAccess<DeviceMaintenanceSystem> {invocation}.has_world())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return handle_site_device_placed(invocation, message);
+}
+
+Gs1Status DeviceMaintenanceSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteDeviceRepairedMessage& message)
+{
+    if (!SiteWorldAccess<DeviceMaintenanceSystem> {invocation}.has_world())
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return handle_site_device_repaired(invocation, message);
 }
 
 Gs1Status DeviceMaintenanceSystem::process_host_message(

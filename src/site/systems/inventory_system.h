@@ -9,6 +9,21 @@ namespace gs1
 class InventorySystem final : public IRuntimeSystem
 {
 public:
+    using subscribed_messages = type_list<
+        SiteRunStartedMessage,
+        SiteDevicePlacedMessage,
+        SiteDeviceBrokenMessage,
+        InventoryDeliveryRequestedMessage,
+        InventoryDeliveryBatchRequestedMessage,
+        InventoryWorkerPackInsertRequestedMessage,
+        InventoryItemUseRequestedMessage,
+        InventoryItemConsumeRequestedMessage,
+        InventoryGlobalItemConsumeRequestedMessage,
+        InventoryTransferRequestedMessage,
+        InventoryItemSubmitRequestedMessage,
+        InventorySlotTappedMessage,
+        InventoryCraftCommitRequestedMessage>;
+
     [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
     {
         return site_access_owned_state_sets<InventorySystem>();
@@ -25,6 +40,42 @@ public:
     [[nodiscard]] Gs1Status process_host_message(
         RuntimeInvocation& invocation,
         const Gs1HostMessage& message) override;
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteRunStartedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteDevicePlacedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteDeviceBrokenMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const InventoryDeliveryRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const InventoryDeliveryBatchRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const InventoryWorkerPackInsertRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const InventoryItemUseRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const InventoryItemConsumeRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const InventoryGlobalItemConsumeRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const InventoryTransferRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const InventoryItemSubmitRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const InventoryCraftCommitRequestedMessage& message);
     void run(RuntimeInvocation& invocation) override;
 
     [[nodiscard]] static constexpr SiteSystemAccess access() noexcept
