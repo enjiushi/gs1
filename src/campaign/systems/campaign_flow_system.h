@@ -21,6 +21,10 @@ public:
         StartSiteAttemptMessage,
         ReturnToRegionalMapMessage,
         SiteAttemptEndedMessage>;
+    using emitted_runtime_messages = type_list<>;
+    static constexpr std::optional<Gs1RuntimeProfileSystemId> profile_id =
+        GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_FLOW;
+    static constexpr std::optional<std::uint32_t> fixed_step_order_value = std::nullopt;
 
     static constexpr std::array<StateSetId, 11> k_owned_state_sets {
         StateSetId::AppState,

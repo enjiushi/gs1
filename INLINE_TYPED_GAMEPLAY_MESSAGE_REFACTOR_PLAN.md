@@ -331,7 +331,11 @@ Legend:
 - [done] The worker-meter, site-tile-state, and typed reward follow-up slices now dispatch immediate typed messages inline for `WorkerMetersChangedMessage`, `SiteTileStateChangedMessage`, `EconomyMoneyAwardRequestedMessage`, `InventoryDeliveryRequestedMessage`, `SiteUnlockableRevealRequestedMessage`, and `RunModifierAwardRequestedMessage`.
 - [done] Touched internal debug log probes no longer emit dead-end internal `PresentLog` gameplay messages; they translate directly to runtime log transport instead.
 - [done] `ActionExecutionSystem` no longer uses the internal gameplay queue for action-start, action-fail, or placement-commit-reject observation; those paths now publish through runtime-to-host action/placement/cue transport while gameplay coordination stays typed inline.
-- [>] Runtime storage is still primarily runtime-polymorphic; typed tuple-backed system ownership has not landed yet.
+- [done] Debug builds now keep a shared semantic gameplay-message stack for both typed inline dispatch and legacy inline `GameMessage` dispatch, with focused regression coverage for push/pop visibility and clean unwind.
+- [done] Runtime trait scaffolding now reads compile-time `profile_id` / `fixed_step_order_value` metadata with runtime virtual fallbacks, and the full active `GameSystems` pack now declares that metadata.
+- [done] Legacy `GameMessage` subscriber registration now caches per-system profile metadata up front, so both fixed-step execution and legacy internal-message profiling consume trait-backed metadata without re-querying virtuals on the hot path.
+- [done] Runtime trait scaffolding now reads compile-time `emitted_runtime_messages` metadata, and the active `GameSystems` pack now aggregates a compile-time runtime-to-host message manifest with regression coverage for the current direct host-transport emitters.
+- [>] Runtime storage now has compile-time `GameSystems` ordering and O(1) typed lookup, but primary ownership/iteration still remains runtime-polymorphic rather than tuple-backed.
 - [>] Some non-migrated internal gameplay paths still rely on the legacy `GameMessage` envelope, but that is a temporary migration state to be removed rather than a supported long-term bridge design.
 - [>] Runtime-level queue draining and generic `process_game_message(const GameMessage&)` dispatch still exist for the remaining unmigrated gameplay message families.
 
@@ -343,53 +347,56 @@ Legend:
 - [done] Create a `system_pack` abstraction that preserves explicit system order.
 - [done] Define runtime helpers for compile-time subscriber filtering from `subscribed_messages`.
 - [done] Define typed internal gameplay dispatch entrypoints on the runtime and invocation layers.
-- [x] Define a compile-time trait shape for `subscribed_messages`, `fixed_step_order`, `emitted_runtime_messages`, and profiling metadata.
+- [>] Define a compile-time trait shape for `subscribed_messages`, `fixed_step_order`, `emitted_runtime_messages`, and profiling metadata.
+  Runtime helpers now cover `subscribed_messages`, `profile_id`, `fixed_step_order_value`, and `emitted_runtime_messages`, with active-system adoption complete.
 - [done] Decide the home for the new typed internal message definitions and supporting metaprogramming utilities.
 
 ### Phase 2: Runtime storage and registry refactor
 
-- [x] Convert runtime system ownership from the current primary runtime-polymorphic registry shape to typed tuple-backed storage.
-- [x] Preserve stable system ordering from the current `initialize_system_registry()` sequence.
-- [x] Rework fixed-step discovery to derive from system traits and the compile-time system pack.
-- [x] Rework ownership/resolver registration to derive from the compile-time system pack.
-- [x] Rework profiling registration and lookup to fit the typed system pack model.
+- [>] Convert runtime system ownership from the current primary runtime-polymorphic registry shape to typed tuple-backed storage.
+- [done] Preserve stable system ordering from the current `initialize_system_registry()` sequence.
+- [>] Rework fixed-step discovery to derive from system traits and the compile-time system pack.
+  Fixed-step registration now caches trait-backed order/profile metadata for the full active `GameSystems` pack, but the runtime still instantiates and iterates systems through the polymorphic registry.
+- [>] Rework ownership/resolver registration to derive from the compile-time system pack.
+- [>] Rework profiling registration and lookup to fit the typed system pack model.
+  Typed inline dispatch, fixed-step execution, and legacy `GameMessage` profiling now consume cached compile-time profile metadata from the active system pack, while broader runtime-to-host validation still remains pending beyond the first emitted-message manifest scaffold.
 
 ### Phase 3: Typed gameplay-dispatch path
 
 - [done] Add typed `dispatch<Message>(...)` support for immediate inline internal gameplay dispatch.
 - [done] Add typed `emit(Message)` support on `RuntimeInvocation`.
 - [done] Keep and strengthen nested inline-dispatch depth tracking and ownership restoration.
-- [x] Add debug-only semantic nested gameplay message-call stack visibility for re-entrant dispatch chains.
-- [x] Remove dependence on runtime-built internal gameplay subscriber arrays keyed by gameplay enum.
+- [done] Add debug-only semantic nested gameplay message-call stack visibility for re-entrant dispatch chains.
+- [>] Remove dependence on runtime-built internal gameplay subscriber arrays keyed by gameplay enum.
 
 ### Phase 4: Host-boundary translation
 
-- [x] Refactor host-message dispatch so ABI host inputs decode and translate immediately into typed internal gameplay messages.
+- [>] Refactor host-message dispatch so ABI host inputs decode and translate immediately into typed internal gameplay messages.
 - [x] Keep host-message ABI transport types unchanged.
-- [x] Ensure translated host-originated gameplay work no longer depends on internal gameplay queueing.
+- [>] Ensure translated host-originated gameplay work no longer depends on internal gameplay queueing.
 
 ### Phase 5: System trait adoption
 
-- [>] Add compile-time gameplay trait declarations to all gameplay systems in the active system pack.
+- [done] Add compile-time gameplay trait declarations to all gameplay systems in the active system pack.
 - [>] Convert systems away from generic internal gameplay envelope subscription lists toward typed message traits.
 - [>] Convert systems away from large `switch (message.type)` gameplay handlers toward typed handlers.
 - [x] Keep host-message handling behavior intact while the internal gameplay side migrates.
 
 ### Phase 6: Internal gameplay message migration
 
-- [x] Replace internal gameplay `GameMessageType`-driven coordination with typed POD gameplay messages.
-- [x] Remove internal gameplay payload packing/unpacking usage from migrated systems.
-- [x] Remove internal gameplay enqueue helpers from site/campaign/runtime code paths.
+- [>] Replace internal gameplay `GameMessageType`-driven coordination with typed POD gameplay messages.
+- [>] Remove internal gameplay payload packing/unpacking usage from migrated systems.
+- [>] Remove internal gameplay enqueue helpers from site/campaign/runtime code paths.
 - [>] Convert fixed-step systems that currently push gameplay queue messages to immediate typed emits.
 - [x] Rewrite queue-inspection logic so gameplay state is represented explicitly rather than inferred from transport contents.
 
 ### Phase 7: Legacy internal gameplay transport retirement
 
-- [x] Remove the internal gameplay `GameMessageQueue` runtime path.
-- [x] Remove internal gameplay queue-drain loops for gameplay-message handling.
-- [x] Remove internal gameplay runtime methods that exist only to drain queued gameplay messages.
-- [x] Remove or repurpose the old internal gameplay envelope types once no longer needed for gameplay coordination.
-- [x] Update runtime state and invocation plumbing so no internal gameplay queue remains.
+- [>] Remove the internal gameplay `GameMessageQueue` runtime path.
+- [>] Remove internal gameplay queue-drain loops for gameplay-message handling.
+- [>] Remove internal gameplay runtime methods that exist only to drain queued gameplay messages.
+- [>] Remove or repurpose the old internal gameplay envelope types once no longer needed for gameplay coordination.
+- [>] Update runtime state and invocation plumbing so no internal gameplay queue remains.
 
 ### Phase 8: Compatibility shadow-state cleanup
 
@@ -402,19 +409,21 @@ Legend:
 
 ### Phase 9: Runtime-to-host manifest and validation
 
-- [x] Aggregate a compile-time manifest of runtime-to-host message types emitted by the active system pack.
-- [x] Add compile-time validation that systems only emit runtime message types included in the manifest.
-- [x] Document the relationship between the stable public ABI transport and the game-specific emitted-runtime-message manifest.
+- [>] Aggregate a compile-time manifest of runtime-to-host message types emitted by the active system pack.
+  A first compile-time manifest scaffold now aggregates the active pack's currently declared direct host-transport emitters (`ActionExecutionSystem` plus debug-log emitters), with deeper validation and broader adoption still pending.
+- [>] Add compile-time validation that systems only emit runtime message types included in the manifest.
+- [>] Document the relationship between the stable public ABI transport and the game-specific emitted-runtime-message manifest.
 
 ### Phase 10: Regression coverage and cleanup
 
-- [x] Add or update focused runtime/system tests that lock immediate inline typed gameplay-dispatch behavior.
-- [x] Add or update regression coverage for nested gameplay dispatch and ownership restoration.
-- [x] Add or update regression coverage for host-message immediate translation into typed gameplay dispatch.
-- [x] Add or update regression coverage for removed queue-peeking behavior.
-- [x] Add or update regression coverage for removal of compatibility shadow-state sync from runtime production flow.
-- [x] Remove obsolete compatibility shims once all active gameplay systems are migrated.
-- [x] Refresh related documentation after implementation lands.
+- [>] Add or update focused runtime/system tests that lock immediate inline typed gameplay-dispatch behavior.
+- [>] Add or update regression coverage for nested gameplay dispatch and ownership restoration.
+  Direct semantic-stack scope coverage is now in place; deeper end-to-end ownership-restoration chains still need broader runtime/system coverage.
+- [>] Add or update regression coverage for host-message immediate translation into typed gameplay dispatch.
+- [>] Add or update regression coverage for removed queue-peeking behavior.
+- [done] Add or update regression coverage for removal of compatibility shadow-state sync from runtime production flow.
+- [>] Remove obsolete compatibility shims once all active gameplay systems are migrated.
+- [>] Refresh related documentation after implementation lands.
 
 ## Exit Criteria
 

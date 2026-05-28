@@ -2,6 +2,7 @@
 
 #include "messages/game_message.h"
 #include "runtime/runtime_state_access.h"
+#include "runtime/system_pack.h"
 #include "runtime/state_set.h"
 #include "site/systems/site_system_context.h"
 #include "gs1/status.h"
@@ -9,7 +10,9 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
+#include <type_traits>
 #include <vector>
 
 namespace gs1
@@ -47,6 +50,9 @@ public:
 using RuntimeGameMessageSubscribers = std::array<std::vector<IRuntimeSystem*>, k_game_message_type_count>;
 using RuntimeHostMessageSubscribers =
     std::array<std::vector<IRuntimeSystem*>, k_runtime_host_message_type_count>;
+
+template <Gs1RuntimeMessageType MessageType>
+using runtime_message_type_constant = std::integral_constant<Gs1RuntimeMessageType, MessageType>;
 
 inline constexpr StateSetId k_site_component_run_meta_state_sets[] = {
     StateSetId::SiteRunMeta};
@@ -254,4 +260,92 @@ struct runtime_subscribed_messages<System, std::void_t<typename System::subscrib
 
 template <typename System>
 using runtime_subscribed_messages_t = typename runtime_subscribed_messages<System>::type;
+
+template <typename System, typename = void>
+struct runtime_emitted_runtime_messages
+{
+    using type = type_list<>;
+};
+
+template <typename System>
+struct runtime_emitted_runtime_messages<System, std::void_t<typename System::emitted_runtime_messages>>
+{
+    using type = typename System::emitted_runtime_messages;
+};
+
+template <typename System>
+using runtime_emitted_runtime_messages_t = typename runtime_emitted_runtime_messages<System>::type;
+
+template <typename System, typename = void>
+struct runtime_profile_system_id
+{
+    static constexpr std::optional<Gs1RuntimeProfileSystemId> value = std::nullopt;
+};
+
+template <typename System>
+struct runtime_profile_system_id<System, std::void_t<decltype(System::profile_id)>>
+{
+    static constexpr std::optional<Gs1RuntimeProfileSystemId> value = System::profile_id;
+};
+
+template <typename System>
+inline constexpr std::optional<Gs1RuntimeProfileSystemId> runtime_profile_system_id_v =
+    runtime_profile_system_id<System>::value;
+
+template <typename System, typename = void>
+struct runtime_fixed_step_order
+{
+    static constexpr std::optional<std::uint32_t> value = std::nullopt;
+};
+
+template <typename System>
+struct runtime_fixed_step_order<System, std::void_t<decltype(System::fixed_step_order_value)>>
+{
+    static constexpr std::optional<std::uint32_t> value = System::fixed_step_order_value;
+};
+
+template <typename System>
+inline constexpr std::optional<std::uint32_t> runtime_fixed_step_order_v =
+    runtime_fixed_step_order<System>::value;
+
+template <typename SystemPack>
+struct runtime_emitted_runtime_message_manifest;
+
+template <typename... Systems>
+struct runtime_emitted_runtime_message_manifest<system_pack<Systems...>>
+{
+    using type = type_list_unique_t<type_list_concat_t<runtime_emitted_runtime_messages_t<Systems>...>>;
+};
+
+template <typename SystemPack>
+using runtime_emitted_runtime_message_manifest_t =
+    typename runtime_emitted_runtime_message_manifest<SystemPack>::type;
+
+template <typename System>
+[[nodiscard]] std::optional<Gs1RuntimeProfileSystemId> runtime_profile_system_id_for(
+    const IRuntimeSystem& system) noexcept
+{
+    if constexpr (runtime_profile_system_id_v<System>.has_value())
+    {
+        return runtime_profile_system_id_v<System>;
+    }
+    else
+    {
+        return system.profile_system_id();
+    }
+}
+
+template <typename System>
+[[nodiscard]] std::optional<std::uint32_t> runtime_fixed_step_order_for(
+    const IRuntimeSystem& system) noexcept
+{
+    if constexpr (runtime_fixed_step_order_v<System>.has_value())
+    {
+        return runtime_fixed_step_order_v<System>;
+    }
+    else
+    {
+        return system.fixed_step_order();
+    }
+}
 }  // namespace gs1

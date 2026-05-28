@@ -292,6 +292,183 @@ constexpr auto record_timing_sample = [](auto& accumulator, double elapsed_ms) n
     accumulator.max_elapsed_ms = std::max(accumulator.max_elapsed_ms, elapsed_ms);
 };
 
+[[nodiscard]] const char* debug_game_message_type_name(GameMessageType type) noexcept
+{
+    switch (type)
+    {
+    case GameMessageType::OpenMainMenu:
+        return "OpenMainMenuMessage";
+    case GameMessageType::StartNewCampaign:
+        return "StartNewCampaignMessage";
+    case GameMessageType::SelectDeploymentSite:
+        return "SelectDeploymentSiteMessage";
+    case GameMessageType::ClearDeploymentSiteSelection:
+        return "ClearDeploymentSiteSelectionMessage";
+    case GameMessageType::DeploymentSiteSelectionChanged:
+        return "DeploymentSiteSelectionChangedMessage";
+    case GameMessageType::ProgressionEventOccurred:
+        return "ProgressionEventOccurredMessage";
+    case GameMessageType::PurchaseEntrySelected:
+        return "PurchaseEntrySelectedMessage";
+    case GameMessageType::TargetGranted:
+        return "TargetGrantedMessage";
+    case GameMessageType::CampaignCashDeltaRequested:
+        return "CampaignCashDeltaRequestedMessage";
+    case GameMessageType::CampaignReputationAwardRequested:
+        return "CampaignReputationAwardRequestedMessage";
+    case GameMessageType::FactionReputationAwardRequested:
+        return "FactionReputationAwardRequestedMessage";
+    case GameMessageType::TechnologyNodeClaimRequested:
+        return "TechnologyNodeClaimRequestedMessage";
+    case GameMessageType::TechnologyNodeRefundRequested:
+        return "TechnologyNodeRefundRequestedMessage";
+    case GameMessageType::StartSiteAttempt:
+        return "StartSiteAttemptMessage";
+    case GameMessageType::ReturnToRegionalMap:
+        return "ReturnToRegionalMapMessage";
+    case GameMessageType::SiteAttemptEnded:
+        return "SiteAttemptEndedMessage";
+    case GameMessageType::PresentLog:
+        return "PresentLogMessage";
+    case GameMessageType::SiteRunStarted:
+        return "SiteRunStartedMessage";
+    case GameMessageType::SiteSceneActivated:
+        return "SiteSceneActivatedMessage";
+    case GameMessageType::StartSiteAction:
+        return "StartSiteActionMessage";
+    case GameMessageType::CancelSiteAction:
+        return "CancelSiteActionMessage";
+    case GameMessageType::SiteActionStarted:
+        return "SiteActionStartedMessage";
+    case GameMessageType::SiteActionCompleted:
+        return "SiteActionCompletedMessage";
+    case GameMessageType::SiteActionFailed:
+        return "SiteActionFailedMessage";
+    case GameMessageType::PlacementReservationRequested:
+        return "PlacementReservationRequestedMessage";
+    case GameMessageType::PlacementReservationAccepted:
+        return "PlacementReservationAcceptedMessage";
+    case GameMessageType::PlacementReservationRejected:
+        return "PlacementReservationRejectedMessage";
+    case GameMessageType::PlacementReservationReleased:
+        return "PlacementReservationReleasedMessage";
+    case GameMessageType::SiteGroundCoverPlaced:
+        return "SiteGroundCoverPlacedMessage";
+    case GameMessageType::SiteTilePlantingCompleted:
+        return "SiteTilePlantingCompletedMessage";
+    case GameMessageType::SiteTileWatered:
+        return "SiteTileWateredMessage";
+    case GameMessageType::SiteTileBurialCleared:
+        return "SiteTileBurialClearedMessage";
+    case GameMessageType::SiteTileHarvested:
+        return "SiteTileHarvestedMessage";
+    case GameMessageType::SiteDevicePlaced:
+        return "SiteDevicePlacedMessage";
+    case GameMessageType::SiteDeviceBroken:
+        return "SiteDeviceBrokenMessage";
+    case GameMessageType::SiteDeviceRepaired:
+        return "SiteDeviceRepairedMessage";
+    case GameMessageType::SiteDeviceConditionChanged:
+        return "SiteDeviceConditionChangedMessage";
+    case GameMessageType::WorkerMeterDeltaRequested:
+        return "WorkerMeterDeltaRequestedMessage";
+    case GameMessageType::WorkerMetersChanged:
+        return "WorkerMetersChangedMessage";
+    case GameMessageType::TileEcologyChanged:
+        return "TileEcologyChangedMessage";
+    case GameMessageType::TileEcologyBatchChanged:
+        return "TileEcologyBatchChangedMessage";
+    case GameMessageType::LivingPlantStabilityChanged:
+        return "LivingPlantStabilityChangedMessage";
+    case GameMessageType::SiteTileStateChanged:
+        return "SiteTileStateChangedMessage";
+    case GameMessageType::RestorationProgressChanged:
+        return "RestorationProgressChangedMessage";
+    case GameMessageType::SiteRefreshTick:
+        return "SiteRefreshTickMessage";
+    case GameMessageType::TaskAcceptRequested:
+        return "TaskAcceptRequestedMessage";
+    case GameMessageType::TaskRewardClaimRequested:
+        return "TaskRewardClaimRequestedMessage";
+    case GameMessageType::PhoneListingPurchased:
+        return "PhoneListingPurchasedMessage";
+    case GameMessageType::PhoneListingSold:
+        return "PhoneListingSoldMessage";
+    case GameMessageType::InventoryTransferCompleted:
+        return "InventoryTransferCompletedMessage";
+    case GameMessageType::InventoryItemSubmitted:
+        return "InventoryItemSubmittedMessage";
+    case GameMessageType::InventoryItemUseCompleted:
+        return "InventoryItemUseCompletedMessage";
+    case GameMessageType::InventoryCraftCompleted:
+        return "InventoryCraftCompletedMessage";
+    case GameMessageType::EconomyMoneyAwardRequested:
+        return "EconomyMoneyAwardRequestedMessage";
+    case GameMessageType::SiteUnlockableRevealRequested:
+        return "SiteUnlockableRevealRequestedMessage";
+    case GameMessageType::RunModifierAwardRequested:
+        return "RunModifierAwardRequestedMessage";
+    case GameMessageType::SiteModifierEndRequested:
+        return "SiteModifierEndRequestedMessage";
+    case GameMessageType::PhoneListingPurchaseRequested:
+        return "PhoneListingPurchaseRequestedMessage";
+    case GameMessageType::PhoneListingSaleRequested:
+        return "PhoneListingSaleRequestedMessage";
+    case GameMessageType::InventoryDeliveryRequested:
+        return "InventoryDeliveryRequestedMessage";
+    case GameMessageType::InventoryDeliveryBatchRequested:
+        return "InventoryDeliveryBatchRequestedMessage";
+    case GameMessageType::InventoryWorkerPackInsertRequested:
+        return "InventoryWorkerPackInsertRequestedMessage";
+    case GameMessageType::InventoryItemUseRequested:
+        return "InventoryItemUseRequestedMessage";
+    case GameMessageType::InventoryItemConsumeRequested:
+        return "InventoryItemConsumeRequestedMessage";
+    case GameMessageType::InventoryGlobalItemConsumeRequested:
+        return "InventoryGlobalItemConsumeRequestedMessage";
+    case GameMessageType::InventoryTransferRequested:
+        return "InventoryTransferRequestedMessage";
+    case GameMessageType::InventoryItemSubmitRequested:
+        return "InventoryItemSubmitRequestedMessage";
+    case GameMessageType::InventorySlotTapped:
+        return "InventorySlotTappedMessage";
+    case GameMessageType::InventoryCraftContextRequested:
+        return "CraftContextRequestedMessage";
+    case GameMessageType::PlacementModeCursorMoved:
+        return "PlacementModeCursorMovedMessage";
+    case GameMessageType::PlacementModeCommitRejected:
+        return "PlacementModeCommitRejectedMessage";
+    case GameMessageType::InventoryCraftCommitRequested:
+        return "InventoryCraftCommitRequestedMessage";
+    case GameMessageType::ContractorHireRequested:
+        return "ContractorHireRequestedMessage";
+    case GameMessageType::SiteUnlockablePurchaseRequested:
+        return "SiteUnlockablePurchaseRequestedMessage";
+    case GameMessageType::Count:
+    default:
+        return "UnknownGameMessage";
+    }
+}
+
+template <typename System>
+void append_runtime_game_message_subscribers(
+    RuntimeGameMessageSubscriberEntryArray& subscribers_by_type,
+    std::span<const GameMessageType> subscribed_types,
+    IRuntimeSystem& system)
+{
+    const auto profile_id = runtime_profile_system_id_for<System>(system);
+    for (const GameMessageType type : subscribed_types)
+    {
+        const auto index = static_cast<std::size_t>(type);
+        if (index < subscribers_by_type.size())
+        {
+            subscribers_by_type[index].push_back(RuntimeGameMessageSubscriberEntry {
+                .system = &system,
+                .profile_id = profile_id});
+        }
+    }
+}
+
 }  // namespace
 
 RuntimeInvocation::RuntimeInvocation(GameRuntime& runtime) noexcept
@@ -614,6 +791,14 @@ void GameRuntime::initialize_system_registry()
         constexpr std::size_t system_index = system_pack_index_v<System, GameSystems>;
         static_assert(system_index < GameSystems::size, "Registered runtime system must exist in GameSystems.");
         systems_by_pack_index_[system_index] = system.get();
+        const auto fixed_step_order = runtime_fixed_step_order_for<System>(*system);
+        if (fixed_step_order.has_value())
+        {
+            fixed_step_systems_.push_back(GameRuntime::FixedStepSystemEntry {
+                .system = system.get(),
+                .profile_id = runtime_profile_system_id_for<System>(*system),
+                .order = *fixed_step_order});
+        }
         systems_.push_back(std::move(system));
     };
 
@@ -645,21 +830,55 @@ void GameRuntime::initialize_system_registry()
     for (const auto& system : systems_)
     {
         state_manager_.register_resolver(*system);
-        append_runtime_subscribers(message_subscribers_, system->subscribed_game_messages(), *system);
         append_runtime_subscribers(host_message_subscribers_, system->subscribed_host_messages(), *system);
-        if (system->fixed_step_order().has_value())
-        {
-            fixed_step_systems_.push_back(system.get());
-        }
     }
+
+    const auto register_message_subscribers = [this]<typename System>()
+    {
+        auto* system = find_system<System>();
+        if (system == nullptr)
+        {
+            return;
+        }
+
+        append_runtime_game_message_subscribers<System>(
+            message_subscribers_,
+            system->subscribed_game_messages(),
+            *system);
+    };
+
+    register_message_subscribers.template operator()<CampaignFlowSystem>();
+    register_message_subscribers.template operator()<LoadoutPlannerSystem>();
+    register_message_subscribers.template operator()<CampaignProgressionSystem>();
+    register_message_subscribers.template operator()<TechnologySystem>();
+    register_message_subscribers.template operator()<ActionExecutionSystem>();
+    register_message_subscribers.template operator()<WeatherEventSystem>();
+    register_message_subscribers.template operator()<WorkerConditionSystem>();
+    register_message_subscribers.template operator()<EcologySystem>();
+    register_message_subscribers.template operator()<PlantWeatherContributionSystem>();
+    register_message_subscribers.template operator()<DeviceWeatherContributionSystem>();
+    register_message_subscribers.template operator()<TaskBoardSystem>();
+    register_message_subscribers.template operator()<PlacementValidationSystem>();
+    register_message_subscribers.template operator()<LocalWeatherResolveSystem>();
+    register_message_subscribers.template operator()<DeviceMaintenanceSystem>();
+    register_message_subscribers.template operator()<InventorySystem>();
+    register_message_subscribers.template operator()<CraftSystem>();
+    register_message_subscribers.template operator()<EconomyPhoneSystem>();
+    register_message_subscribers.template operator()<CampDurabilitySystem>();
+    register_message_subscribers.template operator()<DeviceSupportSystem>();
+    register_message_subscribers.template operator()<ModifierSystem>();
+    register_message_subscribers.template operator()<CampaignTimeSystem>();
+    register_message_subscribers.template operator()<SiteTimeSystem>();
+    register_message_subscribers.template operator()<SiteFlowSystem>();
+    register_message_subscribers.template operator()<FailureRecoverySystem>();
+    register_message_subscribers.template operator()<SiteCompletionSystem>();
 
     std::sort(
         fixed_step_systems_.begin(),
         fixed_step_systems_.end(),
-        [](const IRuntimeSystem* lhs, const IRuntimeSystem* rhs)
+        [](const FixedStepSystemEntry& lhs, const FixedStepSystemEntry& rhs)
         {
-            return lhs->fixed_step_order().value_or(std::numeric_limits<std::uint32_t>::max()) <
-                rhs->fixed_step_order().value_or(std::numeric_limits<std::uint32_t>::max());
+            return lhs.order < rhs.order;
         });
 }
 
@@ -830,6 +1049,46 @@ Gs1Status GameRuntime::handle_message(const GameMessage& message)
     return dispatch_game_message_inline(message);
 }
 
+#ifndef NDEBUG
+void GameRuntime::push_debug_semantic_game_message(std::string_view message_name)
+{
+    debug_semantic_game_message_stack_.push_back(message_name);
+    if (debug_semantic_game_message_stack_.size() >= debug_last_semantic_game_message_stack_.size())
+    {
+        debug_last_semantic_game_message_stack_ = debug_semantic_game_message_stack_;
+    }
+}
+
+void GameRuntime::pop_debug_semantic_game_message() noexcept
+{
+    if (!debug_semantic_game_message_stack_.empty())
+    {
+        debug_semantic_game_message_stack_.pop_back();
+    }
+}
+
+void GameRuntime::print_debug_semantic_game_message_stack() const
+{
+    if (debug_semantic_game_message_stack_.empty())
+    {
+        std::fprintf(stderr, "Semantic gameplay message stack: <empty>\n");
+        return;
+    }
+
+    std::fprintf(stderr, "Semantic gameplay message stack:");
+    for (std::size_t index = 0; index < debug_semantic_game_message_stack_.size(); ++index)
+    {
+        std::fprintf(
+            stderr,
+            "%s%.*s",
+            index == 0U ? " " : " -> ",
+            static_cast<int>(debug_semantic_game_message_stack_[index].size()),
+            debug_semantic_game_message_stack_[index].data());
+    }
+    std::fprintf(stderr, "\n");
+}
+#endif
+
 Gs1Status GameRuntime::dispatch_queued_messages()
 {
     while (!state().message_queue.empty())
@@ -851,6 +1110,9 @@ Gs1Status GameRuntime::dispatch_queued_messages()
 Gs1Status GameRuntime::dispatch_game_message_inline(const GameMessage& message)
 {
     RuntimeInlineGameMessageScope depth_scope {*this};
+#ifndef NDEBUG
+    RuntimeSemanticGameMessageScope semantic_scope {*this, debug_game_message_type_name(message.type)};
+#endif
 
     if (inline_game_message_depth_ == k_inline_game_message_warn_depth)
     {
@@ -859,6 +1121,9 @@ Gs1Status GameRuntime::dispatch_game_message_inline(const GameMessage& message)
             "Warning: internal GameMessage inline dispatch depth reached %u for type=%u.\n",
             inline_game_message_depth_,
             static_cast<unsigned>(message.type));
+#ifndef NDEBUG
+        print_debug_semantic_game_message_stack();
+#endif
     }
 
     assert(
@@ -893,18 +1158,18 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
 
     RuntimeInvocation invocation {*this};
     const auto& subscribers = message_subscribers_[message_type_index(message.type)];
-    for (IRuntimeSystem* system : subscribers)
+    for (const RuntimeGameMessageSubscriberEntry& entry : subscribers)
     {
+        IRuntimeSystem* system = entry.system;
         if (system == nullptr)
         {
             continue;
         }
 
         RuntimeMutationScope mutation_scope {state_manager_, *system};
-        const auto profile_id = system->profile_system_id();
-        const auto status = profile_id.has_value()
+        const auto status = entry.profile_id.has_value()
             ? dispatch_profiled_message(
-                *profile_id,
+                *entry.profile_id,
                 [&]() -> Gs1Status
                 {
                     return system->process_game_message(invocation, message);
@@ -995,23 +1260,23 @@ void GameRuntime::run_fixed_step()
     };
 
     RuntimeInvocation invocation {*this};
-    for (IRuntimeSystem* system : fixed_step_systems_)
+    for (const FixedStepSystemEntry& entry : fixed_step_systems_)
     {
+        IRuntimeSystem* system = entry.system;
         if (system == nullptr)
         {
             continue;
         }
 
         RuntimeMutationScope mutation_scope {state_manager_, *system};
-        const auto profile_id = system->profile_system_id();
-        if (!profile_id.has_value())
+        if (!entry.profile_id.has_value())
         {
             system->run(invocation);
             continue;
         }
 
         run_profiled_system(
-            *profile_id,
+            *entry.profile_id,
             [&]()
             {
                 system->run(invocation);

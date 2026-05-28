@@ -23,12 +23,76 @@
 #include <memory>
 #include <utility>
 #include <optional>
+#include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gs1
 {
 inline constexpr std::uint32_t k_api_version = 7;
+
+class RuntimeSemanticGameMessageScope;
+
+struct RuntimeGameMessageSubscriberEntry final
+{
+    IRuntimeSystem* system {nullptr};
+    std::optional<Gs1RuntimeProfileSystemId> profile_id {};
+};
+
+using RuntimeGameMessageSubscriberEntryArray =
+    std::array<
+        std::vector<RuntimeGameMessageSubscriberEntry>,
+        k_game_message_type_count>;
+
+template <typename Message>
+[[nodiscard]] constexpr std::string_view runtime_debug_type_name() noexcept
+{
+#if defined(_MSC_VER)
+    constexpr std::string_view signature = __FUNCSIG__;
+    constexpr std::string_view prefix = "runtime_debug_type_name<";
+    constexpr std::string_view suffix = ">(void)";
+#elif defined(__clang__)
+    constexpr std::string_view signature = __PRETTY_FUNCTION__;
+    constexpr std::string_view prefix = "runtime_debug_type_name() [Message = ";
+    constexpr std::string_view suffix = "]";
+#elif defined(__GNUC__)
+    constexpr std::string_view signature = __PRETTY_FUNCTION__;
+    constexpr std::string_view prefix =
+        "constexpr std::string_view gs1::runtime_debug_type_name() [with Message = ";
+    constexpr std::string_view suffix = "; std::string_view = std::basic_string_view<char>]";
+#else
+    return "unknown";
+#endif
+
+    const std::size_t start = signature.find(prefix);
+    const std::size_t end = signature.rfind(suffix);
+    if (start == std::string_view::npos || end == std::string_view::npos || end <= start + prefix.size())
+    {
+        return "unknown";
+    }
+
+    auto name = signature.substr(start + prefix.size(), end - (start + prefix.size()));
+    if (name.starts_with("struct "))
+    {
+        name.remove_prefix(7U);
+    }
+    else if (name.starts_with("class "))
+    {
+        name.remove_prefix(6U);
+    }
+    else if (name.starts_with("enum "))
+    {
+        name.remove_prefix(5U);
+    }
+
+    if (name.starts_with("gs1::"))
+    {
+        name.remove_prefix(5U);
+    }
+
+    return name;
+}
 
 class GameRuntime final
 {
@@ -49,6 +113,16 @@ public:
         Gs1RuntimeProfileSystemId system_id,
         bool enabled) noexcept;
     [[nodiscard]] bool profiled_system_enabled(Gs1RuntimeProfileSystemId system_id) const noexcept;
+#ifndef NDEBUG
+    [[nodiscard]] std::span<const std::string_view> debug_semantic_game_message_stack() const noexcept
+    {
+        return debug_semantic_game_message_stack_;
+    }
+    [[nodiscard]] std::span<const std::string_view> debug_last_semantic_game_message_stack() const noexcept
+    {
+        return debug_last_semantic_game_message_stack_;
+    }
+#endif
 
     [[nodiscard]] GameState& state() noexcept { return state_manager_.game_state(); }
     [[nodiscard]] const GameState& state() const noexcept { return state_manager_.game_state(); }
@@ -71,6 +145,7 @@ public:
     friend struct GameRuntimeProjectionTestAccess;
     friend class RuntimeInvocation;
     friend class RuntimeInlineGameMessageScope;
+    friend class RuntimeSemanticGameMessageScope;
 
 private:
     struct TimingAccumulator final
@@ -86,6 +161,13 @@ private:
         bool enabled {true};
         TimingAccumulator run_timing {};
         TimingAccumulator message_timing {};
+    };
+
+    struct FixedStepSystemEntry final
+    {
+        IRuntimeSystem* system {nullptr};
+        std::optional<Gs1RuntimeProfileSystemId> profile_id {};
+        std::uint32_t order {0U};
     };
 
     void initialize_system_registry();
@@ -105,6 +187,11 @@ private:
     void copy_timing_snapshot(
         const TimingAccumulator& source,
         Gs1RuntimeTimingStats& destination) const noexcept;
+#ifndef NDEBUG
+    void push_debug_semantic_game_message(std::string_view message_name);
+    void pop_debug_semantic_game_message() noexcept;
+    void print_debug_semantic_game_message_stack() const;
+#endif
 
 private:
     Gs1RuntimeCreateDesc create_desc_ {};
@@ -115,17 +202,51 @@ private:
     RuntimeGameStateViewCache state_view_cache_ {};
     std::deque<Gs1HostMessage> host_messages_ {};
     std::vector<std::unique_ptr<IRuntimeSystem>> systems_ {};
-    std::vector<IRuntimeSystem*> fixed_step_systems_ {};
+    std::vector<FixedStepSystemEntry> fixed_step_systems_ {};
     RuntimeHostMessageSubscribers host_message_subscribers_ {};
-    RuntimeGameMessageSubscribers message_subscribers_ {};
+    RuntimeGameMessageSubscriberEntryArray message_subscribers_ {};
     std::array<IRuntimeSystem*, GameSystems::size> systems_by_pack_index_ {};
     TimingAccumulator phase1_timing_ {};
     TimingAccumulator phase2_timing_ {};
     TimingAccumulator fixed_step_timing_ {};
     std::uint32_t inline_game_message_depth_ {0U};
+#ifndef NDEBUG
+    std::vector<std::string_view> debug_semantic_game_message_stack_ {};
+    std::vector<std::string_view> debug_last_semantic_game_message_stack_ {};
+#endif
     std::array<ProfiledSystemState, static_cast<std::size_t>(GS1_RUNTIME_PROFILE_SYSTEM_COUNT)>
         profiled_systems_ {};
     bool boot_initialized_ {false};
+};
+
+class RuntimeSemanticGameMessageScope final
+{
+public:
+    RuntimeSemanticGameMessageScope(GameRuntime& runtime, std::string_view message_name) noexcept
+        : runtime_(&runtime)
+    {
+#ifndef NDEBUG
+        runtime_->push_debug_semantic_game_message(message_name);
+#else
+        (void)message_name;
+#endif
+    }
+
+    ~RuntimeSemanticGameMessageScope()
+    {
+#ifndef NDEBUG
+        if (runtime_ != nullptr)
+        {
+            runtime_->pop_debug_semantic_game_message();
+        }
+#endif
+    }
+
+    RuntimeSemanticGameMessageScope(const RuntimeSemanticGameMessageScope&) = delete;
+    RuntimeSemanticGameMessageScope& operator=(const RuntimeSemanticGameMessageScope&) = delete;
+
+private:
+    GameRuntime* runtime_ {nullptr};
 };
 
 template <typename Message>
@@ -182,6 +303,7 @@ inline Gs1Status GameRuntime::dispatch_game_message_inline(const Message& messag
         };
 
         InlineDepthScope depth_scope {*this};
+        RuntimeSemanticGameMessageScope semantic_scope {*this, runtime_debug_type_name<Message>()};
         constexpr std::uint32_t warn_depth = 4U;
 
         if (inline_game_message_depth_ == warn_depth)
@@ -190,6 +312,9 @@ inline Gs1Status GameRuntime::dispatch_game_message_inline(const Message& messag
                 stderr,
                 "Warning: internal typed gameplay message inline dispatch depth reached %u.\n",
                 inline_game_message_depth_);
+#ifndef NDEBUG
+            print_debug_semantic_game_message_stack();
+#endif
         }
 
         assert(
@@ -216,7 +341,7 @@ inline Gs1Status GameRuntime::dispatch_game_message_inline(const Message& messag
                 }
 
                 MutationScope mutation_scope {state_manager_, *system};
-                const auto profile_id = system->profile_system_id();
+                const auto profile_id = runtime_profile_system_id_for<System>(*system);
                 if (!profile_id.has_value() || !profiled_system_enabled(*profile_id))
                 {
                     status = system->handle(invocation, message);

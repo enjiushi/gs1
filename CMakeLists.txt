@@ -323,6 +323,12 @@ if(GS1_BUILD_TESTS)
     add_executable(gs1_runtime_message_chain_test
         tests/runtime/game_runtime_message_chain_test.cpp)
 
+    add_executable(gs1_runtime_semantic_message_stack_test
+        tests/runtime/game_runtime_semantic_message_stack_test.cpp)
+
+    add_executable(gs1_runtime_system_trait_metadata_test
+        tests/runtime/runtime_system_trait_metadata_test.cpp)
+
     add_executable(gs1_timed_modifier_projection_test
         tests/runtime/timed_modifier_projection_test.cpp)
 
@@ -360,6 +366,8 @@ if(GS1_BUILD_TESTS)
             ${CMAKE_CURRENT_SOURCE_DIR}/engines/godot/native)
     target_link_libraries(gs1_runtime_projection_test PRIVATE gs1_gameplay_core gs1_host_bridge)
     target_link_libraries(gs1_runtime_message_chain_test PRIVATE gs1_gameplay_core)
+    target_link_libraries(gs1_runtime_semantic_message_stack_test PRIVATE gs1_gameplay_core)
+    target_link_libraries(gs1_runtime_system_trait_metadata_test PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_timed_modifier_projection_test PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_site_system_message_flow_test PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_state_manager_test PRIVATE gs1_gameplay_core)
@@ -382,6 +390,7 @@ if(GS1_BUILD_TESTS)
     gs1_enable_strict_warnings(gs1_godot_regional_site_selection_policy_test)
     gs1_enable_strict_warnings(gs1_runtime_projection_test)
     gs1_enable_strict_warnings(gs1_runtime_message_chain_test)
+    gs1_enable_strict_warnings(gs1_runtime_semantic_message_stack_test)
     gs1_enable_strict_warnings(gs1_timed_modifier_projection_test)
     gs1_enable_strict_warnings(gs1_site_system_message_flow_test)
     gs1_enable_strict_warnings(gs1_state_manager_test)
@@ -419,6 +428,10 @@ if(GS1_BUILD_TESTS)
     add_test(
         NAME gs1_runtime_message_chain_test
         COMMAND gs1_runtime_message_chain_test)
+
+    add_test(
+        NAME gs1_runtime_semantic_message_stack_test
+        COMMAND gs1_runtime_semantic_message_stack_test)
 
     add_test(
         NAME gs1_timed_modifier_projection_test
@@ -478,6 +491,8 @@ if(GS1_BUILD_TESTS)
     set_tests_properties(gs1_godot_regional_site_selection_policy_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_runtime_message_chain_test PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set_tests_properties(gs1_runtime_semantic_message_stack_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_site_system_message_flow_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

@@ -10,6 +10,10 @@ class CampDurabilitySystem final : public IRuntimeSystem
 {
 public:
     using subscribed_messages = type_list<SiteRunStartedMessage>;
+    using emitted_runtime_messages = type_list<>;
+    static constexpr std::optional<Gs1RuntimeProfileSystemId> profile_id =
+        GS1_RUNTIME_PROFILE_SYSTEM_CAMP_DURABILITY;
+    static constexpr std::optional<std::uint32_t> fixed_step_order_value = 10U;
 
     [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
     {

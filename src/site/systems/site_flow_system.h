@@ -9,6 +9,11 @@ namespace gs1
 class SiteFlowSystem final : public IRuntimeSystem
 {
 public:
+    using emitted_runtime_messages = type_list<>;
+    static constexpr std::optional<Gs1RuntimeProfileSystemId> profile_id =
+        GS1_RUNTIME_PROFILE_SYSTEM_SITE_FLOW;
+    static constexpr std::optional<std::uint32_t> fixed_step_order_value = 2U;
+
     static constexpr std::array<StateSetId, 1> k_owned_state_sets {
         StateSetId::MoveDirection};
     [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
