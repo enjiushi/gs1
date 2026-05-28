@@ -1,6 +1,7 @@
 #pragma once
 
 #include "campaign/campaign_state.h"
+#include "campaign/campaign_progression_state.h"
 #include "campaign/faction_progress_state.h"
 #include "campaign/loadout_planner_state.h"
 #include "campaign/technology_state.h"
@@ -79,6 +80,7 @@ enum class StateSetId : std::uint8_t
     CampaignRegionalMapAvailableSites,
     CampaignRegionalMapCompletedSites,
     CampaignFactionProgress,
+    CampaignProgression,
     CampaignTechnology,
     CampaignLoadoutPlannerMeta,
     CampaignLoadoutPlannerBaselineItems,
@@ -336,6 +338,8 @@ using RuntimeCampaignRegionalMapCompletedSitesStateSet =
     ContainerStateSet<std::optional<std::vector<SiteId>>>;
 using RuntimeCampaignFactionProgressStateSet =
     ContainerStateSet<std::optional<std::vector<FactionProgressState>>>;
+using RuntimeCampaignProgressionStateSet =
+    CacheAlignedStateSet<std::optional<CampaignProgressionState>>;
 using RuntimeCampaignTechnologyStateSet = CacheAlignedStateSet<std::optional<TechnologyState>>;
 using RuntimeCampaignLoadoutPlannerMetaStateSet =
     CacheAlignedStateSet<std::optional<LoadoutPlannerMetaState>>;
@@ -508,6 +512,11 @@ GS1_DEFINE_STATE_TRAITS(
     std::optional<std::vector<FactionProgressState>>,
     RuntimeCampaignFactionProgressStateSet,
     true);
+GS1_DEFINE_STATE_TRAITS(
+    StateSetId::CampaignProgression,
+    std::optional<CampaignProgressionState>,
+    RuntimeCampaignProgressionStateSet,
+    false);
 GS1_DEFINE_STATE_TRAITS(
     StateSetId::CampaignTechnology,
     std::optional<TechnologyState>,
@@ -882,6 +891,7 @@ static_assert(state_contract_is_valid<StateSetId::CampaignRegionalMapRevealedSit
 static_assert(state_contract_is_valid<StateSetId::CampaignRegionalMapAvailableSites>());
 static_assert(state_contract_is_valid<StateSetId::CampaignRegionalMapCompletedSites>());
 static_assert(state_contract_is_valid<StateSetId::CampaignFactionProgress>());
+static_assert(state_contract_is_valid<StateSetId::CampaignProgression>());
 static_assert(state_contract_is_valid<StateSetId::CampaignTechnology>());
 static_assert(state_contract_is_valid<StateSetId::CampaignLoadoutPlannerMeta>());
 static_assert(state_contract_is_valid<StateSetId::CampaignLoadoutPlannerBaselineItems>());

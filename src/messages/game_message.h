@@ -32,6 +32,9 @@ enum class GameMessageType : std::uint8_t
     SelectDeploymentSite,
     ClearDeploymentSiteSelection,
     DeploymentSiteSelectionChanged,
+    ProgressionEventOccurred,
+    PurchaseEntrySelected,
+    TargetGranted,
     CampaignCashDeltaRequested,
     CampaignReputationAwardRequested,
     FactionReputationAwardRequested,
@@ -193,6 +196,27 @@ struct ClearDeploymentSiteSelectionMessage final
 struct DeploymentSiteSelectionChangedMessage final
 {
     std::uint32_t selected_site_id;
+};
+
+struct ProgressionEventOccurredMessage final
+{
+    std::uint32_t progression_event_id;
+    std::uint32_t scope_id;
+    std::int32_t amount;
+};
+
+struct PurchaseEntrySelectedMessage final
+{
+    std::uint32_t purchase_entry_id;
+};
+
+struct TargetGrantedMessage final
+{
+    std::uint32_t target_kind_id;
+    std::uint32_t target_id;
+    std::uint32_t scope_id;
+    std::uint8_t grant_kind;
+    std::uint8_t reserved0[3];
 };
 
 struct CampaignCashDeltaRequestedMessage final
@@ -748,6 +772,9 @@ GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(StartNewCampaignMessage, 16U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SelectDeploymentSiteMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ClearDeploymentSiteSelectionMessage, 1U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(DeploymentSiteSelectionChangedMessage, 4U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ProgressionEventOccurredMessage, 12U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PurchaseEntrySelectedMessage, 4U);
+GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TargetGrantedMessage, 16U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CampaignCashDeltaRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CampaignReputationAwardRequestedMessage, 4U);
 GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(FactionReputationAwardRequestedMessage, 8U);

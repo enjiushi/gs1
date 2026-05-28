@@ -117,6 +117,7 @@ set(GS1_GAMEPLAY_CORE_SOURCES
     src/app/campaign_factory.cpp
     src/app/site_run_factory.cpp
     src/campaign/systems/campaign_flow_system.cpp
+    src/campaign/systems/campaign_progression_system.cpp
     src/campaign/systems/campaign_time_system.cpp
     src/campaign/systems/faction_reputation_system.cpp
     src/campaign/systems/loadout_planner_system.cpp

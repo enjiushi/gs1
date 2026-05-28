@@ -63,6 +63,7 @@ public:
     [[nodiscard]] Gs1Status handle_message(const GameMessage& message);
     friend struct GameRuntimeProjectionTestAccess;
     friend class RuntimeInvocation;
+    friend class RuntimeInlineGameMessageScope;
 
 private:
     struct TimingAccumulator final
@@ -85,6 +86,8 @@ private:
     [[nodiscard]] Gs1Status dispatch_queued_messages();
     [[nodiscard]] Gs1Status dispatch_subscribed_host_message(const Gs1HostMessage& message);
     [[nodiscard]] Gs1Status dispatch_subscribed_message(const GameMessage& message);
+    void flush_compatibility_state_to_split_state();
+    void refresh_compatibility_state_from_split_state();
     void install_campaign_state(const CampaignState& campaign);
     void install_site_run_state(const SiteRunState& site_run);
     void clear_site_run_state();
@@ -110,6 +113,8 @@ private:
     TimingAccumulator phase2_timing_ {};
     TimingAccumulator fixed_step_timing_ {};
     std::uint32_t inline_game_message_depth_ {0U};
+    std::optional<CampaignState> compatibility_campaign_state_ {};
+    std::optional<SiteRunState> compatibility_site_run_state_ {};
     std::array<ProfiledSystemState, static_cast<std::size_t>(GS1_RUNTIME_PROFILE_SYSTEM_COUNT)>
         profiled_systems_ {};
     bool boot_initialized_ {false};

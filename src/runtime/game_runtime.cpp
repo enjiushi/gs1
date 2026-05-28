@@ -1,6 +1,7 @@
 #include "runtime/game_runtime.h"
 
 #include "campaign/systems/campaign_flow_system.h"
+#include "campaign/systems/campaign_progression_system.h"
 #include "campaign/systems/campaign_time_system.h"
 #include "campaign/systems/faction_reputation_system.h"
 #include "campaign/systems/loadout_planner_system.h"
@@ -516,6 +517,7 @@ void GameRuntime::install_campaign_state(const CampaignState& campaign)
 {
     RuntimePrivilegedStateMutation privileged {state_manager_};
     write_campaign_state_to_state_sets(campaign, state(), state_manager_);
+    compatibility_campaign_state_ = campaign;
 }
 
 void GameRuntime::install_site_run_state(const SiteRunState& site_run)
@@ -523,6 +525,7 @@ void GameRuntime::install_site_run_state(const SiteRunState& site_run)
     RuntimePrivilegedStateMutation privileged {state_manager_};
     write_site_run_state_to_state_sets(site_run, state(), state_manager_);
     site_world_ = site_run.site_world;
+    compatibility_site_run_state_ = site_run;
 }
 
 void GameRuntime::clear_site_run_state()
@@ -530,6 +533,53 @@ void GameRuntime::clear_site_run_state()
     RuntimePrivilegedStateMutation privileged {state_manager_};
     write_site_run_state_to_state_sets(std::optional<SiteRunState> {}, state(), state_manager_);
     site_world_ = nullptr;
+    compatibility_site_run_state_.reset();
+}
+
+void GameRuntime::flush_compatibility_state_to_split_state()
+{
+    if (compatibility_campaign_state_.has_value())
+    {
+        RuntimePrivilegedStateMutation privileged {state_manager_};
+        write_campaign_state_to_state_sets(compatibility_campaign_state_.value(), state(), state_manager_);
+    }
+
+    if (compatibility_site_run_state_.has_value())
+    {
+        RuntimePrivilegedStateMutation privileged {state_manager_};
+        write_site_run_state_to_state_sets(compatibility_site_run_state_.value(), state(), state_manager_);
+        site_world_ = compatibility_site_run_state_->site_world;
+    }
+}
+
+void GameRuntime::refresh_compatibility_state_from_split_state()
+{
+    if (state().campaign_core.has_value())
+    {
+        compatibility_campaign_state_.emplace();
+        populate_campaign_state_from_state_sets(
+            compatibility_campaign_state_.value(),
+            state(),
+            state_manager_);
+    }
+    else
+    {
+        compatibility_campaign_state_.reset();
+    }
+
+    if (state().site_run_meta.has_value())
+    {
+        compatibility_site_run_state_.emplace();
+        populate_site_run_state_from_state_sets(
+            compatibility_site_run_state_.value(),
+            state(),
+            state_manager_,
+            site_world_);
+    }
+    else
+    {
+        compatibility_site_run_state_.reset();
+    }
 }
 
 void GameRuntime::initialize_system_registry()
@@ -587,7 +637,7 @@ void GameRuntime::initialize_system_registry()
 
     systems_.push_back(std::make_unique<CampaignFlowSystem>());
     systems_.push_back(std::make_unique<LoadoutPlannerSystem>());
-    systems_.push_back(std::make_unique<FactionReputationSystem>());
+    systems_.push_back(std::make_unique<CampaignProgressionSystem>());
     systems_.push_back(std::make_unique<TechnologySystem>());
     systems_.push_back(std::make_unique<ActionExecutionSystem>());
     systems_.push_back(std::make_unique<WeatherEventSystem>());
@@ -663,6 +713,7 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
 
     out_result = {};
     out_result.struct_size = sizeof(Gs1Phase1Result);
+    flush_compatibility_state_to_split_state();
     auto status = GS1_STATUS_OK;
     if (!boot_initialized_)
     {
@@ -723,6 +774,7 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
 
     status = dispatch_queued_messages();
     state().move_direction = RuntimeMoveDirectionSnapshot {};
+    refresh_compatibility_state_from_split_state();
     out_result.runtime_messages_queued = static_cast<std::uint32_t>(state().runtime_messages.size());
     finish_phase();
     return status;
@@ -743,6 +795,7 @@ Gs1Status GameRuntime::run_phase2(const Gs1Phase2Request& request, Gs1Phase2Resu
 
     out_result = {};
     out_result.struct_size = sizeof(Gs1Phase2Result);
+    flush_compatibility_state_to_split_state();
     auto status = dispatch_host_messages(out_result.processed_host_message_count);
     if (status != GS1_STATUS_OK)
     {
@@ -757,6 +810,7 @@ Gs1Status GameRuntime::run_phase2(const Gs1Phase2Request& request, Gs1Phase2Resu
         return status;
     }
 
+    refresh_compatibility_state_from_split_state();
     out_result.runtime_messages_queued = static_cast<std::uint32_t>(state().runtime_messages.size());
     finish_phase();
     return status;
@@ -800,7 +854,10 @@ Gs1Status GameRuntime::query_site_tile_view(std::uint32_t tile_index, Gs1SiteTil
 
 Gs1Status GameRuntime::handle_message(const GameMessage& message)
 {
-    return dispatch_game_message_inline(message);
+    flush_compatibility_state_to_split_state();
+    const auto status = dispatch_game_message_inline(message);
+    refresh_compatibility_state_from_split_state();
+    return status;
 }
 
 Gs1Status GameRuntime::dispatch_queued_messages()

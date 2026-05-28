@@ -22,6 +22,7 @@ struct GameState final
     RuntimeCampaignRegionalMapAvailableSitesStateSet campaign_regional_map_available_sites {};
     RuntimeCampaignRegionalMapCompletedSitesStateSet campaign_regional_map_completed_sites {};
     RuntimeCampaignFactionProgressStateSet campaign_faction_progress {};
+    RuntimeCampaignProgressionStateSet campaign_progression {};
     RuntimeCampaignTechnologyStateSet campaign_technology {};
     RuntimeCampaignLoadoutPlannerMetaStateSet campaign_loadout_planner_meta {};
     RuntimeCampaignLoadoutPlannerBaselineItemsStateSet campaign_loadout_planner_baseline_items {};

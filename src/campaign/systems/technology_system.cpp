@@ -1,9 +1,11 @@
 #include "campaign/systems/technology_system.h"
 
+#include "content/defs/progression_defs.h"
 #include "runtime/game_runtime.h"
 #include "support/currency.h"
 
 #include <algorithm>
+#include <cassert>
 
 namespace gs1
 {
@@ -87,6 +89,70 @@ const FactionProgressState* find_faction_progress(
     return node_def != nullptr && TechnologySystem::node_purchased(faction_progress, node_def->tech_node_id);
 }
 
+TechnologyNodeGrantState* find_node_grant_state_mut(
+    TechnologyState& technology,
+    TechNodeId tech_node_id) noexcept
+{
+    for (std::uint16_t index = 0; index < technology.technology_node_grant_count; ++index)
+    {
+        auto& grant = technology.technology_node_grants[index];
+        if (grant.tech_node_id == tech_node_id)
+        {
+            return &grant;
+        }
+    }
+
+    return nullptr;
+}
+
+const TechnologyNodeGrantState* find_node_grant_state(
+    const TechnologyState& technology,
+    TechNodeId tech_node_id) noexcept
+{
+    for (std::uint16_t index = 0; index < technology.technology_node_grant_count; ++index)
+    {
+        const auto& grant = technology.technology_node_grants[index];
+        if (grant.tech_node_id == tech_node_id)
+        {
+            return &grant;
+        }
+    }
+
+    return nullptr;
+}
+
+TechnologyNodeGrantState& require_node_grant_state_mut(
+    TechnologyState& technology,
+    TechNodeId tech_node_id)
+{
+    if (auto* existing = find_node_grant_state_mut(technology, tech_node_id);
+        existing != nullptr)
+    {
+        return *existing;
+    }
+
+    assert(technology.technology_node_grant_count < k_max_technology_node_grant_count);
+    auto& grant = technology.technology_node_grants[technology.technology_node_grant_count++];
+    grant = TechnologyNodeGrantState {
+        tech_node_id,
+        TechnologyGrantState::Locked,
+        {0U, 0U, 0U}};
+    return grant;
+}
+
+TechnologyGrantState grant_state_from_payload(std::uint8_t grant_kind) noexcept
+{
+    switch (static_cast<ProgressionGrantKind>(grant_kind))
+    {
+    case ProgressionGrantKind::Available:
+        return TechnologyGrantState::Available;
+    case ProgressionGrantKind::Effective:
+        return TechnologyGrantState::Effective;
+    default:
+        return TechnologyGrantState::Locked;
+    }
+}
+
 }  // namespace
 
 Gs1Status process_technology_message(
@@ -106,7 +172,10 @@ const char* TechnologySystem::name() const noexcept
 
 GameMessageSubscriptionSpan TechnologySystem::subscribed_game_messages() const noexcept
 {
-    static constexpr GameMessageType subscriptions[] = {GameMessageType::CampaignReputationAwardRequested};
+    static constexpr GameMessageType subscriptions[] = {
+        GameMessageType::TargetGranted,
+        GameMessageType::ProgressionEventOccurred,
+        GameMessageType::CampaignReputationAwardRequested};
     return subscriptions;
 }
 
@@ -509,6 +578,41 @@ Gs1Status process_technology_message(
 {
     switch (message.type)
     {
+    case GameMessageType::TargetGranted:
+    {
+        const auto& payload = message.payload_as<TargetGrantedMessage>();
+        if (payload.target_kind_id != k_progression_target_kind_technology_node ||
+            payload.target_id == 0U)
+        {
+            return GS1_STATUS_OK;
+        }
+
+        auto& technology = runtime_invocation_state_ref<RuntimeCampaignTechnologyTag>(invocation);
+        auto& grant = require_node_grant_state_mut(technology, TechNodeId {payload.target_id});
+        const auto next_state = grant_state_from_payload(payload.grant_kind);
+        assert(next_state != TechnologyGrantState::Locked);
+        assert(grant.grant_state != next_state);
+        assert(!(grant.grant_state == TechnologyGrantState::Effective &&
+            next_state == TechnologyGrantState::Available));
+        grant.grant_state = next_state;
+        return GS1_STATUS_OK;
+    }
+
+    case GameMessageType::ProgressionEventOccurred:
+    {
+        const auto& payload = message.payload_as<ProgressionEventOccurredMessage>();
+        const auto* event_def = find_progression_event_def(payload.progression_event_id);
+        if (event_def == nullptr ||
+            event_def->token_kind_id != k_progression_token_kind_total_reputation ||
+            payload.amount <= 0)
+        {
+            return GS1_STATUS_OK;
+        }
+
+        runtime_invocation_state_ref<RuntimeCampaignTechnologyTag>(invocation).total_reputation += payload.amount;
+        return GS1_STATUS_OK;
+    }
+
     case GameMessageType::CampaignReputationAwardRequested:
     {
         if (!runtime_invocation_has_campaign(invocation))

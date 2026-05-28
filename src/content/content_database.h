@@ -6,6 +6,7 @@
 #include "content/defs/item_defs.h"
 #include "content/defs/modifier_defs.h"
 #include "content/defs/plant_defs.h"
+#include "content/defs/progression_defs.h"
 #include "content/defs/reward_defs.h"
 #include "content/defs/structure_defs.h"
 #include "content/defs/task_defs.h"
@@ -36,6 +37,11 @@ struct ContentDatabase final
     std::vector<SiteOnboardingTaskSeedDef> site_onboarding_task_seed_defs {};
     std::vector<RewardCandidateDef> reward_candidate_defs {};
     std::vector<SiteActionDef> site_action_defs {};
+    std::vector<TokenKindDef> token_kind_defs {};
+    std::vector<TargetKindDef> target_kind_defs {};
+    std::vector<ProgressionEventDef> progression_event_defs {};
+    std::vector<ThresholdUnlockDef> threshold_unlock_defs {};
+    std::vector<PurchaseDef> purchase_defs {};
     std::vector<TechnologyTierDef> technology_tier_defs {};
     std::vector<ReputationUnlockDef> reputation_unlock_defs {};
     std::vector<TechnologyNodeDef> technology_node_defs {};

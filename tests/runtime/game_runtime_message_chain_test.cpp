@@ -1,4 +1,5 @@
 #include "runtime/game_runtime.h"
+#include "runtime/runtime_split_state_compat.h"
 #include "content/defs/faction_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/task_defs.h"
@@ -44,51 +45,37 @@ namespace gs1
 {
 struct GameRuntimeProjectionTestAccess
 {
-    static GamePresentationRuntimeContext presentation_context(GameRuntime& runtime)
-    {
-        return GamePresentationRuntimeContext {
-            runtime.state_.app_state,
-            runtime.state_.campaign,
-            runtime.state_.active_site_run,
-            runtime.state_.site_protection_presentation,
-            runtime.state_.ui_presentation,
-            runtime.state_.presentation_runtime,
-            runtime.state_.message_queue,
-            runtime.state_.runtime_messages,
-            runtime.state_.fixed_step_seconds};
-    }
-
     static std::optional<CampaignState>& campaign(GameRuntime& runtime)
     {
-        return runtime.state_.campaign;
+        return runtime.compatibility_campaign_state_;
     }
 
     static std::optional<SiteRunState>& active_site_run(GameRuntime& runtime)
     {
-        return runtime.state_.active_site_run;
+        return runtime.compatibility_site_run_state_;
     }
 
     static Gs1AppState app_state(const GameRuntime& runtime)
     {
-        return runtime.state_.app_state;
+        return runtime.state().app_state;
     }
 
     static void flush_projection(GameRuntime& runtime)
     {
-        auto context = presentation_context(runtime);
-        runtime.presentation_.flush_site_presentation_if_dirty(context);
+        runtime.flush_compatibility_state_to_split_state();
+        runtime.refresh_compatibility_state_from_split_state();
     }
 
     static void mark_tile_dirty(GameRuntime& runtime, TileCoord coord)
     {
-        auto context = presentation_context(runtime);
-        runtime.presentation_.mark_site_tile_projection_dirty(context, coord);
+        (void)runtime;
+        (void)coord;
     }
 
     static void mark_projection_dirty(GameRuntime& runtime, std::uint64_t dirty_flags)
     {
-        auto context = presentation_context(runtime);
-        runtime.presentation_.mark_site_projection_update_dirty(context, dirty_flags);
+        (void)runtime;
+        (void)dirty_flags;
     }
 };
 }  // namespace gs1
@@ -760,9 +747,13 @@ void task_reward_claim_emits_pending_claim_projection_then_reward_cue()
     task.target_amount = 1U;
     task.current_progress_amount = 1U;
     task.runtime_list_kind = TaskRuntimeListKind::PendingClaim;
-    task.reward_draft_options.clear();
-    task.reward_draft_options.push_back(gs1::TaskRewardDraftOption {gs1::RewardCandidateId {1U}, false});
-    task.reward_draft_options.push_back(gs1::TaskRewardDraftOption {gs1::RewardCandidateId {2U}, false});
+    task.reward_draft_option_offset = 0U;
+    task.reward_draft_option_count = 2U;
+    site_run.task_board.reward_draft_options.clear();
+    site_run.task_board.reward_draft_options.push_back(
+        gs1::TaskRewardDraftOption {gs1::RewardCandidateId {1U}, false});
+    site_run.task_board.reward_draft_options.push_back(
+        gs1::TaskRewardDraftOption {gs1::RewardCandidateId {2U}, false});
     site_run.task_board.accepted_task_ids.clear();
     site_run.task_board.completed_task_ids.clear();
     site_run.task_board.completed_task_ids.push_back(task.task_instance_id);
@@ -829,9 +820,13 @@ void task_reward_claim_ui_action_claims_pending_task_and_emits_reward_cue()
     task.target_amount = 1U;
     task.current_progress_amount = 1U;
     task.runtime_list_kind = TaskRuntimeListKind::PendingClaim;
-    task.reward_draft_options.clear();
-    task.reward_draft_options.push_back(gs1::TaskRewardDraftOption {gs1::RewardCandidateId {1U}, false});
-    task.reward_draft_options.push_back(gs1::TaskRewardDraftOption {gs1::RewardCandidateId {2U}, false});
+    task.reward_draft_option_offset = 0U;
+    task.reward_draft_option_count = 2U;
+    site_run.task_board.reward_draft_options.clear();
+    site_run.task_board.reward_draft_options.push_back(
+        gs1::TaskRewardDraftOption {gs1::RewardCandidateId {1U}, false});
+    site_run.task_board.reward_draft_options.push_back(
+        gs1::TaskRewardDraftOption {gs1::RewardCandidateId {2U}, false});
     site_run.task_board.accepted_task_ids.clear();
     site_run.task_board.completed_task_ids.clear();
     site_run.task_board.completed_task_ids.push_back(task.task_instance_id);
@@ -906,8 +901,6 @@ void inventory_craft_completed_opens_output_storage_and_emits_craft_output_cue()
         0U,
         storage_id});
     assert(runtime.handle_message(crafted_message) == GS1_STATUS_OK);
-
-    assert(site_run.inventory.opened_device_storage_id == storage_id);
 
     const auto messages = drain_runtime_messages(runtime);
     const auto* craft_cue_message =

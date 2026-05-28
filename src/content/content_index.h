@@ -2,6 +2,7 @@
 
 #include "content/defs/craft_recipe_defs.h"
 #include "content/defs/excavation_defs.h"
+#include "content/defs/progression_defs.h"
 #include "content/defs/task_defs.h"
 #include "content/defs/technology_defs.h"
 #include "support/id_types.h"
@@ -54,6 +55,20 @@ namespace gs1
         static_cast<std::uint64_t>(granted_content_id);
 }
 
+[[nodiscard]] constexpr std::uint64_t make_threshold_unlock_target_key(
+    std::uint32_t token_kind_id,
+    std::uint32_t scope_id,
+    std::uint32_t target_kind_id,
+    std::uint32_t target_id,
+    ProgressionGrantKind grant_kind) noexcept
+{
+    return (static_cast<std::uint64_t>(token_kind_id) << 48U) |
+        (static_cast<std::uint64_t>(scope_id & 0xFFFFU) << 32U) |
+        (static_cast<std::uint64_t>(target_kind_id & 0xFFU) << 24U) |
+        (static_cast<std::uint64_t>(target_id & 0xFFFFU) << 8U) |
+        static_cast<std::uint64_t>(static_cast<std::uint8_t>(grant_kind));
+}
+
 struct ContentIndex final
 {
     PackedIdIndex<std::uint32_t> site_by_id {};
@@ -70,6 +85,10 @@ struct ContentIndex final
     PackedIdIndex<std::uint32_t> site_onboarding_task_seed_by_task_template {};
     PackedIdIndex<std::uint32_t> reward_candidate_by_id {};
     PackedIdIndex<std::uint32_t> site_action_by_kind {};
+    PackedIdIndex<std::uint32_t> token_kind_by_id {};
+    PackedIdIndex<std::uint32_t> target_kind_by_id {};
+    PackedIdIndex<std::uint32_t> progression_event_by_id {};
+    PackedIdIndex<std::uint32_t> purchase_by_id {};
     PackedIdIndex<std::uint32_t> technology_tier_by_index {};
     PackedIdIndex<std::uint32_t> reputation_unlock_by_id {};
     PackedIdIndex<std::uint64_t> reputation_unlock_by_kind_and_content {};

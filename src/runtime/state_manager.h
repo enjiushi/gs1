@@ -13,6 +13,7 @@ namespace gs1
 class IRuntimeSystem;
 class GameRuntime;
 class RuntimeInvocation;
+class RuntimeMutationScope;
 class RuntimePrivilegedStateMutation;
 struct StateManagerTestAccess;
 
@@ -53,6 +54,7 @@ public:
 private:
     friend class GameRuntime;
     friend class RuntimeInvocation;
+    friend class RuntimeMutationScope;
     friend class RuntimePrivilegedStateMutation;
     friend struct StateManagerTestAccess;
 
@@ -137,6 +139,10 @@ template <StateSetId Id>
     else if constexpr (Id == StateSetId::CampaignFactionProgress)
     {
         return state.campaign_faction_progress.get();
+    }
+    else if constexpr (Id == StateSetId::CampaignProgression)
+    {
+        return state.campaign_progression.get();
     }
     else if constexpr (Id == StateSetId::CampaignTechnology)
     {
@@ -396,11 +402,11 @@ template <StateSetId Id>
 [[nodiscard]] inline typename state_traits<Id>::type& StateManager::state(
     GameState& state) const
 {
-    const auto* current_mutating_system = current_mutating_system();
-    if (privileged_mutation_depth_ == 0U && current_mutating_system != nullptr)
+    const auto* active_mutating_system = this->current_mutating_system();
+    if (privileged_mutation_depth_ == 0U && active_mutating_system != nullptr)
     {
         const auto* owner = active_resolver_by_state_set_[index(Id)];
-        if (owner != nullptr && owner != current_mutating_system)
+        if (owner != nullptr && owner != active_mutating_system)
         {
             throw std::logic_error("State set mutated outside its owning system.");
         }
@@ -445,6 +451,10 @@ template <StateSetId Id>
     else if constexpr (Id == StateSetId::CampaignFactionProgress)
     {
         return state.campaign_faction_progress.get();
+    }
+    else if constexpr (Id == StateSetId::CampaignProgression)
+    {
+        return state.campaign_progression.get();
     }
     else if constexpr (Id == StateSetId::CampaignTechnology)
     {

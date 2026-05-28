@@ -1,5 +1,6 @@
 #pragma once
 
+#include "campaign/campaign_progression_state.h"
 #include "campaign/faction_progress_state.h"
 #include "campaign/loadout_planner_state.h"
 #include "campaign/technology_state.h"
@@ -68,6 +69,7 @@ struct CampaignState final
     Gs1AppState app_state {GS1_APP_STATE_BOOT};
     RegionalMapState regional_map_state {};
     std::vector<FactionProgressState> faction_progress {};
+    CampaignProgressionState progression_state {};
     TechnologyState technology_state {};
     LoadoutPlannerState loadout_planner_state {};
     std::vector<SiteMetaState> sites {};

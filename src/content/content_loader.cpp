@@ -1,6 +1,7 @@
 #include "content/content_loader.h"
 
 #include "content/content_validator.h"
+#include "content/defs/progression_defs.h"
 #include "support/currency.h"
 #include "toml.hpp"
 
@@ -2193,6 +2194,124 @@ void index_defs(
         }
     }
 }
+
+TargetKindDef make_target_kind_def(
+    ContentDatabase& content,
+    std::uint32_t target_kind_id,
+    std::string_view display_name)
+{
+    return TargetKindDef {
+        target_kind_id,
+        {0U, 0U, 0U, 0U},
+        store_string_view(content, std::string {display_name})};
+}
+
+void build_progression_defs_from_loaded_content(ContentDatabase& content)
+{
+    content.token_kind_defs.push_back(TokenKindDef {
+        k_progression_token_kind_total_reputation,
+        false,
+        {0U, 0U, 0U},
+        store_string_view(content, "Total Reputation")});
+    content.token_kind_defs.push_back(TokenKindDef {
+        k_progression_token_kind_faction_reputation,
+        true,
+        {0U, 0U, 0U},
+        store_string_view(content, "Faction Reputation")});
+    content.token_kind_defs.push_back(TokenKindDef {
+        k_progression_token_kind_site_cash,
+        false,
+        {0U, 0U, 0U},
+        store_string_view(content, "Site Cash")});
+
+    content.target_kind_defs.push_back(make_target_kind_def(
+        content,
+        k_progression_target_kind_technology_node,
+        "Technology Node"));
+    content.target_kind_defs.push_back(make_target_kind_def(
+        content,
+        k_progression_target_kind_plant,
+        "Plant"));
+    content.target_kind_defs.push_back(make_target_kind_def(
+        content,
+        k_progression_target_kind_item,
+        "Item"));
+    content.target_kind_defs.push_back(make_target_kind_def(
+        content,
+        k_progression_target_kind_structure_recipe,
+        "Structure Recipe"));
+    content.target_kind_defs.push_back(make_target_kind_def(
+        content,
+        k_progression_target_kind_recipe,
+        "Recipe"));
+    content.target_kind_defs.push_back(make_target_kind_def(
+        content,
+        k_progression_target_kind_site_unlockable,
+        "Site Unlockable"));
+
+    content.progression_event_defs.push_back(ProgressionEventDef {
+        k_progression_event_campaign_reputation_reward,
+        k_progression_token_kind_total_reputation,
+        store_string_view(content, "Campaign Reputation Reward")});
+    content.progression_event_defs.push_back(ProgressionEventDef {
+        k_progression_event_faction_reputation_reward,
+        k_progression_token_kind_faction_reputation,
+        store_string_view(content, "Faction Reputation Reward")});
+
+    for (const auto& unlock_def : content.reputation_unlock_defs)
+    {
+        std::uint32_t target_kind_id = 0U;
+        switch (unlock_def.unlock_kind)
+        {
+        case ReputationUnlockKind::Plant:
+            target_kind_id = k_progression_target_kind_plant;
+            break;
+        case ReputationUnlockKind::Item:
+            target_kind_id = k_progression_target_kind_item;
+            break;
+        case ReputationUnlockKind::StructureRecipe:
+            target_kind_id = k_progression_target_kind_structure_recipe;
+            break;
+        case ReputationUnlockKind::Recipe:
+            target_kind_id = k_progression_target_kind_recipe;
+            break;
+        default:
+            break;
+        }
+
+        if (target_kind_id == 0U)
+        {
+            continue;
+        }
+
+        content.threshold_unlock_defs.push_back(ThresholdUnlockDef {
+            unlock_def.unlock_id,
+            k_progression_token_kind_total_reputation,
+            0U,
+            unlock_def.reputation_requirement,
+            target_kind_id,
+            unlock_def.content_id,
+            ProgressionGrantKind::Effective,
+            {0U, 0U, 0U},
+            unlock_def.display_name});
+    }
+
+    for (const auto& node_def : content.technology_node_defs)
+    {
+        content.threshold_unlock_defs.push_back(ThresholdUnlockDef {
+            node_def.tech_node_id.value,
+            k_progression_token_kind_faction_reputation,
+            node_def.faction_id.value,
+            node_def.reputation_requirement,
+            k_progression_target_kind_technology_node,
+            node_def.tech_node_id.value,
+            node_def.internal_cost_cash_points == 0U
+                ? ProgressionGrantKind::Effective
+                : ProgressionGrantKind::Available,
+            {0U, 0U, 0U},
+            node_def.display_name});
+    }
+}
 }  // namespace
 
 ContentDatabase ContentLoader::load_prototype_content(const std::filesystem::path& content_root)
@@ -2239,6 +2358,7 @@ ContentDatabase ContentLoader::load_prototype_content(const std::filesystem::pat
     load_reputation_unlock_defs(content, reputation_unlocks_path);
     load_technology_node_defs(content, technology_nodes_path);
     load_initial_unlocked_plant_ids(content, initial_unlocked_plants_path);
+    build_progression_defs_from_loaded_content(content);
 
     index_defs(
         sites_path,
@@ -2338,6 +2458,38 @@ ContentDatabase ContentLoader::load_prototype_content(const std::filesystem::pat
         content.index.site_action_by_kind,
         [](const SiteActionDef& def) {
             return static_cast<std::uint32_t>(def.action_kind);
+        });
+    index_defs(
+        reputation_unlocks_path,
+        "token kind",
+        content.token_kind_defs,
+        content.index.token_kind_by_id,
+        [](const TokenKindDef& def) {
+            return def.token_kind_id;
+        });
+    index_defs(
+        reputation_unlocks_path,
+        "target kind",
+        content.target_kind_defs,
+        content.index.target_kind_by_id,
+        [](const TargetKindDef& def) {
+            return def.target_kind_id;
+        });
+    index_defs(
+        reputation_unlocks_path,
+        "progression event",
+        content.progression_event_defs,
+        content.index.progression_event_by_id,
+        [](const ProgressionEventDef& def) {
+            return def.progression_event_id;
+        });
+    index_defs(
+        technology_nodes_path,
+        "purchase entry",
+        content.purchase_defs,
+        content.index.purchase_by_id,
+        [](const PurchaseDef& def) {
+            return def.purchase_entry_id;
         });
     index_defs(
         technology_tiers_path,

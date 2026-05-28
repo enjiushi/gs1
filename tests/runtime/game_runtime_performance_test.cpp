@@ -1,5 +1,6 @@
 #include "content/defs/plant_defs.h"
 #include "runtime/game_runtime.h"
+#include "runtime/runtime_split_state_compat.h"
 #include "site/tile_footprint.h"
 
 #include <algorithm>
@@ -61,12 +62,12 @@ struct GameRuntimeProjectionTestAccess
 {
     static std::optional<CampaignState>& campaign(GameRuntime& runtime)
     {
-        return runtime.state_.campaign;
+        return runtime.compatibility_campaign_state_;
     }
 
     static std::optional<SiteRunState>& active_site_run(GameRuntime& runtime)
     {
-        return runtime.state_.active_site_run;
+        return runtime.compatibility_site_run_state_;
     }
 };
 }  // namespace gs1

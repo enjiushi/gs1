@@ -70,6 +70,12 @@ CampaignState CampaignFactory::create_prototype_campaign(
     {
         campaign.faction_progress.push_back(FactionProgressState {faction_def.faction_id});
     }
+    campaign.progression_state.total_reputation = 0;
+    campaign.progression_state.token_balance_count = 1U;
+    campaign.progression_state.token_balances[0] = CampaignTokenBalanceState {
+        1U,
+        0U,
+        0};
     campaign.technology_state.total_reputation = 0;
     LoadoutPlannerSystem::initialize_campaign_state(campaign);
 

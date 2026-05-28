@@ -4,6 +4,7 @@
 #include "content/defs/item_defs.h"
 #include "content/defs/modifier_defs.h"
 #include "content/defs/plant_defs.h"
+#include "content/defs/progression_defs.h"
 #include "content/defs/reward_defs.h"
 #include "content/defs/structure_defs.h"
 #include "content/defs/task_defs.h"
@@ -389,6 +390,67 @@ const RewardCandidateDef* find_reward_candidate_def(RewardCandidateId reward_can
 std::span<const SiteActionDef> all_site_action_defs() noexcept
 {
     return prototype_content_database().site_action_defs;
+}
+
+std::span<const TokenKindDef> all_token_kind_defs() noexcept
+{
+    return prototype_content_database().token_kind_defs;
+}
+
+std::span<const TargetKindDef> all_target_kind_defs() noexcept
+{
+    return prototype_content_database().target_kind_defs;
+}
+
+std::span<const ProgressionEventDef> all_progression_event_defs() noexcept
+{
+    return prototype_content_database().progression_event_defs;
+}
+
+std::span<const ThresholdUnlockDef> all_threshold_unlock_defs() noexcept
+{
+    return prototype_content_database().threshold_unlock_defs;
+}
+
+std::span<const PurchaseDef> all_purchase_defs() noexcept
+{
+    return prototype_content_database().purchase_defs;
+}
+
+const TokenKindDef* find_token_kind_def(std::uint32_t token_kind_id) noexcept
+{
+    const auto& content = prototype_content_database();
+    const auto it = content.index.token_kind_by_id.find(token_kind_id);
+    return it == content.index.token_kind_by_id.end()
+        ? nullptr
+        : &content.token_kind_defs[it->second];
+}
+
+const TargetKindDef* find_target_kind_def(std::uint32_t target_kind_id) noexcept
+{
+    const auto& content = prototype_content_database();
+    const auto it = content.index.target_kind_by_id.find(target_kind_id);
+    return it == content.index.target_kind_by_id.end()
+        ? nullptr
+        : &content.target_kind_defs[it->second];
+}
+
+const ProgressionEventDef* find_progression_event_def(std::uint32_t progression_event_id) noexcept
+{
+    const auto& content = prototype_content_database();
+    const auto it = content.index.progression_event_by_id.find(progression_event_id);
+    return it == content.index.progression_event_by_id.end()
+        ? nullptr
+        : &content.progression_event_defs[it->second];
+}
+
+const PurchaseDef* find_purchase_def(std::uint32_t purchase_entry_id) noexcept
+{
+    const auto& content = prototype_content_database();
+    const auto it = content.index.purchase_by_id.find(purchase_entry_id);
+    return it == content.index.purchase_by_id.end()
+        ? nullptr
+        : &content.purchase_defs[it->second];
 }
 
 const SiteActionDef* find_site_action_def(ActionKind action_kind) noexcept

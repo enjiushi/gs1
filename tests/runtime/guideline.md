@@ -8,7 +8,7 @@ Runtime-level tests and probes that validate split runtime flow, exported state-
 - When files or folders in this directory change, update this file in the same change.
 
 ## Contents
-- `game_runtime_projection_test.cpp`: Broad runtime projection/state-view regression covering campaign, regional-map, site, inventory, phone, tech-tree, task, weather, protection-overlay, and onboarding output seen by hosts and adapters.
+- `game_runtime_projection_test.cpp`: Current host-contract regression for `Gs1GameStateView` and `query_site_tile_view(...)`, covering campaign/site state-view materialization plus progression-entry and tile-query visibility on the post-projection runtime path.
 - `game_runtime_message_chain_test.cpp`: Runtime message-chain regression covering multi-system gameplay message dispatch, task-claim ordering, cue emission, crafted-output follow-up, and host-facing runtime message ordering, and it is the natural home for future inline nested-gameplay-message behavior coverage as the runtime moves away from deferred internal drains.
 - `state_manager_test.cpp`: Focused resolver-registration coverage for `StateManager`, including default/active owner assignment, idempotent re-registration, duplicate-owner rejection, untouched never-registered state sets, and the mutating-system stack behavior used to preserve correct owner tracking across nested inline gameplay-message dispatch.
 - `timed_modifier_projection_test.cpp`: Focused regression covering active site-modifier projection and remaining-game-hour bucketing behavior.

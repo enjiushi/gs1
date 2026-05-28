@@ -44,6 +44,7 @@ void append_loadout_slots(
 }
 
 void rebuild_campaign_progression_entries(
+    const CampaignProgressionState& progression,
     const TechnologyState& technology,
     std::span<const FactionProgressState> faction_progress,
     std::vector<Gs1ProgressionEntryView>& entries)
@@ -55,7 +56,7 @@ void rebuild_campaign_progression_entries(
     for (const auto& unlock_def : all_reputation_unlock_defs())
     {
         std::uint16_t flags = 0U;
-        if (technology.total_reputation >= unlock_def.reputation_requirement)
+        if (progression.total_reputation >= unlock_def.reputation_requirement)
         {
             flags |= GS1_PROGRESSION_ENTRY_FLAG_UNLOCKED;
         }
@@ -111,6 +112,7 @@ void rebuild_campaign_view(
     std::span<const SiteId> completed_site_ids,
     std::span<const FactionProgressState> faction_progress,
     const TechnologyState& technology,
+    const CampaignProgressionState& progression,
     const LoadoutPlannerMetaState& loadout_planner,
     std::span<const LoadoutSlot> baseline_deployment_items,
     std::span<const LoadoutSlot> available_exported_support_items,
@@ -234,7 +236,7 @@ void rebuild_campaign_view(
         cache.active_nearby_aura_modifier_ids.push_back(id_value(modifier_id));
     }
 
-    rebuild_campaign_progression_entries(technology, faction_progress, cache.progression_entries);
+    rebuild_campaign_progression_entries(progression, technology, faction_progress, cache.progression_entries);
 
     cache.campaign = Gs1CampaignStateView {
         id_value(campaign_core.campaign_id),
@@ -242,7 +244,7 @@ void rebuild_campaign_view(
         campaign_time.campaign_clock_minutes_elapsed,
         campaign_time.campaign_days_total,
         campaign_time.campaign_days_remaining,
-        static_cast<std::uint32_t>(std::max(0, technology.total_reputation)),
+        static_cast<std::uint32_t>(std::max(0, progression.total_reputation)),
         regional_map.has_selected_site_id
             ? static_cast<std::int32_t>(id_value(regional_map.selected_site_id))
             : -1,
@@ -682,6 +684,7 @@ void rebuild_game_state_view_cache(
             completed_site_ids,
             *state_manager.query<StateSetId::CampaignFactionProgress>(state),
             *state_manager.query<StateSetId::CampaignTechnology>(state),
+            *state_manager.query<StateSetId::CampaignProgression>(state),
             loadout,
             baseline_items,
             available_support_items,

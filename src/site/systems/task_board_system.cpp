@@ -6,6 +6,7 @@
 #include "content/defs/gameplay_tuning_defs.h"
 #include "content/defs/item_defs.h"
 #include "content/defs/plant_defs.h"
+#include "content/defs/progression_defs.h"
 #include "content/defs/reward_defs.h"
 #include "content/defs/structure_defs.h"
 #include "content/defs/task_defs.h"
@@ -1309,8 +1310,10 @@ bool queue_reward_message(
         {
             return false;
         }
-        reward_message.type = GameMessageType::CampaignReputationAwardRequested;
-        reward_message.set_payload(CampaignReputationAwardRequestedMessage {
+        reward_message.type = GameMessageType::ProgressionEventOccurred;
+        reward_message.set_payload(ProgressionEventOccurredMessage {
+            k_progression_event_campaign_reputation_reward,
+            0U,
             reward_candidate_def.reputation_delta});
         break;
     case RewardEffectKind::FactionReputation:
@@ -1319,8 +1322,9 @@ bool queue_reward_message(
         {
             return false;
         }
-        reward_message.type = GameMessageType::FactionReputationAwardRequested;
-        reward_message.set_payload(FactionReputationAwardRequestedMessage {
+        reward_message.type = GameMessageType::ProgressionEventOccurred;
+        reward_message.set_payload(ProgressionEventOccurredMessage {
+            k_progression_event_faction_reputation_reward,
             reward_candidate_def.faction_id.value,
             reward_candidate_def.reputation_delta});
         break;

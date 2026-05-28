@@ -1,6 +1,7 @@
 #include "content/content_validator.h"
 
 #include "content/defs/faction_defs.h"
+#include "content/defs/progression_defs.h"
 #include "support/currency.h"
 
 #include <algorithm>
@@ -1666,6 +1667,39 @@ std::vector<ContentValidationIssue> validate_content_database(
             {
                 break;
             }
+        }
+    }
+
+    if (issues.empty())
+    {
+        if (content.token_kind_defs.empty() ||
+            find_token_kind_def(k_progression_token_kind_total_reputation) == nullptr ||
+            find_token_kind_def(k_progression_token_kind_faction_reputation) == nullptr)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Derived progression token kinds must include total and faction reputation."});
+        }
+    }
+
+    if (issues.empty())
+    {
+        if (content.target_kind_defs.empty() ||
+            find_target_kind_def(k_progression_target_kind_technology_node) == nullptr)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Derived progression target kinds must include technology nodes."});
+        }
+    }
+
+    if (issues.empty())
+    {
+        if (content.progression_event_defs.size() < 2U)
+        {
+            issues.push_back(ContentValidationIssue {
+                ContentValidationSeverity::Error,
+                "Derived progression events must include campaign and faction reputation reward events."});
         }
     }
 

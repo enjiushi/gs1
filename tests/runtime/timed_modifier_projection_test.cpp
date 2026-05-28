@@ -1,4 +1,5 @@
 #include "runtime/game_runtime.h"
+#include "runtime/runtime_split_state_compat.h"
 #include "content/defs/item_defs.h"
 
 #include <cassert>
@@ -22,34 +23,20 @@ namespace gs1
 {
 struct GameRuntimeProjectionTestAccess
 {
-    static GamePresentationRuntimeContext presentation_context(GameRuntime& runtime)
-    {
-        return GamePresentationRuntimeContext {
-            runtime.state_.app_state,
-            runtime.state_.campaign,
-            runtime.state_.active_site_run,
-            runtime.state_.site_protection_presentation,
-            runtime.state_.ui_presentation,
-            runtime.state_.presentation_runtime,
-            runtime.state_.message_queue,
-            runtime.state_.runtime_messages,
-            runtime.state_.fixed_step_seconds};
-    }
-
     static std::optional<CampaignState>& campaign(GameRuntime& runtime)
     {
-        return runtime.state_.campaign;
+        return runtime.compatibility_campaign_state_;
     }
 
     static std::optional<SiteRunState>& active_site_run(GameRuntime& runtime)
     {
-        return runtime.state_.active_site_run;
+        return runtime.compatibility_site_run_state_;
     }
 
     static void flush_projection(GameRuntime& runtime)
     {
-        auto context = presentation_context(runtime);
-        runtime.presentation_.flush_site_presentation_if_dirty(context);
+        runtime.flush_compatibility_state_to_split_state();
+        runtime.refresh_compatibility_state_from_split_state();
     }
 };
 }  // namespace gs1

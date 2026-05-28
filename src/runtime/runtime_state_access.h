@@ -43,6 +43,10 @@ struct RuntimeCampaignFactionProgressTag
 {
 };
 
+struct RuntimeCampaignProgressionTag
+{
+};
+
 struct RuntimeCampaignTimeTag
 {
 };
@@ -66,6 +70,7 @@ template <class Tag>
 struct state_owner;
 
 class CampaignFlowSystem;
+class CampaignProgressionSystem;
 class CampaignTimeSystem;
 class FactionReputationSystem;
 class TechnologySystem;
@@ -86,7 +91,13 @@ struct state_owner<RuntimeCampaignTimeTag>
 template <>
 struct state_owner<RuntimeCampaignFactionProgressTag>
 {
-    using type = FactionReputationSystem;
+    using type = CampaignProgressionSystem;
+};
+
+template <>
+struct state_owner<RuntimeCampaignProgressionTag>
+{
+    using type = CampaignProgressionSystem;
 };
 
 template <>
@@ -219,6 +230,20 @@ inline decltype(auto) runtime_invocation_state_cref<RuntimeCampaignFactionProgre
     const RuntimeInvocation& invocation)
 {
     return invocation.state_manager_->query<StateSetId::CampaignFactionProgress>(*invocation.owned_state_).value();
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_ref<RuntimeCampaignProgressionTag>(
+    RuntimeInvocation& invocation)
+{
+    return invocation.state_manager_->state<StateSetId::CampaignProgression>(*invocation.owned_state_).value();
+}
+
+template <>
+inline decltype(auto) runtime_invocation_state_cref<RuntimeCampaignProgressionTag>(
+    const RuntimeInvocation& invocation)
+{
+    return invocation.state_manager_->query<StateSetId::CampaignProgression>(*invocation.owned_state_).value();
 }
 
 template <>

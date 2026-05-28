@@ -24,6 +24,36 @@ inline void write_sites_state_to_state_sets(
 [[nodiscard]] inline std::vector<SiteMetaState> assemble_sites_state_from_state_sets(
     const GameState& state,
     const StateManager& state_manager);
+[[nodiscard]] inline InventoryState assemble_inventory_state_from_state_sets(
+    const GameState& state,
+    const StateManager& state_manager);
+[[nodiscard]] inline ContractorState assemble_contractor_state_from_state_sets(
+    const GameState& state,
+    const StateManager& state_manager);
+[[nodiscard]] inline TaskBoardState assemble_task_board_state_from_state_sets(
+    const GameState& state,
+    const StateManager& state_manager);
+[[nodiscard]] inline ModifierState assemble_modifier_state_from_state_sets(
+    const GameState& state,
+    const StateManager& state_manager);
+[[nodiscard]] inline EconomyState assemble_economy_state_from_state_sets(
+    const GameState& state,
+    const StateManager& state_manager);
+[[nodiscard]] inline ActionState assemble_action_state_from_state_sets(
+    const GameState& state,
+    const StateManager& state_manager);
+[[nodiscard]] inline SiteObjectiveState assemble_site_objective_state_from_state_sets(
+    const GameState& state,
+    const StateManager& state_manager);
+[[nodiscard]] inline LocalWeatherResolveState assemble_local_weather_resolve_state_from_state_sets(
+    const GameState& state,
+    const StateManager& state_manager);
+[[nodiscard]] inline PlantWeatherContributionState assemble_plant_weather_contribution_state_from_state_sets(
+    const GameState& state,
+    const StateManager& state_manager);
+[[nodiscard]] inline DeviceWeatherContributionState assemble_device_weather_contribution_state_from_state_sets(
+    const GameState& state,
+    const StateManager& state_manager);
 
 inline void populate_campaign_state_from_state_sets(
     CampaignState& campaign,
@@ -35,6 +65,8 @@ inline void populate_campaign_state_from_state_sets(
     const auto& time = state_manager.query<StateSetId::CampaignTime>(state);
     const auto& faction_progress =
         state_manager.query<StateSetId::CampaignFactionProgress>(state);
+    const auto& progression =
+        state_manager.query<StateSetId::CampaignProgression>(state);
     const auto& technology = state_manager.query<StateSetId::CampaignTechnology>(state);
 
     if (!core.has_value())
@@ -78,6 +110,10 @@ inline void populate_campaign_state_from_state_sets(
     if (faction_progress.has_value())
     {
         campaign.faction_progress = *faction_progress;
+    }
+    if (progression.has_value())
+    {
+        campaign.progression_state = *progression;
     }
     if (technology.has_value())
     {
@@ -420,9 +456,80 @@ inline void write_campaign_state_to_state_sets(
         campaign.campaign_days_remaining};
     write_regional_map_state_to_state_sets(campaign.regional_map_state, state, state_manager);
     state_manager.state<StateSetId::CampaignFactionProgress>(state) = campaign.faction_progress;
+    state_manager.state<StateSetId::CampaignProgression>(state) = campaign.progression_state;
     state_manager.state<StateSetId::CampaignTechnology>(state) = campaign.technology_state;
     write_loadout_planner_state_to_state_sets(campaign.loadout_planner_state, state, state_manager);
     write_sites_state_to_state_sets(campaign.sites, state, state_manager);
+}
+
+inline void populate_site_run_state_from_state_sets(
+    SiteRunState& site_run,
+    const GameState& state,
+    const StateManager& state_manager,
+    const SiteWorldHandle& site_world)
+{
+    site_run = {};
+    const auto& meta = state_manager.query<StateSetId::SiteRunMeta>(state);
+    const auto& clock = state_manager.query<StateSetId::SiteClock>(state);
+    const auto& camp = state_manager.query<StateSetId::SiteCamp>(state);
+    const auto& weather = state_manager.query<StateSetId::SiteWeather>(state);
+    const auto& event = state_manager.query<StateSetId::SiteEvent>(state);
+    const auto& counters = state_manager.query<StateSetId::SiteCounters>(state);
+    const auto& move_direction = state_manager.query<StateSetId::MoveDirection>(state);
+
+    if (!meta.has_value())
+    {
+        return;
+    }
+
+    site_run.site_run_id = meta->site_run_id;
+    site_run.site_id = meta->site_id;
+    site_run.site_archetype_id = meta->site_archetype_id;
+    site_run.attempt_index = meta->attempt_index;
+    site_run.site_attempt_seed = meta->site_attempt_seed;
+    site_run.run_status = meta->run_status;
+    site_run.result_newly_revealed_site_count = meta->result_newly_revealed_site_count;
+    site_run.site_world = site_world;
+    if (clock.has_value())
+    {
+        site_run.clock = *clock;
+    }
+    if (camp.has_value())
+    {
+        site_run.camp = *camp;
+    }
+    site_run.inventory = assemble_inventory_state_from_state_sets(state, state_manager);
+    site_run.contractor = assemble_contractor_state_from_state_sets(state, state_manager);
+    if (weather.has_value())
+    {
+        site_run.weather = *weather;
+    }
+    if (event.has_value())
+    {
+        site_run.event = *event;
+    }
+    site_run.task_board = assemble_task_board_state_from_state_sets(state, state_manager);
+    site_run.modifier = assemble_modifier_state_from_state_sets(state, state_manager);
+    site_run.economy = assemble_economy_state_from_state_sets(state, state_manager);
+    site_run.craft = assemble_craft_state_from_state_sets(state, state_manager);
+    site_run.site_action = assemble_action_state_from_state_sets(state, state_manager);
+    if (counters.has_value())
+    {
+        site_run.counters = *counters;
+    }
+    site_run.objective = assemble_site_objective_state_from_state_sets(state, state_manager);
+    site_run.local_weather_resolve =
+        assemble_local_weather_resolve_state_from_state_sets(state, state_manager);
+    site_run.plant_weather_contribution =
+        assemble_plant_weather_contribution_state_from_state_sets(state, state_manager);
+    site_run.device_weather_contribution =
+        assemble_device_weather_contribution_state_from_state_sets(state, state_manager);
+
+    site_run.host_move_direction = SiteHostMoveDirectionState {
+        move_direction.world_move_x,
+        move_direction.world_move_y,
+        move_direction.world_move_z,
+        move_direction.present};
 }
 
 [[nodiscard]] inline std::vector<SiteMetaState> assemble_sites_state_from_state_sets(
