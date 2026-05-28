@@ -469,6 +469,383 @@ void append_runtime_game_message_subscribers(
     }
 }
 
+template <GameMessageType Type>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v =
+    false;
+
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::OpenMainMenu> =
+    typed_gameplay_dispatch_traits<OpenMainMenuMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::StartNewCampaign> =
+    typed_gameplay_dispatch_traits<StartNewCampaignMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SelectDeploymentSite> =
+    typed_gameplay_dispatch_traits<SelectDeploymentSiteMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::ClearDeploymentSiteSelection> =
+    typed_gameplay_dispatch_traits<ClearDeploymentSiteSelectionMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::DeploymentSiteSelectionChanged> =
+    typed_gameplay_dispatch_traits<DeploymentSiteSelectionChangedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::ProgressionEventOccurred> =
+    typed_gameplay_dispatch_traits<ProgressionEventOccurredMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PurchaseEntrySelected> =
+    typed_gameplay_dispatch_traits<PurchaseEntrySelectedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::TargetGranted> =
+    typed_gameplay_dispatch_traits<TargetGrantedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::CampaignReputationAwardRequested> =
+    typed_gameplay_dispatch_traits<CampaignReputationAwardRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::FactionReputationAwardRequested> =
+    typed_gameplay_dispatch_traits<FactionReputationAwardRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::StartSiteAttempt> =
+    typed_gameplay_dispatch_traits<StartSiteAttemptMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::ReturnToRegionalMap> =
+    typed_gameplay_dispatch_traits<ReturnToRegionalMapMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteAttemptEnded> =
+    typed_gameplay_dispatch_traits<SiteAttemptEndedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteRunStarted> =
+    typed_gameplay_dispatch_traits<SiteRunStartedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteSceneActivated> =
+    typed_gameplay_dispatch_traits<SiteSceneActivatedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::StartSiteAction> =
+    typed_gameplay_dispatch_traits<StartSiteActionMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PhoneListingPurchased> =
+    typed_gameplay_dispatch_traits<PhoneListingPurchasedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PhoneListingSold> =
+    typed_gameplay_dispatch_traits<PhoneListingSoldMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryTransferCompleted> =
+    typed_gameplay_dispatch_traits<InventoryTransferCompletedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryItemSubmitted> =
+    typed_gameplay_dispatch_traits<InventoryItemSubmittedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryItemUseCompleted> =
+    typed_gameplay_dispatch_traits<InventoryItemUseCompletedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryCraftCompleted> =
+    typed_gameplay_dispatch_traits<InventoryCraftCompletedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::EconomyMoneyAwardRequested> =
+    typed_gameplay_dispatch_traits<EconomyMoneyAwardRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteUnlockableRevealRequested> =
+    typed_gameplay_dispatch_traits<SiteUnlockableRevealRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::RunModifierAwardRequested> =
+    typed_gameplay_dispatch_traits<RunModifierAwardRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteRefreshTick> =
+    typed_gameplay_dispatch_traits<SiteRefreshTickMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryDeliveryBatchRequested> =
+    typed_gameplay_dispatch_traits<InventoryDeliveryBatchRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryDeliveryRequested> =
+    typed_gameplay_dispatch_traits<InventoryDeliveryRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryWorkerPackInsertRequested> =
+    typed_gameplay_dispatch_traits<InventoryWorkerPackInsertRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryItemUseRequested> =
+    typed_gameplay_dispatch_traits<InventoryItemUseRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryItemConsumeRequested> =
+    typed_gameplay_dispatch_traits<InventoryItemConsumeRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryGlobalItemConsumeRequested> =
+    typed_gameplay_dispatch_traits<InventoryGlobalItemConsumeRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryTransferRequested> =
+    typed_gameplay_dispatch_traits<InventoryTransferRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryItemSubmitRequested> =
+    typed_gameplay_dispatch_traits<InventoryItemSubmitRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryCraftContextRequested> =
+    typed_gameplay_dispatch_traits<CraftContextRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteGroundCoverPlaced> =
+    typed_gameplay_dispatch_traits<SiteGroundCoverPlacedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteTilePlantingCompleted> =
+    typed_gameplay_dispatch_traits<SiteTilePlantingCompletedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteTileWatered> =
+    typed_gameplay_dispatch_traits<SiteTileWateredMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteTileBurialCleared> =
+    typed_gameplay_dispatch_traits<SiteTileBurialClearedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteTileHarvested> =
+    typed_gameplay_dispatch_traits<SiteTileHarvestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteDevicePlaced> =
+    typed_gameplay_dispatch_traits<SiteDevicePlacedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteDeviceBroken> =
+    typed_gameplay_dispatch_traits<SiteDeviceBrokenMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteDeviceRepaired> =
+    typed_gameplay_dispatch_traits<SiteDeviceRepairedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteDeviceConditionChanged> =
+    typed_gameplay_dispatch_traits<SiteDeviceConditionChangedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::WorkerMeterDeltaRequested> =
+    typed_gameplay_dispatch_traits<WorkerMeterDeltaRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::WorkerMetersChanged> =
+    typed_gameplay_dispatch_traits<WorkerMetersChangedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::TileEcologyChanged> =
+    typed_gameplay_dispatch_traits<TileEcologyChangedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::TileEcologyBatchChanged> =
+    typed_gameplay_dispatch_traits<TileEcologyBatchChangedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::LivingPlantStabilityChanged> =
+    typed_gameplay_dispatch_traits<LivingPlantStabilityChangedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteTileStateChanged> =
+    typed_gameplay_dispatch_traits<SiteTileStateChangedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::RestorationProgressChanged> =
+    typed_gameplay_dispatch_traits<RestorationProgressChangedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteActionCompleted> =
+    typed_gameplay_dispatch_traits<SiteActionCompletedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PlacementReservationRequested> =
+    typed_gameplay_dispatch_traits<PlacementReservationRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PlacementReservationAccepted> =
+    typed_gameplay_dispatch_traits<PlacementReservationAcceptedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PlacementReservationRejected> =
+    typed_gameplay_dispatch_traits<PlacementReservationRejectedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PlacementReservationReleased> =
+    typed_gameplay_dispatch_traits<PlacementReservationReleasedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryCraftCommitRequested> =
+    typed_gameplay_dispatch_traits<InventoryCraftCommitRequestedMessage>::enabled;
+
+template <typename System>
+void append_runtime_game_message_subscribers_if_legacy(
+    RuntimeGameMessageSubscriberEntryArray& subscribers_by_type,
+    std::span<const GameMessageType> subscribed_types,
+    IRuntimeSystem& system)
+{
+    const auto profile_id = runtime_profile_system_id_for<System>(system);
+    for (const GameMessageType type : subscribed_types)
+    {
+        if (type == GameMessageType::Count)
+        {
+            continue;
+        }
+
+        switch (type)
+        {
+        case GameMessageType::OpenMainMenu:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::OpenMainMenu>) { continue; }
+            break;
+        case GameMessageType::StartNewCampaign:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::StartNewCampaign>) { continue; }
+            break;
+        case GameMessageType::SelectDeploymentSite:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SelectDeploymentSite>) { continue; }
+            break;
+        case GameMessageType::ClearDeploymentSiteSelection:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::ClearDeploymentSiteSelection>) { continue; }
+            break;
+        case GameMessageType::DeploymentSiteSelectionChanged:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::DeploymentSiteSelectionChanged>) { continue; }
+            break;
+        case GameMessageType::ProgressionEventOccurred:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::ProgressionEventOccurred>) { continue; }
+            break;
+        case GameMessageType::PurchaseEntrySelected:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PurchaseEntrySelected>) { continue; }
+            break;
+        case GameMessageType::TargetGranted:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::TargetGranted>) { continue; }
+            break;
+        case GameMessageType::CampaignReputationAwardRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::CampaignReputationAwardRequested>) { continue; }
+            break;
+        case GameMessageType::FactionReputationAwardRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::FactionReputationAwardRequested>) { continue; }
+            break;
+        case GameMessageType::StartSiteAttempt:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::StartSiteAttempt>) { continue; }
+            break;
+        case GameMessageType::ReturnToRegionalMap:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::ReturnToRegionalMap>) { continue; }
+            break;
+        case GameMessageType::SiteAttemptEnded:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteAttemptEnded>) { continue; }
+            break;
+        case GameMessageType::SiteRunStarted:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteRunStarted>) { continue; }
+            break;
+        case GameMessageType::SiteSceneActivated:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteSceneActivated>) { continue; }
+            break;
+        case GameMessageType::StartSiteAction:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::StartSiteAction>) { continue; }
+            break;
+        case GameMessageType::PhoneListingPurchased:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PhoneListingPurchased>) { continue; }
+            break;
+        case GameMessageType::PhoneListingSold:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PhoneListingSold>) { continue; }
+            break;
+        case GameMessageType::InventoryTransferCompleted:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryTransferCompleted>) { continue; }
+            break;
+        case GameMessageType::InventoryItemSubmitted:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryItemSubmitted>) { continue; }
+            break;
+        case GameMessageType::InventoryItemUseCompleted:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryItemUseCompleted>) { continue; }
+            break;
+        case GameMessageType::InventoryCraftCompleted:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryCraftCompleted>) { continue; }
+            break;
+        case GameMessageType::EconomyMoneyAwardRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::EconomyMoneyAwardRequested>) { continue; }
+            break;
+        case GameMessageType::SiteUnlockableRevealRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteUnlockableRevealRequested>) { continue; }
+            break;
+        case GameMessageType::RunModifierAwardRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::RunModifierAwardRequested>) { continue; }
+            break;
+        case GameMessageType::SiteRefreshTick:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteRefreshTick>) { continue; }
+            break;
+        case GameMessageType::InventoryDeliveryBatchRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryDeliveryBatchRequested>) { continue; }
+            break;
+        case GameMessageType::InventoryDeliveryRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryDeliveryRequested>) { continue; }
+            break;
+        case GameMessageType::InventoryWorkerPackInsertRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryWorkerPackInsertRequested>) { continue; }
+            break;
+        case GameMessageType::InventoryItemUseRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryItemUseRequested>) { continue; }
+            break;
+        case GameMessageType::InventoryItemConsumeRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryItemConsumeRequested>) { continue; }
+            break;
+        case GameMessageType::InventoryGlobalItemConsumeRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryGlobalItemConsumeRequested>) { continue; }
+            break;
+        case GameMessageType::InventoryTransferRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryTransferRequested>) { continue; }
+            break;
+        case GameMessageType::InventoryItemSubmitRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryItemSubmitRequested>) { continue; }
+            break;
+        case GameMessageType::InventoryCraftContextRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryCraftContextRequested>) { continue; }
+            break;
+        case GameMessageType::SiteGroundCoverPlaced:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteGroundCoverPlaced>) { continue; }
+            break;
+        case GameMessageType::SiteTilePlantingCompleted:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteTilePlantingCompleted>) { continue; }
+            break;
+        case GameMessageType::SiteTileWatered:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteTileWatered>) { continue; }
+            break;
+        case GameMessageType::SiteTileBurialCleared:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteTileBurialCleared>) { continue; }
+            break;
+        case GameMessageType::SiteTileHarvested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteTileHarvested>) { continue; }
+            break;
+        case GameMessageType::SiteDevicePlaced:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteDevicePlaced>) { continue; }
+            break;
+        case GameMessageType::SiteDeviceBroken:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteDeviceBroken>) { continue; }
+            break;
+        case GameMessageType::SiteDeviceRepaired:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteDeviceRepaired>) { continue; }
+            break;
+        case GameMessageType::SiteDeviceConditionChanged:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteDeviceConditionChanged>) { continue; }
+            break;
+        case GameMessageType::WorkerMeterDeltaRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::WorkerMeterDeltaRequested>) { continue; }
+            break;
+        case GameMessageType::WorkerMetersChanged:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::WorkerMetersChanged>) { continue; }
+            break;
+        case GameMessageType::TileEcologyChanged:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::TileEcologyChanged>) { continue; }
+            break;
+        case GameMessageType::TileEcologyBatchChanged:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::TileEcologyBatchChanged>) { continue; }
+            break;
+        case GameMessageType::LivingPlantStabilityChanged:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::LivingPlantStabilityChanged>) { continue; }
+            break;
+        case GameMessageType::SiteTileStateChanged:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteTileStateChanged>) { continue; }
+            break;
+        case GameMessageType::RestorationProgressChanged:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::RestorationProgressChanged>) { continue; }
+            break;
+        case GameMessageType::SiteActionCompleted:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteActionCompleted>) { continue; }
+            break;
+        case GameMessageType::PlacementReservationRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PlacementReservationRequested>) { continue; }
+            break;
+        case GameMessageType::PlacementReservationAccepted:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PlacementReservationAccepted>) { continue; }
+            break;
+        case GameMessageType::PlacementReservationRejected:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PlacementReservationRejected>) { continue; }
+            break;
+        case GameMessageType::PlacementReservationReleased:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PlacementReservationReleased>) { continue; }
+            break;
+        case GameMessageType::InventoryCraftCommitRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryCraftCommitRequested>) { continue; }
+            break;
+        default:
+            break;
+        }
+
+        const auto index = static_cast<std::size_t>(type);
+        if (index < subscribers_by_type.size())
+        {
+            subscribers_by_type[index].push_back(RuntimeGameMessageSubscriberEntry {
+                .system = &system,
+                .profile_id = profile_id});
+        }
+    }
+}
+
 }  // namespace
 
 RuntimeInvocation::RuntimeInvocation(GameRuntime& runtime) noexcept
@@ -841,7 +1218,7 @@ void GameRuntime::initialize_system_registry()
             return;
         }
 
-        append_runtime_game_message_subscribers<System>(
+        append_runtime_game_message_subscribers_if_legacy<System>(
             message_subscribers_,
             system->subscribed_game_messages(),
             *system);
@@ -1138,6 +1515,141 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
     if (!is_valid_message_type(message.type) || message.type == GameMessageType::Count)
     {
         return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    switch (message.type)
+    {
+    case GameMessageType::OpenMainMenu:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<OpenMainMenuMessage>());
+    case GameMessageType::StartNewCampaign:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<StartNewCampaignMessage>());
+    case GameMessageType::SelectDeploymentSite:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<SelectDeploymentSiteMessage>());
+    case GameMessageType::ClearDeploymentSiteSelection:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<ClearDeploymentSiteSelectionMessage>());
+    case GameMessageType::DeploymentSiteSelectionChanged:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<DeploymentSiteSelectionChangedMessage>());
+    case GameMessageType::ProgressionEventOccurred:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<ProgressionEventOccurredMessage>());
+    case GameMessageType::PurchaseEntrySelected:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<PurchaseEntrySelectedMessage>());
+    case GameMessageType::TargetGranted:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<TargetGrantedMessage>());
+    case GameMessageType::CampaignReputationAwardRequested:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<CampaignReputationAwardRequestedMessage>());
+    case GameMessageType::FactionReputationAwardRequested:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<FactionReputationAwardRequestedMessage>());
+    case GameMessageType::StartSiteAttempt:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<StartSiteAttemptMessage>());
+    case GameMessageType::ReturnToRegionalMap:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<ReturnToRegionalMapMessage>());
+    case GameMessageType::SiteAttemptEnded:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteAttemptEndedMessage>());
+    case GameMessageType::SiteRunStarted:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteRunStartedMessage>());
+    case GameMessageType::SiteSceneActivated:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteSceneActivatedMessage>());
+    case GameMessageType::StartSiteAction:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<StartSiteActionMessage>());
+    case GameMessageType::PhoneListingPurchased:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<PhoneListingPurchasedMessage>());
+    case GameMessageType::PhoneListingSold:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<PhoneListingSoldMessage>());
+    case GameMessageType::InventoryTransferCompleted:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<InventoryTransferCompletedMessage>());
+    case GameMessageType::InventoryItemSubmitted:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<InventoryItemSubmittedMessage>());
+    case GameMessageType::InventoryItemUseCompleted:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<InventoryItemUseCompletedMessage>());
+    case GameMessageType::InventoryCraftCompleted:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<InventoryCraftCompletedMessage>());
+    case GameMessageType::EconomyMoneyAwardRequested:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<EconomyMoneyAwardRequestedMessage>());
+    case GameMessageType::SiteUnlockableRevealRequested:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteUnlockableRevealRequestedMessage>());
+    case GameMessageType::RunModifierAwardRequested:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<RunModifierAwardRequestedMessage>());
+    case GameMessageType::SiteRefreshTick:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteRefreshTickMessage>());
+    case GameMessageType::InventoryDeliveryBatchRequested:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<InventoryDeliveryBatchRequestedMessage>());
+    case GameMessageType::InventoryDeliveryRequested:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<InventoryDeliveryRequestedMessage>());
+    case GameMessageType::InventoryWorkerPackInsertRequested:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<InventoryWorkerPackInsertRequestedMessage>());
+    case GameMessageType::InventoryItemUseRequested:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<InventoryItemUseRequestedMessage>());
+    case GameMessageType::InventoryItemConsumeRequested:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<InventoryItemConsumeRequestedMessage>());
+    case GameMessageType::InventoryGlobalItemConsumeRequested:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<InventoryGlobalItemConsumeRequestedMessage>());
+    case GameMessageType::InventoryTransferRequested:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<InventoryTransferRequestedMessage>());
+    case GameMessageType::InventoryItemSubmitRequested:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<InventoryItemSubmitRequestedMessage>());
+    case GameMessageType::InventoryCraftContextRequested:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<CraftContextRequestedMessage>());
+    case GameMessageType::SiteGroundCoverPlaced:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteGroundCoverPlacedMessage>());
+    case GameMessageType::SiteTilePlantingCompleted:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<SiteTilePlantingCompletedMessage>());
+    case GameMessageType::SiteTileWatered:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteTileWateredMessage>());
+    case GameMessageType::SiteTileBurialCleared:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteTileBurialClearedMessage>());
+    case GameMessageType::SiteTileHarvested:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteTileHarvestedMessage>());
+    case GameMessageType::SiteDevicePlaced:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteDevicePlacedMessage>());
+    case GameMessageType::SiteDeviceBroken:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteDeviceBrokenMessage>());
+    case GameMessageType::SiteDeviceRepaired:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteDeviceRepairedMessage>());
+    case GameMessageType::SiteDeviceConditionChanged:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<SiteDeviceConditionChangedMessage>());
+    case GameMessageType::WorkerMeterDeltaRequested:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<WorkerMeterDeltaRequestedMessage>());
+    case GameMessageType::WorkerMetersChanged:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<WorkerMetersChangedMessage>());
+    case GameMessageType::TileEcologyChanged:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<TileEcologyChangedMessage>());
+    case GameMessageType::TileEcologyBatchChanged:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<TileEcologyBatchChangedMessage>());
+    case GameMessageType::LivingPlantStabilityChanged:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<LivingPlantStabilityChangedMessage>());
+    case GameMessageType::SiteTileStateChanged:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteTileStateChangedMessage>());
+    case GameMessageType::RestorationProgressChanged:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<RestorationProgressChangedMessage>());
+    case GameMessageType::SiteActionCompleted:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteActionCompletedMessage>());
+    case GameMessageType::PlacementReservationRequested:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<PlacementReservationRequestedMessage>());
+    case GameMessageType::PlacementReservationAccepted:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<PlacementReservationAcceptedMessage>());
+    case GameMessageType::PlacementReservationRejected:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<PlacementReservationRejectedMessage>());
+    case GameMessageType::PlacementReservationReleased:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<PlacementReservationReleasedMessage>());
+    case GameMessageType::InventoryCraftCommitRequested:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<InventoryCraftCommitRequestedMessage>());
+    default:
+        break;
     }
 
     const auto dispatch_profiled_message = [this](Gs1RuntimeProfileSystemId system_id, auto&& dispatch_fn)

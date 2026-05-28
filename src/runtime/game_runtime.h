@@ -182,6 +182,8 @@ private:
     [[nodiscard]] Gs1Status dispatch_game_message_inline(const GameMessage& message);
     template <typename Message>
     [[nodiscard]] Gs1Status dispatch_game_message_inline(const Message& message);
+    template <typename Message>
+    [[nodiscard]] Gs1Status dispatch_typed_game_message_to_subscribers(const Message& message);
     template <typename System>
     [[nodiscard]] System* find_system() noexcept;
     void copy_timing_snapshot(
@@ -321,52 +323,81 @@ inline Gs1Status GameRuntime::dispatch_game_message_inline(const Message& messag
             inline_game_message_depth_ <= warn_depth &&
             "Internal typed gameplay message inline dispatch depth exceeded limit 4.");
 
-        RuntimeInvocation invocation {*this};
-        using subscriber_list = typename typed_gameplay_dispatch_traits<Message>::subscribers;
-        Gs1Status status = GS1_STATUS_OK;
-
-        for_each_type<subscriber_list>(
-            [&]<typename System>()
-            {
-                if (status != GS1_STATUS_OK)
-                {
-                    return;
-                }
-
-                auto* system = find_system<System>();
-                if (system == nullptr)
-                {
-                    status = GS1_STATUS_INVALID_STATE;
-                    return;
-                }
-
-                MutationScope mutation_scope {state_manager_, *system};
-                const auto profile_id = runtime_profile_system_id_for<System>(*system);
-                if (!profile_id.has_value() || !profiled_system_enabled(*profile_id))
-                {
-                    status = system->handle(invocation, message);
-                    return;
-                }
-
-                const auto started_at = std::chrono::steady_clock::now();
-                status = system->handle(invocation, message);
-                const double elapsed_ms =
-                    std::chrono::duration<double, std::milli>(
-                        std::chrono::steady_clock::now() - started_at)
-                        .count();
-                auto& accumulator =
-                    profiled_systems_[static_cast<std::size_t>(*profile_id)].message_timing;
-                accumulator.sample_count += 1U;
-                accumulator.last_elapsed_ms = elapsed_ms;
-                accumulator.total_elapsed_ms += elapsed_ms;
-                if (elapsed_ms > accumulator.max_elapsed_ms)
-                {
-                    accumulator.max_elapsed_ms = elapsed_ms;
-                }
-            });
-
-        return status;
+        return dispatch_typed_game_message_to_subscribers(message);
     }
+}
+
+template <typename Message>
+inline Gs1Status GameRuntime::dispatch_typed_game_message_to_subscribers(const Message& message)
+{
+    static_assert(
+        typed_gameplay_dispatch_traits<Message>::enabled,
+        "Typed subscriber dispatch requires an enabled typed gameplay dispatch trait.");
+
+    struct MutationScope final
+    {
+        MutationScope(StateManager& state_manager, IRuntimeSystem& system)
+            : state_manager_(&state_manager)
+        {
+            state_manager_->push_current_mutating_system(&system);
+        }
+
+        ~MutationScope()
+        {
+            if (state_manager_ != nullptr)
+            {
+                state_manager_->pop_current_mutating_system();
+            }
+        }
+
+        StateManager* state_manager_ {nullptr};
+    };
+
+    RuntimeInvocation invocation {*this};
+    using subscriber_list = typename typed_gameplay_dispatch_traits<Message>::subscribers;
+    Gs1Status status = GS1_STATUS_OK;
+
+    for_each_type<subscriber_list>(
+        [&]<typename System>()
+        {
+            if (status != GS1_STATUS_OK)
+            {
+                return;
+            }
+
+            auto* system = find_system<System>();
+            if (system == nullptr)
+            {
+                status = GS1_STATUS_INVALID_STATE;
+                return;
+            }
+
+            MutationScope mutation_scope {state_manager_, *system};
+            const auto profile_id = runtime_profile_system_id_for<System>(*system);
+            if (!profile_id.has_value() || !profiled_system_enabled(*profile_id))
+            {
+                status = system->handle(invocation, message);
+                return;
+            }
+
+            const auto started_at = std::chrono::steady_clock::now();
+            status = system->handle(invocation, message);
+            const double elapsed_ms =
+                std::chrono::duration<double, std::milli>(
+                    std::chrono::steady_clock::now() - started_at)
+                    .count();
+            auto& accumulator =
+                profiled_systems_[static_cast<std::size_t>(*profile_id)].message_timing;
+            accumulator.sample_count += 1U;
+            accumulator.last_elapsed_ms = elapsed_ms;
+            accumulator.total_elapsed_ms += elapsed_ms;
+            if (elapsed_ms > accumulator.max_elapsed_ms)
+            {
+                accumulator.max_elapsed_ms = elapsed_ms;
+            }
+        });
+
+    return status;
 }
 
 template <typename System>

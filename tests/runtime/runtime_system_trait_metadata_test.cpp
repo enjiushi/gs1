@@ -3,6 +3,8 @@
 #include "campaign/systems/campaign_time_system.h"
 #include "campaign/systems/loadout_planner_system.h"
 #include "campaign/systems/technology_system.h"
+#include "messages/game_message.h"
+#include "runtime/game_runtime.h"
 #include "runtime/game_systems.h"
 #include "runtime/system_pack.h"
 #include "runtime/system_interface.h"
@@ -30,16 +32,32 @@
 #include <optional>
 #include <type_traits>
 
+namespace gs1
+{
+struct GameRuntimeProjectionTestAccess
+{
+    [[nodiscard]] static std::size_t legacy_game_message_subscriber_count(
+        const GameRuntime& runtime,
+        GameMessageType type)
+    {
+        return runtime.message_subscribers_[static_cast<std::size_t>(type)].size();
+    }
+};
+}  // namespace gs1
+
 namespace
 {
 using gs1::CampaignFlowSystem;
 using gs1::GameSystems;
 using gs1::GameMessage;
+using gs1::GameMessageType;
 using gs1::GameMessageSubscriptionSpan;
+using gs1::GameRuntime;
 using gs1::HostMessageSubscriptionSpan;
 using gs1::IRuntimeSystem;
 using gs1::RuntimeInvocation;
 using gs1::SiteTimeSystem;
+using gs1::StartNewCampaignMessage;
 
 using ExpectedRuntimeMessageManifest = gs1::type_list<
     gs1::runtime_message_type_constant<GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE>,
@@ -144,6 +162,32 @@ int main()
     if (gs1::runtime_fixed_step_order_for<SiteTimeSystem>(site_time) != 1U)
     {
         return 6;
+    }
+
+    Gs1RuntimeCreateDesc create_desc {};
+    create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    create_desc.api_version = gs1::k_api_version;
+    create_desc.fixed_step_seconds = 1.0 / 60.0;
+
+    GameRuntime runtime {create_desc};
+    if (gs1::GameRuntimeProjectionTestAccess::legacy_game_message_subscriber_count(
+            runtime,
+            GameMessageType::StartNewCampaign) != 0U)
+    {
+        return 7;
+    }
+
+    GameMessage start_campaign_message {};
+    start_campaign_message.type = GameMessageType::StartNewCampaign;
+    start_campaign_message.set_payload(StartNewCampaignMessage {42ULL, 30U});
+    if (runtime.handle_message(start_campaign_message) != GS1_STATUS_OK)
+    {
+        return 8;
+    }
+
+    if (!runtime.state().campaign_core.has_value())
+    {
+        return 9;
     }
 
     return 0;
