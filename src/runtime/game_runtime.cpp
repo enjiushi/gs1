@@ -558,6 +558,15 @@ template <>
 inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteRefreshTick> =
     typed_gameplay_dispatch_traits<SiteRefreshTickMessage>::enabled;
 template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::TaskAcceptRequested> =
+    typed_gameplay_dispatch_traits<TaskAcceptRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::TaskRewardClaimRequested> =
+    typed_gameplay_dispatch_traits<TaskRewardClaimRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteModifierEndRequested> =
+    typed_gameplay_dispatch_traits<SiteModifierEndRequestedMessage>::enabled;
+template <>
 inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryDeliveryBatchRequested> =
     typed_gameplay_dispatch_traits<InventoryDeliveryBatchRequestedMessage>::enabled;
 template <>
@@ -750,6 +759,15 @@ void append_runtime_game_message_subscribers_if_legacy(
             break;
         case GameMessageType::SiteRefreshTick:
             if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteRefreshTick>) { continue; }
+            break;
+        case GameMessageType::TaskAcceptRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::TaskAcceptRequested>) { continue; }
+            break;
+        case GameMessageType::TaskRewardClaimRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::TaskRewardClaimRequested>) { continue; }
+            break;
+        case GameMessageType::SiteModifierEndRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteModifierEndRequested>) { continue; }
             break;
         case GameMessageType::InventoryDeliveryBatchRequested:
             if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryDeliveryBatchRequested>) { continue; }
@@ -1591,6 +1609,14 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
         return dispatch_typed_game_message_to_subscribers(message.payload_as<RunModifierAwardRequestedMessage>());
     case GameMessageType::SiteRefreshTick:
         return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteRefreshTickMessage>());
+    case GameMessageType::TaskAcceptRequested:
+        return dispatch_typed_game_message_to_subscribers(message.payload_as<TaskAcceptRequestedMessage>());
+    case GameMessageType::TaskRewardClaimRequested:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<TaskRewardClaimRequestedMessage>());
+    case GameMessageType::SiteModifierEndRequested:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<SiteModifierEndRequestedMessage>());
     case GameMessageType::InventoryDeliveryBatchRequested:
         return dispatch_typed_game_message_to_subscribers(
             message.payload_as<InventoryDeliveryBatchRequestedMessage>());
@@ -1825,6 +1851,30 @@ std::optional<Gs1Status> GameRuntime::dispatch_runtime_translated_host_message(
         }
         return dispatch_game_message_inline(TechnologyNodeRefundRequestedMessage {
             action.target_id});
+
+    case GS1_GAMEPLAY_ACTION_ACCEPT_TASK:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        return dispatch_game_message_inline(TaskAcceptRequestedMessage {action.target_id});
+
+    case GS1_GAMEPLAY_ACTION_CLAIM_TASK_REWARD:
+        if (action.target_id == 0U ||
+            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        return dispatch_game_message_inline(TaskRewardClaimRequestedMessage {
+            action.target_id,
+            static_cast<std::uint32_t>(action.arg0)});
+
+    case GS1_GAMEPLAY_ACTION_END_SITE_MODIFIER:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        return dispatch_game_message_inline(SiteModifierEndRequestedMessage {action.target_id});
 
     default:
         return std::nullopt;

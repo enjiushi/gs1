@@ -184,26 +184,44 @@ int main()
     {
         return 7;
     }
+    if (gs1::GameRuntimeProjectionTestAccess::legacy_game_message_subscriber_count(
+            runtime,
+            GameMessageType::TaskAcceptRequested) != 0U)
+    {
+        return 8;
+    }
+    if (gs1::GameRuntimeProjectionTestAccess::legacy_game_message_subscriber_count(
+            runtime,
+            GameMessageType::TaskRewardClaimRequested) != 0U)
+    {
+        return 9;
+    }
+    if (gs1::GameRuntimeProjectionTestAccess::legacy_game_message_subscriber_count(
+            runtime,
+            GameMessageType::SiteModifierEndRequested) != 0U)
+    {
+        return 10;
+    }
 
     GameMessage start_campaign_message {};
     start_campaign_message.type = GameMessageType::StartNewCampaign;
     start_campaign_message.set_payload(StartNewCampaignMessage {42ULL, 30U});
     if (runtime.handle_message(start_campaign_message) != GS1_STATUS_OK)
     {
-        return 8;
+        return 11;
     }
 
     if (!runtime.state().campaign_core.has_value())
     {
-        return 9;
+        return 12;
     }
 
     GameRuntime host_runtime {create_desc};
     if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
             host_runtime,
-            GS1_HOST_EVENT_GAMEPLAY_ACTION) != 4U)
+            GS1_HOST_EVENT_GAMEPLAY_ACTION) != 2U)
     {
-        return 10;
+        return 13;
     }
 
     Gs1HostMessage host_message {};
@@ -215,7 +233,7 @@ int main()
         45ULL};
     if (host_runtime.submit_host_messages(&host_message, 1U) != GS1_STATUS_OK)
     {
-        return 11;
+        return 14;
     }
 
     Gs1Phase2Request phase2_request {};
@@ -223,19 +241,37 @@ int main()
     Gs1Phase2Result phase2_result {};
     if (host_runtime.run_phase2(phase2_request, phase2_result) != GS1_STATUS_OK)
     {
-        return 12;
+        return 15;
     }
 
     if (!host_runtime.state().campaign_core.has_value())
     {
-        return 13;
+        return 16;
     }
 
     if (gs1::GameRuntimeProjectionTestAccess::legacy_game_message_subscriber_count(
             host_runtime,
             GameMessageType::TechnologyNodeClaimRequested) != 0U)
     {
-        return 14;
+        return 17;
+    }
+    if (gs1::GameRuntimeProjectionTestAccess::legacy_game_message_subscriber_count(
+            host_runtime,
+            GameMessageType::TaskAcceptRequested) != 0U)
+    {
+        return 18;
+    }
+    if (gs1::GameRuntimeProjectionTestAccess::legacy_game_message_subscriber_count(
+            host_runtime,
+            GameMessageType::TaskRewardClaimRequested) != 0U)
+    {
+        return 19;
+    }
+    if (gs1::GameRuntimeProjectionTestAccess::legacy_game_message_subscriber_count(
+            host_runtime,
+            GameMessageType::SiteModifierEndRequested) != 0U)
+    {
+        return 20;
     }
 
     host_message.payload.gameplay_action.action = Gs1GameplayAction {
@@ -245,17 +281,17 @@ int main()
         0ULL};
     if (host_runtime.submit_host_messages(&host_message, 1U) != GS1_STATUS_OK)
     {
-        return 15;
+        return 21;
     }
 
     if (host_runtime.run_phase2(phase2_request, phase2_result) != GS1_STATUS_OK)
     {
-        return 16;
+        return 22;
     }
 
     if (!host_runtime.state().campaign_technology.has_value())
     {
-        return 17;
+        return 23;
     }
 
     return 0;

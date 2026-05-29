@@ -2751,8 +2751,7 @@ GameMessageSubscriptionSpan TaskBoardSystem::subscribed_game_messages() const no
 
 HostMessageSubscriptionSpan TaskBoardSystem::subscribed_host_messages() const noexcept
 {
-    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_GAMEPLAY_ACTION};
-    return subscriptions;
+    return {};
 }
 
 std::optional<Gs1RuntimeProfileSystemId> TaskBoardSystem::profile_system_id() const noexcept
@@ -2795,6 +2794,32 @@ Gs1Status TaskBoardSystem::handle(
         (void)refresh_normal_task_pool(invocation, true);
     }
 
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const TaskAcceptRequestedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_task_accept_requested(invocation, message);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TaskBoardSystem::handle(
+    RuntimeInvocation& invocation,
+    const TaskRewardClaimRequestedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    handle_task_reward_claim_requested(invocation, message);
     return GS1_STATUS_OK;
 }
 
@@ -3035,13 +3060,11 @@ Gs1Status TaskBoardSystem::process_game_message(
     case GameMessageType::SiteRefreshTick:
         return handle(invocation, message.payload_as<SiteRefreshTickMessage>());
     case GameMessageType::TaskAcceptRequested:
-        handle_task_accept_requested(invocation, message.payload_as<TaskAcceptRequestedMessage>());
-        break;
+        return handle(invocation, message.payload_as<TaskAcceptRequestedMessage>());
     case GameMessageType::TaskRewardClaimRequested:
-        handle_task_reward_claim_requested(
+        return handle(
             invocation,
             message.payload_as<TaskRewardClaimRequestedMessage>());
-        break;
     case GameMessageType::RestorationProgressChanged:
         return handle(invocation, message.payload_as<RestorationProgressChangedMessage>());
     case GameMessageType::TileEcologyChanged:

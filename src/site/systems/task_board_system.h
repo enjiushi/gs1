@@ -60,6 +60,12 @@ public:
         const SiteRefreshTickMessage& message);
     [[nodiscard]] Gs1Status handle(
         RuntimeInvocation& invocation,
+        const TaskAcceptRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const TaskRewardClaimRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
         const RestorationProgressChangedMessage& message);
     [[nodiscard]] Gs1Status handle(
         RuntimeInvocation& invocation,

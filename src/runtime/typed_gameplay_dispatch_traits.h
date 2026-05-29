@@ -36,6 +36,33 @@ struct typed_gameplay_dispatch_traits<SiteRefreshTickMessage>
 };
 
 template <>
+struct typed_gameplay_dispatch_traits<TaskAcceptRequestedMessage>
+{
+    using subscribers = typename typed_game_message_subscribers<
+        TaskAcceptRequestedMessage,
+        GameSystems>::type;
+    static constexpr bool enabled = true;
+};
+
+template <>
+struct typed_gameplay_dispatch_traits<TaskRewardClaimRequestedMessage>
+{
+    using subscribers = typename typed_game_message_subscribers<
+        TaskRewardClaimRequestedMessage,
+        GameSystems>::type;
+    static constexpr bool enabled = true;
+};
+
+template <>
+struct typed_gameplay_dispatch_traits<SiteModifierEndRequestedMessage>
+{
+    using subscribers = typename typed_game_message_subscribers<
+        SiteModifierEndRequestedMessage,
+        GameSystems>::type;
+    static constexpr bool enabled = true;
+};
+
+template <>
 struct typed_gameplay_dispatch_traits<OpenMainMenuMessage>
 {
     using subscribers = typename typed_game_message_subscribers<

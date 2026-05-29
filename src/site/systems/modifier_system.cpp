@@ -1196,8 +1196,7 @@ GameMessageSubscriptionSpan ModifierSystem::subscribed_game_messages() const noe
 
 HostMessageSubscriptionSpan ModifierSystem::subscribed_host_messages() const noexcept
 {
-    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_GAMEPLAY_ACTION};
-    return subscriptions;
+    return {};
 }
 
 std::optional<Gs1RuntimeProfileSystemId> ModifierSystem::profile_system_id() const noexcept

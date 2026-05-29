@@ -125,6 +125,24 @@ struct gameplay_message_traits<SiteRefreshTickMessage>
 };
 
 template <>
+struct gameplay_message_traits<TaskAcceptRequestedMessage>
+{
+    static constexpr GameMessageType type = GameMessageType::TaskAcceptRequested;
+};
+
+template <>
+struct gameplay_message_traits<TaskRewardClaimRequestedMessage>
+{
+    static constexpr GameMessageType type = GameMessageType::TaskRewardClaimRequested;
+};
+
+template <>
+struct gameplay_message_traits<SiteModifierEndRequestedMessage>
+{
+    static constexpr GameMessageType type = GameMessageType::SiteModifierEndRequested;
+};
+
+template <>
 struct gameplay_message_traits<StartSiteActionMessage>
 {
     static constexpr GameMessageType type = GameMessageType::StartSiteAction;
