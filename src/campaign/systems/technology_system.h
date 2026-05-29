@@ -17,7 +17,9 @@ public:
     using subscribed_messages = type_list<
         TargetGrantedMessage,
         ProgressionEventOccurredMessage,
-        CampaignReputationAwardRequestedMessage>;
+        CampaignReputationAwardRequestedMessage,
+        TechnologyNodeClaimRequestedMessage,
+        TechnologyNodeRefundRequestedMessage>;
     using emitted_runtime_messages = type_list<>;
     static constexpr std::optional<Gs1RuntimeProfileSystemId> profile_id =
         GS1_RUNTIME_PROFILE_SYSTEM_TECHNOLOGY;
@@ -49,6 +51,12 @@ public:
     [[nodiscard]] Gs1Status handle(
         RuntimeInvocation& invocation,
         const CampaignReputationAwardRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const TechnologyNodeClaimRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const TechnologyNodeRefundRequestedMessage& message);
     void run(RuntimeInvocation& invocation) override;
     [[nodiscard]] static bool node_purchased(
         const CampaignState& campaign,

@@ -65,6 +65,7 @@ using gs1::IRuntimeSystem;
 using gs1::RuntimeInvocation;
 using gs1::SiteTimeSystem;
 using gs1::StartNewCampaignMessage;
+using gs1::TechnologyState;
 
 using ExpectedRuntimeMessageManifest = gs1::type_list<
     gs1::runtime_message_type_constant<GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE>,
@@ -228,6 +229,33 @@ int main()
     if (!host_runtime.state().campaign_core.has_value())
     {
         return 13;
+    }
+
+    if (gs1::GameRuntimeProjectionTestAccess::legacy_game_message_subscriber_count(
+            host_runtime,
+            GameMessageType::TechnologyNodeClaimRequested) != 0U)
+    {
+        return 14;
+    }
+
+    host_message.payload.gameplay_action.action = Gs1GameplayAction {
+        GS1_GAMEPLAY_ACTION_CLAIM_TECHNOLOGY_NODE,
+        1U,
+        1ULL,
+        0ULL};
+    if (host_runtime.submit_host_messages(&host_message, 1U) != GS1_STATUS_OK)
+    {
+        return 15;
+    }
+
+    if (host_runtime.run_phase2(phase2_request, phase2_result) != GS1_STATUS_OK)
+    {
+        return 16;
+    }
+
+    if (!host_runtime.state().campaign_technology.has_value())
+    {
+        return 17;
     }
 
     return 0;

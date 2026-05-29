@@ -187,7 +187,9 @@ GameMessageSubscriptionSpan TechnologySystem::subscribed_game_messages() const n
     static constexpr GameMessageType subscriptions[] = {
         GameMessageType::TargetGranted,
         GameMessageType::ProgressionEventOccurred,
-        GameMessageType::CampaignReputationAwardRequested};
+        GameMessageType::CampaignReputationAwardRequested,
+        GameMessageType::TechnologyNodeClaimRequested,
+        GameMessageType::TechnologyNodeRefundRequested};
     return subscriptions;
 }
 
@@ -274,6 +276,40 @@ Gs1Status TechnologySystem::handle(
     const CampaignReputationAwardRequestedMessage& message)
 {
     return process_campaign_reputation_award_message(invocation, message);
+}
+
+Gs1Status TechnologySystem::handle(
+    RuntimeInvocation& invocation,
+    const TechnologyNodeClaimRequestedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    if (message.tech_node_id == 0U || message.reputation_faction_id == 0U)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    return GS1_STATUS_OK;
+}
+
+Gs1Status TechnologySystem::handle(
+    RuntimeInvocation& invocation,
+    const TechnologyNodeRefundRequestedMessage& message)
+{
+    if (!runtime_invocation_has_campaign(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    if (message.tech_node_id == 0U)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    return GS1_STATUS_OK;
 }
 
 bool TechnologySystem::node_purchased(

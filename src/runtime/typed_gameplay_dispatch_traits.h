@@ -153,6 +153,24 @@ struct typed_gameplay_dispatch_traits<FactionReputationAwardRequestedMessage>
 };
 
 template <>
+struct typed_gameplay_dispatch_traits<TechnologyNodeClaimRequestedMessage>
+{
+    using subscribers = typename typed_game_message_subscribers<
+        TechnologyNodeClaimRequestedMessage,
+        GameSystems>::type;
+    static constexpr bool enabled = true;
+};
+
+template <>
+struct typed_gameplay_dispatch_traits<TechnologyNodeRefundRequestedMessage>
+{
+    using subscribers = typename typed_game_message_subscribers<
+        TechnologyNodeRefundRequestedMessage,
+        GameSystems>::type;
+    static constexpr bool enabled = true;
+};
+
+template <>
 struct typed_gameplay_dispatch_traits<SiteRunStartedMessage>
 {
     using subscribers = typename typed_game_message_subscribers<

@@ -337,6 +337,7 @@ Legend:
 - [done] Runtime trait scaffolding now reads compile-time `emitted_runtime_messages` metadata, and the active `GameSystems` pack now aggregates a compile-time runtime-to-host message manifest with regression coverage for the current direct host-transport emitters.
 - [done] Legacy `GameMessage` envelopes for already-migrated typed families now bridge straight into compile-time typed subscriber dispatch, and the runtime no longer registers legacy enum-keyed subscriber-table entries for those migrated families.
 - [done] The campaign-flow gameplay-action host path now translates directly at the runtime boundary into typed internal gameplay messages, so those host actions no longer depend on `CampaignFlowSystem` host-message subscriber registration before reaching typed dispatch.
+- [done] The technology claim/refund gameplay-action host path now translates directly at the runtime boundary into typed internal gameplay messages, and the technology message family no longer needs legacy enum-keyed subscriber-table entries for those claim/refund requests.
 - [>] Runtime storage now has compile-time `GameSystems` ordering and O(1) typed lookup, but primary ownership/iteration still remains runtime-polymorphic rather than tuple-backed.
 - [>] Some non-migrated internal gameplay paths still rely on the legacy `GameMessage` envelope, but that is a temporary migration state to be removed rather than a supported long-term bridge design.
 - [>] Runtime-level queue draining and generic `process_game_message(const GameMessage&)` dispatch still exist for the remaining unmigrated gameplay message families.
@@ -377,6 +378,7 @@ Legend:
 
 - [>] Refactor host-message dispatch so ABI host inputs decode and translate immediately into typed internal gameplay messages.
 - [done] The campaign-flow gameplay-action host family (`start new campaign`, deployment selection/clear, start attempt, return to regional map) now translates directly in `GameRuntime` before host-subscriber fan-out.
+- [done] The technology claim/refund gameplay-action host family now translates directly in `GameRuntime` before host-subscriber fan-out.
 - [x] Keep host-message ABI transport types unchanged.
 - [>] Ensure translated host-originated gameplay work no longer depends on internal gameplay queueing.
 

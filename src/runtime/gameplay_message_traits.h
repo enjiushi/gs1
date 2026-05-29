@@ -95,6 +95,18 @@ struct gameplay_message_traits<FactionReputationAwardRequestedMessage>
 };
 
 template <>
+struct gameplay_message_traits<TechnologyNodeClaimRequestedMessage>
+{
+    static constexpr GameMessageType type = GameMessageType::TechnologyNodeClaimRequested;
+};
+
+template <>
+struct gameplay_message_traits<TechnologyNodeRefundRequestedMessage>
+{
+    static constexpr GameMessageType type = GameMessageType::TechnologyNodeRefundRequested;
+};
+
+template <>
 struct gameplay_message_traits<SiteRunStartedMessage>
 {
     static constexpr GameMessageType type = GameMessageType::SiteRunStarted;

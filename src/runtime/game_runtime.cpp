@@ -504,6 +504,12 @@ template <>
 inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::FactionReputationAwardRequested> =
     typed_gameplay_dispatch_traits<FactionReputationAwardRequestedMessage>::enabled;
 template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::TechnologyNodeClaimRequested> =
+    typed_gameplay_dispatch_traits<TechnologyNodeClaimRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::TechnologyNodeRefundRequested> =
+    typed_gameplay_dispatch_traits<TechnologyNodeRefundRequestedMessage>::enabled;
+template <>
 inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::StartSiteAttempt> =
     typed_gameplay_dispatch_traits<StartSiteAttemptMessage>::enabled;
 template <>
@@ -690,6 +696,12 @@ void append_runtime_game_message_subscribers_if_legacy(
             break;
         case GameMessageType::FactionReputationAwardRequested:
             if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::FactionReputationAwardRequested>) { continue; }
+            break;
+        case GameMessageType::TechnologyNodeClaimRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::TechnologyNodeClaimRequested>) { continue; }
+            break;
+        case GameMessageType::TechnologyNodeRefundRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::TechnologyNodeRefundRequested>) { continue; }
             break;
         case GameMessageType::StartSiteAttempt:
             if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::StartSiteAttempt>) { continue; }
@@ -1541,6 +1553,12 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
     case GameMessageType::FactionReputationAwardRequested:
         return dispatch_typed_game_message_to_subscribers(
             message.payload_as<FactionReputationAwardRequestedMessage>());
+    case GameMessageType::TechnologyNodeClaimRequested:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<TechnologyNodeClaimRequestedMessage>());
+    case GameMessageType::TechnologyNodeRefundRequested:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<TechnologyNodeRefundRequestedMessage>());
     case GameMessageType::StartSiteAttempt:
         return dispatch_typed_game_message_to_subscribers(message.payload_as<StartSiteAttemptMessage>());
     case GameMessageType::ReturnToRegionalMap:
@@ -1789,6 +1807,24 @@ std::optional<Gs1Status> GameRuntime::dispatch_runtime_translated_host_message(
 
     case GS1_GAMEPLAY_ACTION_RETURN_TO_REGIONAL_MAP:
         return dispatch_game_message_inline(ReturnToRegionalMapMessage {});
+
+    case GS1_GAMEPLAY_ACTION_CLAIM_TECHNOLOGY_NODE:
+        if (action.target_id == 0U || action.arg0 == 0U ||
+            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        return dispatch_game_message_inline(TechnologyNodeClaimRequestedMessage {
+            action.target_id,
+            static_cast<std::uint32_t>(action.arg0)});
+
+    case GS1_GAMEPLAY_ACTION_REFUND_TECHNOLOGY_NODE:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        return dispatch_game_message_inline(TechnologyNodeRefundRequestedMessage {
+            action.target_id});
 
     default:
         return std::nullopt;
