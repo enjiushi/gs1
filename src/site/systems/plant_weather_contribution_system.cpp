@@ -691,13 +691,10 @@ Gs1Status PlantWeatherContributionSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    if (message.type == GameMessageType::SiteRunStarted)
-    {
-        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-    }
-
     switch (message.type)
     {
+    case GameMessageType::SiteRunStarted:
+        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
     case GameMessageType::TileEcologyChanged:
         return handle(invocation, message.payload_as<TileEcologyChangedMessage>());
     case GameMessageType::TileEcologyBatchChanged:

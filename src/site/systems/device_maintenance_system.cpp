@@ -328,28 +328,17 @@ Gs1Status DeviceMaintenanceSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    if (message.type == GameMessageType::SiteRunStarted)
+    switch (message.type)
     {
+    case GameMessageType::SiteRunStarted:
         return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-    }
-
-    SiteWorldAccess<DeviceMaintenanceSystem> world {invocation};
-    if (!world.has_world())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    if (message.type == GameMessageType::SiteDevicePlaced)
-    {
+    case GameMessageType::SiteDevicePlaced:
         return handle(invocation, message.payload_as<SiteDevicePlacedMessage>());
-    }
-
-    if (message.type == GameMessageType::SiteDeviceRepaired)
-    {
+    case GameMessageType::SiteDeviceRepaired:
         return handle(invocation, message.payload_as<SiteDeviceRepairedMessage>());
+    default:
+        return GS1_STATUS_OK;
     }
-
-    return GS1_STATUS_OK;
 }
 
 Gs1Status DeviceMaintenanceSystem::handle(

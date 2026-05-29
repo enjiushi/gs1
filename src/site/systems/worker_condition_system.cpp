@@ -692,43 +692,17 @@ Gs1Status WorkerConditionSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    SiteWorldAccess<WorkerConditionSystem> world {invocation};
-    if (message.type == GameMessageType::SiteRunStarted)
+    switch (message.type)
     {
+    case GameMessageType::SiteRunStarted:
         return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-    }
-
-    if (message.type != GameMessageType::WorkerMeterDeltaRequested &&
-        message.type != GameMessageType::InventoryItemUseCompleted)
-    {
+    case GameMessageType::WorkerMeterDeltaRequested:
+        return handle(invocation, message.payload_as<WorkerMeterDeltaRequestedMessage>());
+    case GameMessageType::InventoryItemUseCompleted:
+        return handle(invocation, message.payload_as<InventoryItemUseCompletedMessage>());
+    default:
         return GS1_STATUS_OK;
     }
-
-    if (!world.has_world())
-    {
-        return GS1_STATUS_OK;
-    }
-
-    auto worker = world.read_worker();
-    const auto previous = worker.conditions;
-    const auto deltas =
-        message.type == GameMessageType::WorkerMeterDeltaRequested
-        ? deltas_from_message(message.payload_as<WorkerMeterDeltaRequestedMessage>())
-        : deltas_from_item_use_completed(
-              message.payload_as<InventoryItemUseCompletedMessage>());
-    worker.conditions = resolve_worker_conditions(
-        previous,
-        deltas,
-        world.read_modifier().resolved_channel_totals,
-        0.0f,
-        0.0f);
-    const bool modified = worker_conditions_changed(previous, worker.conditions);
-    if (modified)
-    {
-        world.write_worker(worker);
-        return emit_worker_meters_changed_if_needed(invocation, world);
-    }
-    return GS1_STATUS_OK;
 }
 
 Gs1Status WorkerConditionSystem::handle(

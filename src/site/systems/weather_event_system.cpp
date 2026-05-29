@@ -394,17 +394,15 @@ Gs1Status WeatherEventSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    if (message.type == GameMessageType::SiteRunStarted)
+    switch (message.type)
     {
+    case GameMessageType::SiteRunStarted:
         return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-    }
-
-    if (message.type == GameMessageType::SiteAttemptEnded)
-    {
+    case GameMessageType::SiteAttemptEnded:
         return handle(invocation, message.payload_as<SiteAttemptEndedMessage>());
+    default:
+        return GS1_STATUS_OK;
     }
-
-    return GS1_STATUS_OK;
 }
 
 Gs1Status WeatherEventSystem::handle(
