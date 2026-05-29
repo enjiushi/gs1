@@ -161,6 +161,12 @@ struct gameplay_message_traits<StartSiteActionMessage>
 };
 
 template <>
+struct gameplay_message_traits<CancelSiteActionMessage>
+{
+    static constexpr GameMessageType type = GameMessageType::CancelSiteAction;
+};
+
+template <>
 struct gameplay_message_traits<PhoneListingPurchasedMessage>
 {
     static constexpr GameMessageType type = GameMessageType::PhoneListingPurchased;
@@ -272,6 +278,12 @@ template <>
 struct gameplay_message_traits<CraftContextRequestedMessage>
 {
     static constexpr GameMessageType type = GameMessageType::InventoryCraftContextRequested;
+};
+
+template <>
+struct gameplay_message_traits<PlacementModeCursorMovedMessage>
+{
+    static constexpr GameMessageType type = GameMessageType::PlacementModeCursorMoved;
 };
 
 template <>

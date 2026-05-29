@@ -3391,12 +3391,7 @@ GameMessageSubscriptionSpan ActionExecutionSystem::subscribed_game_messages() co
 
 HostMessageSubscriptionSpan ActionExecutionSystem::subscribed_host_messages() const noexcept
 {
-    static constexpr Gs1HostMessageType subscriptions[] = {
-        GS1_HOST_EVENT_SITE_ACTION_REQUEST,
-        GS1_HOST_EVENT_SITE_ACTION_CANCEL,
-        GS1_HOST_EVENT_SITE_CONTEXT_REQUEST,
-    };
-    return subscriptions;
+    return {};
 }
 
 std::optional<Gs1RuntimeProfileSystemId> ActionExecutionSystem::profile_system_id() const noexcept
@@ -3544,63 +3539,9 @@ Gs1Status ActionExecutionSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
-    if (!runtime_invocation_has_campaign(invocation) || !world.has_world())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    switch (message.type)
-    {
-    case GS1_HOST_EVENT_SITE_ACTION_REQUEST:
-        if (message.payload.site_action_request.action_kind == GS1_SITE_ACTION_NONE)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return handle_start_site_action(
-            invocation,
-            StartSiteActionMessage {
-                message.payload.site_action_request.action_kind,
-                message.payload.site_action_request.flags,
-                message.payload.site_action_request.quantity == 0U
-                    ? 1U
-                    : message.payload.site_action_request.quantity,
-                message.payload.site_action_request.target_tile_x,
-                message.payload.site_action_request.target_tile_y,
-                message.payload.site_action_request.primary_subject_id,
-                message.payload.site_action_request.secondary_subject_id,
-                message.payload.site_action_request.item_id});
-
-    case GS1_HOST_EVENT_SITE_ACTION_CANCEL:
-        if (message.payload.site_action_cancel.action_id == 0U &&
-            (message.payload.site_action_cancel.flags &
-                (GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION |
-                    GS1_SITE_ACTION_CANCEL_FLAG_PLACEMENT_MODE)) == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return handle_cancel_site_action(
-            invocation,
-            CancelSiteActionMessage {
-                message.payload.site_action_cancel.action_id,
-                message.payload.site_action_cancel.flags});
-
-    case GS1_HOST_EVENT_SITE_CONTEXT_REQUEST:
-        if (!world.read_action().placement_mode.active)
-        {
-            return GS1_STATUS_OK;
-        }
-        return handle_placement_mode_cursor_moved(
-            invocation,
-            PlacementModeCursorMovedMessage {
-                message.payload.site_context_request.tile_x,
-                message.payload.site_context_request.tile_y,
-                message.payload.site_context_request.flags});
-
-    default:
-        return GS1_STATUS_OK;
-    }
+    (void)invocation;
+    (void)message;
+    return GS1_STATUS_OK;
 }
 
 void ActionExecutionSystem::run(RuntimeInvocation& invocation)

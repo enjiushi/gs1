@@ -1850,6 +1850,65 @@ std::optional<Gs1Status> GameRuntime::dispatch_runtime_translated_host_message(
             payload.companion_storage_id});
     }
 
+    if (message.type == GS1_HOST_EVENT_SITE_CONTEXT_REQUEST)
+    {
+        if (!state().site_run_meta.has_value())
+        {
+            return GS1_STATUS_OK;
+        }
+
+        const auto& payload = message.payload.site_context_request;
+        const auto& action_meta =
+            state_manager_.query<StateSetId::SiteActionMeta>(state());
+        if (action_meta.has_value() && action_meta->placement_mode.active)
+        {
+            return dispatch_game_message_inline(PlacementModeCursorMovedMessage {
+                payload.tile_x,
+                payload.tile_y,
+                payload.flags});
+        }
+
+        return dispatch_game_message_inline(CraftContextRequestedMessage {
+            payload.tile_x,
+            payload.tile_y,
+            payload.flags});
+    }
+
+    if (message.type == GS1_HOST_EVENT_SITE_ACTION_REQUEST)
+    {
+        const auto& payload = message.payload.site_action_request;
+        if (payload.action_kind == GS1_SITE_ACTION_NONE)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+
+        return dispatch_game_message_inline(StartSiteActionMessage {
+            payload.action_kind,
+            payload.flags,
+            payload.quantity == 0U ? 1U : payload.quantity,
+            payload.target_tile_x,
+            payload.target_tile_y,
+            payload.primary_subject_id,
+            payload.secondary_subject_id,
+            payload.item_id});
+    }
+
+    if (message.type == GS1_HOST_EVENT_SITE_ACTION_CANCEL)
+    {
+        const auto& payload = message.payload.site_action_cancel;
+        if (payload.action_id == 0U &&
+            (payload.flags &
+                (GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION |
+                    GS1_SITE_ACTION_CANCEL_FLAG_PLACEMENT_MODE)) == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+
+        return dispatch_game_message_inline(CancelSiteActionMessage {
+            payload.action_id,
+            payload.flags});
+    }
+
     if (message.type != GS1_HOST_EVENT_GAMEPLAY_ACTION)
     {
         return std::nullopt;

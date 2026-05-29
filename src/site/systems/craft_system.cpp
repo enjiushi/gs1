@@ -216,8 +216,7 @@ GameMessageSubscriptionSpan CraftSystem::subscribed_game_messages() const noexce
 
 HostMessageSubscriptionSpan CraftSystem::subscribed_host_messages() const noexcept
 {
-    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_SITE_CONTEXT_REQUEST};
-    return subscriptions;
+    return {};
 }
 
 std::optional<Gs1RuntimeProfileSystemId> CraftSystem::profile_system_id() const noexcept
@@ -300,18 +299,9 @@ Gs1Status CraftSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    if (message.type != GS1_HOST_EVENT_SITE_CONTEXT_REQUEST ||
-        SiteWorldAccess<CraftSystem> {invocation}.read_action().placement_mode.active)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    return handle_craft_context_requested(
-        invocation,
-        CraftContextRequestedMessage {
-            message.payload.site_context_request.tile_x,
-            message.payload.site_context_request.tile_y,
-            message.payload.site_context_request.flags});
+    (void)invocation;
+    (void)message;
+    return GS1_STATUS_OK;
 }
 
 void CraftSystem::run(RuntimeInvocation& invocation)

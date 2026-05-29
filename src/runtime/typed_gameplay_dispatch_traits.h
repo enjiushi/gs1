@@ -243,6 +243,15 @@ struct typed_gameplay_dispatch_traits<StartSiteActionMessage>
 };
 
 template <>
+struct typed_gameplay_dispatch_traits<CancelSiteActionMessage>
+{
+    using subscribers = typename typed_game_message_subscribers<
+        CancelSiteActionMessage,
+        GameSystems>::type;
+    static constexpr bool enabled = true;
+};
+
+template <>
 struct typed_gameplay_dispatch_traits<PhoneListingPurchasedMessage>
 {
     using subscribers = typename typed_game_message_subscribers<

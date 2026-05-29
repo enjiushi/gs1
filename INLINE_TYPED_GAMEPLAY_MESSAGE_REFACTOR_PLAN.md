@@ -390,6 +390,8 @@ Legend:
 - [done] The site-modifier end gameplay-action host family now translates directly in `GameRuntime` before host-subscriber fan-out.
 - [done] The economy-phone buy/sell/hire/unlock gameplay-action host family now translates directly in `GameRuntime` before host-subscriber fan-out.
 - [done] The site inventory slot-tap host path now translates directly in `GameRuntime` into `InventorySlotTappedMessage`, and `InventorySystem` no longer depends on host-subscriber registration for that request.
+- [done] The site context-request host path now translates directly in `GameRuntime` into either `PlacementModeCursorMovedMessage` or `CraftContextRequestedMessage` based on authoritative runtime action state, and `ActionExecutionSystem` / `CraftSystem` no longer need that host subscription path.
+- [done] The site action request/cancel host paths now translate directly in `GameRuntime` into `StartSiteActionMessage` / `CancelSiteActionMessage`, and `ActionExecutionSystem` no longer depends on host-subscriber registration for those requests.
 - [x] Keep host-message ABI transport types unchanged.
 - [>] Ensure translated host-originated gameplay work no longer depends on internal gameplay queueing.
 
