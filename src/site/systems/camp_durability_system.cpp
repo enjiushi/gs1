@@ -140,12 +140,13 @@ Gs1Status CampDurabilitySystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    if (message.type == GameMessageType::SiteRunStarted)
+    switch (message.type)
     {
+    case GameMessageType::SiteRunStarted:
         return handle(invocation, message.payload_as<SiteRunStartedMessage>());
+    default:
+        return GS1_STATUS_OK;
     }
-
-    return GS1_STATUS_OK;
 }
 
 Gs1Status CampDurabilitySystem::handle(

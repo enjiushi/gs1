@@ -1252,103 +1252,23 @@ Gs1Status EcologySystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    SiteWorldAccess<EcologySystem> world {invocation};
-    if (message.type == GameMessageType::SiteRunStarted)
-    {
-        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-    }
-
-    if (!world.has_world())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
     switch (message.type)
     {
+    case GameMessageType::SiteRunStarted:
+        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
     case GameMessageType::SiteGroundCoverPlaced:
-    {
-        const auto& payload = message.payload_as<SiteGroundCoverPlacedMessage>();
-        const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
-        const std::uint32_t changed_mask = apply_ground_cover(world, coord, payload);
-        if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
-        {
-            mark_dirty_tile_ecology(world, coord, changed_mask);
-        }
-        break;
-    }
-
+        return handle(invocation, message.payload_as<SiteGroundCoverPlacedMessage>());
     case GameMessageType::SiteTilePlantingCompleted:
-    {
-        const auto& payload = message.payload_as<SiteTilePlantingCompletedMessage>();
-        const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
-        const TileFootprint footprint =
-            resolve_plant_tile_footprint(PlantId {payload.plant_type_id});
-        const TileCoord anchor = align_tile_anchor_to_footprint(coord, footprint);
-        for_each_tile_in_footprint(
-            anchor,
-            footprint,
-            [&](TileCoord footprint_coord) {
-                const std::uint32_t changed_mask =
-                    apply_planting(world, invocation, footprint_coord, payload);
-                if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
-                {
-                    mark_dirty_tile_ecology(world, footprint_coord, changed_mask);
-                }
-            });
-        break;
-    }
-
+        return handle(invocation, message.payload_as<SiteTilePlantingCompletedMessage>());
     case GameMessageType::SiteTileWatered:
-    {
-        const auto& payload = message.payload_as<SiteTileWateredMessage>();
-        const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
-        const std::uint32_t changed_mask = apply_watering(world, coord, payload);
-        if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
-        {
-            mark_dirty_tile_ecology(world, coord, changed_mask);
-        }
-        break;
-    }
-
+        return handle(invocation, message.payload_as<SiteTileWateredMessage>());
     case GameMessageType::SiteTileBurialCleared:
-    {
-        const auto& payload = message.payload_as<SiteTileBurialClearedMessage>();
-        const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
-        const std::uint32_t changed_mask = apply_burial_cleared(world, coord, payload);
-        if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
-        {
-            mark_dirty_tile_ecology(world, coord, changed_mask);
-        }
-        break;
-    }
-
+        return handle(invocation, message.payload_as<SiteTileBurialClearedMessage>());
     case GameMessageType::SiteTileHarvested:
-    {
-        const auto& payload = message.payload_as<SiteTileHarvestedMessage>();
-        const TileCoord coord {payload.target_tile_x, payload.target_tile_y};
-        const TileFootprint footprint =
-            resolve_plant_tile_footprint(PlantId {payload.plant_type_id});
-        const TileCoord anchor = align_tile_anchor_to_footprint(coord, footprint);
-        for_each_tile_in_footprint(
-            anchor,
-            footprint,
-            [&](TileCoord footprint_coord) {
-                const std::uint32_t changed_mask =
-                    apply_harvest(world, invocation, footprint_coord, payload);
-                if (changed_mask != TILE_ECOLOGY_CHANGED_NONE)
-                {
-                    mark_dirty_tile_ecology(world, footprint_coord, changed_mask);
-                }
-            });
-        break;
-    }
-
+        return handle(invocation, message.payload_as<SiteTileHarvestedMessage>());
     default:
-        break;
+        return GS1_STATUS_OK;
     }
-
-    flush_dirty_tile_ecology_batches(invocation, world);
-    return GS1_STATUS_OK;
 }
 
 Gs1Status EcologySystem::handle(
