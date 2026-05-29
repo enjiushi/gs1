@@ -123,10 +123,6 @@ void rebuild_selected_loadout(
 
 }  // namespace
 
-Gs1Status process_loadout_planner_selection_changed(
-    RuntimeInvocation& invocation,
-    const DeploymentSiteSelectionChangedMessage& message);
-
 void LoadoutPlannerSystem::initialize_campaign_state(CampaignState& campaign)
 {
     const auto& content = get_prototype_campaign_content();
@@ -173,17 +169,12 @@ Gs1Status LoadoutPlannerSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    if (!runtime_invocation_has_campaign(invocation))
+    if (message.type == GameMessageType::DeploymentSiteSelectionChanged)
     {
-        return GS1_STATUS_INVALID_STATE;
+        return handle(invocation, message.payload_as<DeploymentSiteSelectionChangedMessage>());
     }
 
-    if (message.type != GameMessageType::DeploymentSiteSelectionChanged)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    return handle(invocation, message.payload_as<DeploymentSiteSelectionChangedMessage>());
+    return GS1_STATUS_OK;
 }
 
 Gs1Status LoadoutPlannerSystem::process_host_message(
@@ -196,23 +187,6 @@ Gs1Status LoadoutPlannerSystem::process_host_message(
 }
 
 Gs1Status LoadoutPlannerSystem::handle(
-    RuntimeInvocation& invocation,
-    const DeploymentSiteSelectionChangedMessage& message)
-{
-    if (!runtime_invocation_has_campaign(invocation))
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    return process_loadout_planner_selection_changed(invocation, message);
-}
-
-void LoadoutPlannerSystem::run(RuntimeInvocation& invocation)
-{
-    (void)invocation;
-}
-
-Gs1Status process_loadout_planner_selection_changed(
     RuntimeInvocation& invocation,
     const DeploymentSiteSelectionChangedMessage& message)
 {
@@ -279,5 +253,10 @@ Gs1Status process_loadout_planner_selection_changed(
     selected_slots = std::move(planner_state.selected_loadout_slots);
     nearby_aura_ids = std::move(planner_state.active_nearby_aura_modifier_ids);
     return GS1_STATUS_OK;
+}
+
+void LoadoutPlannerSystem::run(RuntimeInvocation& invocation)
+{
+    (void)invocation;
 }
 }  // namespace gs1

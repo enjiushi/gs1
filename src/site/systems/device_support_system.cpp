@@ -19,15 +19,6 @@ namespace
 constexpr float k_device_efficiency_epsilon = 0.0005f;
 constexpr float k_device_water_epsilon = 0.0005f;
 
-Gs1Status process_message(
-    gs1::RuntimeInvocation& invocation,
-    const gs1::GameMessage& message)
-{
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
-}
-
 void run_system(gs1::RuntimeInvocation& invocation)
 {
     auto access = gs1::make_game_state_access<gs1::DeviceSupportSystem>(invocation);
@@ -136,13 +127,9 @@ Gs1Status DeviceSupportSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    gs1::SiteWorldAccess<gs1::DeviceSupportSystem> world {invocation};
-    if (!world.has_world())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    return process_message(invocation, message);
+    (void)invocation;
+    (void)message;
+    return GS1_STATUS_OK;
 }
 
 Gs1Status DeviceSupportSystem::process_host_message(

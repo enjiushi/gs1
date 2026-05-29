@@ -8,6 +8,7 @@ namespace gs1
 class CampaignTimeSystem final : public IRuntimeSystem
 {
 public:
+    using subscribed_messages = type_list<>;
     using emitted_runtime_messages = type_list<>;
     static constexpr std::optional<Gs1RuntimeProfileSystemId> profile_id =
         GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_TIME;

@@ -79,6 +79,10 @@ constexpr bool has_declared_runtime_metadata_v =
     gs1::runtime_fixed_step_order_v<System>.has_value();
 
 template <typename System>
+constexpr bool has_declared_subscribed_messages_v =
+    requires { typename System::subscribed_messages; };
+
+template <typename System>
 constexpr bool has_declared_runtime_message_manifest_v =
     requires { typename System::emitted_runtime_messages; };
 
@@ -129,6 +133,10 @@ int main()
     static_assert(!gs1::runtime_fixed_step_order_v<FallbackOnlySystem>.has_value());
     static_assert(gs1::type_list_size_v<gs1::runtime_emitted_runtime_messages_t<FallbackOnlySystem>> == 0U);
     static_assert(all_game_systems_declare_runtime_metadata(GameSystems {}));
+    static_assert(has_declared_subscribed_messages_v<gs1::CampaignTimeSystem>);
+    static_assert(has_declared_subscribed_messages_v<gs1::DeviceSupportSystem>);
+    static_assert(has_declared_subscribed_messages_v<gs1::SiteFlowSystem>);
+    static_assert(has_declared_subscribed_messages_v<gs1::SiteTimeSystem>);
     static_assert(has_declared_runtime_message_manifest_v<CampaignFlowSystem>);
     static_assert(!has_declared_runtime_message_manifest_v<FallbackOnlySystem>);
     static_assert(std::is_same_v<

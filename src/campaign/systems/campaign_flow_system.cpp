@@ -302,73 +302,6 @@ Gs1Status handle_site_attempt_ended(
 }
 }  // namespace
 
-Gs1Status process_campaign_flow_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message);
-
-Gs1Status process_campaign_flow_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message);
-
-Gs1Status process_campaign_flow_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    switch (message.type)
-    {
-    case GS1_HOST_EVENT_GAMEPLAY_ACTION:
-    {
-        const auto& action = message.payload.gameplay_action.action;
-        switch (action.type)
-        {
-        case GS1_GAMEPLAY_ACTION_START_NEW_CAMPAIGN:
-            invocation.emit_game_message(
-                StartNewCampaignMessage {action.arg0, static_cast<std::uint32_t>(action.arg1)});
-            return GS1_STATUS_OK;
-
-        case GS1_GAMEPLAY_ACTION_SELECT_DEPLOYMENT_SITE:
-            if (action.target_id == 0U)
-            {
-                return GS1_STATUS_INVALID_ARGUMENT;
-            }
-            invocation.emit_game_message(SelectDeploymentSiteMessage {action.target_id});
-            return GS1_STATUS_OK;
-
-        case GS1_GAMEPLAY_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
-            invocation.emit_game_message(ClearDeploymentSiteSelectionMessage {});
-            return GS1_STATUS_OK;
-
-        case GS1_GAMEPLAY_ACTION_START_SITE_ATTEMPT:
-            if (action.target_id == 0U)
-            {
-                return GS1_STATUS_INVALID_ARGUMENT;
-            }
-            invocation.emit_game_message(StartSiteAttemptMessage {action.target_id});
-            return GS1_STATUS_OK;
-
-        case GS1_GAMEPLAY_ACTION_RETURN_TO_REGIONAL_MAP:
-            invocation.emit_game_message(ReturnToRegionalMapMessage {});
-            return GS1_STATUS_OK;
-
-        case GS1_GAMEPLAY_ACTION_OPEN_REGIONAL_MAP_TECH_TREE:
-        case GS1_GAMEPLAY_ACTION_CLOSE_REGIONAL_MAP_TECH_TREE:
-        case GS1_GAMEPLAY_ACTION_SELECT_TECH_TREE_FACTION_TAB:
-        case GS1_GAMEPLAY_ACTION_SET_PHONE_PANEL_SECTION:
-        case GS1_GAMEPLAY_ACTION_CLOSE_PHONE_PANEL:
-        case GS1_GAMEPLAY_ACTION_OPEN_SITE_PROTECTION_SELECTOR:
-        case GS1_GAMEPLAY_ACTION_CLOSE_SITE_PROTECTION_UI:
-        case GS1_GAMEPLAY_ACTION_SET_SITE_PROTECTION_OVERLAY_MODE:
-        case GS1_GAMEPLAY_ACTION_NONE:
-        default:
-            return GS1_STATUS_OK;
-        }
-    }
-
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
 const char* CampaignFlowSystem::name() const noexcept
 {
     return "CampaignFlowSystem";
@@ -407,14 +340,41 @@ Gs1Status CampaignFlowSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    return process_campaign_flow_message(invocation, message);
+    switch (message.type)
+    {
+    case GameMessageType::OpenMainMenu:
+        return handle(invocation, message.payload_as<OpenMainMenuMessage>());
+
+    case GameMessageType::StartNewCampaign:
+        return handle(invocation, message.payload_as<StartNewCampaignMessage>());
+
+    case GameMessageType::SelectDeploymentSite:
+        return handle(invocation, message.payload_as<SelectDeploymentSiteMessage>());
+
+    case GameMessageType::ClearDeploymentSiteSelection:
+        return handle(invocation, message.payload_as<ClearDeploymentSiteSelectionMessage>());
+
+    case GameMessageType::StartSiteAttempt:
+        return handle(invocation, message.payload_as<StartSiteAttemptMessage>());
+
+    case GameMessageType::ReturnToRegionalMap:
+        return handle(invocation, message.payload_as<ReturnToRegionalMapMessage>());
+
+    case GameMessageType::SiteAttemptEnded:
+        return handle(invocation, message.payload_as<SiteAttemptEndedMessage>());
+
+    default:
+        return GS1_STATUS_OK;
+    }
 }
 
 Gs1Status CampaignFlowSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    return process_campaign_flow_host_message(invocation, message);
+    (void)invocation;
+    (void)message;
+    return GS1_STATUS_OK;
 }
 
 Gs1Status CampaignFlowSystem::handle(
@@ -487,45 +447,5 @@ void CampaignFlowSystem::run(RuntimeInvocation& invocation)
     app_state = GS1_APP_STATE_SITE_ACTIVE;
     set_campaign_app_state(invocation, app_state);
     invocation.emit_game_message(SiteSceneActivatedMessage {});
-}
-
-Gs1Status process_campaign_flow_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::OpenMainMenu:
-        return handle_open_main_menu(invocation);
-
-    case GameMessageType::StartNewCampaign:
-        return handle_start_new_campaign(invocation, message.payload_as<StartNewCampaignMessage>());
-
-    case GameMessageType::SelectDeploymentSite:
-        return handle_deployment_site_selection(
-            invocation,
-            message.payload_as<SelectDeploymentSiteMessage>().site_id);
-
-    case GameMessageType::ClearDeploymentSiteSelection:
-        return handle_deployment_site_selection(invocation, std::nullopt);
-
-    case GameMessageType::StartSiteAttempt:
-        return handle_start_site_attempt(invocation, message.payload_as<StartSiteAttemptMessage>().site_id);
-
-    case GameMessageType::ReturnToRegionalMap:
-        return handle_return_to_regional_map(invocation);
-
-    case GameMessageType::SiteAttemptEnded:
-        return handle_site_attempt_ended(invocation, message.payload_as<SiteAttemptEndedMessage>());
-
-    case GameMessageType::DeploymentSiteSelectionChanged:
-    case GameMessageType::CampaignReputationAwardRequested:
-    case GameMessageType::FactionReputationAwardRequested:
-    case GameMessageType::TechnologyNodeClaimRequested:
-    case GameMessageType::TechnologyNodeRefundRequested:
-    case GameMessageType::PresentLog:
-    default:
-        return GS1_STATUS_OK;
-    }
 }
 }  // namespace gs1

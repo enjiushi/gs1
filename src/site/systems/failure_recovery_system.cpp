@@ -36,12 +36,12 @@ Gs1Status FailureRecoverySystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    if (message.type != GameMessageType::SiteAttemptEnded)
+    if (message.type == GameMessageType::SiteAttemptEnded)
     {
-        return GS1_STATUS_OK;
+        return handle(invocation, message.payload_as<SiteAttemptEndedMessage>());
     }
 
-    return handle(invocation, message.payload_as<SiteAttemptEndedMessage>());
+    return GS1_STATUS_OK;
 }
 
 Gs1Status FailureRecoverySystem::process_host_message(
