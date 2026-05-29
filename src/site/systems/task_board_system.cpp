@@ -3048,11 +3048,6 @@ Gs1Status TaskBoardSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    auto access = make_game_state_access<TaskBoardSystem>(invocation);
-    if (!runtime_invocation_has_campaign(invocation))
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
     switch (message.type)
     {
     case GameMessageType::SiteRunStarted:
@@ -3078,88 +3073,39 @@ Gs1Status TaskBoardSystem::process_game_message(
     case GameMessageType::WorkerMetersChanged:
         return handle(invocation, message.payload_as<WorkerMetersChangedMessage>());
     case GameMessageType::PhoneListingPurchased:
-        handle_phone_listing_purchased(invocation, message.payload_as<PhoneListingPurchasedMessage>());
-        break;
+        return handle(invocation, message.payload_as<PhoneListingPurchasedMessage>());
     case GameMessageType::PhoneListingSold:
-        handle_phone_listing_sold(invocation, message.payload_as<PhoneListingSoldMessage>());
-        break;
+        return handle(invocation, message.payload_as<PhoneListingSoldMessage>());
     case GameMessageType::InventoryTransferCompleted:
-        handle_inventory_transfer_completed(
-            invocation,
-            message.payload_as<InventoryTransferCompletedMessage>());
-        break;
+        return handle(invocation, message.payload_as<InventoryTransferCompletedMessage>());
     case GameMessageType::InventoryItemSubmitted:
-        handle_inventory_item_submitted(
-            invocation,
-            message.payload_as<InventoryItemSubmittedMessage>());
-        break;
+        return handle(invocation, message.payload_as<InventoryItemSubmittedMessage>());
     case GameMessageType::InventoryItemUseCompleted:
-        handle_inventory_item_use_completed(
-            invocation,
-            message.payload_as<InventoryItemUseCompletedMessage>());
-        break;
+        return handle(invocation, message.payload_as<InventoryItemUseCompletedMessage>());
     case GameMessageType::InventoryCraftCompleted:
-        handle_inventory_craft_completed(
-            invocation,
-            message.payload_as<InventoryCraftCompletedMessage>());
-        break;
+        return handle(invocation, message.payload_as<InventoryCraftCompletedMessage>());
     case GameMessageType::SiteTilePlantingCompleted:
         return handle(invocation, message.payload_as<SiteTilePlantingCompletedMessage>());
     case GameMessageType::SiteActionCompleted:
-        handle_site_action_completed(invocation, message.payload_as<SiteActionCompletedMessage>());
-        break;
+        return handle(invocation, message.payload_as<SiteActionCompletedMessage>());
     case GameMessageType::SiteDevicePlaced:
         return handle(invocation, message.payload_as<SiteDevicePlacedMessage>());
     case GameMessageType::SiteDeviceConditionChanged:
         return handle(invocation, message.payload_as<SiteDeviceConditionChangedMessage>());
     case GameMessageType::EconomyMoneyAwardRequested:
-        handle_money_award_requested(
-            invocation,
-            message.payload_as<EconomyMoneyAwardRequestedMessage>());
-        break;
+        return handle(invocation, message.payload_as<EconomyMoneyAwardRequestedMessage>());
     default:
-        break;
+        return GS1_STATUS_OK;
     }
-
-    return GS1_STATUS_OK;
 }
 
 Gs1Status TaskBoardSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    if (message.type != GS1_HOST_EVENT_GAMEPLAY_ACTION)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    const auto& action = message.payload.gameplay_action.action;
-    switch (action.type)
-    {
-    case GS1_GAMEPLAY_ACTION_ACCEPT_TASK:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        handle_task_accept_requested(invocation, TaskAcceptRequestedMessage {action.target_id});
-        return GS1_STATUS_OK;
-
-    case GS1_GAMEPLAY_ACTION_CLAIM_TASK_REWARD:
-        if (action.target_id == 0U ||
-            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        handle_task_reward_claim_requested(
-            invocation,
-            TaskRewardClaimRequestedMessage {
-                action.target_id,
-                static_cast<std::uint32_t>(action.arg0)});
-        return GS1_STATUS_OK;
-
-    default:
-        return GS1_STATUS_OK;
-    }
+    (void)invocation;
+    (void)message;
+    return GS1_STATUS_OK;
 }
 
 void TaskBoardSystem::run(RuntimeInvocation& invocation)

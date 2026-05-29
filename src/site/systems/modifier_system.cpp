@@ -1213,30 +1213,25 @@ Gs1Status ModifierSystem::process_game_message(
     RuntimeInvocation& invocation,
     const GameMessage& message)
 {
-    if (message.type == GameMessageType::SiteRunStarted)
+    switch (message.type)
     {
+    case GameMessageType::SiteRunStarted:
         return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-    }
-    else if (message.type == GameMessageType::RunModifierAwardRequested)
-    {
+    case GameMessageType::RunModifierAwardRequested:
         return handle(
             invocation,
             message.payload_as<RunModifierAwardRequestedMessage>());
-    }
-    else if (message.type == GameMessageType::InventoryItemUseCompleted)
-    {
+    case GameMessageType::InventoryItemUseCompleted:
         return handle(
             invocation,
             message.payload_as<InventoryItemUseCompletedMessage>());
-    }
-    else if (message.type == GameMessageType::SiteModifierEndRequested)
-    {
+    case GameMessageType::SiteModifierEndRequested:
         return handle(
             invocation,
             message.payload_as<SiteModifierEndRequestedMessage>());
+    default:
+        return GS1_STATUS_OK;
     }
-
-    return GS1_STATUS_OK;
 }
 
 Gs1Status ModifierSystem::handle(
@@ -1296,23 +1291,8 @@ Gs1Status ModifierSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    if (message.type != GS1_HOST_EVENT_GAMEPLAY_ACTION)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    const auto& action = message.payload.gameplay_action.action;
-    if (action.type != GS1_GAMEPLAY_ACTION_END_SITE_MODIFIER)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    if (action.target_id == 0U)
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    handle_site_modifier_end_requested(invocation, SiteModifierEndRequestedMessage {action.target_id});
+    (void)invocation;
+    (void)message;
     return GS1_STATUS_OK;
 }
 

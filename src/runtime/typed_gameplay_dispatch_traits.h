@@ -63,6 +63,24 @@ struct typed_gameplay_dispatch_traits<SiteModifierEndRequestedMessage>
 };
 
 template <>
+struct typed_gameplay_dispatch_traits<PhoneListingPurchaseRequestedMessage>
+{
+    using subscribers = typename typed_game_message_subscribers<
+        PhoneListingPurchaseRequestedMessage,
+        GameSystems>::type;
+    static constexpr bool enabled = true;
+};
+
+template <>
+struct typed_gameplay_dispatch_traits<PhoneListingSaleRequestedMessage>
+{
+    using subscribers = typename typed_game_message_subscribers<
+        PhoneListingSaleRequestedMessage,
+        GameSystems>::type;
+    static constexpr bool enabled = true;
+};
+
+template <>
 struct typed_gameplay_dispatch_traits<OpenMainMenuMessage>
 {
     using subscribers = typename typed_game_message_subscribers<
@@ -355,6 +373,24 @@ struct typed_gameplay_dispatch_traits<InventoryCraftCommitRequestedMessage>
 {
     using subscribers = typename typed_game_message_subscribers<
         InventoryCraftCommitRequestedMessage,
+        GameSystems>::type;
+    static constexpr bool enabled = true;
+};
+
+template <>
+struct typed_gameplay_dispatch_traits<ContractorHireRequestedMessage>
+{
+    using subscribers = typename typed_game_message_subscribers<
+        ContractorHireRequestedMessage,
+        GameSystems>::type;
+    static constexpr bool enabled = true;
+};
+
+template <>
+struct typed_gameplay_dispatch_traits<SiteUnlockablePurchaseRequestedMessage>
+{
+    using subscribers = typename typed_game_message_subscribers<
+        SiteUnlockablePurchaseRequestedMessage,
         GameSystems>::type;
     static constexpr bool enabled = true;
 };

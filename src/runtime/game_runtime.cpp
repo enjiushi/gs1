@@ -567,6 +567,12 @@ template <>
 inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteModifierEndRequested> =
     typed_gameplay_dispatch_traits<SiteModifierEndRequestedMessage>::enabled;
 template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PhoneListingPurchaseRequested> =
+    typed_gameplay_dispatch_traits<PhoneListingPurchaseRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PhoneListingSaleRequested> =
+    typed_gameplay_dispatch_traits<PhoneListingSaleRequestedMessage>::enabled;
+template <>
 inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryDeliveryBatchRequested> =
     typed_gameplay_dispatch_traits<InventoryDeliveryBatchRequestedMessage>::enabled;
 template <>
@@ -659,6 +665,12 @@ inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessage
 template <>
 inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryCraftCommitRequested> =
     typed_gameplay_dispatch_traits<InventoryCraftCommitRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::ContractorHireRequested> =
+    typed_gameplay_dispatch_traits<ContractorHireRequestedMessage>::enabled;
+template <>
+inline constexpr bool legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteUnlockablePurchaseRequested> =
+    typed_gameplay_dispatch_traits<SiteUnlockablePurchaseRequestedMessage>::enabled;
 
 template <typename System>
 void append_runtime_game_message_subscribers_if_legacy(
@@ -769,6 +781,12 @@ void append_runtime_game_message_subscribers_if_legacy(
         case GameMessageType::SiteModifierEndRequested:
             if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteModifierEndRequested>) { continue; }
             break;
+        case GameMessageType::PhoneListingPurchaseRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PhoneListingPurchaseRequested>) { continue; }
+            break;
+        case GameMessageType::PhoneListingSaleRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::PhoneListingSaleRequested>) { continue; }
+            break;
         case GameMessageType::InventoryDeliveryBatchRequested:
             if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryDeliveryBatchRequested>) { continue; }
             break;
@@ -861,6 +879,12 @@ void append_runtime_game_message_subscribers_if_legacy(
             break;
         case GameMessageType::InventoryCraftCommitRequested:
             if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::InventoryCraftCommitRequested>) { continue; }
+            break;
+        case GameMessageType::ContractorHireRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::ContractorHireRequested>) { continue; }
+            break;
+        case GameMessageType::SiteUnlockablePurchaseRequested:
+            if constexpr (legacy_game_message_type_uses_typed_dispatch_v<GameMessageType::SiteUnlockablePurchaseRequested>) { continue; }
             break;
         default:
             break;
@@ -1617,6 +1641,12 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
     case GameMessageType::SiteModifierEndRequested:
         return dispatch_typed_game_message_to_subscribers(
             message.payload_as<SiteModifierEndRequestedMessage>());
+    case GameMessageType::PhoneListingPurchaseRequested:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<PhoneListingPurchaseRequestedMessage>());
+    case GameMessageType::PhoneListingSaleRequested:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<PhoneListingSaleRequestedMessage>());
     case GameMessageType::InventoryDeliveryBatchRequested:
         return dispatch_typed_game_message_to_subscribers(
             message.payload_as<InventoryDeliveryBatchRequestedMessage>());
@@ -1692,6 +1722,12 @@ Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
     case GameMessageType::InventoryCraftCommitRequested:
         return dispatch_typed_game_message_to_subscribers(
             message.payload_as<InventoryCraftCommitRequestedMessage>());
+    case GameMessageType::ContractorHireRequested:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<ContractorHireRequestedMessage>());
+    case GameMessageType::SiteUnlockablePurchaseRequested:
+        return dispatch_typed_game_message_to_subscribers(
+            message.payload_as<SiteUnlockablePurchaseRequestedMessage>());
     default:
         break;
     }
@@ -1875,6 +1911,44 @@ std::optional<Gs1Status> GameRuntime::dispatch_runtime_translated_host_message(
             return GS1_STATUS_INVALID_ARGUMENT;
         }
         return dispatch_game_message_inline(SiteModifierEndRequestedMessage {action.target_id});
+
+    case GS1_GAMEPLAY_ACTION_BUY_PHONE_LISTING:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        return dispatch_game_message_inline(PhoneListingPurchaseRequestedMessage {
+            action.target_id,
+            static_cast<std::uint16_t>(action.arg0),
+            0U});
+
+    case GS1_GAMEPLAY_ACTION_SELL_PHONE_LISTING:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        return dispatch_game_message_inline(PhoneListingSaleRequestedMessage {
+            action.target_id,
+            static_cast<std::uint16_t>(action.arg0),
+            0U});
+
+    case GS1_GAMEPLAY_ACTION_HIRE_CONTRACTOR:
+        if (action.target_id == 0U ||
+            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        return dispatch_game_message_inline(ContractorHireRequestedMessage {
+            action.target_id,
+            static_cast<std::uint32_t>(action.arg0)});
+
+    case GS1_GAMEPLAY_ACTION_PURCHASE_SITE_UNLOCKABLE:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        return dispatch_game_message_inline(SiteUnlockablePurchaseRequestedMessage {
+            action.target_id});
 
     default:
         return std::nullopt;

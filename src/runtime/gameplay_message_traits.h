@@ -143,6 +143,18 @@ struct gameplay_message_traits<SiteModifierEndRequestedMessage>
 };
 
 template <>
+struct gameplay_message_traits<PhoneListingPurchaseRequestedMessage>
+{
+    static constexpr GameMessageType type = GameMessageType::PhoneListingPurchaseRequested;
+};
+
+template <>
+struct gameplay_message_traits<PhoneListingSaleRequestedMessage>
+{
+    static constexpr GameMessageType type = GameMessageType::PhoneListingSaleRequested;
+};
+
+template <>
 struct gameplay_message_traits<StartSiteActionMessage>
 {
     static constexpr GameMessageType type = GameMessageType::StartSiteAction;
@@ -236,6 +248,18 @@ template <>
 struct gameplay_message_traits<InventoryCraftCommitRequestedMessage>
 {
     static constexpr GameMessageType type = GameMessageType::InventoryCraftCommitRequested;
+};
+
+template <>
+struct gameplay_message_traits<ContractorHireRequestedMessage>
+{
+    static constexpr GameMessageType type = GameMessageType::ContractorHireRequested;
+};
+
+template <>
+struct gameplay_message_traits<SiteUnlockablePurchaseRequestedMessage>
+{
+    static constexpr GameMessageType type = GameMessageType::SiteUnlockablePurchaseRequested;
 };
 
 template <>

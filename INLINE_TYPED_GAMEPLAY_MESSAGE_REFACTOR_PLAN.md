@@ -340,6 +340,8 @@ Legend:
 - [done] The technology claim/refund gameplay-action host path now translates directly at the runtime boundary into typed internal gameplay messages, and the technology message family no longer needs legacy enum-keyed subscriber-table entries for those claim/refund requests.
 - [done] The task-board accept/claim gameplay-action host path now translates directly at the runtime boundary into typed internal gameplay messages, and the task-request message family no longer needs legacy enum-keyed subscriber-table entries or `TaskBoardSystem` gameplay-action host subscription.
 - [done] The site-modifier end gameplay-action host path now translates directly at the runtime boundary into typed internal gameplay messages, and the modifier-end request family no longer needs legacy enum-keyed subscriber-table entries or `ModifierSystem` gameplay-action host subscription.
+- [done] The economy-phone buy/sell/hire/unlock gameplay-action host path now translates directly at the runtime boundary into typed internal gameplay messages, and the storefront request families no longer need legacy enum-keyed subscriber-table entries or `EconomyPhoneSystem` gameplay-action host subscription.
+- [done] `TechnologySystem`, `TaskBoardSystem`, `ModifierSystem`, and `EconomyPhoneSystem` now route their already-migrated gameplay families through direct typed `handle(...)` paths, and their retired gameplay-action host subscriber overrides are reduced to inert no-op stubs behind runtime-boundary translation.
 - [>] Runtime storage now has compile-time `GameSystems` ordering and O(1) typed lookup, but primary ownership/iteration still remains runtime-polymorphic rather than tuple-backed.
 - [>] Some non-migrated internal gameplay paths still rely on the legacy `GameMessage` envelope, but that is a temporary migration state to be removed rather than a supported long-term bridge design.
 - [>] Runtime-level queue draining and generic `process_game_message(const GameMessage&)` dispatch still exist for the remaining unmigrated gameplay message families.
@@ -383,6 +385,7 @@ Legend:
 - [done] The technology claim/refund gameplay-action host family now translates directly in `GameRuntime` before host-subscriber fan-out.
 - [done] The task-board accept/claim gameplay-action host family now translates directly in `GameRuntime` before host-subscriber fan-out.
 - [done] The site-modifier end gameplay-action host family now translates directly in `GameRuntime` before host-subscriber fan-out.
+- [done] The economy-phone buy/sell/hire/unlock gameplay-action host family now translates directly in `GameRuntime` before host-subscriber fan-out.
 - [x] Keep host-message ABI transport types unchanged.
 - [>] Ensure translated host-originated gameplay work no longer depends on internal gameplay queueing.
 

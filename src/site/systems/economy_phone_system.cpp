@@ -820,8 +820,7 @@ GameMessageSubscriptionSpan EconomyPhoneSystem::subscribed_game_messages() const
 
 HostMessageSubscriptionSpan EconomyPhoneSystem::subscribed_host_messages() const noexcept
 {
-    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_GAMEPLAY_ACTION};
-    return subscriptions;
+    return {};
 }
 
 std::optional<Gs1RuntimeProfileSystemId> EconomyPhoneSystem::profile_system_id() const noexcept
@@ -871,10 +870,76 @@ Gs1Status EconomyPhoneSystem::handle(
 
 Gs1Status EconomyPhoneSystem::handle(
     RuntimeInvocation& invocation,
+    const PhoneListingPurchaseRequestedMessage& message)
+{
+    auto* listing = find_listing(economy_phone_world(invocation).own_economy(), message.listing_id);
+    if (listing == nullptr)
+    {
+        return GS1_STATUS_NOT_FOUND;
+    }
+
+    const std::uint32_t quantity = normalize_quantity(message.quantity);
+    switch (listing->kind)
+    {
+    case PhoneListingKind::BuyItem:
+        return process_buy_listing(invocation, *listing, quantity);
+    case PhoneListingKind::PurchaseUnlockable:
+        return process_unlockable_purchase(invocation, listing->item_id.value, listing->price);
+    default:
+        return GS1_STATUS_INVALID_STATE;
+    }
+}
+
+Gs1Status EconomyPhoneSystem::handle(
+    RuntimeInvocation& invocation,
+    const PhoneListingSaleRequestedMessage& message)
+{
+    auto* listing = find_listing(
+        economy_phone_world(invocation).own_economy(),
+        message.listing_id_or_item_id);
+    if (listing == nullptr)
+    {
+        listing = find_sell_listing_for_item(
+            economy_phone_world(invocation).own_economy(),
+            message.listing_id_or_item_id);
+        if (listing == nullptr)
+        {
+            refresh_dynamic_sell_listings(invocation, true);
+            return GS1_STATUS_OK;
+        }
+    }
+
+    return process_sell_listing(invocation, *listing, normalize_quantity(message.quantity));
+}
+
+Gs1Status EconomyPhoneSystem::handle(
+    RuntimeInvocation& invocation,
+    const ContractorHireRequestedMessage& message)
+{
+    return process_contractor_hire(invocation, message);
+}
+
+Gs1Status EconomyPhoneSystem::handle(
+    RuntimeInvocation& invocation,
     const SiteUnlockableRevealRequestedMessage& message)
 {
     reveal_unlockable_for_site(invocation, message.unlockable_id);
     return GS1_STATUS_OK;
+}
+
+Gs1Status EconomyPhoneSystem::handle(
+    RuntimeInvocation& invocation,
+    const SiteUnlockablePurchaseRequestedMessage& message)
+{
+    const auto* listing = find_unlockable_listing(
+        economy_phone_world(invocation).own_economy(),
+        message.unlockable_id);
+    if (listing == nullptr)
+    {
+        return GS1_STATUS_NOT_FOUND;
+    }
+
+    return process_unlockable_purchase(invocation, message.unlockable_id, listing->price);
 }
 
 Gs1Status EconomyPhoneSystem::process_game_message(
@@ -893,60 +958,16 @@ Gs1Status EconomyPhoneSystem::process_game_message(
         return handle(invocation, message.payload_as<EconomyMoneyAwardRequestedMessage>());
 
     case GameMessageType::PhoneListingPurchaseRequested:
-    {
-        const auto& payload = message.payload_as<PhoneListingPurchaseRequestedMessage>();
-        auto* listing = find_listing(economy_phone_world(invocation).own_economy(), payload.listing_id);
-        if (listing == nullptr)
-        {
-            return GS1_STATUS_NOT_FOUND;
-        }
-
-        const std::uint32_t quantity = normalize_quantity(payload.quantity);
-        switch (listing->kind)
-        {
-        case PhoneListingKind::BuyItem:
-            return process_buy_listing(invocation, *listing, quantity);
-        case PhoneListingKind::PurchaseUnlockable:
-            return process_unlockable_purchase(invocation, listing->item_id.value, listing->price);
-        default:
-            return GS1_STATUS_INVALID_STATE;
-        }
-    }
+        return handle(invocation, message.payload_as<PhoneListingPurchaseRequestedMessage>());
 
     case GameMessageType::PhoneListingSaleRequested:
-    {
-        const auto& payload = message.payload_as<PhoneListingSaleRequestedMessage>();
-        auto* listing = find_listing(economy_phone_world(invocation).own_economy(), payload.listing_id_or_item_id);
-        if (listing == nullptr)
-        {
-            listing = find_sell_listing_for_item(
-                economy_phone_world(invocation).own_economy(),
-                payload.listing_id_or_item_id);
-            if (listing == nullptr)
-            {
-                refresh_dynamic_sell_listings(invocation, true);
-                return GS1_STATUS_OK;
-            }
-        }
-
-        const std::uint32_t quantity = normalize_quantity(payload.quantity);
-        return process_sell_listing(invocation, *listing, quantity);
-    }
+        return handle(invocation, message.payload_as<PhoneListingSaleRequestedMessage>());
 
     case GameMessageType::ContractorHireRequested:
-        return process_contractor_hire(invocation, message.payload_as<ContractorHireRequestedMessage>());
+        return handle(invocation, message.payload_as<ContractorHireRequestedMessage>());
 
     case GameMessageType::SiteUnlockablePurchaseRequested:
-    {
-        const auto& payload = message.payload_as<SiteUnlockablePurchaseRequestedMessage>();
-        const auto* listing = find_unlockable_listing(economy_phone_world(invocation).own_economy(), payload.unlockable_id);
-        if (listing == nullptr)
-        {
-            return GS1_STATUS_NOT_FOUND;
-        }
-
-        return process_unlockable_purchase(invocation, payload.unlockable_id, listing->price);
-    }
+        return handle(invocation, message.payload_as<SiteUnlockablePurchaseRequestedMessage>());
 
     case GameMessageType::SiteUnlockableRevealRequested:
         return handle(invocation, message.payload_as<SiteUnlockableRevealRequestedMessage>());
@@ -960,101 +981,9 @@ Gs1Status EconomyPhoneSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    if (message.type != GS1_HOST_EVENT_GAMEPLAY_ACTION)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    const auto& action = message.payload.gameplay_action.action;
-    switch (action.type)
-    {
-    case GS1_GAMEPLAY_ACTION_BUY_PHONE_LISTING:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        {
-            auto* listing = find_listing(economy_phone_world(invocation).own_economy(), action.target_id);
-            if (listing == nullptr)
-            {
-                return GS1_STATUS_NOT_FOUND;
-            }
-
-            return listing->kind == PhoneListingKind::BuyItem
-                ? process_buy_listing(
-                    invocation,
-                    *listing,
-                    normalize_quantity(static_cast<std::uint16_t>(action.arg0)))
-                : (listing->kind == PhoneListingKind::PurchaseUnlockable
-                    ? process_unlockable_purchase(invocation, listing->item_id.value, listing->price)
-                    : GS1_STATUS_INVALID_STATE);
-        }
-
-    case GS1_GAMEPLAY_ACTION_SELL_PHONE_LISTING:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        {
-            auto* listing = find_listing(economy_phone_world(invocation).own_economy(), action.target_id);
-            if (listing == nullptr)
-            {
-                listing = find_sell_listing_for_item(
-                    economy_phone_world(invocation).own_economy(),
-                    action.target_id);
-                if (listing == nullptr)
-                {
-                    refresh_dynamic_sell_listings(invocation, true);
-                    return GS1_STATUS_OK;
-                }
-            }
-
-            return listing->kind == PhoneListingKind::SellItem
-                ? process_sell_listing(
-                    invocation,
-                    *listing,
-                    normalize_quantity(static_cast<std::uint16_t>(action.arg0)))
-                : GS1_STATUS_INVALID_STATE;
-        }
-
-    case GS1_GAMEPLAY_ACTION_HIRE_CONTRACTOR:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        {
-            auto* listing = find_listing(economy_phone_world(invocation).own_economy(), action.target_id);
-            if (listing == nullptr)
-            {
-                return GS1_STATUS_NOT_FOUND;
-            }
-
-            return process_contractor_hire(
-                invocation,
-                ContractorHireRequestedMessage {
-                    action.target_id,
-                    static_cast<std::uint32_t>(action.arg0)});
-        }
-
-    case GS1_GAMEPLAY_ACTION_PURCHASE_SITE_UNLOCKABLE:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        {
-            const auto* listing =
-                find_unlockable_listing(economy_phone_world(invocation).own_economy(), action.target_id);
-            if (listing == nullptr)
-            {
-                return GS1_STATUS_NOT_FOUND;
-            }
-
-            return process_unlockable_purchase(invocation, action.target_id, listing->price);
-        }
-
-    default:
-        return GS1_STATUS_OK;
-    }
+    (void)invocation;
+    (void)message;
+    return GS1_STATUS_OK;
 }
 
 void EconomyPhoneSystem::run(RuntimeInvocation& invocation)

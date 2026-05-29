@@ -50,7 +50,19 @@ public:
         const EconomyMoneyAwardRequestedMessage& message);
     [[nodiscard]] Gs1Status handle(
         RuntimeInvocation& invocation,
+        const PhoneListingPurchaseRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const PhoneListingSaleRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const ContractorHireRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
         const SiteUnlockableRevealRequestedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
+        const SiteUnlockablePurchaseRequestedMessage& message);
     void run(RuntimeInvocation& invocation) override;
 
     [[nodiscard]] static constexpr SiteSystemAccess access() noexcept

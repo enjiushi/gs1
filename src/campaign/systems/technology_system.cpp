@@ -167,10 +167,6 @@ Gs1Status process_campaign_reputation_award_message(
     RuntimeInvocation& invocation,
     const CampaignReputationAwardRequestedMessage& message);
 
-Gs1Status process_technology_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message);
-
 template <>
 struct system_state_tags<TechnologySystem>
 {
@@ -195,8 +191,7 @@ GameMessageSubscriptionSpan TechnologySystem::subscribed_game_messages() const n
 
 HostMessageSubscriptionSpan TechnologySystem::subscribed_host_messages() const noexcept
 {
-    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_GAMEPLAY_ACTION};
-    return subscriptions;
+    return {};
 }
 
 std::optional<Gs1RuntimeProfileSystemId> TechnologySystem::profile_system_id() const noexcept
@@ -218,7 +213,26 @@ Gs1Status TechnologySystem::process_game_message(
         return GS1_STATUS_INVALID_STATE;
     }
 
-    return process_technology_message(invocation, message);
+    switch (message.type)
+    {
+    case GameMessageType::TargetGranted:
+        return handle(invocation, message.payload_as<TargetGrantedMessage>());
+
+    case GameMessageType::ProgressionEventOccurred:
+        return handle(invocation, message.payload_as<ProgressionEventOccurredMessage>());
+
+    case GameMessageType::CampaignReputationAwardRequested:
+        return handle(invocation, message.payload_as<CampaignReputationAwardRequestedMessage>());
+
+    case GameMessageType::TechnologyNodeClaimRequested:
+        return handle(invocation, message.payload_as<TechnologyNodeClaimRequestedMessage>());
+
+    case GameMessageType::TechnologyNodeRefundRequested:
+        return handle(invocation, message.payload_as<TechnologyNodeRefundRequestedMessage>());
+
+    default:
+        return GS1_STATUS_OK;
+    }
 }
 
 Gs1Status TechnologySystem::process_host_message(
@@ -708,49 +722,4 @@ Gs1Status process_campaign_reputation_award_message(
     return GS1_STATUS_OK;
 }
 
-Gs1Status process_technology_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::TargetGranted:
-        return process_target_granted_message(invocation, message.payload_as<TargetGrantedMessage>());
-
-    case GameMessageType::ProgressionEventOccurred:
-        return process_progression_event_message(
-            invocation,
-            message.payload_as<ProgressionEventOccurredMessage>());
-
-    case GameMessageType::CampaignReputationAwardRequested:
-        return process_campaign_reputation_award_message(
-            invocation,
-            message.payload_as<CampaignReputationAwardRequestedMessage>());
-
-    case GameMessageType::TechnologyNodeClaimRequested:
-    {
-        const auto& payload = message.payload_as<TechnologyNodeClaimRequestedMessage>();
-        if (payload.tech_node_id == 0U || payload.reputation_faction_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-
-        return GS1_STATUS_OK;
-    }
-
-    case GameMessageType::TechnologyNodeRefundRequested:
-    {
-        const auto& payload = message.payload_as<TechnologyNodeRefundRequestedMessage>();
-        if (payload.tech_node_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-
-        return GS1_STATUS_OK;
-    }
-
-    default:
-        return GS1_STATUS_OK;
-    }
-}
 }  // namespace gs1
