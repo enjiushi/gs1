@@ -389,6 +389,7 @@ Legend:
 - [done] The task-board accept/claim gameplay-action host family now translates directly in `GameRuntime` before host-subscriber fan-out.
 - [done] The site-modifier end gameplay-action host family now translates directly in `GameRuntime` before host-subscriber fan-out.
 - [done] The economy-phone buy/sell/hire/unlock gameplay-action host family now translates directly in `GameRuntime` before host-subscriber fan-out.
+- [done] The site inventory slot-tap host path now translates directly in `GameRuntime` into `InventorySlotTappedMessage`, and `InventorySystem` no longer depends on host-subscriber registration for that request.
 - [x] Keep host-message ABI transport types unchanged.
 - [>] Ensure translated host-originated gameplay work no longer depends on internal gameplay queueing.
 

@@ -369,6 +369,15 @@ struct typed_gameplay_dispatch_traits<InventoryItemSubmitRequestedMessage>
 };
 
 template <>
+struct typed_gameplay_dispatch_traits<InventorySlotTappedMessage>
+{
+    using subscribers = typename typed_game_message_subscribers<
+        InventorySlotTappedMessage,
+        GameSystems>::type;
+    static constexpr bool enabled = true;
+};
+
+template <>
 struct typed_gameplay_dispatch_traits<InventoryCraftCommitRequestedMessage>
 {
     using subscribers = typename typed_game_message_subscribers<

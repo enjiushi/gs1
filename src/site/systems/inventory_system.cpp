@@ -1443,10 +1443,7 @@ GameMessageSubscriptionSpan InventorySystem::subscribed_game_messages() const no
 
 HostMessageSubscriptionSpan InventorySystem::subscribed_host_messages() const noexcept
 {
-    static constexpr Gs1HostMessageType subscriptions[] = {
-        GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP,
-    };
-    return subscriptions;
+    return {};
 }
 
 std::optional<Gs1RuntimeProfileSystemId> InventorySystem::profile_system_id() const noexcept
@@ -1659,6 +1656,18 @@ Gs1Status InventorySystem::handle(
 
 Gs1Status InventorySystem::handle(
     RuntimeInvocation& invocation,
+    const InventorySlotTappedMessage& message)
+{
+    if (!inventory_runtime_ready(invocation))
+    {
+        return GS1_STATUS_INVALID_STATE;
+    }
+
+    return handle_inventory_slot_tapped(invocation, message);
+}
+
+Gs1Status InventorySystem::handle(
+    RuntimeInvocation& invocation,
     const InventoryCraftCommitRequestedMessage& message)
 {
     if (!inventory_runtime_ready(invocation))
@@ -1673,27 +1682,9 @@ Gs1Status InventorySystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    if (!inventory_runtime_ready(invocation))
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    switch (message.type)
-    {
-    case GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP:
-        return handle_inventory_slot_tapped(
-            invocation,
-            InventorySlotTappedMessage {
-                message.payload.site_inventory_slot_tap.storage_id,
-                message.payload.site_inventory_slot_tap.item_instance_id,
-                message.payload.site_inventory_slot_tap.slot_index,
-                message.payload.site_inventory_slot_tap.container_kind,
-                0U,
-                message.payload.site_inventory_slot_tap.companion_storage_id});
-
-    default:
-        return GS1_STATUS_OK;
-    }
+    (void)invocation;
+    (void)message;
+    return GS1_STATUS_OK;
 }
 
 void InventorySystem::run(RuntimeInvocation& invocation)

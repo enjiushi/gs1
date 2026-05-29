@@ -245,6 +245,12 @@ struct gameplay_message_traits<InventoryItemSubmitRequestedMessage>
 };
 
 template <>
+struct gameplay_message_traits<InventorySlotTappedMessage>
+{
+    static constexpr GameMessageType type = GameMessageType::InventorySlotTapped;
+};
+
+template <>
 struct gameplay_message_traits<InventoryCraftCommitRequestedMessage>
 {
     static constexpr GameMessageType type = GameMessageType::InventoryCraftCommitRequested;

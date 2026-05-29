@@ -79,6 +79,9 @@ public:
         const InventoryItemSubmitRequestedMessage& message);
     [[nodiscard]] Gs1Status handle(
         RuntimeInvocation& invocation,
+        const InventorySlotTappedMessage& message);
+    [[nodiscard]] Gs1Status handle(
+        RuntimeInvocation& invocation,
         const InventoryCraftCommitRequestedMessage& message);
     void run(RuntimeInvocation& invocation) override;
 

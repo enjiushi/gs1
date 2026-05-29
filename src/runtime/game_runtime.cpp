@@ -1838,6 +1838,18 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
 std::optional<Gs1Status> GameRuntime::dispatch_runtime_translated_host_message(
     const Gs1HostMessage& message)
 {
+    if (message.type == GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP)
+    {
+        const auto& payload = message.payload.site_inventory_slot_tap;
+        return dispatch_game_message_inline(InventorySlotTappedMessage {
+            payload.storage_id,
+            payload.item_instance_id,
+            payload.slot_index,
+            payload.container_kind,
+            0U,
+            payload.companion_storage_id});
+    }
+
     if (message.type != GS1_HOST_EVENT_GAMEPLAY_ACTION)
     {
         return std::nullopt;
