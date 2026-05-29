@@ -301,43 +301,6 @@ std::optional<std::uint32_t> CampaignProgressionSystem::fixed_step_order() const
     return std::nullopt;
 }
 
-Gs1Status CampaignProgressionSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    if (!runtime_invocation_has_campaign(invocation))
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    switch (message.type)
-    {
-    case GameMessageType::ProgressionEventOccurred:
-        return handle(invocation, message.payload_as<ProgressionEventOccurredMessage>());
-
-    case GameMessageType::PurchaseEntrySelected:
-        return handle(invocation, message.payload_as<PurchaseEntrySelectedMessage>());
-
-    case GameMessageType::CampaignReputationAwardRequested:
-        return handle(invocation, message.payload_as<CampaignReputationAwardRequestedMessage>());
-
-    case GameMessageType::FactionReputationAwardRequested:
-        return handle(invocation, message.payload_as<FactionReputationAwardRequestedMessage>());
-
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
-Gs1Status CampaignProgressionSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
-}
-
 Gs1Status CampaignProgressionSystem::handle(
     RuntimeInvocation& invocation,
     const ProgressionEventOccurredMessage& message)

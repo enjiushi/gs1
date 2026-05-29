@@ -687,23 +687,6 @@ std::optional<std::uint32_t> PlantWeatherContributionSystem::fixed_step_order() 
     return 6U;
 }
 
-Gs1Status PlantWeatherContributionSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-    case GameMessageType::TileEcologyChanged:
-        return handle(invocation, message.payload_as<TileEcologyChangedMessage>());
-    case GameMessageType::TileEcologyBatchChanged:
-        return handle(invocation, message.payload_as<TileEcologyBatchChangedMessage>());
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
 Gs1Status PlantWeatherContributionSystem::handle(
     RuntimeInvocation& invocation,
     const SiteRunStartedMessage& message)
@@ -735,15 +718,6 @@ Gs1Status PlantWeatherContributionSystem::handle(
     const TileEcologyBatchChangedMessage& message)
 {
     return handle_tile_ecology_batch_changed(invocation, message);
-}
-
-Gs1Status PlantWeatherContributionSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
 }
 
 void PlantWeatherContributionSystem::run(RuntimeInvocation& invocation)

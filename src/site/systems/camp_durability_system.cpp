@@ -136,19 +136,6 @@ std::optional<std::uint32_t> CampDurabilitySystem::fixed_step_order() const noex
     return 10U;
 }
 
-Gs1Status CampDurabilitySystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
 Gs1Status CampDurabilitySystem::handle(
     RuntimeInvocation& invocation,
     const SiteRunStartedMessage& message)
@@ -168,15 +155,6 @@ Gs1Status CampDurabilitySystem::handle(
     refresh_memory_with_current_state(invocation);
     return GS1_STATUS_OK;
 }
-Gs1Status CampDurabilitySystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)message;
-    (void)invocation;
-    return GS1_STATUS_OK;
-}
-
 void CampDurabilitySystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<CampDurabilitySystem>(invocation);

@@ -38,8 +38,12 @@ void set_campaign_app_state(RuntimeInvocation& invocation, Gs1AppState app_state
 {
     make_game_state_access<CampaignFlowSystem>(invocation).template write<RuntimeAppStateTag>() =
         app_state;
-    invocation.state_manager()->state<StateSetId::CampaignCore>(*invocation.owned_state())->app_state =
-        app_state;
+    auto& campaign_core =
+        invocation.state_manager()->state<StateSetId::CampaignCore>(*invocation.owned_state());
+    if (campaign_core.has_value())
+    {
+        campaign_core->app_state = app_state;
+    }
 }
 
 void set_campaign_active_site_id(RuntimeInvocation& invocation, std::optional<SiteId> site_id)
@@ -334,47 +338,6 @@ std::optional<Gs1RuntimeProfileSystemId> CampaignFlowSystem::profile_system_id()
 std::optional<std::uint32_t> CampaignFlowSystem::fixed_step_order() const noexcept
 {
     return std::nullopt;
-}
-
-Gs1Status CampaignFlowSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::OpenMainMenu:
-        return handle(invocation, message.payload_as<OpenMainMenuMessage>());
-
-    case GameMessageType::StartNewCampaign:
-        return handle(invocation, message.payload_as<StartNewCampaignMessage>());
-
-    case GameMessageType::SelectDeploymentSite:
-        return handle(invocation, message.payload_as<SelectDeploymentSiteMessage>());
-
-    case GameMessageType::ClearDeploymentSiteSelection:
-        return handle(invocation, message.payload_as<ClearDeploymentSiteSelectionMessage>());
-
-    case GameMessageType::StartSiteAttempt:
-        return handle(invocation, message.payload_as<StartSiteAttemptMessage>());
-
-    case GameMessageType::ReturnToRegionalMap:
-        return handle(invocation, message.payload_as<ReturnToRegionalMapMessage>());
-
-    case GameMessageType::SiteAttemptEnded:
-        return handle(invocation, message.payload_as<SiteAttemptEndedMessage>());
-
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
-Gs1Status CampaignFlowSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
 }
 
 Gs1Status CampaignFlowSystem::handle(

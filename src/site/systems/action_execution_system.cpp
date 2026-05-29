@@ -3501,49 +3501,6 @@ Gs1Status ActionExecutionSystem::handle(
     return GS1_STATUS_OK;
 }
 
-Gs1Status ActionExecutionSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    auto access = make_game_state_access<ActionExecutionSystem>(invocation);
-    auto world = SiteWorldAccess<ActionExecutionSystem> {invocation};
-    if (!runtime_invocation_has_campaign(invocation) || !world.has_world())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-    auto action_state = world.own_action();
-    const auto& payload_type = message.type;
-    switch (payload_type)
-    {
-    case GameMessageType::StartSiteAction:
-        return handle_start_site_action(invocation, message.payload_as<StartSiteActionMessage>());
-
-    case GameMessageType::CancelSiteAction:
-        return handle_cancel_site_action(invocation, message.payload_as<CancelSiteActionMessage>());
-
-    case GameMessageType::PlacementModeCursorMoved:
-        return handle_placement_mode_cursor_moved(invocation, message.payload_as<PlacementModeCursorMovedMessage>());
-
-    case GameMessageType::PlacementReservationAccepted:
-        return handle(invocation, message.payload_as<PlacementReservationAcceptedMessage>());
-
-    case GameMessageType::PlacementReservationRejected:
-        return handle(invocation, message.payload_as<PlacementReservationRejectedMessage>());
-
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
-Gs1Status ActionExecutionSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
-}
-
 void ActionExecutionSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<ActionExecutionSystem>(invocation);

@@ -1,8 +1,10 @@
 #include "runtime/game_runtime.h"
 #include "../system/source/split_state_test_helpers.h"
 #include "content/defs/item_defs.h"
+#include "site/inventory_storage.h"
 
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -10,8 +12,6 @@
 namespace
 {
 using gs1::CampaignState;
-using gs1::GameMessage;
-using gs1::GameMessageType;
 using gs1::GameRuntime;
 using gs1::InventoryItemUseRequestedMessage;
 using gs1::SiteRunState;
@@ -60,20 +60,14 @@ struct GameRuntimeProjectionTestAccess
 
 namespace
 {
-GameMessage make_start_campaign_message()
+StartNewCampaignMessage make_start_campaign_message()
 {
-    GameMessage message {};
-    message.type = GameMessageType::StartNewCampaign;
-    message.set_payload(StartNewCampaignMessage {42ULL, 30U});
-    return message;
+    return StartNewCampaignMessage {42ULL, 30U};
 }
 
-GameMessage make_start_site_attempt_message(std::uint32_t site_id)
+StartSiteAttemptMessage make_start_site_attempt_message(std::uint32_t site_id)
 {
-    GameMessage message {};
-    message.type = GameMessageType::StartSiteAttempt;
-    message.set_payload(StartSiteAttemptMessage {site_id});
-    return message;
+    return StartSiteAttemptMessage {site_id};
 }
 
 Gs1HostMessage make_site_scene_ready_event()
@@ -83,20 +77,17 @@ Gs1HostMessage make_site_scene_ready_event()
     return event;
 }
 
-GameMessage make_inventory_use_message(
+InventoryItemUseRequestedMessage make_inventory_use_message(
     std::uint32_t item_id,
     std::uint32_t quantity,
     std::uint32_t storage_id,
     std::uint32_t slot_index)
 {
-    GameMessage message {};
-    message.type = GameMessageType::InventoryItemUseRequested;
-    message.set_payload(InventoryItemUseRequestedMessage {
+    return InventoryItemUseRequestedMessage {
         item_id,
         storage_id,
         static_cast<std::uint16_t>(quantity),
-        static_cast<std::uint16_t>(slot_index)});
-    return message;
+        static_cast<std::uint16_t>(slot_index)};
 }
 
 std::vector<Gs1RuntimeMessage> drain_runtime_messages(GameRuntime& runtime)
@@ -108,6 +99,14 @@ std::vector<Gs1RuntimeMessage> drain_runtime_messages(GameRuntime& runtime)
         messages.push_back(message);
     }
     return messages;
+}
+
+Gs1GameStateView read_view(GameRuntime& runtime)
+{
+    Gs1GameStateView view {};
+    view.struct_size = sizeof(Gs1GameStateView);
+    assert(runtime.get_game_state_view(view) == GS1_STATUS_OK);
+    return view;
 }
 
 void run_phase1(GameRuntime& runtime, double real_delta_seconds, Gs1Phase1Result& out_result)
@@ -129,25 +128,37 @@ void run_phase2(GameRuntime& runtime, Gs1Phase2Result& out_result)
     assert(runtime.run_phase2(request, out_result) == GS1_STATUS_OK);
 }
 
-const Gs1RuntimeMessage* find_site_modifier_message(
-    const std::vector<Gs1RuntimeMessage>& messages,
+const Gs1SiteModifierView* find_site_modifier_view(
+    const Gs1GameStateView& view,
     std::uint32_t modifier_id)
 {
-    for (const auto& message : messages)
+    if (view.active_site == nullptr || view.active_site->active_modifiers == nullptr)
     {
-        if (message.type != GS1_ENGINE_MESSAGE_SITE_MODIFIER_UPSERT)
-        {
-            continue;
-        }
+        return nullptr;
+    }
 
-        const auto& payload = message.payload_as<Gs1EngineMessageSiteModifierData>();
-        if (payload.modifier_id == modifier_id)
+    for (std::uint32_t index = 0U; index < view.active_site->active_modifier_count; ++index)
+    {
+        const auto& modifier = view.active_site->active_modifiers[index];
+        if (modifier.modifier_id == modifier_id)
         {
-            return &message;
+            return &modifier;
         }
     }
 
     return nullptr;
+}
+
+std::uint16_t projected_remaining_game_hours(const Gs1SiteModifierView& modifier)
+{
+    constexpr double epsilon = 0.0001;
+    if (modifier.remaining_world_minutes <= epsilon)
+    {
+        return 0U;
+    }
+
+    return static_cast<std::uint16_t>(std::ceil(
+        std::max(0.0, modifier.remaining_world_minutes - epsilon) / 60.0));
 }
 
 void bootstrap_site_one(GameRuntime& runtime)
@@ -182,11 +193,17 @@ void timed_modifier_projection_only_republishes_on_game_hour_boundaries()
         runtime,
         [](SiteRunState& site_run)
         {
-            site_run.inventory.worker_pack_slots[0].occupied = true;
-            site_run.inventory.worker_pack_slots[0].item_id = gs1::ItemId {gs1::k_item_focus_tonic};
-            site_run.inventory.worker_pack_slots[0].item_quantity = 1U;
-            site_run.inventory.worker_pack_slots[0].item_condition = 1.0f;
-            site_run.inventory.worker_pack_slots[0].item_freshness = 1.0f;
+            gs1::inventory_storage::initialize_site_inventory_storage(site_run);
+            const auto worker_pack = gs1::inventory_storage::worker_pack_container(site_run);
+            assert(worker_pack.is_valid());
+            const auto remaining = gs1::inventory_storage::add_item_to_container(
+                site_run,
+                worker_pack,
+                gs1::ItemId {gs1::k_item_focus_tonic},
+                1U,
+                1.0f,
+                1.0f);
+            assert(remaining == 0U);
         });
     drain_runtime_messages(runtime);
 
@@ -196,28 +213,24 @@ void timed_modifier_projection_only_republishes_on_game_hour_boundaries()
                gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime)->inventory.worker_pack_storage_id,
                0U)) == GS1_STATUS_OK);
 
-    const auto activation_messages = drain_runtime_messages(runtime);
-    const auto* activation_modifier_message =
-        find_site_modifier_message(activation_messages, 3003U);
-    assert(activation_modifier_message != nullptr);
-    assert(
-        activation_modifier_message->payload_as<Gs1EngineMessageSiteModifierData>()
-            .remaining_game_hours == 16U);
+    const auto activation_view = read_view(runtime);
+    const auto* activation_modifier = find_site_modifier_view(activation_view, 3003U);
+    assert(activation_modifier != nullptr);
+    assert(projected_remaining_game_hours(*activation_modifier) == 16U);
 
     Gs1Phase1Result first_tick_result {};
     run_phase1(runtime, 60.0, first_tick_result);
-    const auto first_tick_messages = drain_runtime_messages(runtime);
-    assert(find_site_modifier_message(first_tick_messages, 3003U) == nullptr);
+    const auto first_tick_view = read_view(runtime);
+    const auto* first_tick_modifier = find_site_modifier_view(first_tick_view, 3003U);
+    assert(first_tick_modifier != nullptr);
+    assert(projected_remaining_game_hours(*first_tick_modifier) == 16U);
 
     Gs1Phase1Result second_tick_result {};
     run_phase1(runtime, 60.0, second_tick_result);
-    const auto second_tick_messages = drain_runtime_messages(runtime);
-    const auto* hour_boundary_modifier_message =
-        find_site_modifier_message(second_tick_messages, 3003U);
-    assert(hour_boundary_modifier_message != nullptr);
-    assert(
-        hour_boundary_modifier_message->payload_as<Gs1EngineMessageSiteModifierData>()
-            .remaining_game_hours == 15U);
+    const auto second_tick_view = read_view(runtime);
+    const auto* second_tick_modifier = find_site_modifier_view(second_tick_view, 3003U);
+    assert(second_tick_modifier != nullptr);
+    assert(projected_remaining_game_hours(*second_tick_modifier) == 15U);
 }
 }  // namespace
 

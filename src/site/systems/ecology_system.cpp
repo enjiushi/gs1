@@ -1109,7 +1109,6 @@ void update_restoration_progress(
     std::uint32_t new_count)
 {
     auto& counters = world.own_counters();
-    auto objective = world.own_objective();
     const auto previous_count = counters.fully_grown_tile_count;
     if (previous_count == new_count)
     {
@@ -1125,8 +1124,6 @@ void update_restoration_progress(
         normalized_progress = std::clamp(normalized_progress, 0.0f, 1.0f);
     }
     counters.objective_progress_normalized = normalized_progress;
-    objective.objective_progress_normalized = normalized_progress;
-
     invocation.emit_game_message(RestorationProgressChangedMessage {
         new_count,
         counters.site_completion_tile_threshold,
@@ -1149,7 +1146,7 @@ void update_highway_protection_progress(
     float average_sand_cover)
 {
     auto& counters = world.own_counters();
-    auto objective = world.own_objective();
+    const auto& objective = world.read_objective();
     const float clamped_average = std::clamp(average_sand_cover, 0.0f, k_meter_scale);
     const float previous_average = objective.highway_average_sand_cover;
     float normalized_progress = 1.0f;
@@ -1173,8 +1170,6 @@ void update_highway_protection_progress(
 
     counters.highway_average_sand_cover = clamped_average;
     counters.objective_progress_normalized = normalized_progress;
-    objective.highway_average_sand_cover = clamped_average;
-    objective.objective_progress_normalized = normalized_progress;
 }
 
 void update_living_plant_stability(
@@ -1247,29 +1242,6 @@ void emit_startup_ecology_snapshots(
     update_restoration_progress(world, invocation, fully_grown_count);
 }
 }  // namespace
-
-Gs1Status EcologySystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-    case GameMessageType::SiteGroundCoverPlaced:
-        return handle(invocation, message.payload_as<SiteGroundCoverPlacedMessage>());
-    case GameMessageType::SiteTilePlantingCompleted:
-        return handle(invocation, message.payload_as<SiteTilePlantingCompletedMessage>());
-    case GameMessageType::SiteTileWatered:
-        return handle(invocation, message.payload_as<SiteTileWateredMessage>());
-    case GameMessageType::SiteTileBurialCleared:
-        return handle(invocation, message.payload_as<SiteTileBurialClearedMessage>());
-    case GameMessageType::SiteTileHarvested:
-        return handle(invocation, message.payload_as<SiteTileHarvestedMessage>());
-    default:
-        return GS1_STATUS_OK;
-    }
-}
 
 Gs1Status EcologySystem::handle(
     RuntimeInvocation& invocation,
@@ -1406,15 +1378,6 @@ Gs1Status EcologySystem::handle(
         });
 
     flush_dirty_tile_ecology_batches(invocation, world);
-    return GS1_STATUS_OK;
-}
-
-Gs1Status EcologySystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)message;
-    (void)invocation;
     return GS1_STATUS_OK;
 }
 

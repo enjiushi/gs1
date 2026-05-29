@@ -204,68 +204,6 @@ std::optional<std::uint32_t> TechnologySystem::fixed_step_order() const noexcept
     return std::nullopt;
 }
 
-Gs1Status TechnologySystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    if (!runtime_invocation_has_campaign(invocation))
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    switch (message.type)
-    {
-    case GameMessageType::TargetGranted:
-        return handle(invocation, message.payload_as<TargetGrantedMessage>());
-
-    case GameMessageType::ProgressionEventOccurred:
-        return handle(invocation, message.payload_as<ProgressionEventOccurredMessage>());
-
-    case GameMessageType::CampaignReputationAwardRequested:
-        return handle(invocation, message.payload_as<CampaignReputationAwardRequestedMessage>());
-
-    case GameMessageType::TechnologyNodeClaimRequested:
-        return handle(invocation, message.payload_as<TechnologyNodeClaimRequestedMessage>());
-
-    case GameMessageType::TechnologyNodeRefundRequested:
-        return handle(invocation, message.payload_as<TechnologyNodeRefundRequestedMessage>());
-
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
-Gs1Status TechnologySystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    if (message.type != GS1_HOST_EVENT_GAMEPLAY_ACTION)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    const auto& action = message.payload.gameplay_action.action;
-    switch (action.type)
-    {
-    case GS1_GAMEPLAY_ACTION_CLAIM_TECHNOLOGY_NODE:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return GS1_STATUS_OK;
-
-    case GS1_GAMEPLAY_ACTION_REFUND_TECHNOLOGY_NODE:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return GS1_STATUS_OK;
-
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
 void TechnologySystem::run(RuntimeInvocation& invocation)
 {
     (void)invocation;

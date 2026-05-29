@@ -229,29 +229,6 @@ std::optional<std::uint32_t> CraftSystem::fixed_step_order() const noexcept
     return 15U;
 }
 
-Gs1Status CraftSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-
-    case GameMessageType::SiteDevicePlaced:
-        return handle(invocation, message.payload_as<SiteDevicePlacedMessage>());
-
-    case GameMessageType::SiteDeviceBroken:
-        return handle(invocation, message.payload_as<SiteDeviceBrokenMessage>());
-
-    case GameMessageType::InventoryCraftContextRequested:
-        return handle(invocation, message.payload_as<CraftContextRequestedMessage>());
-
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
 Gs1Status CraftSystem::handle(
     RuntimeInvocation& invocation,
     const SiteRunStartedMessage& message)
@@ -293,15 +270,6 @@ Gs1Status CraftSystem::handle(
     const CraftContextRequestedMessage& message)
 {
     return handle_craft_context_requested(invocation, message);
-}
-
-Gs1Status CraftSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
 }
 
 void CraftSystem::run(RuntimeInvocation& invocation)

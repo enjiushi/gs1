@@ -165,27 +165,6 @@ std::optional<std::uint32_t> LoadoutPlannerSystem::fixed_step_order() const noex
     return std::nullopt;
 }
 
-Gs1Status LoadoutPlannerSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    if (message.type == GameMessageType::DeploymentSiteSelectionChanged)
-    {
-        return handle(invocation, message.payload_as<DeploymentSiteSelectionChangedMessage>());
-    }
-
-    return GS1_STATUS_OK;
-}
-
-Gs1Status LoadoutPlannerSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
-}
-
 Gs1Status LoadoutPlannerSystem::handle(
     RuntimeInvocation& invocation,
     const DeploymentSiteSelectionChangedMessage& message)

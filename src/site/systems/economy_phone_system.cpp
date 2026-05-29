@@ -942,50 +942,6 @@ Gs1Status EconomyPhoneSystem::handle(
     return process_unlockable_purchase(invocation, message.unlockable_id, listing->price);
 }
 
-Gs1Status EconomyPhoneSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-
-    case GameMessageType::SiteRefreshTick:
-        return handle(invocation, message.payload_as<SiteRefreshTickMessage>());
-
-    case GameMessageType::EconomyMoneyAwardRequested:
-        return handle(invocation, message.payload_as<EconomyMoneyAwardRequestedMessage>());
-
-    case GameMessageType::PhoneListingPurchaseRequested:
-        return handle(invocation, message.payload_as<PhoneListingPurchaseRequestedMessage>());
-
-    case GameMessageType::PhoneListingSaleRequested:
-        return handle(invocation, message.payload_as<PhoneListingSaleRequestedMessage>());
-
-    case GameMessageType::ContractorHireRequested:
-        return handle(invocation, message.payload_as<ContractorHireRequestedMessage>());
-
-    case GameMessageType::SiteUnlockablePurchaseRequested:
-        return handle(invocation, message.payload_as<SiteUnlockablePurchaseRequestedMessage>());
-
-    case GameMessageType::SiteUnlockableRevealRequested:
-        return handle(invocation, message.payload_as<SiteUnlockableRevealRequestedMessage>());
-
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
-Gs1Status EconomyPhoneSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
-}
-
 void EconomyPhoneSystem::run(RuntimeInvocation& invocation)
 {
     refresh_dynamic_sell_listings(invocation);

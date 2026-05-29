@@ -198,6 +198,13 @@ bool tracked_tile_coord_in_bounds(
         static_cast<std::uint32_t>(coord.y) < board.tracked_tile_height;
 }
 
+bool tracked_tile_cache_initialized(const ConstTaskBoardStateRef board) noexcept
+{
+    return board.tracked_tile_width > 0U &&
+        board.tracked_tile_height > 0U &&
+        !board.tracked_tiles.empty();
+}
+
 std::size_t tracked_tile_index(
     const ConstTaskBoardStateRef board,
     TileCoord coord) noexcept
@@ -2293,6 +2300,12 @@ void handle_tile_ecology_changed(
     RuntimeInvocation& invocation,
     const TileEcologyChangedMessage& payload)
 {
+    const auto board_state = task_board_world(invocation).read_task_board();
+    if (!tracked_tile_cache_initialized(board_state))
+    {
+        return;
+    }
+
     if ((payload.changed_mask &
             (TILE_ECOLOGY_CHANGED_OCCUPANCY | TILE_ECOLOGY_CHANGED_DENSITY)) == 0U)
     {
@@ -2321,6 +2334,12 @@ void handle_tile_ecology_batch_changed(
     RuntimeInvocation& invocation,
     const TileEcologyBatchChangedMessage& payload)
 {
+    const auto board_state = task_board_world(invocation).read_task_board();
+    if (!tracked_tile_cache_initialized(board_state))
+    {
+        return;
+    }
+
     auto board = task_board_world(invocation).own_task_board();
     bool any_relevant_entry = false;
     for (std::size_t index = 0U;
@@ -2365,6 +2384,12 @@ void handle_site_tile_state_changed(
     RuntimeInvocation& invocation,
     const SiteTileStateChangedMessage& payload)
 {
+    const auto board_state = task_board_world(invocation).read_task_board();
+    if (!tracked_tile_cache_initialized(board_state))
+    {
+        return;
+    }
+
     auto board = task_board_world(invocation).own_task_board();
     apply_tracked_plant_state(
         board,
@@ -3041,70 +3066,6 @@ Gs1Status TaskBoardSystem::handle(
     }
 
     handle_money_award_requested(invocation, message);
-    return GS1_STATUS_OK;
-}
-
-Gs1Status TaskBoardSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-    case GameMessageType::SiteRefreshTick:
-        return handle(invocation, message.payload_as<SiteRefreshTickMessage>());
-    case GameMessageType::TaskAcceptRequested:
-        return handle(invocation, message.payload_as<TaskAcceptRequestedMessage>());
-    case GameMessageType::TaskRewardClaimRequested:
-        return handle(
-            invocation,
-            message.payload_as<TaskRewardClaimRequestedMessage>());
-    case GameMessageType::RestorationProgressChanged:
-        return handle(invocation, message.payload_as<RestorationProgressChangedMessage>());
-    case GameMessageType::TileEcologyChanged:
-        return handle(invocation, message.payload_as<TileEcologyChangedMessage>());
-    case GameMessageType::TileEcologyBatchChanged:
-        return handle(invocation, message.payload_as<TileEcologyBatchChangedMessage>());
-    case GameMessageType::LivingPlantStabilityChanged:
-        return handle(invocation, message.payload_as<LivingPlantStabilityChangedMessage>());
-    case GameMessageType::SiteTileStateChanged:
-        return handle(invocation, message.payload_as<SiteTileStateChangedMessage>());
-    case GameMessageType::WorkerMetersChanged:
-        return handle(invocation, message.payload_as<WorkerMetersChangedMessage>());
-    case GameMessageType::PhoneListingPurchased:
-        return handle(invocation, message.payload_as<PhoneListingPurchasedMessage>());
-    case GameMessageType::PhoneListingSold:
-        return handle(invocation, message.payload_as<PhoneListingSoldMessage>());
-    case GameMessageType::InventoryTransferCompleted:
-        return handle(invocation, message.payload_as<InventoryTransferCompletedMessage>());
-    case GameMessageType::InventoryItemSubmitted:
-        return handle(invocation, message.payload_as<InventoryItemSubmittedMessage>());
-    case GameMessageType::InventoryItemUseCompleted:
-        return handle(invocation, message.payload_as<InventoryItemUseCompletedMessage>());
-    case GameMessageType::InventoryCraftCompleted:
-        return handle(invocation, message.payload_as<InventoryCraftCompletedMessage>());
-    case GameMessageType::SiteTilePlantingCompleted:
-        return handle(invocation, message.payload_as<SiteTilePlantingCompletedMessage>());
-    case GameMessageType::SiteActionCompleted:
-        return handle(invocation, message.payload_as<SiteActionCompletedMessage>());
-    case GameMessageType::SiteDevicePlaced:
-        return handle(invocation, message.payload_as<SiteDevicePlacedMessage>());
-    case GameMessageType::SiteDeviceConditionChanged:
-        return handle(invocation, message.payload_as<SiteDeviceConditionChangedMessage>());
-    case GameMessageType::EconomyMoneyAwardRequested:
-        return handle(invocation, message.payload_as<EconomyMoneyAwardRequestedMessage>());
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
-Gs1Status TaskBoardSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)invocation;
-    (void)message;
     return GS1_STATUS_OK;
 }
 

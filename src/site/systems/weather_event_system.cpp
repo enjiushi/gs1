@@ -390,21 +390,6 @@ std::optional<std::uint32_t> WeatherEventSystem::fixed_step_order() const noexce
     return 4U;
 }
 
-Gs1Status WeatherEventSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-    case GameMessageType::SiteAttemptEnded:
-        return handle(invocation, message.payload_as<SiteAttemptEndedMessage>());
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
 Gs1Status WeatherEventSystem::handle(
     RuntimeInvocation& invocation,
     const SiteRunStartedMessage& message)
@@ -487,15 +472,6 @@ Gs1Status WeatherEventSystem::handle(
     auto& event = world.own_event();
     clear_event_timeline(event);
     event.minutes_until_next_wave = 0.0;
-    return GS1_STATUS_OK;
-}
-
-Gs1Status WeatherEventSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)invocation;
-    (void)message;
     return GS1_STATUS_OK;
 }
 

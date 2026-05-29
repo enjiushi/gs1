@@ -348,8 +348,18 @@ Legend:
 - [done] Runtime primary system ownership now lives in compile-time `GameSystems::tuple_type` storage, while fixed-step execution and subscriber registration reuse those live typed instances through the existing runtime interface.
 - [done] Runtime resolver/ownership registration now derives from compile-time `GameSystems` tuple iteration rather than a separate hand-built polymorphic registry pass.
 - [done] `PlacementModeCursorMovedMessage` now dispatches through compile-time typed subscriber resolution, so the site-context cursor follow-up no longer leaves a legacy enum-keyed subscriber-table entry behind.
-- [>] Some non-migrated internal gameplay paths still rely on the legacy `GameMessage` envelope, but that is a temporary migration state to be removed rather than a supported long-term bridge design.
-- [>] Runtime-level queue draining and generic `process_game_message(const GameMessage&)` dispatch still exist for the remaining unmigrated gameplay message families.
+- [done] `CampaignFlowSystem`, `CampaignProgressionSystem`, and `LoadoutPlannerSystem` no longer keep dead per-system legacy gameplay-envelope trampolines for their fully typed-enabled message families, and `IRuntimeSystem` now supplies default no-op legacy message hooks so fully migrated systems can shed inert overrides instead of preserving empty queue-era plumbing.
+- [done] `ActionExecutionSystem`, `CraftSystem`, `EconomyPhoneSystem`, and `TaskBoardSystem` likewise dropped dead per-system legacy gameplay-envelope and empty host-hook overrides for their fully typed-enabled subscribed families, and the runtime legacy-subscriber skip table now also suppresses the already-migrated `PlacementModeCursorMoved` family consistently.
+- [done] Empty-subscription fixed-step systems plus additional single-message typed listeners (`CampaignTimeSystem`, `SiteTimeSystem`, `SiteFlowSystem`, `DeviceSupportSystem`, `CampDurabilitySystem`, `LocalWeatherResolveSystem`, `FailureRecoverySystem`, and `SiteCompletionSystem`) now rely on shared runtime default no-op legacy hooks instead of preserving file-local empty overrides.
+- [done] Additional migrated site systems (`EcologySystem`, `DeviceMaintenanceSystem`, `DeviceWeatherContributionSystem`, `InventorySystem`, `ModifierSystem`, `PlacementValidationSystem`, `PlantWeatherContributionSystem`, `WeatherEventSystem`, and `WorkerConditionSystem`) no longer keep empty host-message overrides when runtime-boundary translation or zero host subscriptions already make those hooks inert.
+- [done] `TechnologySystem` no longer keeps an unreachable gameplay-action host override now that claim/refund input is translated in `GameRuntime`, and the dormant no-subscription `FactionReputationSystem` compatibility hook pair was trimmed back to shared runtime defaults.
+- [done] Those same migrated site systems (`EcologySystem`, `DeviceMaintenanceSystem`, `DeviceWeatherContributionSystem`, `InventorySystem`, `ModifierSystem`, `PlacementValidationSystem`, `PlantWeatherContributionSystem`, `WeatherEventSystem`, and `WorkerConditionSystem`) no longer keep legacy `process_game_message(...)` trampoline switches for message families already routed entirely through compile-time typed subscriber dispatch.
+- [done] `GameRuntime` no longer builds or consults a runtime `GameMessageType`-keyed internal subscriber registry; compile-time typed dispatch is now the only production subscriber resolution path, and the trait metadata regression now locks that through typed-dispatch coverage instead of peeking into a legacy table.
+- [done] The runtime projection, timed-modifier, and performance regressions now enter migrated gameplay paths through direct typed `GameRuntime::handle_message(Message)` calls instead of hand-packed legacy `GameMessage` envelopes, further isolating the remaining compatibility bridge to dedicated envelope-focused tests and fixtures.
+- [done] The typed-runtime regression slice is now stabilized end-to-end: direct typed projection/performance/timed-modifier coverage uncovered and fixed the missing `SITE_SCENE_READY` -> `SiteSceneActivatedMessage` bridge, a no-campaign startup app-state write in `CampaignFlowSystem`, owner-guard violations in `EcologySystem`, `InventorySystem`, and `ModifierSystem`, and a `TaskBoardSystem` site-start ordering assumption exposed by immediate inline dispatch.
+- [done] `site_system_message_flow_test.cpp` now routes its already migrated `DeploymentSiteSelectionChangedMessage` and `StartSiteAttemptMessage` coverage through direct typed system handlers instead of legacy `GameMessage` envelope dispatch, shrinking the remaining queue-era runtime-test surface a bit further.
+- [>] Some non-migrated internal gameplay paths still rely on the legacy `GameMessage` envelope and queue as a temporary producer bridge, but that is migration debt to remove rather than a supported long-term dispatch design.
+- [>] Runtime-level queue draining and generic `GameMessage` handling still exist only so those last unmigrated envelope producers can flow into the typed dispatch switch.
 
 ## Work Items
 
@@ -381,7 +391,7 @@ Legend:
 - [done] Keep and strengthen nested inline-dispatch depth tracking and ownership restoration.
 - [done] Add debug-only semantic nested gameplay message-call stack visibility for re-entrant dispatch chains.
 - [>] Remove dependence on runtime-built internal gameplay subscriber arrays keyed by gameplay enum.
-  Migrated gameplay-message families no longer populate or use the legacy enum-keyed subscriber table, but unmigrated families still do.
+  `GameRuntime` no longer builds or uses the legacy enum-keyed gameplay subscriber table at all; only the remaining queue/envelope producer bridge still needs retirement.
 
 ### Phase 4: Host-boundary translation
 
@@ -402,7 +412,9 @@ Legend:
 
 - [done] Add compile-time gameplay trait declarations to all gameplay systems in the active system pack.
 - [>] Convert systems away from generic internal gameplay envelope subscription lists toward typed message traits.
+  Fully typed-enabled campaign flow/progression/loadout plus action/craft/economy/task-board listeners no longer keep per-system legacy-envelope trampoline overrides, and empty-subscription or single-message typed fixed-step systems now also lean on shared runtime defaults instead of local no-op overrides. Subscriber resolution itself is now compile-time-only in production runtime code; the remaining work is concentrated in the still-unmigrated envelope producers rather than already typed-enabled listeners.
 - [>] Convert systems away from large `switch (message.type)` gameplay handlers toward typed handlers.
+  The fully typed-enabled campaign flow/progression/loadout plus action/craft/economy/task-board families now rely only on direct typed `handle(...)` entrypoints, and the already typed-enabled ecology/device/inventory/modifier/weather/worker families no longer keep legacy `process_game_message(...)` trampoline switches, while other unmigrated families still retain queue-era dispatch.
 - [x] Keep host-message handling behavior intact while the internal gameplay side migrates.
 
 ### Phase 6: Internal gameplay message migration
@@ -440,6 +452,7 @@ Legend:
 ### Phase 10: Regression coverage and cleanup
 
 - [>] Add or update focused runtime/system tests that lock immediate inline typed gameplay-dispatch behavior.
+  Several runtime regression tests now call typed `handle_message(Message)` overloads directly for migrated campaign/site entrypoints, `site_system_message_flow_test.cpp` now exercises its migrated campaign/loadout families through direct typed system handlers, and the latest stabilization pass locked the startup-order and owner-guard regressions that immediate inline dispatch exposed. The shared system-test fixtures and the remaining envelope-focused regressions still need equivalent typed harness coverage.
 - [>] Add or update regression coverage for nested gameplay dispatch and ownership restoration.
   Direct semantic-stack scope coverage is now in place; deeper end-to-end ownership-restoration chains still need broader runtime/system coverage.
 - [>] Add or update regression coverage for host-message immediate translation into typed gameplay dispatch.

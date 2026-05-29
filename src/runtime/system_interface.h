@@ -35,10 +35,20 @@ public:
     [[nodiscard]] virtual std::optional<std::uint32_t> fixed_step_order() const noexcept = 0;
     [[nodiscard]] virtual Gs1Status process_game_message(
         RuntimeInvocation& invocation,
-        const GameMessage& message) = 0;
+        const GameMessage& message)
+    {
+        (void)invocation;
+        (void)message;
+        return GS1_STATUS_OK;
+    }
     [[nodiscard]] virtual Gs1Status process_host_message(
         RuntimeInvocation& invocation,
-        const Gs1HostMessage& message) = 0;
+        const Gs1HostMessage& message)
+    {
+        (void)invocation;
+        (void)message;
+        return GS1_STATUS_OK;
+    }
     virtual void run(RuntimeInvocation& invocation) = 0;
 
     [[nodiscard]] virtual std::span<const StateSetId> owned_state_sets() const noexcept

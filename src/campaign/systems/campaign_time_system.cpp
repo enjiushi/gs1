@@ -35,24 +35,6 @@ std::optional<std::uint32_t> CampaignTimeSystem::fixed_step_order() const noexce
     return 0U;
 }
 
-Gs1Status CampaignTimeSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
-}
-
-Gs1Status CampaignTimeSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
-}
-
 void CampaignTimeSystem::run(RuntimeInvocation& invocation)
 {
     if (!runtime_invocation_has_campaign(invocation))

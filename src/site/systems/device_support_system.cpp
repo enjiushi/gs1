@@ -123,24 +123,6 @@ std::optional<std::uint32_t> DeviceSupportSystem::fixed_step_order() const noexc
     return 12U;
 }
 
-Gs1Status DeviceSupportSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
-}
-
-Gs1Status DeviceSupportSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)message;
-    (void)invocation;
-    return GS1_STATUS_OK;
-}
-
 void DeviceSupportSystem::run(RuntimeInvocation& invocation)
 {
     run_system(invocation);

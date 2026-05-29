@@ -34,17 +34,6 @@ inline constexpr std::uint32_t k_api_version = 7;
 
 class RuntimeSemanticGameMessageScope;
 
-struct RuntimeGameMessageSubscriberEntry final
-{
-    IRuntimeSystem* system {nullptr};
-    std::optional<Gs1RuntimeProfileSystemId> profile_id {};
-};
-
-using RuntimeGameMessageSubscriberEntryArray =
-    std::array<
-        std::vector<RuntimeGameMessageSubscriberEntry>,
-        k_game_message_type_count>;
-
 template <typename Message>
 [[nodiscard]] constexpr std::string_view runtime_debug_type_name() noexcept
 {
@@ -208,7 +197,6 @@ private:
     GameSystems::tuple_type systems_ {};
     std::vector<FixedStepSystemEntry> fixed_step_systems_ {};
     RuntimeHostMessageSubscribers host_message_subscribers_ {};
-    RuntimeGameMessageSubscriberEntryArray message_subscribers_ {};
     TimingAccumulator phase1_timing_ {};
     TimingAccumulator phase2_timing_ {};
     TimingAccumulator fixed_step_timing_ {};
@@ -319,7 +307,6 @@ inline Gs1Status GameRuntime::dispatch_game_message_inline(const Message& messag
             print_debug_semantic_game_message_stack();
 #endif
         }
-
         assert(
             inline_game_message_depth_ <= warn_depth &&
             "Internal typed gameplay message inline dispatch depth exceeded limit 4.");

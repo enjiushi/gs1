@@ -26,10 +26,6 @@ FactionProgressState* find_faction_progress_mut(
 
 }  // namespace
 
-Gs1Status process_faction_reputation_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message);
-
 template <>
 struct system_state_tags<FactionReputationSystem>
 {
@@ -61,38 +57,9 @@ std::optional<std::uint32_t> FactionReputationSystem::fixed_step_order() const n
     return std::nullopt;
 }
 
-Gs1Status FactionReputationSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    if (!runtime_invocation_has_campaign(invocation))
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    return process_faction_reputation_message(invocation, message);
-}
-
-Gs1Status FactionReputationSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
-}
-
 void FactionReputationSystem::run(RuntimeInvocation& invocation)
 {
     (void)invocation;
 }
 
-Gs1Status process_faction_reputation_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
-}
 }  // namespace gs1

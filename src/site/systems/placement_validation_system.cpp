@@ -290,43 +290,6 @@ Gs1Status PlacementValidationSystem::handle(
     return GS1_STATUS_OK;
 }
 
-Gs1Status PlacementValidationSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    SiteWorldAccess<PlacementValidationSystem> world {invocation};
-    if (!world.has_world())
-    {
-        return GS1_STATUS_INVALID_STATE;
-    }
-
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-
-    case GameMessageType::PlacementReservationRequested:
-        return handle(invocation, message.payload_as<PlacementReservationRequestedMessage>());
-
-    case GameMessageType::PlacementReservationReleased:
-        return handle(invocation, message.payload_as<PlacementReservationReleasedMessage>());
-
-    default:
-        break;
-    }
-
-    return GS1_STATUS_OK;
-}
-
-Gs1Status PlacementValidationSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)message;
-    (void)invocation;
-    return GS1_STATUS_OK;
-}
-
 void PlacementValidationSystem::run(RuntimeInvocation& invocation)
 {
     (void)invocation;

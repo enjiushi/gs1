@@ -1071,7 +1071,7 @@ void handle_site_run_started(
     modifier_state.resolved_bureau_technology_effects = {};
 
     const auto& aura_ids = invocation.state_manager()
-                               ->state<StateSetId::CampaignLoadoutPlannerNearbyAuraModifiers>(
+                               ->query<StateSetId::CampaignLoadoutPlannerNearbyAuraModifiers>(
                                    *invocation.owned_state())
                                .value();
     modifier_state.active_nearby_aura_modifier_ids.insert(
@@ -1209,31 +1209,6 @@ std::optional<std::uint32_t> ModifierSystem::fixed_step_order() const noexcept
     return 3U;
 }
 
-Gs1Status ModifierSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-    case GameMessageType::RunModifierAwardRequested:
-        return handle(
-            invocation,
-            message.payload_as<RunModifierAwardRequestedMessage>());
-    case GameMessageType::InventoryItemUseCompleted:
-        return handle(
-            invocation,
-            message.payload_as<InventoryItemUseCompletedMessage>());
-    case GameMessageType::SiteModifierEndRequested:
-        return handle(
-            invocation,
-            message.payload_as<SiteModifierEndRequestedMessage>());
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
 Gs1Status ModifierSystem::handle(
     RuntimeInvocation& invocation,
     const SiteRunStartedMessage& message)
@@ -1284,15 +1259,6 @@ Gs1Status ModifierSystem::handle(
     }
 
     handle_site_modifier_end_requested(invocation, message);
-    return GS1_STATUS_OK;
-}
-
-Gs1Status ModifierSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)invocation;
-    (void)message;
     return GS1_STATUS_OK;
 }
 

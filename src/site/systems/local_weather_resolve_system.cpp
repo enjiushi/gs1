@@ -336,34 +336,12 @@ std::optional<std::uint32_t> LocalWeatherResolveSystem::fixed_step_order() const
     return 8U;
 }
 
-Gs1Status LocalWeatherResolveSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
 Gs1Status LocalWeatherResolveSystem::handle(
     RuntimeInvocation& invocation,
     const SiteRunStartedMessage& message)
 {
     (void)message;
     return handle_site_run_started(invocation);
-}
-
-Gs1Status LocalWeatherResolveSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)message;
-    (void)invocation;
-    return GS1_STATUS_OK;
 }
 
 void LocalWeatherResolveSystem::run(RuntimeInvocation& invocation)

@@ -412,27 +412,6 @@ std::optional<std::uint32_t> DeviceWeatherContributionSystem::fixed_step_order()
     return 7U;
 }
 
-Gs1Status DeviceWeatherContributionSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-    case GameMessageType::SiteDevicePlaced:
-        return handle(invocation, message.payload_as<SiteDevicePlacedMessage>());
-    case GameMessageType::SiteDeviceBroken:
-        return handle(invocation, message.payload_as<SiteDeviceBrokenMessage>());
-    case GameMessageType::SiteDeviceRepaired:
-        return handle(invocation, message.payload_as<SiteDeviceRepairedMessage>());
-    case GameMessageType::SiteDeviceConditionChanged:
-        return handle(invocation, message.payload_as<SiteDeviceConditionChangedMessage>());
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
 Gs1Status DeviceWeatherContributionSystem::handle(
     RuntimeInvocation& invocation,
     const SiteRunStartedMessage& message)
@@ -478,15 +457,6 @@ Gs1Status DeviceWeatherContributionSystem::handle(
     const SiteDeviceConditionChangedMessage& message)
 {
     return handle_site_device_condition_changed(invocation, message);
-}
-
-Gs1Status DeviceWeatherContributionSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)message;
-    (void)invocation;
-    return GS1_STATUS_OK;
 }
 
 void DeviceWeatherContributionSystem::run(RuntimeInvocation& invocation)

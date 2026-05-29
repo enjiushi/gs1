@@ -42,28 +42,21 @@ struct GameRuntimeProjectionTestAccess
 
 namespace
 {
-using gs1::GameMessage;
-using gs1::GameMessageType;
 using gs1::GameRuntime;
 using gs1::ProgressionEventOccurredMessage;
+using gs1::SiteRunState;
 using gs1::StartNewCampaignMessage;
 using gs1::StartSiteAttemptMessage;
 using gs1::TileCoord;
 
-GameMessage make_start_campaign_message()
+StartNewCampaignMessage make_start_campaign_message()
 {
-    GameMessage message {};
-    message.type = GameMessageType::StartNewCampaign;
-    message.set_payload(StartNewCampaignMessage {42ULL, 30U});
-    return message;
+    return StartNewCampaignMessage {42ULL, 30U};
 }
 
-GameMessage make_start_site_attempt_message(std::uint32_t site_id)
+StartSiteAttemptMessage make_start_site_attempt_message(std::uint32_t site_id)
 {
-    GameMessage message {};
-    message.type = GameMessageType::StartSiteAttempt;
-    message.set_payload(StartSiteAttemptMessage {site_id});
-    return message;
+    return StartSiteAttemptMessage {site_id};
 }
 
 Gs1HostMessage make_site_scene_ready_event()
@@ -99,11 +92,13 @@ void bootstrap_site_one(GameRuntime& runtime)
     assert(campaign_view.campaign->site_count > 0U);
 
     const auto site_id = campaign_view.campaign->sites[0].site_id;
-    assert(runtime.handle_message(make_start_site_attempt_message(site_id)) == GS1_STATUS_OK);
+    const auto start_site_status = runtime.handle_message(make_start_site_attempt_message(site_id));
+    assert(start_site_status == GS1_STATUS_OK);
 
     const auto ready_event = make_site_scene_ready_event();
     assert(runtime.submit_host_messages(&ready_event, 1U) == GS1_STATUS_OK);
     run_phase2(runtime);
+    (void)read_view(runtime);
 }
 
 void campaign_and_site_state_view_exposes_current_runtime_state()
@@ -180,13 +175,10 @@ void progression_events_update_campaign_view_and_progression_entries()
     GameRuntime runtime {create_desc};
     assert(runtime.handle_message(make_start_campaign_message()) == GS1_STATUS_OK);
 
-    GameMessage progression_message {};
-    progression_message.type = GameMessageType::ProgressionEventOccurred;
-    progression_message.set_payload(ProgressionEventOccurredMessage {
+    assert(runtime.handle_message(ProgressionEventOccurredMessage {
         gs1::k_progression_event_campaign_reputation_reward,
         0U,
-        100});
-    assert(runtime.handle_message(progression_message) == GS1_STATUS_OK);
+        100}) == GS1_STATUS_OK);
 
     const auto view = read_view(runtime);
     assert(view.has_campaign == 1U);

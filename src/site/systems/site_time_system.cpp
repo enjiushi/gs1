@@ -57,24 +57,6 @@ std::optional<std::uint32_t> SiteTimeSystem::fixed_step_order() const noexcept
     return 1U;
 }
 
-Gs1Status SiteTimeSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
-}
-
-Gs1Status SiteTimeSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
-}
-
 void SiteTimeSystem::run(RuntimeInvocation& invocation)
 {
     auto access = make_game_state_access<SiteTimeSystem>(invocation);

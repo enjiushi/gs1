@@ -252,28 +252,6 @@ std::optional<std::uint32_t> SiteCompletionSystem::fixed_step_order() const noex
     return 20U;
 }
 
-Gs1Status SiteCompletionSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::SiteAttemptEnded:
-        return handle(invocation, message.payload_as<SiteAttemptEndedMessage>());
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
-Gs1Status SiteCompletionSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
-}
-
 Gs1Status SiteCompletionSystem::handle(
     RuntimeInvocation& invocation,
     const SiteAttemptEndedMessage& message)

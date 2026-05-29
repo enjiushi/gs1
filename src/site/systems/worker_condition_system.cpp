@@ -688,23 +688,6 @@ std::optional<std::uint32_t> WorkerConditionSystem::fixed_step_order() const noe
     return 9U;
 }
 
-Gs1Status WorkerConditionSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-    case GameMessageType::WorkerMeterDeltaRequested:
-        return handle(invocation, message.payload_as<WorkerMeterDeltaRequestedMessage>());
-    case GameMessageType::InventoryItemUseCompleted:
-        return handle(invocation, message.payload_as<InventoryItemUseCompletedMessage>());
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
 Gs1Status WorkerConditionSystem::handle(
     RuntimeInvocation& invocation,
     const SiteRunStartedMessage& message)
@@ -731,15 +714,6 @@ Gs1Status WorkerConditionSystem::handle(
     const InventoryItemUseCompletedMessage& message)
 {
     return apply_worker_condition_deltas(invocation, deltas_from_item_use_completed(message));
-}
-
-Gs1Status WorkerConditionSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)invocation;
-    (void)message;
-    return GS1_STATUS_OK;
 }
 
 void WorkerConditionSystem::run(RuntimeInvocation& invocation)

@@ -32,28 +32,6 @@ std::optional<std::uint32_t> FailureRecoverySystem::fixed_step_order() const noe
     return 19U;
 }
 
-Gs1Status FailureRecoverySystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::SiteAttemptEnded:
-        return handle(invocation, message.payload_as<SiteAttemptEndedMessage>());
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
-Gs1Status FailureRecoverySystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)message;
-    (void)invocation;
-    return GS1_STATUS_OK;
-}
-
 Gs1Status FailureRecoverySystem::handle(
     RuntimeInvocation& invocation,
     const SiteAttemptEndedMessage& message)

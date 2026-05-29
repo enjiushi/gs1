@@ -324,23 +324,6 @@ std::optional<std::uint32_t> DeviceMaintenanceSystem::fixed_step_order() const n
     return 11U;
 }
 
-Gs1Status DeviceMaintenanceSystem::process_game_message(
-    RuntimeInvocation& invocation,
-    const GameMessage& message)
-{
-    switch (message.type)
-    {
-    case GameMessageType::SiteRunStarted:
-        return handle(invocation, message.payload_as<SiteRunStartedMessage>());
-    case GameMessageType::SiteDevicePlaced:
-        return handle(invocation, message.payload_as<SiteDevicePlacedMessage>());
-    case GameMessageType::SiteDeviceRepaired:
-        return handle(invocation, message.payload_as<SiteDeviceRepairedMessage>());
-    default:
-        return GS1_STATUS_OK;
-    }
-}
-
 Gs1Status DeviceMaintenanceSystem::handle(
     RuntimeInvocation& invocation,
     const SiteRunStartedMessage& message)
@@ -371,15 +354,6 @@ Gs1Status DeviceMaintenanceSystem::handle(
     }
 
     return handle_site_device_repaired(invocation, message);
-}
-
-Gs1Status DeviceMaintenanceSystem::process_host_message(
-    RuntimeInvocation& invocation,
-    const Gs1HostMessage& message)
-{
-    (void)message;
-    (void)invocation;
-    return GS1_STATUS_OK;
 }
 
 void DeviceMaintenanceSystem::run(RuntimeInvocation& invocation)

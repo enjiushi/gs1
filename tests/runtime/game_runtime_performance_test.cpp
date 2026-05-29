@@ -18,8 +18,6 @@
 namespace
 {
 using gs1::CampaignState;
-using gs1::GameMessage;
-using gs1::GameMessageType;
 using gs1::GameRuntime;
 using gs1::SiteRunState;
 using gs1::StartNewCampaignMessage;
@@ -179,20 +177,14 @@ constexpr SeededPlant kPerfSeededPlants[] {
     {gs1::PlantId {gs1::k_plant_saxaul}, TileCoord {24, 26}, 74.0f},
 };
 
-GameMessage make_start_campaign_message()
+StartNewCampaignMessage make_start_campaign_message()
 {
-    GameMessage message {};
-    message.type = GameMessageType::StartNewCampaign;
-    message.set_payload(StartNewCampaignMessage {42ULL, 30U});
-    return message;
+    return StartNewCampaignMessage {42ULL, 30U};
 }
 
-GameMessage make_start_site_attempt_message(std::uint32_t site_id)
+StartSiteAttemptMessage make_start_site_attempt_message(std::uint32_t site_id)
 {
-    GameMessage message {};
-    message.type = GameMessageType::StartSiteAttempt;
-    message.set_payload(StartSiteAttemptMessage {site_id});
-    return message;
+    return StartSiteAttemptMessage {site_id};
 }
 
 Gs1HostMessage make_site_scene_ready_event()
