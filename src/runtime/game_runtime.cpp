@@ -1204,9 +1204,7 @@ void GameRuntime::initialize_system_registry()
     }
 #endif
 
-    systems_.clear();
     fixed_step_systems_.clear();
-    systems_by_pack_index_.fill(nullptr);
     for (auto& subscribers : host_message_subscribers_)
     {
         subscribers.clear();
@@ -1218,91 +1216,33 @@ void GameRuntime::initialize_system_registry()
 
     const auto append_system = [this]<typename System>()
     {
-        auto system = std::make_unique<System>();
-        constexpr std::size_t system_index = system_pack_index_v<System, GameSystems>;
-        static_assert(system_index < GameSystems::size, "Registered runtime system must exist in GameSystems.");
-        systems_by_pack_index_[system_index] = system.get();
-        const auto fixed_step_order = runtime_fixed_step_order_for<System>(*system);
+        auto& system = std::get<System>(systems_);
+        const auto fixed_step_order = runtime_fixed_step_order_for<System>(system);
         if (fixed_step_order.has_value())
         {
             fixed_step_systems_.push_back(GameRuntime::FixedStepSystemEntry {
-                .system = system.get(),
-                .profile_id = runtime_profile_system_id_for<System>(*system),
+                .system = &system,
+                .profile_id = runtime_profile_system_id_for<System>(system),
                 .order = *fixed_step_order});
         }
-        systems_.push_back(std::move(system));
     };
 
-    append_system.template operator()<CampaignFlowSystem>();
-    append_system.template operator()<LoadoutPlannerSystem>();
-    append_system.template operator()<CampaignProgressionSystem>();
-    append_system.template operator()<TechnologySystem>();
-    append_system.template operator()<ActionExecutionSystem>();
-    append_system.template operator()<WeatherEventSystem>();
-    append_system.template operator()<WorkerConditionSystem>();
-    append_system.template operator()<EcologySystem>();
-    append_system.template operator()<PlantWeatherContributionSystem>();
-    append_system.template operator()<DeviceWeatherContributionSystem>();
-    append_system.template operator()<TaskBoardSystem>();
-    append_system.template operator()<PlacementValidationSystem>();
-    append_system.template operator()<LocalWeatherResolveSystem>();
-    append_system.template operator()<DeviceMaintenanceSystem>();
-    append_system.template operator()<InventorySystem>();
-    append_system.template operator()<CraftSystem>();
-    append_system.template operator()<EconomyPhoneSystem>();
-    append_system.template operator()<CampDurabilitySystem>();
-    append_system.template operator()<DeviceSupportSystem>();
-    append_system.template operator()<ModifierSystem>();
-    append_system.template operator()<CampaignTimeSystem>();
-    append_system.template operator()<SiteTimeSystem>();
-    append_system.template operator()<SiteFlowSystem>();
-    append_system.template operator()<FailureRecoverySystem>();
-    append_system.template operator()<SiteCompletionSystem>();
-    for (const auto& system : systems_)
+    const auto register_subscribers = [this]<typename System>()
     {
-        state_manager_.register_resolver(*system);
-        append_runtime_subscribers(host_message_subscribers_, system->subscribed_host_messages(), *system);
-    }
-
-    const auto register_message_subscribers = [this]<typename System>()
-    {
-        auto* system = find_system<System>();
-        if (system == nullptr)
-        {
-            return;
-        }
-
+        auto& system = std::get<System>(systems_);
+        state_manager_.register_resolver(system);
+        append_runtime_subscribers(
+            host_message_subscribers_,
+            system.subscribed_host_messages(),
+            system);
         append_runtime_game_message_subscribers_if_legacy<System>(
             message_subscribers_,
-            system->subscribed_game_messages(),
-            *system);
+            system.subscribed_game_messages(),
+            system);
     };
 
-    register_message_subscribers.template operator()<CampaignFlowSystem>();
-    register_message_subscribers.template operator()<LoadoutPlannerSystem>();
-    register_message_subscribers.template operator()<CampaignProgressionSystem>();
-    register_message_subscribers.template operator()<TechnologySystem>();
-    register_message_subscribers.template operator()<ActionExecutionSystem>();
-    register_message_subscribers.template operator()<WeatherEventSystem>();
-    register_message_subscribers.template operator()<WorkerConditionSystem>();
-    register_message_subscribers.template operator()<EcologySystem>();
-    register_message_subscribers.template operator()<PlantWeatherContributionSystem>();
-    register_message_subscribers.template operator()<DeviceWeatherContributionSystem>();
-    register_message_subscribers.template operator()<TaskBoardSystem>();
-    register_message_subscribers.template operator()<PlacementValidationSystem>();
-    register_message_subscribers.template operator()<LocalWeatherResolveSystem>();
-    register_message_subscribers.template operator()<DeviceMaintenanceSystem>();
-    register_message_subscribers.template operator()<InventorySystem>();
-    register_message_subscribers.template operator()<CraftSystem>();
-    register_message_subscribers.template operator()<EconomyPhoneSystem>();
-    register_message_subscribers.template operator()<CampDurabilitySystem>();
-    register_message_subscribers.template operator()<DeviceSupportSystem>();
-    register_message_subscribers.template operator()<ModifierSystem>();
-    register_message_subscribers.template operator()<CampaignTimeSystem>();
-    register_message_subscribers.template operator()<SiteTimeSystem>();
-    register_message_subscribers.template operator()<SiteFlowSystem>();
-    register_message_subscribers.template operator()<FailureRecoverySystem>();
-    register_message_subscribers.template operator()<SiteCompletionSystem>();
+    for_each_type<typename GameSystems::list>(append_system);
+    for_each_type<typename GameSystems::list>(register_subscribers);
 
     std::sort(
         fixed_step_systems_.begin(),
@@ -1848,6 +1788,23 @@ std::optional<Gs1Status> GameRuntime::dispatch_runtime_translated_host_message(
             payload.container_kind,
             0U,
             payload.companion_storage_id});
+    }
+
+    if (message.type == GS1_HOST_EVENT_SITE_MOVE_DIRECTION)
+    {
+        if (!state().site_run_meta.has_value() || site_world() == nullptr)
+        {
+            return GS1_STATUS_OK;
+        }
+
+        const auto& payload = message.payload.site_move_direction;
+        RuntimePrivilegedStateMutation privileged {state_manager_};
+        auto& move_direction = state_manager_.state<StateSetId::MoveDirection>(state());
+        move_direction.world_move_x = payload.world_move_x;
+        move_direction.world_move_y = payload.world_move_y;
+        move_direction.world_move_z = payload.world_move_z;
+        move_direction.present = true;
+        return GS1_STATUS_OK;
     }
 
     if (message.type == GS1_HOST_EVENT_SITE_CONTEXT_REQUEST)

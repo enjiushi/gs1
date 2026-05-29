@@ -345,7 +345,9 @@ Legend:
 - [done] `CampaignTimeSystem`, `DeviceSupportSystem`, `SiteFlowSystem`, and `SiteTimeSystem` now declare explicit compile-time empty `subscribed_messages` traits instead of relying on fallback empties, and the remaining lightweight `SiteRunStarted` listeners now use the same direct typed-handler routing shape as the rest of the migrated family.
 - [done] `EcologySystem` and `DeviceWeatherContributionSystem` now route their already-migrated message families through direct typed `handle(...)` paths instead of keeping duplicated legacy-envelope mutation logic inline.
 - [done] `CampDurabilitySystem`, `LocalWeatherResolveSystem`, `FailureRecoverySystem`, and `SiteCompletionSystem` now use the same direct typed-handler legacy entry routing shape as the rest of their migrated lifecycle families instead of ad hoc single-message envelope checks.
-- [>] Runtime storage now has compile-time `GameSystems` ordering and O(1) typed lookup, but primary ownership/iteration still remains runtime-polymorphic rather than tuple-backed.
+- [done] Runtime primary system ownership now lives in compile-time `GameSystems::tuple_type` storage, while fixed-step execution and subscriber registration reuse those live typed instances through the existing runtime interface.
+- [done] Runtime resolver/ownership registration now derives from compile-time `GameSystems` tuple iteration rather than a separate hand-built polymorphic registry pass.
+- [done] `PlacementModeCursorMovedMessage` now dispatches through compile-time typed subscriber resolution, so the site-context cursor follow-up no longer leaves a legacy enum-keyed subscriber-table entry behind.
 - [>] Some non-migrated internal gameplay paths still rely on the legacy `GameMessage` envelope, but that is a temporary migration state to be removed rather than a supported long-term bridge design.
 - [>] Runtime-level queue draining and generic `process_game_message(const GameMessage&)` dispatch still exist for the remaining unmigrated gameplay message families.
 
@@ -363,12 +365,12 @@ Legend:
 
 ### Phase 2: Runtime storage and registry refactor
 
-- [>] Convert runtime system ownership from the current primary runtime-polymorphic registry shape to typed tuple-backed storage.
+- [done] Convert runtime system ownership from the current primary runtime-polymorphic registry shape to typed tuple-backed storage.
 - [done] Preserve stable system ordering from the current `initialize_system_registry()` sequence.
   The `system_pack_index` helper is now corrected so the O(1) typed lookup path actually resolves the intended live runtime system instead of later pack entries.
 - [>] Rework fixed-step discovery to derive from system traits and the compile-time system pack.
-  Fixed-step registration now caches trait-backed order/profile metadata for the full active `GameSystems` pack, but the runtime still instantiates and iterates systems through the polymorphic registry.
-- [>] Rework ownership/resolver registration to derive from the compile-time system pack.
+  Fixed-step registration now caches trait-backed order/profile metadata for the full active `GameSystems` pack and builds from tuple-backed runtime storage, but the runtime still sorts the runnable list at initialization time instead of deriving a fully compile-time ordered fixed-step list.
+- [done] Rework ownership/resolver registration to derive from the compile-time system pack.
 - [>] Rework profiling registration and lookup to fit the typed system pack model.
   Typed inline dispatch, fixed-step execution, and legacy `GameMessage` profiling now consume cached compile-time profile metadata from the active system pack, while broader runtime-to-host validation still remains pending beyond the first emitted-message manifest scaffold.
 
@@ -390,10 +392,11 @@ Legend:
 - [done] The site-modifier end gameplay-action host family now translates directly in `GameRuntime` before host-subscriber fan-out.
 - [done] The economy-phone buy/sell/hire/unlock gameplay-action host family now translates directly in `GameRuntime` before host-subscriber fan-out.
 - [done] The site inventory slot-tap host path now translates directly in `GameRuntime` into `InventorySlotTappedMessage`, and `InventorySystem` no longer depends on host-subscriber registration for that request.
+- [done] The site move-direction host path now decodes directly in `GameRuntime` into the runtime-owned move-direction snapshot state, and `SiteFlowSystem` no longer depends on host-subscriber registration for movement input.
 - [done] The site context-request host path now translates directly in `GameRuntime` into either `PlacementModeCursorMovedMessage` or `CraftContextRequestedMessage` based on authoritative runtime action state, and `ActionExecutionSystem` / `CraftSystem` no longer need that host subscription path.
 - [done] The site action request/cancel host paths now translate directly in `GameRuntime` into `StartSiteActionMessage` / `CancelSiteActionMessage`, and `ActionExecutionSystem` no longer depends on host-subscriber registration for those requests.
 - [x] Keep host-message ABI transport types unchanged.
-- [>] Ensure translated host-originated gameplay work no longer depends on internal gameplay queueing.
+- [done] Ensure translated host-originated gameplay work no longer depends on internal gameplay queueing.
 
 ### Phase 5: System trait adoption
 

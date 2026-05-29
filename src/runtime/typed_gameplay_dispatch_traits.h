@@ -423,6 +423,15 @@ struct typed_gameplay_dispatch_traits<CraftContextRequestedMessage>
 };
 
 template <>
+struct typed_gameplay_dispatch_traits<PlacementModeCursorMovedMessage>
+{
+    using subscribers = typename typed_game_message_subscribers<
+        PlacementModeCursorMovedMessage,
+        GameSystems>::type;
+    static constexpr bool enabled = true;
+};
+
+template <>
 struct typed_gameplay_dispatch_traits<SiteGroundCoverPlacedMessage>
 {
     using subscribers = typename typed_game_message_subscribers<

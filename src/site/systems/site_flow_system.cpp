@@ -58,8 +58,7 @@ GameMessageSubscriptionSpan SiteFlowSystem::subscribed_game_messages() const noe
 
 HostMessageSubscriptionSpan SiteFlowSystem::subscribed_host_messages() const noexcept
 {
-    static constexpr Gs1HostMessageType subscriptions[] = {GS1_HOST_EVENT_SITE_MOVE_DIRECTION};
-    return subscriptions;
+    return {};
 }
 
 std::optional<Gs1RuntimeProfileSystemId> SiteFlowSystem::profile_system_id() const noexcept
@@ -85,24 +84,8 @@ Gs1Status SiteFlowSystem::process_host_message(
     RuntimeInvocation& invocation,
     const Gs1HostMessage& message)
 {
-    if (message.type != GS1_HOST_EVENT_SITE_MOVE_DIRECTION)
-    {
-        return GS1_STATUS_OK;
-    }
-
-    SiteWorldAccess<SiteFlowSystem> world {invocation};
-    if (!world.has_world())
-    {
-        return GS1_STATUS_OK;
-    }
-
-    auto access = make_game_state_access<SiteFlowSystem>(invocation);
-    const auto& payload = message.payload.site_move_direction;
-    auto& move_direction = access.template write<RuntimeMoveDirectionTag>();
-    move_direction.world_move_x = payload.world_move_x;
-    move_direction.world_move_y = payload.world_move_y;
-    move_direction.world_move_z = payload.world_move_z;
-    move_direction.present = true;
+    (void)invocation;
+    (void)message;
     return GS1_STATUS_OK;
 }
 

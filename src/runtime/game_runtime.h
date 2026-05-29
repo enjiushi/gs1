@@ -205,11 +205,10 @@ private:
     GameState& state_;
     RuntimeGameStateViewCache state_view_cache_ {};
     std::deque<Gs1HostMessage> host_messages_ {};
-    std::vector<std::unique_ptr<IRuntimeSystem>> systems_ {};
+    GameSystems::tuple_type systems_ {};
     std::vector<FixedStepSystemEntry> fixed_step_systems_ {};
     RuntimeHostMessageSubscribers host_message_subscribers_ {};
     RuntimeGameMessageSubscriberEntryArray message_subscribers_ {};
-    std::array<IRuntimeSystem*, GameSystems::size> systems_by_pack_index_ {};
     TimingAccumulator phase1_timing_ {};
     TimingAccumulator phase2_timing_ {};
     TimingAccumulator fixed_step_timing_ {};
@@ -407,7 +406,8 @@ inline System* GameRuntime::find_system() noexcept
 {
     constexpr std::size_t system_index = system_pack_index_v<System, GameSystems>;
     static_assert(system_index < GameSystems::size, "Requested system is not part of GameSystems.");
-    return static_cast<System*>(systems_by_pack_index_[system_index]);
+    (void)system_index;
+    return &std::get<System>(systems_);
 }
 
 template <typename Message>
