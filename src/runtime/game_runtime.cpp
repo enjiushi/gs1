@@ -1729,6 +1729,12 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
         return GS1_STATUS_INVALID_ARGUMENT;
     }
 
+    if (const auto translated_status = dispatch_runtime_translated_host_message(message);
+        translated_status.has_value())
+    {
+        return *translated_status;
+    }
+
     RuntimeInvocation invocation {*this};
     const auto& subscribers = host_message_subscribers_[host_message_type_index(message.type)];
     for (IRuntimeSystem* system : subscribers)
@@ -1747,6 +1753,46 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
     }
 
     return GS1_STATUS_OK;
+}
+
+std::optional<Gs1Status> GameRuntime::dispatch_runtime_translated_host_message(
+    const Gs1HostMessage& message)
+{
+    if (message.type != GS1_HOST_EVENT_GAMEPLAY_ACTION)
+    {
+        return std::nullopt;
+    }
+
+    const auto& action = message.payload.gameplay_action.action;
+    switch (action.type)
+    {
+    case GS1_GAMEPLAY_ACTION_START_NEW_CAMPAIGN:
+        return dispatch_game_message_inline(
+            StartNewCampaignMessage {action.arg0, static_cast<std::uint32_t>(action.arg1)});
+
+    case GS1_GAMEPLAY_ACTION_SELECT_DEPLOYMENT_SITE:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        return dispatch_game_message_inline(SelectDeploymentSiteMessage {action.target_id});
+
+    case GS1_GAMEPLAY_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
+        return dispatch_game_message_inline(ClearDeploymentSiteSelectionMessage {});
+
+    case GS1_GAMEPLAY_ACTION_START_SITE_ATTEMPT:
+        if (action.target_id == 0U)
+        {
+            return GS1_STATUS_INVALID_ARGUMENT;
+        }
+        return dispatch_game_message_inline(StartSiteAttemptMessage {action.target_id});
+
+    case GS1_GAMEPLAY_ACTION_RETURN_TO_REGIONAL_MAP:
+        return dispatch_game_message_inline(ReturnToRegionalMapMessage {});
+
+    default:
+        return std::nullopt;
+    }
 }
 
 void GameRuntime::run_fixed_step()

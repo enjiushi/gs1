@@ -23,18 +23,25 @@ template <typename System, typename... Systems>
 struct system_pack_index<System, system_pack<Systems...>>
 {
 private:
-    static constexpr std::size_t resolve() noexcept
+    template <std::size_t Index, typename First, typename... Rest>
+    static consteval std::size_t resolve_impl() noexcept
     {
-        std::size_t index = 0U;
-        bool found = false;
-        ((std::same_as<System, Systems>
-              ? (found = true, false)
-              : (++index, false)) || ...);
-        return found ? index : sizeof...(Systems);
+        if constexpr (std::same_as<System, First>)
+        {
+            return Index;
+        }
+        else if constexpr (sizeof...(Rest) == 0U)
+        {
+            return sizeof...(Systems);
+        }
+        else
+        {
+            return resolve_impl<Index + 1U, Rest...>();
+        }
     }
 
 public:
-    static constexpr std::size_t value = resolve();
+    static constexpr std::size_t value = resolve_impl<0U, Systems...>();
 };
 
 template <typename System, typename SystemPack>

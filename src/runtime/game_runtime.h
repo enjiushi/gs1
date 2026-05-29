@@ -174,6 +174,8 @@ private:
     [[nodiscard]] Gs1Status dispatch_host_messages(std::uint32_t& out_processed_count);
     [[nodiscard]] Gs1Status dispatch_queued_messages();
     [[nodiscard]] Gs1Status dispatch_subscribed_host_message(const Gs1HostMessage& message);
+    [[nodiscard]] std::optional<Gs1Status> dispatch_runtime_translated_host_message(
+        const Gs1HostMessage& message);
     [[nodiscard]] Gs1Status dispatch_subscribed_message(const GameMessage& message);
     void install_campaign_state(const CampaignState& campaign);
     void install_site_run_state(const SiteRunState& site_run);

@@ -390,9 +390,7 @@ GameMessageSubscriptionSpan CampaignFlowSystem::subscribed_game_messages() const
 
 HostMessageSubscriptionSpan CampaignFlowSystem::subscribed_host_messages() const noexcept
 {
-    static constexpr Gs1HostMessageType subscriptions[] = {
-        GS1_HOST_EVENT_GAMEPLAY_ACTION};
-    return subscriptions;
+    return {};
 }
 
 std::optional<Gs1RuntimeProfileSystemId> CampaignFlowSystem::profile_system_id() const noexcept

@@ -73,6 +73,26 @@ inline constexpr std::int32_t k_faction_reputation_step = 200;
         : &content.modifier_defs[it->second];
 }
 
+[[nodiscard]] const TokenKindDef* find_content_token_kind_def(
+    const ContentDatabase& content,
+    std::uint32_t token_kind_id) noexcept
+{
+    const auto it = content.index.token_kind_by_id.find(token_kind_id);
+    return it == content.index.token_kind_by_id.end()
+        ? nullptr
+        : &content.token_kind_defs[it->second];
+}
+
+[[nodiscard]] const TargetKindDef* find_content_target_kind_def(
+    const ContentDatabase& content,
+    std::uint32_t target_kind_id) noexcept
+{
+    const auto it = content.index.target_kind_by_id.find(target_kind_id);
+    return it == content.index.target_kind_by_id.end()
+        ? nullptr
+        : &content.target_kind_defs[it->second];
+}
+
 [[nodiscard]] std::uint32_t resolved_item_cash_points_for_validation(
     const ContentDatabase& content,
     const ItemDef& item_def) noexcept
@@ -1673,8 +1693,8 @@ std::vector<ContentValidationIssue> validate_content_database(
     if (issues.empty())
     {
         if (content.token_kind_defs.empty() ||
-            find_token_kind_def(k_progression_token_kind_total_reputation) == nullptr ||
-            find_token_kind_def(k_progression_token_kind_faction_reputation) == nullptr)
+            find_content_token_kind_def(content, k_progression_token_kind_total_reputation) == nullptr ||
+            find_content_token_kind_def(content, k_progression_token_kind_faction_reputation) == nullptr)
         {
             issues.push_back(ContentValidationIssue {
                 ContentValidationSeverity::Error,
@@ -1685,7 +1705,7 @@ std::vector<ContentValidationIssue> validate_content_database(
     if (issues.empty())
     {
         if (content.target_kind_defs.empty() ||
-            find_target_kind_def(k_progression_target_kind_technology_node) == nullptr)
+            find_content_target_kind_def(content, k_progression_target_kind_technology_node) == nullptr)
         {
             issues.push_back(ContentValidationIssue {
                 ContentValidationSeverity::Error,

@@ -42,6 +42,13 @@ struct GameRuntimeProjectionTestAccess
     {
         return runtime.message_subscribers_[static_cast<std::size_t>(type)].size();
     }
+
+    [[nodiscard]] static std::size_t host_message_subscriber_count(
+        const GameRuntime& runtime,
+        Gs1HostMessageType type)
+    {
+        return runtime.host_message_subscribers_[static_cast<std::size_t>(type)].size();
+    }
 };
 }  // namespace gs1
 
@@ -188,6 +195,39 @@ int main()
     if (!runtime.state().campaign_core.has_value())
     {
         return 9;
+    }
+
+    GameRuntime host_runtime {create_desc};
+    if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
+            host_runtime,
+            GS1_HOST_EVENT_GAMEPLAY_ACTION) != 4U)
+    {
+        return 10;
+    }
+
+    Gs1HostMessage host_message {};
+    host_message.type = GS1_HOST_EVENT_GAMEPLAY_ACTION;
+    host_message.payload.gameplay_action.action = Gs1GameplayAction {
+        GS1_GAMEPLAY_ACTION_START_NEW_CAMPAIGN,
+        0U,
+        77ULL,
+        45ULL};
+    if (host_runtime.submit_host_messages(&host_message, 1U) != GS1_STATUS_OK)
+    {
+        return 11;
+    }
+
+    Gs1Phase2Request phase2_request {};
+    phase2_request.struct_size = sizeof(Gs1Phase2Request);
+    Gs1Phase2Result phase2_result {};
+    if (host_runtime.run_phase2(phase2_request, phase2_result) != GS1_STATUS_OK)
+    {
+        return 12;
+    }
+
+    if (!host_runtime.state().campaign_core.has_value())
+    {
+        return 13;
     }
 
     return 0;
