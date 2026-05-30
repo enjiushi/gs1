@@ -48,15 +48,6 @@ using gs1::WeatherEventSystem;
 using gs1::WorkerConditionSystem;
 using namespace gs1::testing::fixtures;
 
-template <typename Payload>
-GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
-{
-    GameMessage message {};
-    message.type = type;
-    message.set_payload(payload);
-    return message;
-}
-
 constexpr std::int32_t reputation_for_progress_tier(std::uint32_t tier_index) noexcept
 {
     return static_cast<std::int32_t>(tier_index) * 200;
@@ -218,10 +209,8 @@ void weather_event_site_run_started_applies_site_one_background_conditions(
     auto site_one_context = make_site_context<WeatherEventSystem>(campaign, site_one_run, queue_one);
     auto site_two_context = make_site_context<WeatherEventSystem>(campaign, site_two_run, queue_two);
     const auto started_one = make_message(
-        GameMessageType::SiteRunStarted,
         SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
     const auto started_two = make_message(
-        GameMessageType::SiteRunStarted,
         SiteRunStartedMessage {2U, 1U, 102U, 1U, 42ULL});
 
     GS1_SYSTEM_TEST_REQUIRE(
@@ -261,7 +250,6 @@ void site_one_starting_weather_keeps_starter_plant_density_stable(
         invoke_system_message<WeatherEventSystem>(
             weather_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1701U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
     const auto& site_one_content = require_site_content(context, 1U);
 
@@ -293,7 +281,6 @@ void site_one_small_fixed_steps_keep_density_stable_without_density_reports(
     auto site_run = make_prototype_site_run(campaign, 1U);
     GameMessageQueue queue {};
     const auto started = make_message(
-        GameMessageType::SiteRunStarted,
         SiteRunStartedMessage {1U, 1702U, 101U, 1U, 42ULL});
 
     auto weather_context = make_site_context<WeatherEventSystem>(campaign, site_run, queue);
@@ -339,7 +326,6 @@ void weather_event_run_advances_active_event_through_full_lifecycle(
         invoke_system_message<WeatherEventSystem>(
             weather_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     site_run.event.active_event_template_id = gs1::EventTemplateId {1U};
@@ -403,7 +389,6 @@ void weather_event_does_not_reseed_when_event_is_already_active(
         invoke_system_message<WeatherEventSystem>(
             site_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.weather.forecast_profile_state.forecast_profile_id == 7U);
@@ -431,7 +416,6 @@ void weather_event_timeline_progress_tracks_site_clock_progress(
         invoke_system_message<WeatherEventSystem>(
             weather_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     site_run.event.active_event_template_id = gs1::EventTemplateId {1U};
@@ -469,7 +453,6 @@ void weather_event_timeline_ramp_down_smooths_weather_toward_lower_target(
         invoke_system_message<WeatherEventSystem>(
             weather_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     site_run.event.active_event_template_id = gs1::EventTemplateId {1U};
@@ -514,7 +497,6 @@ void onboarding_chain_locks_weather_to_authored_baseline_until_chain_finishes(
     GameMessageQueue queue {};
     auto weather_context = make_site_context<WeatherEventSystem>(campaign, site_run, queue, 1.0);
     const auto started = make_message(
-        GameMessageType::SiteRunStarted,
         SiteRunStartedMessage {1U, 1703U, 101U, 1U, 42ULL});
 
     GS1_SYSTEM_TEST_REQUIRE(
@@ -616,7 +598,6 @@ void weather_event_highway_objective_schedules_repeating_waves_with_one_sided_wi
         invoke_system_message<WeatherEventSystem>(
             weather_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {5U, 1U, 105U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.weather.forecast_profile_state.forecast_profile_id == 2U);
@@ -654,7 +635,6 @@ void weather_event_cash_target_objective_schedules_repeating_waves_from_target_e
         invoke_system_message<WeatherEventSystem>(
             weather_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {8U, 1U, 108U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.weather.forecast_profile_state.forecast_profile_id == 2U);
@@ -686,14 +666,17 @@ void local_weather_resolve_recomputes_full_grid_each_run(
     site_run.weather.weather_wind = 5.0f;
     site_run.weather.weather_dust = 3.0f;
 
-    GS1_SYSTEM_TEST_CHECK(context, system_subscribes_to_message<LocalWeatherResolveSystem>(GameMessageType::SiteRunStarted));
-    GS1_SYSTEM_TEST_CHECK(context, !system_subscribes_to_message<LocalWeatherResolveSystem>(GameMessageType::TileEcologyBatchChanged));
+    const bool subscribes_site_run_started =
+        system_subscribes_to_message<LocalWeatherResolveSystem, SiteRunStartedMessage>();
+    const bool subscribes_tile_ecology_batch =
+        system_subscribes_to_message<LocalWeatherResolveSystem, gs1::TileEcologyBatchChangedMessage>();
+    GS1_SYSTEM_TEST_CHECK(context, subscribes_site_run_started);
+    GS1_SYSTEM_TEST_CHECK(context, !subscribes_tile_ecology_batch);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         invoke_system_message<LocalWeatherResolveSystem>(
             site_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     run_local_weather_pipeline(campaign, site_run, queue);
@@ -921,7 +904,6 @@ void local_weather_resolve_straw_checkerboard_planting_completion_projects_wind_
         invoke_system_message<EcologySystem>(
             ecology_context,
             make_message(
-                GameMessageType::SiteTilePlantingCompleted,
                 gs1::SiteTilePlantingCompletedMessage {
                     1U,
                     3,
@@ -934,7 +916,7 @@ void local_weather_resolve_straw_checkerboard_planting_completion_projects_wind_
         make_site_context<PlantWeatherContributionSystem>(campaign, site_run, queue);
     for (const auto& message : queue)
     {
-        if (!system_subscribes_to_message<PlantWeatherContributionSystem>(message.type))
+        if (!system_subscribes_to_message<PlantWeatherContributionSystem>(message))
         {
             continue;
         }
@@ -1138,15 +1120,20 @@ void local_weather_resolve_applies_device_wind_protection_value_and_range(
     tile.device.device_efficiency = 0.5f;
     site_run.site_world->set_tile(TileCoord {2, 2}, tile);
 
-    GS1_SYSTEM_TEST_CHECK(context, !system_subscribes_to_message<LocalWeatherResolveSystem>(GameMessageType::SiteDevicePlaced));
-    GS1_SYSTEM_TEST_CHECK(context, !system_subscribes_to_message<LocalWeatherResolveSystem>(GameMessageType::SiteDeviceBroken));
-    GS1_SYSTEM_TEST_CHECK(context, !system_subscribes_to_message<LocalWeatherResolveSystem>(GameMessageType::SiteDeviceRepaired));
+    const bool subscribes_site_device_placed =
+        system_subscribes_to_message<LocalWeatherResolveSystem, gs1::SiteDevicePlacedMessage>();
+    const bool subscribes_site_device_broken =
+        system_subscribes_to_message<LocalWeatherResolveSystem, gs1::SiteDeviceBrokenMessage>();
+    const bool subscribes_site_device_repaired =
+        system_subscribes_to_message<LocalWeatherResolveSystem, gs1::SiteDeviceRepairedMessage>();
+    GS1_SYSTEM_TEST_CHECK(context, !subscribes_site_device_placed);
+    GS1_SYSTEM_TEST_CHECK(context, !subscribes_site_device_broken);
+    GS1_SYSTEM_TEST_CHECK(context, !subscribes_site_device_repaired);
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         invoke_system_message<DeviceWeatherContributionSystem>(
             device_context,
             make_message(
-                GameMessageType::SiteDevicePlaced,
                 gs1::SiteDevicePlacedMessage {
                     0U,
                     2,
@@ -1334,7 +1321,6 @@ void worker_condition_requested_delta_recomputes_cap_and_clamps_energy(
         invoke_system_message<WorkerConditionSystem>(
             site_context,
             make_message(
-                GameMessageType::WorkerMeterDeltaRequested,
                 gs1::WorkerMeterDeltaRequestedMessage {
                     1U,
                     gs1::WORKER_METER_CHANGED_HEALTH |
@@ -1570,11 +1556,11 @@ void worker_condition_run_softens_environmental_decay_when_sheltered(
     sheltered_run.weather.weather_heat = 90.0f;
     sheltered_run.weather.weather_wind = 90.0f;
     sheltered_run.weather.weather_dust = 90.0f;
-    auto sheltered_tile = sheltered_run.site_world->tile_at(TileCoord {2, 2});
-    sheltered_tile.local_weather.heat = 30.0f;
-    sheltered_tile.local_weather.wind = 30.0f;
-    sheltered_tile.local_weather.dust = 30.0f;
-    sheltered_run.site_world->set_tile(TileCoord {2, 2}, sheltered_tile);
+    auto mitigated_tile = sheltered_run.site_world->tile_at(TileCoord {2, 2});
+    mitigated_tile.local_weather.heat = 30.0f;
+    mitigated_tile.local_weather.wind = 30.0f;
+    mitigated_tile.local_weather.dust = 30.0f;
+    sheltered_run.site_world->set_tile(TileCoord {2, 2}, mitigated_tile);
 
     invoke_system_run<WorkerConditionSystem>(exposed_context);
     invoke_system_run<WorkerConditionSystem>(sheltered_context);
@@ -1836,7 +1822,6 @@ void camp_durability_resets_and_crosses_service_thresholds(gs1::testing::SystemT
         invoke_system_message<CampDurabilitySystem>(
             site_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1501U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(site_run.camp.camp_durability, 100.0f));
     GS1_SYSTEM_TEST_CHECK(context, site_run.camp.camp_protection_resolved);
@@ -1873,7 +1858,6 @@ void modifier_imports_campaign_aura_and_reacts_to_camp_changes(
         invoke_system_message<ModifierSystem>(
             site_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1601U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, site_run.modifier.active_nearby_aura_modifier_ids.size() == 2U);
     const auto initial_morale = site_run.modifier.resolved_channel_totals.morale;
@@ -1920,7 +1904,6 @@ void modifier_imports_campaign_assistant_and_scales_technology_run_modifiers_wit
         invoke_system_message<ModifierSystem>(
             site_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1602U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     const auto* imported_modifier = gs1::find_technology_node_def(

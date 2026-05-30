@@ -63,7 +63,6 @@ Gs1Status invoke_system_message(
     state.app_state = app_state;
     state.fixed_step_seconds = fixed_step_seconds;
     state.runtime_messages = runtime_messages;
-    state.message_queue = message_queue;
     state.move_direction = gs1::RuntimeMoveDirectionSnapshot {
         move_direction.world_move_x,
         move_direction.world_move_y,
@@ -92,12 +91,12 @@ Gs1Status invoke_system_message(
         move_direction.world_move_y,
         move_direction.world_move_z,
         move_direction.present,
-        active_site_run.has_value() ? active_site_run->site_world : gs1::SiteWorldHandle {}};
+        active_site_run.has_value() ? active_site_run->site_world : gs1::SiteWorldHandle {},
+        &message_queue};
     System system {};
     const auto status = system.handle(invocation, message);
     app_state = state.app_state.get();
     runtime_messages = state.runtime_messages;
-    message_queue = state.message_queue;
     if (state.campaign_core.has_value())
     {
         if (!campaign.has_value())
@@ -145,7 +144,6 @@ void run_system(
     state.app_state = app_state;
     state.fixed_step_seconds = fixed_step_seconds;
     state.runtime_messages = runtime_messages;
-    state.message_queue = message_queue;
     state.move_direction = gs1::RuntimeMoveDirectionSnapshot {
         move_direction.world_move_x,
         move_direction.world_move_y,
@@ -174,12 +172,12 @@ void run_system(
         move_direction.world_move_y,
         move_direction.world_move_z,
         move_direction.present,
-        active_site_run.has_value() ? active_site_run->site_world : gs1::SiteWorldHandle {}};
+        active_site_run.has_value() ? active_site_run->site_world : gs1::SiteWorldHandle {},
+        &message_queue};
     System system {};
     system.run(invocation);
     app_state = state.app_state.get();
     runtime_messages = state.runtime_messages;
-    message_queue = state.message_queue;
     if (state.campaign_core.has_value())
     {
         if (!campaign.has_value())

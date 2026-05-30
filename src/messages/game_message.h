@@ -5,26 +5,11 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <deque>
-#include <memory>
-#include <new>
-#include <type_traits>
+#include <vector>
+#include <variant>
 
 namespace gs1
 {
-inline constexpr std::size_t k_message_cache_line_size = 64U;
-inline constexpr std::size_t k_message_payload_byte_count = k_message_cache_line_size - sizeof(std::uint8_t);
-
-#define GS1_ASSERT_TRIVIAL_MESSAGE_TYPE(Type) \
-    static_assert(std::is_standard_layout_v<Type>, #Type " must remain standard layout."); \
-    static_assert(std::is_trivial_v<Type>, #Type " must remain trivial."); \
-    static_assert(std::is_trivially_copyable_v<Type>, #Type " must remain trivially copyable.")
-
-#define GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(Type, ExpectedSize) \
-    GS1_ASSERT_TRIVIAL_MESSAGE_TYPE(Type); \
-    static_assert(sizeof(Type) == (ExpectedSize), #Type " size changed; revisit message payload packing."); \
-    static_assert(sizeof(Type) <= k_message_payload_byte_count, #Type " exceeds the game message payload budget.")
-
 enum class GameMessageType : std::uint8_t
 {
     OpenMainMenu,
@@ -767,142 +752,135 @@ struct SiteUnlockablePurchaseRequestedMessage final
     std::uint32_t unlockable_id;
 };
 
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(OpenMainMenuMessage, 1U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(StartNewCampaignMessage, 16U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SelectDeploymentSiteMessage, 4U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ClearDeploymentSiteSelectionMessage, 1U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(DeploymentSiteSelectionChangedMessage, 4U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ProgressionEventOccurredMessage, 12U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PurchaseEntrySelectedMessage, 4U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TargetGrantedMessage, 16U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CampaignCashDeltaRequestedMessage, 4U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CampaignReputationAwardRequestedMessage, 4U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(FactionReputationAwardRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TechnologyNodeClaimRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TechnologyNodeRefundRequestedMessage, 4U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(StartSiteAttemptMessage, 4U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ReturnToRegionalMapMessage, 1U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteAttemptEndedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PresentLogMessage, 63U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteRunStartedMessage, 24U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteSceneActivatedMessage, 1U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(StartSiteActionMessage, 24U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CancelSiteActionMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteActionStartedMessage, 24U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteActionCompletedMessage, 24U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteActionFailedMessage, 24U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PlacementReservationRequestedMessage, 20U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PlacementReservationAcceptedMessage, 16U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PlacementReservationRejectedMessage, 16U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PlacementReservationReleasedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteGroundCoverPlacedMessage, 24U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTilePlantingCompletedMessage, 24U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTileWateredMessage, 20U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTileBurialClearedMessage, 20U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTileHarvestedMessage, 28U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteDevicePlacedMessage, 20U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteDeviceBrokenMessage, 24U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteDeviceRepairedMessage, 16U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteDeviceConditionChangedMessage, 20U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(WorkerMeterDeltaRequestedMessage, 36U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(WorkerMetersChangedMessage, 32U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TileEcologyChangedMessage, 28U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TileEcologyBatchEntry, 16U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TileEcologyBatchChangedMessage, 52U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(LivingPlantStabilityChangedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteTileStateChangedMessage, 44U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(RestorationProgressChangedMessage, 12U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteRefreshTickMessage, 4U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskAcceptRequestedMessage, 4U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(TaskRewardClaimRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingPurchasedMessage, 12U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingSoldMessage, 12U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryTransferCompletedMessage, 16U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemSubmittedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemUseCompletedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryCraftCompletedMessage, 16U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(EconomyMoneyAwardRequestedMessage, 4U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteUnlockableRevealRequestedMessage, 4U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(RunModifierAwardRequestedMessage, 4U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteModifierEndRequestedMessage, 4U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingPurchaseRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PhoneListingSaleRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryBatchEntry, 4U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryDeliveryBatchRequestedMessage, 44U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryWorkerPackInsertRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemUseRequestedMessage, 12U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemConsumeRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryGlobalItemConsumeRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryTransferRequestedMessage, 16U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryItemSubmitRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventorySlotTappedMessage, 16U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(CraftContextRequestedMessage, 12U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PlacementModeCursorMovedMessage, 12U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(PlacementModeCommitRejectedMessage, 24U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(InventoryCraftCommitRequestedMessage, 16U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(ContractorHireRequestedMessage, 8U);
-GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT(SiteUnlockablePurchaseRequestedMessage, 4U);
+using GameMessagePayload = std::variant<
+    OpenMainMenuMessage,
+    StartNewCampaignMessage,
+    SelectDeploymentSiteMessage,
+    ClearDeploymentSiteSelectionMessage,
+    DeploymentSiteSelectionChangedMessage,
+    ProgressionEventOccurredMessage,
+    PurchaseEntrySelectedMessage,
+    TargetGrantedMessage,
+    CampaignCashDeltaRequestedMessage,
+    CampaignReputationAwardRequestedMessage,
+    FactionReputationAwardRequestedMessage,
+    TechnologyNodeClaimRequestedMessage,
+    TechnologyNodeRefundRequestedMessage,
+    StartSiteAttemptMessage,
+    ReturnToRegionalMapMessage,
+    SiteAttemptEndedMessage,
+    PresentLogMessage,
+    SiteRunStartedMessage,
+    SiteSceneActivatedMessage,
+    StartSiteActionMessage,
+    CancelSiteActionMessage,
+    SiteActionStartedMessage,
+    SiteActionCompletedMessage,
+    SiteActionFailedMessage,
+    PlacementReservationRequestedMessage,
+    PlacementReservationAcceptedMessage,
+    PlacementReservationRejectedMessage,
+    PlacementReservationReleasedMessage,
+    SiteGroundCoverPlacedMessage,
+    SiteTilePlantingCompletedMessage,
+    SiteTileWateredMessage,
+    SiteTileBurialClearedMessage,
+    SiteTileHarvestedMessage,
+    SiteDevicePlacedMessage,
+    SiteDeviceBrokenMessage,
+    SiteDeviceRepairedMessage,
+    SiteDeviceConditionChangedMessage,
+    WorkerMeterDeltaRequestedMessage,
+    WorkerMetersChangedMessage,
+    TileEcologyChangedMessage,
+    TileEcologyBatchChangedMessage,
+    LivingPlantStabilityChangedMessage,
+    SiteTileStateChangedMessage,
+    RestorationProgressChangedMessage,
+    SiteRefreshTickMessage,
+    TaskAcceptRequestedMessage,
+    TaskRewardClaimRequestedMessage,
+    PhoneListingPurchasedMessage,
+    PhoneListingSoldMessage,
+    InventoryTransferCompletedMessage,
+    InventoryItemSubmittedMessage,
+    InventoryItemUseCompletedMessage,
+    InventoryCraftCompletedMessage,
+    EconomyMoneyAwardRequestedMessage,
+    SiteUnlockableRevealRequestedMessage,
+    RunModifierAwardRequestedMessage,
+    SiteModifierEndRequestedMessage,
+    PhoneListingPurchaseRequestedMessage,
+    PhoneListingSaleRequestedMessage,
+    InventoryDeliveryRequestedMessage,
+    InventoryDeliveryBatchRequestedMessage,
+    InventoryWorkerPackInsertRequestedMessage,
+    InventoryItemUseRequestedMessage,
+    InventoryItemConsumeRequestedMessage,
+    InventoryGlobalItemConsumeRequestedMessage,
+    InventoryTransferRequestedMessage,
+    InventoryItemSubmitRequestedMessage,
+    InventorySlotTappedMessage,
+    CraftContextRequestedMessage,
+    PlacementModeCursorMovedMessage,
+    PlacementModeCommitRejectedMessage,
+    InventoryCraftCommitRequestedMessage,
+    ContractorHireRequestedMessage,
+    SiteUnlockablePurchaseRequestedMessage>;
 
-struct alignas(k_message_cache_line_size) GameMessage final
+static_assert(
+    std::variant_size_v<GameMessagePayload> == k_game_message_type_count,
+    "GameMessageType and GameMessagePayload must stay in the same order.");
+
+struct GameMessage final
 {
-    unsigned char payload[k_message_payload_byte_count];
-    GameMessageType type;
+    GameMessageType type {GameMessageType::Count};
+    GameMessagePayload payload {};
+
+    GameMessage() = default;
+
+    template <typename PayloadData>
+    explicit GameMessage(const PayloadData& value) noexcept
+        : payload(value)
+    {
+        type = static_cast<GameMessageType>(payload.index());
+    }
 
     template <typename PayloadData>
     [[nodiscard]] PayloadData& emplace_payload() noexcept
     {
-        validate_payload_type<PayloadData>();
-        auto* ptr = std::construct_at(reinterpret_cast<PayloadData*>(payload), PayloadData {});
-        return *std::launder(ptr);
+        payload.template emplace<PayloadData>();
+        type = static_cast<GameMessageType>(payload.index());
+        return std::get<PayloadData>(payload);
     }
 
     template <typename PayloadData>
     [[nodiscard]] PayloadData& emplace_payload(const PayloadData& value) noexcept
     {
-        validate_payload_type<PayloadData>();
-        auto* ptr = std::construct_at(reinterpret_cast<PayloadData*>(payload), value);
-        return *std::launder(ptr);
+        payload.template emplace<PayloadData>(value);
+        type = static_cast<GameMessageType>(payload.index());
+        return std::get<PayloadData>(payload);
     }
 
     template <typename PayloadData>
     void set_payload(const PayloadData& value) noexcept
     {
-        (void)emplace_payload(value);
+        payload = value;
+        type = static_cast<GameMessageType>(payload.index());
     }
 
     template <typename PayloadData>
     [[nodiscard]] PayloadData& payload_as() noexcept
     {
-        validate_payload_type<PayloadData>();
-        return *std::launder(reinterpret_cast<PayloadData*>(payload));
+        return std::get<PayloadData>(payload);
     }
 
     template <typename PayloadData>
     [[nodiscard]] const PayloadData& payload_as() const noexcept
     {
-        validate_payload_type<PayloadData>();
-        return *std::launder(reinterpret_cast<const PayloadData*>(payload));
-    }
-
-private:
-    template <typename PayloadData>
-    static constexpr void validate_payload_type() noexcept
-    {
-        GS1_ASSERT_TRIVIAL_MESSAGE_TYPE(PayloadData);
-        static_assert(sizeof(PayloadData) <= k_message_payload_byte_count, "Game message payload data exceeds message payload storage.");
-        static_assert(alignof(PayloadData) <= alignof(GameMessage), "Game message payload data requires stronger alignment than GameMessage.");
+        return std::get<PayloadData>(payload);
     }
 };
 
-GS1_ASSERT_TRIVIAL_MESSAGE_TYPE(GameMessage);
-static_assert(sizeof(GameMessage) == k_message_cache_line_size, "GameMessage must fit exactly one cache line.");
-static_assert(alignof(GameMessage) == k_message_cache_line_size, "GameMessage must be cache-line aligned.");
-static_assert(offsetof(GameMessage, payload) == 0U, "GameMessage payload must start at byte zero.");
-static_assert(offsetof(GameMessage, type) == k_message_payload_byte_count, "GameMessage type must sit at the tail byte.");
-
-using GameMessageQueue = std::deque<GameMessage>;
-
-#undef GS1_ASSERT_MESSAGE_PAYLOAD_LAYOUT
-#undef GS1_ASSERT_TRIVIAL_MESSAGE_TYPE
+using GameMessageQueue = std::vector<GameMessage>;
 }  // namespace gs1

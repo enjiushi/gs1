@@ -1,7 +1,6 @@
 #pragma once
 
 #include "runtime/game_state.h"
-#include "runtime/gameplay_message_traits.h"
 #include "runtime/runtime_split_state_compat.h"
 #include "runtime/state_manager.h"
 #include "runtime/type_list.h"
@@ -103,8 +102,14 @@ class RuntimeInvocation final
 {
 public:
     explicit RuntimeInvocation(GameRuntime& runtime) noexcept;
-    explicit RuntimeInvocation(GameState& state) noexcept;
-    RuntimeInvocation(GameState& state, StateManager& state_manager, SiteWorldHandle site_world = {}) noexcept;
+    explicit RuntimeInvocation(
+        GameState& state,
+        GameMessageQueue* emitted_game_messages = nullptr) noexcept;
+    RuntimeInvocation(
+        GameState& state,
+        StateManager& state_manager,
+        SiteWorldHandle site_world = {},
+        GameMessageQueue* emitted_game_messages = nullptr) noexcept;
     RuntimeInvocation(
         GameState& state,
         StateManager& state_manager,
@@ -112,7 +117,8 @@ public:
         float move_direction_y,
         float move_direction_z,
         bool move_direction_present,
-        SiteWorldHandle site_world = {}) noexcept;
+        SiteWorldHandle site_world = {},
+        GameMessageQueue* emitted_game_messages = nullptr) noexcept;
     ~RuntimeInvocation() = default;
 
     RuntimeInvocation(const RuntimeInvocation&) = delete;
@@ -141,7 +147,6 @@ public:
     void install_campaign_state(const CampaignState& campaign);
     void install_site_run_state(const SiteRunState& site_run);
     void clear_site_run_state();
-    void push_game_message(const GameMessage& message);
     template <typename Message>
     void emit_game_message(const Message& message);
     void push_runtime_message(const Gs1RuntimeMessage& message);
@@ -160,6 +165,7 @@ private:
     double* fixed_step_seconds_ {nullptr};
     RuntimeMoveDirectionSnapshot move_direction_ {};
     SiteWorldHandle site_world_ {};
+    GameMessageQueue* emitted_game_messages_ {nullptr};
     std::deque<Gs1RuntimeMessage>* runtime_messages_ {nullptr};
 };
 

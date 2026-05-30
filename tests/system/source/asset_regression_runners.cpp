@@ -282,15 +282,6 @@ PlacementReservationRejectionReason parse_rejection_reason(
     return fallback;
 }
 
-template <typename Payload>
-GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
-{
-    GameMessage message {};
-    message.type = type;
-    message.set_payload(payload);
-    return message;
-}
-
 void inventory_regression_runner(
     gs1::testing::SystemTestExecutionContext& context,
     const gs1::testing::SystemTestAssetDocument& document)
@@ -308,7 +299,6 @@ void inventory_regression_runner(
         invoke_system_message<InventorySystem>(
             site_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {site_id, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     if (scenario == "use_item" || scenario == "transfer")
@@ -327,7 +317,6 @@ void inventory_regression_runner(
         const auto status = invoke_system_message<InventorySystem>(
             site_context,
             make_message(
-                GameMessageType::InventoryItemUseRequested,
                 gs1::InventoryItemUseRequestedMessage {
                     parse_u32(context, values, "item_id"),
                     site_run.inventory.worker_pack_storage_id,
@@ -363,7 +352,6 @@ void inventory_regression_runner(
         const auto status = invoke_system_message<InventorySystem>(
             site_context,
             make_message(
-                GameMessageType::InventoryTransferRequested,
                 gs1::InventoryTransferRequestedMessage {
                     site_run.inventory.worker_pack_storage_id,
                     site_run.inventory.worker_pack_storage_id,
@@ -407,7 +395,6 @@ void economy_phone_regression_runner(
         invoke_system_message<EconomyPhoneSystem>(
             site_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     if (scenario == "purchase_unlockable_listing")
@@ -415,7 +402,6 @@ void economy_phone_regression_runner(
         const auto status = invoke_system_message<EconomyPhoneSystem>(
             site_context,
             make_message(
-                GameMessageType::PhoneListingPurchaseRequested,
                 gs1::PhoneListingPurchaseRequestedMessage {
                     parse_u32(context, values, "listing_id"),
                     static_cast<std::uint16_t>(parse_u32(context, values, "quantity", 1U)),
@@ -438,7 +424,6 @@ void economy_phone_regression_runner(
         const auto status = invoke_system_message<EconomyPhoneSystem>(
             site_context,
             make_message(
-                GameMessageType::PhoneListingPurchaseRequested,
                 gs1::PhoneListingPurchaseRequestedMessage {
                     parse_u32(context, values, "listing_id"),
                     static_cast<std::uint16_t>(parse_u32(context, values, "quantity", 1U)),
@@ -465,7 +450,6 @@ void economy_phone_regression_runner(
         const auto status = invoke_system_message<EconomyPhoneSystem>(
             site_context,
             make_message(
-                GameMessageType::ContractorHireRequested,
                 gs1::ContractorHireRequestedMessage {
                     parse_u32(context, values, "listing_id"),
                     parse_u32(context, values, "work_units", 1U)}));
@@ -513,7 +497,6 @@ void task_board_regression_runner(
             invoke_system_message<TaskBoardSystem>(
                 site_context,
                 make_message(
-                    GameMessageType::SiteRunStarted,
                     SiteRunStartedMessage {site_id, 1U, 102U, 1U, 42ULL})) == GS1_STATUS_OK);
         GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.visible_tasks.size() == parse_u32(context, values, "expect_visible"));
         GS1_SYSTEM_TEST_CHECK(context, site_run.task_board.accepted_task_ids.size() == parse_u32(context, values, "expect_accepted"));
@@ -567,7 +550,6 @@ void placement_validation_regression_runner(
                 invoke_system_message<PlacementValidationSystem>(
                     site_context,
                     make_message(
-                        GameMessageType::PlacementReservationRequested,
                         gs1::PlacementReservationRequestedMessage {
                             parse_u32(context, values, "pre_action_id", 90U),
                             coord.x,
@@ -589,7 +571,6 @@ void placement_validation_regression_runner(
             invoke_system_message<PlacementValidationSystem>(
                 site_context,
                 make_message(
-                    GameMessageType::PlacementReservationRequested,
                     gs1::PlacementReservationRequestedMessage {
                         parse_u32(context, values, "action_id", 91U),
                         coord.x,
@@ -661,7 +642,6 @@ void ecology_regression_runner(
             invoke_system_message<EcologySystem>(
                 site_context,
                 make_message(
-                    GameMessageType::SiteTileWatered,
                     gs1::SiteTileWateredMessage {
                         parse_u32(context, values, "source_id", 1U),
                         coord.x,
@@ -699,7 +679,6 @@ void ecology_regression_runner(
             invoke_system_message<EcologySystem>(
                 site_context,
                 make_message(
-                    GameMessageType::SiteTileBurialCleared,
                     gs1::SiteTileBurialClearedMessage {
                         parse_u32(context, values, "source_id", 1U),
                         coord.x,

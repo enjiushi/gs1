@@ -464,10 +464,13 @@ RuntimeInvocation::RuntimeInvocation(GameRuntime& runtime) noexcept
 {
 }
 
-RuntimeInvocation::RuntimeInvocation(GameState& state) noexcept
+RuntimeInvocation::RuntimeInvocation(
+    GameState& state,
+    GameMessageQueue* emitted_game_messages) noexcept
     : owned_state_(&state)
     , app_state_(&state.app_state.get())
     , fixed_step_seconds_(&state.fixed_step_seconds.get())
+    , emitted_game_messages_(emitted_game_messages)
     , runtime_messages_(&state.runtime_messages)
 {
 }
@@ -475,12 +478,14 @@ RuntimeInvocation::RuntimeInvocation(GameState& state) noexcept
 RuntimeInvocation::RuntimeInvocation(
     GameState& state,
     StateManager& state_manager,
-    SiteWorldHandle site_world) noexcept
+    SiteWorldHandle site_world,
+    GameMessageQueue* emitted_game_messages) noexcept
     : owned_state_(&state)
     , state_manager_(&state_manager)
     , app_state_(&state.app_state.get())
     , fixed_step_seconds_(&state.fixed_step_seconds.get())
     , site_world_(std::move(site_world))
+    , emitted_game_messages_(emitted_game_messages)
     , runtime_messages_(&state.runtime_messages)
 {
 }
@@ -492,12 +497,14 @@ RuntimeInvocation::RuntimeInvocation(
     float move_direction_y,
     float move_direction_z,
     bool move_direction_present,
-    SiteWorldHandle site_world) noexcept
+    SiteWorldHandle site_world,
+    GameMessageQueue* emitted_game_messages) noexcept
     : owned_state_(&state)
     , state_manager_(&state_manager)
     , app_state_(&state.app_state.get())
     , fixed_step_seconds_(&state.fixed_step_seconds.get())
     , site_world_(std::move(site_world))
+    , emitted_game_messages_(emitted_game_messages)
     , runtime_messages_(&state.runtime_messages)
 {
     move_direction_ = RuntimeMoveDirectionSnapshot {
@@ -506,12 +513,6 @@ RuntimeInvocation::RuntimeInvocation(
         move_direction_z,
         move_direction_present};
     state_manager_->state<StateSetId::MoveDirection>(state) = move_direction_;
-}
-
-void RuntimeInvocation::push_game_message(const GameMessage& message)
-{
-    assert(runtime_ == nullptr);
-    owned_state_->message_queue.push_back(message);
 }
 
 void RuntimeInvocation::install_campaign_state(const CampaignState& campaign)

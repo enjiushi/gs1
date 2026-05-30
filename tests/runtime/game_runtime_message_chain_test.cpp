@@ -22,7 +22,7 @@ namespace
 {
 using gs1::CampaignState;
 using gs1::GameMessage;
-using gs1::GameMessageType;
+using gs1::GameMessageQueue;
 using gs1::GameRuntime;
 using gs1::GameState;
 using gs1::InventoryItemUseRequestedMessage;
@@ -134,10 +134,7 @@ InventoryItemUseRequestedMessage make_inventory_use_message(
 
 GameMessage make_site_attempt_ended_message(std::uint32_t site_id, Gs1SiteAttemptResult result)
 {
-    GameMessage message {};
-    message.type = GameMessageType::SiteAttemptEnded;
-    message.set_payload(gs1::SiteAttemptEndedMessage {site_id, result});
-    return message;
+    return GameMessage {gs1::SiteAttemptEndedMessage {site_id, result}};
 }
 
 std::vector<Gs1RuntimeMessage> drain_runtime_messages(GameRuntime& runtime)
@@ -186,42 +183,22 @@ void run_phase2(GameRuntime& runtime, Gs1Phase2Result& out_result)
     assert(runtime.run_phase2(request, out_result) == GS1_STATUS_OK);
 }
 
-void runtime_phase_no_longer_consumes_internal_gameplay_queue()
-{
-    Gs1RuntimeCreateDesc create_desc {};
-    create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
-    create_desc.api_version = gs1::k_api_version;
-    create_desc.fixed_step_seconds = 1.0 / 60.0;
-    create_desc.adapter_config_json_utf8 = nullptr;
-
-    GameRuntime runtime {create_desc};
-    runtime.state().message_queue.push_back(
-        make_site_attempt_ended_message(7U, GS1_SITE_ATTEMPT_RESULT_COMPLETED));
-
-    Gs1Phase2Result result {};
-    run_phase2(runtime, result);
-
-    assert(runtime.state().message_queue.size() == 1U);
-    assert(runtime.state().message_queue.front().type == GameMessageType::SiteAttemptEnded);
-    assert(runtime.state().message_queue.front().payload_as<gs1::SiteAttemptEndedMessage>().site_id == 7U);
-    assert(runtime.state().message_queue.front().payload_as<gs1::SiteAttemptEndedMessage>().result ==
-        GS1_SITE_ATTEMPT_RESULT_COMPLETED);
-}
-
-void runtime_invocation_without_runtime_still_records_legacy_fixture_queue_messages()
+void runtime_invocation_without_runtime_emits_into_explicit_test_queue()
 {
     GameState state {};
     StateManager state_manager {};
+    GameMessageQueue emitted_messages {};
     RuntimeInvocation invocation {
         state,
         state_manager,
-        SiteWorldHandle {}};
+        SiteWorldHandle {},
+        &emitted_messages};
 
     invocation.emit_game_message(SiteSceneActivatedMessage {});
 
-    assert(state.message_queue.size() == 1U);
-    assert(state.message_queue.front().type == GameMessageType::SiteSceneActivated);
-    (void)state.message_queue.front().payload_as<gs1::SiteSceneActivatedMessage>();
+    assert(emitted_messages.size() == 1U);
+    assert(emitted_messages.front().type == gs1::GameMessageType::SiteSceneActivated);
+    (void)emitted_messages.front().payload_as<gs1::SiteSceneActivatedMessage>();
 }
 
 std::vector<const Gs1RuntimeMessage*> collect_messages_of_type(
@@ -978,8 +955,7 @@ void direct_site_weather_fixture_mutation_updates_authoritative_local_weather_an
 
 int main()
 {
-    runtime_phase_no_longer_consumes_internal_gameplay_queue();
-    runtime_invocation_without_runtime_still_records_legacy_fixture_queue_messages();
+    runtime_invocation_without_runtime_emits_into_explicit_test_queue();
     site_loading_waits_for_scene_ready_before_bootstrap_and_fixed_steps();
     inventory_item_use_updates_worker_and_projection();
     inventory_use_request_keeps_singleton_projections_singular_across_immediate_and_flush_paths();

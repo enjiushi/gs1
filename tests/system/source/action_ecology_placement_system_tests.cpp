@@ -54,15 +54,6 @@ using gs1::TileCoord;
 using gs1::TileEcologyBatchChangedMessage;
 using namespace gs1::testing::fixtures;
 
-template <typename Payload>
-GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
-{
-    GameMessage message {};
-    message.type = type;
-    message.set_payload(payload);
-    return message;
-}
-
 constexpr std::int32_t reputation_for_progress_tier(std::uint32_t tier_index) noexcept
 {
     return static_cast<std::int32_t>(tier_index) * 200;
@@ -77,7 +68,6 @@ GameMessage make_start_action_message(
     std::uint8_t flags = 0U)
 {
     return make_message(
-        GameMessageType::StartSiteAction,
         gs1::StartSiteActionMessage {
             action_kind,
             flags,
@@ -650,7 +640,6 @@ void action_execution_plant_waits_for_reservation_then_starts_on_accept(
         invoke_system_message<ActionExecutionSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationAccepted,
                 PlacementReservationAcceptedMessage {action_id, 3, 3, 55U})) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.awaiting_placement_reservation);
@@ -685,7 +674,6 @@ void planting_auto_move_reaches_tile_before_action_starts(
         invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
-                GameMessageType::PlacementReservationAccepted,
                 PlacementReservationAcceptedMessage {action_id, 4, 2, 56U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.awaiting_placement_reservation);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.started_at_world_minute.has_value());
@@ -758,7 +746,6 @@ void action_execution_deferred_plant_enters_placement_mode_and_tracks_preview(
         invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
-                GameMessageType::PlacementModeCursorMoved,
                 PlacementModeCursorMovedMessage {5, 5, 0U})) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.target_tile.has_value());
@@ -883,7 +870,6 @@ void action_execution_cancel_placement_mode_clears_preview_without_failure(
         invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
-                GameMessageType::CancelSiteAction,
                 gs1::CancelSiteActionMessage {
                     0U,
                     GS1_SITE_ACTION_CANCEL_FLAG_PLACEMENT_MODE})) == GS1_STATUS_OK);
@@ -914,7 +900,6 @@ void action_execution_rejection_and_cancel_clear_action_state(
         invoke_system_message<ActionExecutionSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationRejected,
                 PlacementReservationRejectedMessage {
                     action_id,
                     4,
@@ -940,7 +925,6 @@ void action_execution_rejection_and_cancel_clear_action_state(
         invoke_system_message<ActionExecutionSystem>(
             site_context,
             make_message(
-                GameMessageType::CancelSiteAction,
                 gs1::CancelSiteActionMessage {cancel_id, GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.current_action_id.has_value());
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 2U);
@@ -1043,7 +1027,6 @@ void action_execution_plant_completion_emits_ground_cover_after_reservation(
         invoke_system_message<ActionExecutionSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationAccepted,
                 PlacementReservationAcceptedMessage {action_id, 2, 2, 77U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.awaiting_placement_reservation);
 
@@ -1504,7 +1487,7 @@ void harvest_flow_inserts_output_and_reduces_multitile_density(
     while (!queue.empty())
     {
         const auto message = queue.front();
-        queue.pop_front();
+        queue.erase(queue.begin());
         GS1_SYSTEM_TEST_CHECK(
             context,
             invoke_system_message<InventorySystem>(inventory_context, message) == GS1_STATUS_OK);
@@ -1579,7 +1562,7 @@ void harvest_last_cut_kills_low_density_plant_without_loot(
     while (!queue.empty())
     {
         const auto message = queue.front();
-        queue.pop_front();
+        queue.erase(queue.begin());
         GS1_SYSTEM_TEST_CHECK(
             context,
             invoke_system_message<InventorySystem>(inventory_context, message) == GS1_STATUS_OK);
@@ -1788,7 +1771,7 @@ void action_execution_excavate_completion_misses_or_finds_deterministic_loot(
     while (!queue.empty())
     {
         const auto message = queue.front();
-        queue.pop_front();
+        queue.erase(queue.begin());
         GS1_SYSTEM_TEST_CHECK(
             context,
             invoke_system_message<InventorySystem>(inventory_context, message) == GS1_STATUS_OK);
@@ -1829,7 +1812,7 @@ void action_execution_excavate_completion_misses_or_finds_deterministic_loot(
     while (!queue.empty())
     {
         const auto message = queue.front();
-        queue.pop_front();
+        queue.erase(queue.begin());
         GS1_SYSTEM_TEST_CHECK(
             context,
             invoke_system_message<InventorySystem>(inventory_context, message) == GS1_STATUS_OK);
@@ -1956,7 +1939,6 @@ void action_execution_shovel_in_worker_pack_reduces_plant_and_excavate_duration_
         invoke_system_message<ActionExecutionSystem>(
             baseline_context,
             make_message(
-                GameMessageType::PlacementReservationAccepted,
                 PlacementReservationAcceptedMessage {baseline_action_id, 4, 2, 101U})) == GS1_STATUS_OK);
     baseline_queue.clear();
     invoke_system_run<SiteFlowSystem>(baseline_flow_context);
@@ -1991,7 +1973,6 @@ void action_execution_shovel_in_worker_pack_reduces_plant_and_excavate_duration_
         invoke_system_message<ModifierSystem>(
             boosted_modifier_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 gs1::SiteRunStartedMessage {1U, 5202U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
     boosted_queue.clear();
 
@@ -2012,7 +1993,6 @@ void action_execution_shovel_in_worker_pack_reduces_plant_and_excavate_duration_
         invoke_system_message<ActionExecutionSystem>(
             boosted_context,
             make_message(
-                GameMessageType::PlacementReservationAccepted,
                 PlacementReservationAcceptedMessage {boosted_action_id, 4, 2, 102U})) == GS1_STATUS_OK);
     boosted_queue.clear();
     invoke_system_run<SiteFlowSystem>(boosted_flow_context);
@@ -2091,7 +2071,6 @@ void action_execution_shovel_in_worker_pack_reduces_plant_and_excavate_duration_
         invoke_system_message<ModifierSystem>(
             boosted_excavate_modifier_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 gs1::SiteRunStartedMessage {1U, 5204U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
     boosted_excavate_queue.clear();
 
@@ -2232,7 +2211,6 @@ void action_execution_item_based_plant_completion_consumes_seed_and_emits_planti
         invoke_system_message<ActionExecutionSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationAccepted,
                 PlacementReservationAcceptedMessage {action_id, 2, 2, 88U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.awaiting_placement_reservation);
 
@@ -2309,7 +2287,6 @@ void action_execution_item_based_plant_completion_rearms_placement_mode_when_see
         invoke_system_message<ActionExecutionSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationAccepted,
                 PlacementReservationAcceptedMessage {action_id, 4, 4, 92U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, !site_run.site_action.awaiting_placement_reservation);
 
@@ -2382,7 +2359,6 @@ void action_execution_item_based_plant_completion_stops_rearming_when_last_seed_
         invoke_system_message<ActionExecutionSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationAccepted,
                 PlacementReservationAcceptedMessage {action_id, 4, 4, 93U})) == GS1_STATUS_OK);
 
     auto flow_context = make_site_context<SiteFlowSystem>(campaign, site_run, queue, 60.0);
@@ -2445,7 +2421,6 @@ void action_execution_checkerboard_item_uses_2x2_placement_and_rejects_occupied_
         invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
-                GameMessageType::PlacementModeCursorMoved,
                 PlacementModeCursorMovedMessage {5, 5, 0U})) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_CHECK(context, site_run.site_action.placement_mode.target_tile.has_value());
@@ -2513,7 +2488,6 @@ void action_execution_plant_progress_tracks_fixed_step_duration(
         invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
-                GameMessageType::PlacementReservationAccepted,
                 PlacementReservationAcceptedMessage {action_id, 2, 2, 90U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     GS1_SYSTEM_TEST_CHECK(context, queue[0].type == GameMessageType::SiteActionStarted);
@@ -2586,7 +2560,6 @@ void action_execution_plant_duration_respects_small_fixed_steps(
         invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
-                GameMessageType::PlacementReservationAccepted,
                 PlacementReservationAcceptedMessage {action_id, 2, 2, 91U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_REQUIRE(context, queue.size() == 1U);
     queue.clear();
@@ -2623,7 +2596,6 @@ void placement_validation_accepts_releases_and_rejects_reserved_tiles(
     auto site_context = make_site_context<PlacementValidationSystem>(campaign, site_run, queue);
 
     const auto request = make_message(
-        GameMessageType::PlacementReservationRequested,
         gs1::PlacementReservationRequestedMessage {
             11U,
             2,
@@ -2646,7 +2618,6 @@ void placement_validation_accepts_releases_and_rejects_reserved_tiles(
         invoke_system_message<PlacementValidationSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationRequested,
                 gs1::PlacementReservationRequestedMessage {
                     12U,
                     2,
@@ -2668,7 +2639,6 @@ void placement_validation_accepts_releases_and_rejects_reserved_tiles(
         invoke_system_message<PlacementValidationSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationReleased,
                 gs1::PlacementReservationReleasedMessage {0U, token})) == GS1_STATUS_OK);
 
     GS1_SYSTEM_TEST_REQUIRE(
@@ -2676,7 +2646,6 @@ void placement_validation_accepts_releases_and_rejects_reserved_tiles(
         invoke_system_message<PlacementValidationSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationRequested,
                 gs1::PlacementReservationRequestedMessage {
                     13U,
                     2,
@@ -2707,7 +2676,6 @@ void placement_validation_rejects_blocked_and_occupied_tiles(
         invoke_system_message<PlacementValidationSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationRequested,
                 gs1::PlacementReservationRequestedMessage {
                     21U,
                     1,
@@ -2731,7 +2699,6 @@ void placement_validation_rejects_blocked_and_occupied_tiles(
         invoke_system_message<PlacementValidationSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationRequested,
                 gs1::PlacementReservationRequestedMessage {
                     22U,
                     3,
@@ -2766,7 +2733,6 @@ void placement_validation_structure_layer_handles_blocked_occupied_and_valid_til
         invoke_system_message<PlacementValidationSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationRequested,
                 gs1::PlacementReservationRequestedMessage {
                     31U,
                     5,
@@ -2790,7 +2756,6 @@ void placement_validation_structure_layer_handles_blocked_occupied_and_valid_til
         invoke_system_message<PlacementValidationSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationRequested,
                 gs1::PlacementReservationRequestedMessage {
                     32U,
                     6,
@@ -2811,7 +2776,6 @@ void placement_validation_structure_layer_handles_blocked_occupied_and_valid_til
         invoke_system_message<PlacementValidationSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationRequested,
                 gs1::PlacementReservationRequestedMessage {
                     33U,
                     1,
@@ -2837,7 +2801,6 @@ void placement_validation_living_plants_use_2x2_footprint(
         invoke_system_message<PlacementValidationSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationRequested,
                 PlacementReservationRequestedMessage {
                     41U,
                     4,
@@ -2856,7 +2819,6 @@ void placement_validation_living_plants_use_2x2_footprint(
         invoke_system_message<PlacementValidationSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationRequested,
                 PlacementReservationRequestedMessage {
                     42U,
                     5,
@@ -2877,7 +2839,6 @@ void placement_validation_living_plants_use_2x2_footprint(
         invoke_system_message<PlacementValidationSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationRequested,
                 PlacementReservationRequestedMessage {
                     43U,
                     8,
@@ -2898,7 +2859,6 @@ void placement_validation_living_plants_use_2x2_footprint(
         invoke_system_message<PlacementValidationSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationReleased,
                 gs1::PlacementReservationReleasedMessage {0U, token})) == GS1_STATUS_OK);
 
     auto occupied_tile = site_run.site_world->tile_at(TileCoord {5, 4});
@@ -2910,7 +2870,6 @@ void placement_validation_living_plants_use_2x2_footprint(
         invoke_system_message<PlacementValidationSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationRequested,
                 PlacementReservationRequestedMessage {
                     44U,
                     4,
@@ -2939,7 +2898,6 @@ void placement_validation_rejects_misaligned_multitile_requests(
         invoke_system_message<PlacementValidationSystem>(
             site_context,
             make_message(
-                GameMessageType::PlacementReservationRequested,
                 PlacementReservationRequestedMessage {
                     45U,
                     5,
@@ -2969,7 +2927,6 @@ void ecology_ground_cover_and_planting_update_tile_state(
         invoke_system_message<EcologySystem>(
             site_context,
             make_message(
-                GameMessageType::SiteGroundCoverPlaced,
                 SiteGroundCoverPlacedMessage {1U, 2, 2, 5U, 0.4f, 0U})) == GS1_STATUS_OK);
     auto tile = site_run.site_world->tile_at(TileCoord {2, 2});
     GS1_SYSTEM_TEST_CHECK(context, tile.ecology.ground_cover_type_id == 5U);
@@ -2988,7 +2945,6 @@ void ecology_ground_cover_and_planting_update_tile_state(
         invoke_system_message<EcologySystem>(
             site_context,
             make_message(
-                GameMessageType::SiteTilePlantingCompleted,
                 SiteTilePlantingCompletedMessage {
                     2U,
                     2,
@@ -3019,7 +2975,6 @@ void ecology_multitile_planting_completion_aligns_non_anchor_targets_to_footprin
         invoke_system_message<EcologySystem>(
             site_context,
             make_message(
-                GameMessageType::SiteTilePlantingCompleted,
                 SiteTilePlantingCompletedMessage {
                     3U,
                     3,
@@ -3057,7 +3012,6 @@ void ecology_watering_and_burial_clear_require_valid_targets(
         invoke_system_message<EcologySystem>(
             site_context,
             make_message(
-                GameMessageType::SiteTileWatered,
                 SiteTileWateredMessage {1U, 1, 1, 1.0f, 0U})) == GS1_STATUS_OK);
     GS1_SYSTEM_TEST_CHECK(context, queue.empty());
 
@@ -3073,7 +3027,6 @@ void ecology_watering_and_burial_clear_require_valid_targets(
         invoke_system_message<EcologySystem>(
             site_context,
             make_message(
-                GameMessageType::SiteTileWatered,
                 SiteTileWateredMessage {2U, 1, 1, 1.5f, 0U})) == GS1_STATUS_OK);
     tile = site_run.site_world->tile_at(TileCoord {1, 1});
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.moisture, 53.0f));
@@ -3089,7 +3042,6 @@ void ecology_watering_and_burial_clear_require_valid_targets(
         invoke_system_message<EcologySystem>(
             site_context,
             make_message(
-                GameMessageType::SiteTileBurialCleared,
                 SiteTileBurialClearedMessage {3U, 1, 1, 0.3f, 0U})) == GS1_STATUS_OK);
     tile = site_run.site_world->tile_at(TileCoord {1, 1});
     GS1_SYSTEM_TEST_CHECK(context, approx_equal(tile.ecology.sand_burial, 50.0f));
@@ -3253,7 +3205,6 @@ void ecology_highway_target_tiles_accumulate_cover_and_clear_via_burial_action(
         invoke_system_message<EcologySystem>(
             site_context,
             make_message(
-                GameMessageType::SiteTileBurialCleared,
                 SiteTileBurialClearedMessage {
                     1U,
                     road_coord.x,
@@ -3319,7 +3270,6 @@ void action_execution_uses_resolved_village_effect_state_for_shovel_bonuses(
         invoke_system_message<ActionExecutionSystem>(
             baseline_action_context,
             make_message(
-                GameMessageType::PlacementReservationAccepted,
                 PlacementReservationAcceptedMessage {baseline_action_id, 4, 2, 103U})) ==
             GS1_STATUS_OK);
     baseline_queue.clear();
@@ -3351,7 +3301,6 @@ void action_execution_uses_resolved_village_effect_state_for_shovel_bonuses(
         invoke_system_message<ActionExecutionSystem>(
             boosted_action_context,
             make_message(
-                GameMessageType::PlacementReservationAccepted,
                 PlacementReservationAcceptedMessage {boosted_action_id, 4, 2, 104U})) ==
             GS1_STATUS_OK);
     boosted_queue.clear();

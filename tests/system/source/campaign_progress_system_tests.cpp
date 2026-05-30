@@ -50,15 +50,6 @@ using gs1::SiteCompletionSystem;
 using gs1::SiteFlowSystem;
 using gs1::SiteTimeSystem;
 
-template <typename Payload>
-GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
-{
-    GameMessage message {};
-    message.type = type;
-    message.set_payload(payload);
-    return message;
-}
-
 constexpr std::int32_t reputation_for_progress_tier(std::uint32_t tier_index) noexcept
 {
     return static_cast<std::int32_t>(tier_index) * 200;
@@ -93,7 +84,6 @@ void campaign_flow_start_new_campaign_initializes_state(gs1::testing::SystemTest
 
 
     const auto message = make_message(
-        GameMessageType::StartNewCampaign,
         StartNewCampaignMessage {77ULL, 18U});
 
     GS1_SYSTEM_TEST_REQUIRE(
@@ -213,7 +203,6 @@ void campaign_flow_selection_paths_update_selection_and_queue(gs1::testing::Syst
 
 
     auto select_available = make_message(
-        GameMessageType::SelectDeploymentSite,
         gs1::SelectDeploymentSiteMessage {1U});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -233,7 +222,6 @@ void campaign_flow_selection_paths_update_selection_and_queue(gs1::testing::Syst
     GS1_SYSTEM_TEST_CHECK(context, queue.empty());
 
     auto clear_selection = make_message(
-        GameMessageType::ClearDeploymentSiteSelection,
         gs1::ClearDeploymentSiteSelectionMessage {});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -246,14 +234,12 @@ void campaign_flow_selection_paths_update_selection_and_queue(gs1::testing::Syst
 
     queue.clear();
     auto select_missing = make_message(
-        GameMessageType::SelectDeploymentSite,
         gs1::SelectDeploymentSiteMessage {999U});
     GS1_SYSTEM_TEST_CHECK(
         context,
         invoke_system_message<CampaignFlowSystem>(select_missing, app_state, campaign, active_site_run, queue) == GS1_STATUS_NOT_FOUND);
 
     auto select_unavailable = make_message(
-        GameMessageType::SelectDeploymentSite,
         gs1::SelectDeploymentSiteMessage {2U});
     GS1_SYSTEM_TEST_CHECK(
         context,
@@ -269,7 +255,6 @@ void campaign_flow_start_attempt_and_return_to_map(gs1::testing::SystemTestExecu
 
 
     const auto start_message = make_message(
-        GameMessageType::StartSiteAttempt,
         StartSiteAttemptMessage {1U});
 
     GS1_SYSTEM_TEST_REQUIRE(
@@ -293,7 +278,6 @@ void campaign_flow_start_attempt_and_return_to_map(gs1::testing::SystemTestExecu
 
     queue.clear();
     const auto return_message = make_message(
-        GameMessageType::ReturnToRegionalMap,
         gs1::ReturnToRegionalMapMessage {});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -316,7 +300,7 @@ void campaign_flow_completed_attempt_unblocks_visible_adjacent_sites(gs1::testin
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         invoke_system_message<CampaignFlowSystem>(
-            make_message(GameMessageType::StartSiteAttempt, StartSiteAttemptMessage {1U}),
+            make_message(StartSiteAttemptMessage {1U}),
             app_state,
             campaign,
             active_site_run,
@@ -326,7 +310,6 @@ void campaign_flow_completed_attempt_unblocks_visible_adjacent_sites(gs1::testin
     GS1_SYSTEM_TEST_REQUIRE(context, active_site_run.has_value());
 
     const auto end_message = make_message(
-        GameMessageType::SiteAttemptEnded,
         SiteAttemptEndedMessage {1U, GS1_SITE_ATTEMPT_RESULT_COMPLETED});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -376,7 +359,7 @@ void campaign_flow_failed_attempt_preserves_locked_neighbors(gs1::testing::Syste
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         invoke_system_message<CampaignFlowSystem>(
-            make_message(GameMessageType::StartSiteAttempt, StartSiteAttemptMessage {1U}),
+            make_message(StartSiteAttemptMessage {1U}),
             app_state,
             campaign,
             active_site_run,
@@ -389,7 +372,6 @@ void campaign_flow_failed_attempt_preserves_locked_neighbors(gs1::testing::Syste
         context,
         invoke_system_message<CampaignFlowSystem>(
             make_message(
-                GameMessageType::SiteAttemptEnded,
                 SiteAttemptEndedMessage {1U, GS1_SITE_ATTEMPT_RESULT_FAILED}),
             app_state,
             campaign,
@@ -455,7 +437,6 @@ void loadout_planner_tracks_selected_target_site(gs1::testing::SystemTestExecuti
     auto campaign_context = make_campaign_context(campaign);
 
     auto select_message = make_message(
-        GameMessageType::DeploymentSiteSelectionChanged,
         DeploymentSiteSelectionChangedMessage {3U});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -465,7 +446,6 @@ void loadout_planner_tracks_selected_target_site(gs1::testing::SystemTestExecuti
     GS1_SYSTEM_TEST_CHECK(context, campaign.loadout_planner_state.selected_loadout_slots.size() == 2U);
 
     auto clear_message = make_message(
-        GameMessageType::DeploymentSiteSelectionChanged,
         DeploymentSiteSelectionChangedMessage {0U});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -486,7 +466,6 @@ void loadout_planner_builds_adjacent_completed_site_support(gs1::testing::System
 
     auto campaign_context = make_campaign_context(campaign);
     auto select_message = make_message(
-        GameMessageType::DeploymentSiteSelectionChanged,
         DeploymentSiteSelectionChangedMessage {2U});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
@@ -836,7 +815,6 @@ void faction_reputation_awards_unlock_assistant_at_threshold(
         invoke_system_message<FactionReputationSystem>(
             campaign_context,
             make_message(
-                GameMessageType::FactionReputationAwardRequested,
                 gs1::FactionReputationAwardRequestedMessage {
                     gs1::k_faction_village_committee,
                     10})) == GS1_STATUS_OK);
@@ -861,7 +839,6 @@ void faction_reputation_awards_do_not_reduce_total_reputation(
         invoke_system_message<FactionReputationSystem>(
             campaign_context,
             make_message(
-                GameMessageType::FactionReputationAwardRequested,
                 gs1::FactionReputationAwardRequestedMessage {
                     gs1::k_faction_village_committee,
                     10})) == GS1_STATUS_OK);
@@ -870,7 +847,6 @@ void faction_reputation_awards_do_not_reduce_total_reputation(
         invoke_system_message<FactionReputationSystem>(
             campaign_context,
             make_message(
-                GameMessageType::FactionReputationAwardRequested,
                 gs1::FactionReputationAwardRequestedMessage {
                     gs1::k_faction_village_committee,
                     -5})) == GS1_STATUS_OK);

@@ -22,15 +22,6 @@ using gs1::StartSiteActionMessage;
 using gs1::TileCoord;
 using namespace gs1::testing::fixtures;
 
-template <typename Payload>
-GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
-{
-    GameMessage message {};
-    message.type = type;
-    message.set_payload(payload);
-    return message;
-}
-
 void craft_action_waits_for_worker_to_reach_device_range_before_starting(
     gs1::testing::SystemTestExecutionContext& context)
 {
@@ -46,7 +37,6 @@ void craft_action_waits_for_worker_to_reach_device_range_before_starting(
         invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     const auto workbench_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);
@@ -76,7 +66,6 @@ void craft_action_waits_for_worker_to_reach_device_range_before_starting(
         invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
-                GameMessageType::StartSiteAction,
                 StartSiteActionMessage {
                     GS1_SITE_ACTION_CRAFT,
                     0U,

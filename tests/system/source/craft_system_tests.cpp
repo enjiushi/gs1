@@ -35,15 +35,6 @@ using gs1::SiteRunStartedMessage;
 using gs1::TileCoord;
 using namespace gs1::testing::fixtures;
 
-template <typename Payload>
-GameMessage make_message(gs1::GameMessageType type, const Payload& payload)
-{
-    GameMessage message {};
-    message.type = type;
-    message.set_payload(payload);
-    return message;
-}
-
 constexpr std::int32_t reputation_for_progress_tier(std::uint32_t tier_index) noexcept
 {
     return static_cast<std::int32_t>(tier_index) * 200;
@@ -63,7 +54,6 @@ void action_execution_build_completion_consumes_deployable_and_emits_device_plac
         invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
     (void)gs1::inventory_storage::add_item_to_container(
         site_run,
@@ -77,7 +67,6 @@ void action_execution_build_completion_consumes_deployable_and_emits_device_plac
         invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
-                GameMessageType::StartSiteAction,
                 gs1::StartSiteActionMessage {
                     GS1_SITE_ACTION_BUILD,
                     0U,
@@ -95,7 +84,6 @@ void action_execution_build_completion_consumes_deployable_and_emits_device_plac
         invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
-                GameMessageType::PlacementReservationAccepted,
                 PlacementReservationAcceptedMessage {
                     site_run.site_action.current_action_id->value,
                     site_run.camp.camp_anchor_tile.x,
@@ -151,7 +139,6 @@ void action_execution_craft_requires_hammer_for_shovel_recipe(
         invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     const auto delivery_box = gs1::inventory_storage::delivery_box_container(site_run);
@@ -173,7 +160,6 @@ void action_execution_craft_requires_hammer_for_shovel_recipe(
         invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
-                GameMessageType::StartSiteAction,
                 gs1::StartSiteActionMessage {
                     GS1_SITE_ACTION_CRAFT,
                     4U,
@@ -202,7 +188,6 @@ void action_execution_craft_requires_hammer_for_shovel_recipe(
         invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
-                GameMessageType::StartSiteAction,
                 gs1::StartSiteActionMessage {
                     GS1_SITE_ACTION_CRAFT,
                     4U,
@@ -231,7 +216,6 @@ void inventory_craft_commit_consumes_nearby_ingredients_and_outputs_to_device_st
         invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     const auto delivery_box = gs1::inventory_storage::delivery_box_container(site_run);
@@ -257,7 +241,6 @@ void inventory_craft_commit_consumes_nearby_ingredients_and_outputs_to_device_st
         invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
-                GameMessageType::InventoryCraftCommitRequested,
                 InventoryCraftCommitRequestedMessage {
                     gs1::k_recipe_craft_storage_crate,
                     workbench_tile.x,
@@ -300,7 +283,6 @@ void inventory_craft_commit_requires_hammer_for_storage_crate_recipe(
         invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     const auto delivery_box = gs1::inventory_storage::delivery_box_container(site_run);
@@ -321,7 +303,6 @@ void inventory_craft_commit_requires_hammer_for_storage_crate_recipe(
         invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
-                GameMessageType::InventoryCraftCommitRequested,
                 InventoryCraftCommitRequestedMessage {
                     gs1::k_recipe_craft_storage_crate,
                     workbench_tile.x,
@@ -343,7 +324,6 @@ void inventory_craft_commit_crafts_hammer_from_wood_and_iron(
         invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     const auto delivery_box = gs1::inventory_storage::delivery_box_container(site_run);
@@ -364,7 +344,6 @@ void inventory_craft_commit_crafts_hammer_from_wood_and_iron(
         invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
-                GameMessageType::InventoryCraftCommitRequested,
                 InventoryCraftCommitRequestedMessage {
                     gs1::k_recipe_craft_hammer,
                     workbench_tile.x,
@@ -408,7 +387,6 @@ void craft_commit_crafts_chemistry_station_kit_from_workbench_when_unlocked(
         invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     const auto delivery_box = gs1::inventory_storage::delivery_box_container(site_run);
@@ -434,7 +412,6 @@ void craft_commit_crafts_chemistry_station_kit_from_workbench_when_unlocked(
         invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
-                GameMessageType::InventoryCraftCommitRequested,
                 InventoryCraftCommitRequestedMessage {
                     gs1::k_recipe_craft_chemistry_station,
                     workbench_tile.x,
@@ -474,7 +451,7 @@ void craft_context_omits_hammer_gated_device_recipe_without_hammer(
     auto craft_context = make_site_context<CraftSystem>(campaign, site_run, queue);
 
     const auto start_message =
-        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
+        make_message( SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         invoke_system_message<InventorySystem>(inventory_context, start_message) == GS1_STATUS_OK);
@@ -500,7 +477,6 @@ void craft_context_omits_hammer_gated_device_recipe_without_hammer(
         invoke_system_message<CraftSystem>(
             craft_context,
             make_message(
-                GameMessageType::InventoryCraftContextRequested,
                 CraftContextRequestedMessage {
                     workbench_tile.x,
                     workbench_tile.y,
@@ -533,7 +509,6 @@ void craft_context_omits_hammer_gated_device_recipe_without_hammer(
         invoke_system_message<CraftSystem>(
             craft_context,
             make_message(
-                GameMessageType::InventoryCraftContextRequested,
                 CraftContextRequestedMessage {
                     workbench_tile.x,
                     workbench_tile.y,
@@ -562,7 +537,6 @@ void craft_cache_tracks_worker_pack_membership_by_distance(
         invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     const auto item_defs = gs1::all_item_defs();
@@ -639,7 +613,6 @@ void craft_cache_skips_refresh_while_idle(
         invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     invoke_system_run<CraftSystem>(craft_context);
@@ -685,7 +658,7 @@ void craft_context_recognizes_nearby_inputs_with_64bit_item_entity_ids(
     auto craft_context = make_site_context<CraftSystem>(campaign, site_run, queue);
 
     const auto start_message =
-        make_message(GameMessageType::SiteRunStarted, SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
+        make_message( SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL});
     GS1_SYSTEM_TEST_REQUIRE(
         context,
         invoke_system_message<InventorySystem>(inventory_context, start_message) == GS1_STATUS_OK);
@@ -761,7 +734,6 @@ void craft_context_recognizes_nearby_inputs_with_64bit_item_entity_ids(
         invoke_system_message<CraftSystem>(
             craft_context,
             make_message(
-                GameMessageType::InventoryCraftContextRequested,
                 CraftContextRequestedMessage {
                     workbench_tile.x,
                     workbench_tile.y,
@@ -791,7 +763,6 @@ void dynamically_placed_storage_device_reuses_single_inventory_container(
         invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     const TileCoord target_tile {site_run.camp.camp_anchor_tile.x, site_run.camp.camp_anchor_tile.y - 1};
@@ -826,7 +797,6 @@ void dynamically_placed_storage_device_reuses_single_inventory_container(
         invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
-                GameMessageType::InventoryItemConsumeRequested,
                 InventoryItemConsumeRequestedMessage {
                     gs1::k_item_storage_crate_kit,
                     1U,
@@ -834,7 +804,6 @@ void dynamically_placed_storage_device_reuses_single_inventory_container(
                     0U})) == GS1_STATUS_OK);
 
     const auto placed_message = make_message(
-        GameMessageType::SiteDevicePlaced,
         SiteDevicePlacedMessage {
             1U,
             target_tile.x,
@@ -895,7 +864,6 @@ void repair_action_requires_hammer_and_restores_device_integrity(
         invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
-                GameMessageType::StartSiteAction,
                 gs1::StartSiteActionMessage {
                     GS1_SITE_ACTION_REPAIR,
                     4U,
@@ -926,7 +894,6 @@ void repair_action_requires_hammer_and_restores_device_integrity(
         invoke_system_message<ActionExecutionSystem>(
             action_context,
             make_message(
-                GameMessageType::StartSiteAction,
                 gs1::StartSiteActionMessage {
                     GS1_SITE_ACTION_REPAIR,
                     4U,
@@ -969,7 +936,6 @@ void storage_device_breakage_destroys_owned_storage_and_items(
         invoke_system_message<InventorySystem>(
             inventory_context,
             make_message(
-                GameMessageType::SiteRunStarted,
                 SiteRunStartedMessage {1U, 1U, 101U, 1U, 42ULL})) == GS1_STATUS_OK);
 
     const auto storage_tile = default_starter_workbench_tile(site_run.camp.camp_anchor_tile);

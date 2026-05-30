@@ -1,9 +1,7 @@
 #pragma once
 
-#include "campaign/systems/campaign_flow_system.h"
-#include "campaign/systems/campaign_time_system.h"
 #include "messages/game_message.h"
-#include "runtime/gameplay_message_traits.h"
+#include "runtime/game_systems.h"
 #include "runtime/game_state.h"
 #include "runtime/state_manager.h"
 #include "runtime/game_state_view.h"
@@ -403,7 +401,13 @@ inline void RuntimeInvocation::emit_game_message(const Message& message)
         return;
     }
 
-    push_game_message(make_game_message(message));
+    assert(
+        emitted_game_messages_ != nullptr &&
+        "Offline RuntimeInvocation emit_game_message requires an explicit test message queue.");
+    if (emitted_game_messages_ != nullptr)
+    {
+        emitted_game_messages_->emplace_back(message);
+    }
 }
 }  // namespace gs1
 

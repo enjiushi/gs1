@@ -1,6 +1,5 @@
 #pragma once
 
-#include "messages/game_message.h"
 #include "runtime/runtime_clock.h"
 #include "runtime/state_set.h"
 #include "gs1/types.h"
@@ -95,8 +94,6 @@ struct GameState final
         site_device_weather_contribution_dirty_tile_indices {};
     RuntimeSiteDeviceWeatherContributionDirtyTileMaskStateSet
         site_device_weather_contribution_dirty_tile_mask {};
-
-    GameMessageQueue message_queue {};
     std::deque<Gs1RuntimeMessage> runtime_messages {};
 };
 }  // namespace gs1
