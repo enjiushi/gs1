@@ -422,7 +422,6 @@ enum Gs1EngineMessageType : std::uint8_t
 
     GS1_ENGINE_MESSAGE_HUD_STATE = 44,
     GS1_ENGINE_MESSAGE_NOTIFICATION_PUSH = 45,
-    GS1_ENGINE_MESSAGE_SITE_RESULT_READY = 46,
     GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE = 47,
     GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES = 48
 };
@@ -569,7 +568,6 @@ struct Gs1Phase1Result
 {
     std::uint32_t struct_size;
     std::uint32_t fixed_steps_executed;
-    std::uint32_t runtime_messages_queued;
     std::uint32_t processed_host_message_count;
 };
 
@@ -583,8 +581,8 @@ struct Gs1Phase2Result
     std::uint32_t struct_size;
     std::uint32_t processed_host_message_count;
     std::uint32_t reserved0;
-    std::uint32_t runtime_messages_queued;
     std::uint32_t reserved1;
+    std::uint32_t reserved2;
 };
 
 struct Gs1EngineMessageLogTextData
@@ -1001,13 +999,6 @@ struct Gs1EngineMessageNotificationData
     char text[39];
 };
 
-struct Gs1EngineMessageSiteResultData
-{
-    std::uint32_t site_id;
-    Gs1SiteAttemptResult result;
-    std::uint16_t newly_revealed_site_count;
-};
-
 struct Gs1EngineMessageOneShotCueData
 {
     std::uint32_t subject_id;
@@ -1079,7 +1070,7 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1SiteStorageViewRequest, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1SiteContextRequestCommand, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1SiteInventorySlotTapCommand, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase1Request, 16U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase1Result, 16U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase1Result, 12U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase2Request, 4U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase2Result, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageLogTextData, 63U);
@@ -1115,7 +1106,6 @@ GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteDeviceVisualData, 32U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageHudStateData, 36U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageCampaignResourcesData, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageNotificationData, 56U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageSiteResultData, 8U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1EngineMessageOneShotCueData, 24U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1RuntimeMessage, 64U);
 
@@ -1153,7 +1143,6 @@ static_assert(sizeof(Gs1EngineMessageSiteDeviceVisualData) <= GS1_MESSAGE_PAYLOA
 static_assert(sizeof(Gs1EngineMessageHudStateData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageCampaignResourcesData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageNotificationData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
-static_assert(sizeof(Gs1EngineMessageSiteResultData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1EngineMessageOneShotCueData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
 static_assert(sizeof(Gs1RuntimeMessage) == GS1_MESSAGE_CACHE_LINE_SIZE, "Gs1RuntimeMessage must fit exactly one cache line.");
 static_assert(alignof(Gs1RuntimeMessage) == GS1_MESSAGE_CACHE_LINE_SIZE, "Gs1RuntimeMessage must be cache-line aligned.");

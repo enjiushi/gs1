@@ -460,7 +460,6 @@ RuntimeInvocation::RuntimeInvocation(GameRuntime& runtime) noexcept
     , app_state_(&runtime.state().app_state.get())
     , fixed_step_seconds_(&runtime.state().fixed_step_seconds.get())
     , site_world_(runtime.site_world_)
-    , runtime_messages_(&runtime.state().runtime_messages)
 {
 }
 
@@ -471,7 +470,6 @@ RuntimeInvocation::RuntimeInvocation(
     , app_state_(&state.app_state.get())
     , fixed_step_seconds_(&state.fixed_step_seconds.get())
     , emitted_game_messages_(emitted_game_messages)
-    , runtime_messages_(&state.runtime_messages)
 {
 }
 
@@ -486,7 +484,6 @@ RuntimeInvocation::RuntimeInvocation(
     , fixed_step_seconds_(&state.fixed_step_seconds.get())
     , site_world_(std::move(site_world))
     , emitted_game_messages_(emitted_game_messages)
-    , runtime_messages_(&state.runtime_messages)
 {
 }
 
@@ -505,7 +502,6 @@ RuntimeInvocation::RuntimeInvocation(
     , fixed_step_seconds_(&state.fixed_step_seconds.get())
     , site_world_(std::move(site_world))
     , emitted_game_messages_(emitted_game_messages)
-    , runtime_messages_(&state.runtime_messages)
 {
     move_direction_ = RuntimeMoveDirectionSnapshot {
         move_direction_x,
@@ -553,30 +549,6 @@ void RuntimeInvocation::clear_site_run_state()
     RuntimePrivilegedStateMutation privileged {*state_manager_};
     write_site_run_state_to_state_sets(std::optional<SiteRunState> {}, *owned_state_, *state_manager_);
     site_world_ = nullptr;
-}
-
-void RuntimeInvocation::push_runtime_message(const Gs1RuntimeMessage& message)
-{
-    runtime_messages_->push_back(message);
-}
-
-void RuntimeInvocation::push_log_message(Gs1LogLevel level, const char* text)
-{
-    if (text == nullptr)
-    {
-        return;
-    }
-
-    Gs1RuntimeMessage message {};
-    message.type = GS1_ENGINE_MESSAGE_LOG_TEXT;
-    auto& payload = message.emplace_payload<Gs1EngineMessageLogTextData>();
-    payload.level = level;
-    std::memset(payload.text, 0, sizeof(payload.text));
-    const auto copy_length = std::min<std::size_t>(
-        std::strlen(text),
-        sizeof(payload.text) - 1U);
-    std::memcpy(payload.text, text, copy_length);
-    push_runtime_message(message);
 }
 
 GameRuntime::GameRuntime(Gs1RuntimeCreateDesc create_desc)
@@ -874,21 +846,18 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
 
     if (!state().site_run_meta.has_value())
     {
-        out_result.runtime_messages_queued = static_cast<std::uint32_t>(state().runtime_messages.size());
         finish_phase();
         return GS1_STATUS_OK;
     }
 
     if (state().app_state.get() == GS1_APP_STATE_SITE_LOADING)
     {
-        out_result.runtime_messages_queued = static_cast<std::uint32_t>(state().runtime_messages.size());
         finish_phase();
         return GS1_STATUS_OK;
     }
 
     if (!state().site_clock.has_value())
     {
-        out_result.runtime_messages_queued = static_cast<std::uint32_t>(state().runtime_messages.size());
         finish_phase();
         return GS1_STATUS_OK;
     }
@@ -903,7 +872,6 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
     }
 
     state().move_direction = RuntimeMoveDirectionSnapshot {};
-    out_result.runtime_messages_queued = static_cast<std::uint32_t>(state().runtime_messages.size());
     finish_phase();
     return status;
 }
@@ -930,21 +898,8 @@ Gs1Status GameRuntime::run_phase2(const Gs1Phase2Request& request, Gs1Phase2Resu
         return status;
     }
 
-    out_result.runtime_messages_queued = static_cast<std::uint32_t>(state().runtime_messages.size());
     finish_phase();
     return status;
-}
-
-Gs1Status GameRuntime::pop_runtime_message(Gs1RuntimeMessage& out_message)
-{
-    if (state().runtime_messages.empty())
-    {
-        return GS1_STATUS_BUFFER_EMPTY;
-    }
-
-    out_message = state().runtime_messages.front();
-    state().runtime_messages.pop_front();
-    return GS1_STATUS_OK;
 }
 
 Gs1Status GameRuntime::get_game_state_view(Gs1GameStateView& out_view)

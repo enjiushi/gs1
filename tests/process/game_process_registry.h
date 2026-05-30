@@ -1,7 +1,6 @@
 #pragma once
 
 #include "host/runtime_dll_loader.h"
-#include "smoke_engine_host.h"
 
 #include <cstdint>
 #include <string_view>
@@ -20,7 +19,7 @@ struct GameProcessScenarioDescriptor final
     int (*run)(
         const Gs1RuntimeApi& api,
         Gs1RuntimeHandle* runtime,
-        SmokeEngineHost::LogMode log_mode,
+        bool verbose_logging,
         const GameProcessTestRunOptions& options) {nullptr};
 };
 

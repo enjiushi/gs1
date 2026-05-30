@@ -64,7 +64,7 @@ void emit_site_one_local_weather_probe_log(
         resolved_weather.wind,
         resolved_weather.dust,
         plant_density);
-    invocation.push_log_message(GS1_LOG_LEVEL_DEBUG, text);
+    (void)invocation;
 
     std::snprintf(
         text,
@@ -75,7 +75,7 @@ void emit_site_one_local_weather_probe_log(
         total_contribution.wind_protection,
         total_contribution.heat_protection,
         total_contribution.dust_protection);
-    invocation.push_log_message(GS1_LOG_LEVEL_DEBUG, text);
+    (void)invocation;
 }
 
 void ensure_local_weather_runtime_buffers(

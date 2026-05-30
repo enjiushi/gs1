@@ -173,23 +173,19 @@ bool Gs1GodotCraftPanelController::handles_engine_message(Gs1EngineMessageType t
     {
     case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
     case GS1_ENGINE_MESSAGE_SET_APP_STATE:
-    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_FAILURE:
         return true;
     default:
         return false;
     }
 }
 
-void Gs1GodotCraftPanelController::handle_engine_message(const Gs1EngineMessage& message)
+void Gs1GodotCraftPanelController::handle_engine_message(const Gs1GodotEngineMessage& message)
 {
     switch (message.type)
     {
     case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
     case GS1_ENGINE_MESSAGE_SET_APP_STATE:
         refresh_from_game_state_view();
-        break;
-    case GS1_ENGINE_MESSAGE_SITE_PLACEMENT_FAILURE:
-        placement_failure_ = message.payload_as<Gs1EngineMessagePlacementFailureData>();
         break;
     default:
         break;
@@ -203,7 +199,6 @@ void Gs1GodotCraftPanelController::handle_engine_message(const Gs1EngineMessage&
 void Gs1GodotCraftPanelController::handle_runtime_message_reset()
 {
     placement_preview_.reset();
-    placement_failure_.reset();
     craft_context_.reset();
     prune_button_registry(craft_option_buttons_, {});
     apply_panel_visibility();
@@ -216,7 +211,6 @@ void Gs1GodotCraftPanelController::refresh_from_game_state_view()
 
     if (adapter_service_ == nullptr)
     {
-        placement_failure_.reset();
         return;
     }
 
@@ -225,7 +219,6 @@ void Gs1GodotCraftPanelController::refresh_from_game_state_view()
         view.has_active_site == 0U ||
         view.active_site == nullptr)
     {
-        placement_failure_.reset();
         return;
     }
 
@@ -259,7 +252,7 @@ void Gs1GodotCraftPanelController::refresh_from_game_state_view()
 void Gs1GodotCraftPanelController::apply_panel_visibility()
 {
     const bool panel_visible =
-        (placement_preview_.has_value() || placement_failure_.has_value() || craft_context_.has_value());
+        (placement_preview_.has_value() || craft_context_.has_value());
     if (panel_ != nullptr)
     {
         panel_->set_visible(panel_visible);
@@ -285,16 +278,6 @@ void Gs1GodotCraftPanelController::update_craft_summary()
             preview.tile_x,
             preview.tile_y,
             static_cast<int>(preview.blocked_mask)));
-    }
-
-    if (placement_failure_.has_value())
-    {
-        const auto& failure = placement_failure_.value();
-        lines.push_back(vformat(
-            "Placement Failure: tile (%d, %d) flags %d",
-            failure.tile_x,
-            failure.tile_y,
-            static_cast<int>(failure.flags)));
     }
 
     if (craft_context_.has_value())

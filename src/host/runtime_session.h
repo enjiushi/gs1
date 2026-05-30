@@ -41,8 +41,6 @@ public:
     [[nodiscard]] bool submit_site_context_request(const Gs1SiteContextRequestCommand& command);
     [[nodiscard]] bool submit_site_inventory_slot_tap(const Gs1SiteInventorySlotTapCommand& command);
     [[nodiscard]] bool submit_site_scene_ready();
-    [[nodiscard]] bool pop_runtime_message(Gs1RuntimeMessage& out_message);
-    [[nodiscard]] bool pop_engine_message(Gs1EngineMessage& out_message);
     [[nodiscard]] bool get_game_state_view(Gs1GameStateView& out_view);
     [[nodiscard]] bool query_site_tile_view(std::uint32_t tile_index, Gs1SiteTileView& out_tile);
 

@@ -51,7 +51,7 @@ void emit_site_one_weather_probe_log(
         wind,
         dust,
         wind_direction_degrees);
-    invocation.push_log_message(payload.level, payload.text);
+    (void)invocation;
 }
 
 struct SiteBaselineWeather final

@@ -10,7 +10,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <deque>
 #include <optional>
 #include <span>
 #include <type_traits>
@@ -135,22 +134,11 @@ public:
     [[nodiscard]] SiteWorld* site_world() noexcept { return site_world_.get(); }
     [[nodiscard]] const SiteWorld* site_world() const noexcept { return site_world_.get(); }
     [[nodiscard]] const SiteWorldHandle& site_world_handle() const noexcept { return site_world_; }
-    [[nodiscard]] std::deque<Gs1RuntimeMessage>& runtime_message_queue() noexcept
-    {
-        return *runtime_messages_;
-    }
-    [[nodiscard]] const std::deque<Gs1RuntimeMessage>& runtime_message_queue() const noexcept
-    {
-        return *runtime_messages_;
-    }
-
     void install_campaign_state(const CampaignState& campaign);
     void install_site_run_state(const SiteRunState& site_run);
     void clear_site_run_state();
     template <typename Message>
     void emit_game_message(const Message& message);
-    void push_runtime_message(const Gs1RuntimeMessage& message);
-    void push_log_message(Gs1LogLevel level, const char* text);
 
 private:
     template <class Tag>
@@ -166,7 +154,6 @@ private:
     RuntimeMoveDirectionSnapshot move_direction_ {};
     SiteWorldHandle site_world_ {};
     GameMessageQueue* emitted_game_messages_ {nullptr};
-    std::deque<Gs1RuntimeMessage>* runtime_messages_ {nullptr};
 };
 
 template <class Tag>

@@ -4,8 +4,6 @@
 #include "runtime/state_set.h"
 #include "gs1/types.h"
 
-#include <deque>
-
 namespace gs1
 {
 struct GameState final
@@ -94,6 +92,5 @@ struct GameState final
         site_device_weather_contribution_dirty_tile_indices {};
     RuntimeSiteDeviceWeatherContributionDirtyTileMaskStateSet
         site_device_weather_contribution_dirty_tile_mask {};
-    std::deque<Gs1RuntimeMessage> runtime_messages {};
 };
 }  // namespace gs1

@@ -12,8 +12,6 @@ public:
     using subscribed_messages = type_list<
         SiteRunStartedMessage,
         SiteAttemptEndedMessage>;
-    using emitted_runtime_messages =
-        type_list<runtime_message_type_constant<GS1_ENGINE_MESSAGE_LOG_TEXT>>;
     static constexpr std::optional<Gs1RuntimeProfileSystemId> profile_id =
         GS1_RUNTIME_PROFILE_SYSTEM_WEATHER_EVENT;
     static constexpr std::optional<std::uint32_t> fixed_step_order_value = 4U;

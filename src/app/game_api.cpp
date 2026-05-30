@@ -178,18 +178,6 @@ Gs1Status gs1_run_phase2(
     return runtime->runtime.run_phase2(*request, *out_result);
 }
 
-Gs1Status gs1_pop_runtime_message(
-    Gs1RuntimeHandle* runtime,
-    Gs1RuntimeMessage* out_message) GS1_NOEXCEPT
-{
-    if (runtime == nullptr || out_message == nullptr)
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    return runtime->runtime.pop_runtime_message(*out_message);
-}
-
 Gs1Status gs1_get_game_state_view(
     Gs1RuntimeHandle* runtime,
     Gs1GameStateView* out_view) GS1_NOEXCEPT

@@ -754,7 +754,7 @@ void emit_plant_density_changed_log(
         coord.y,
         previous_density,
         next_density);
-    invocation.push_log_message(payload.level, payload.text);
+    (void)invocation;
 }
 
 void emit_site_one_startup_probe_log(
@@ -780,7 +780,7 @@ void emit_site_one_startup_probe_log(
         coord.y,
         ecology.plant_id.value,
         ecology.plant_density);
-    invocation.push_log_message(payload.level, payload.text);
+    (void)invocation;
 }
 
 void emit_site_one_ecology_probe_log(
@@ -809,7 +809,7 @@ void emit_site_one_ecology_probe_log(
         density_delta,
         growth_pressure,
         effective_wind);
-    invocation.push_log_message(payload.level, payload.text);
+    (void)invocation;
 }
 
 bool density_crosses_report_threshold(

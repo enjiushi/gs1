@@ -20,7 +20,7 @@ void ui_action_string_payload_parses()
 
     assert(ok);
     assert(error.empty());
-    assert(command.kind == Gs1GodotDebugHttpCommandKind::UiAction);
+    assert(command.kind == Gs1GodotDebugHttpCommandKind::GameplayAction);
     assert(command.action_type == GS1_UI_ACTION_START_NEW_CAMPAIGN);
     assert(command.target_id == 7);
     assert(command.arg0 == 11);

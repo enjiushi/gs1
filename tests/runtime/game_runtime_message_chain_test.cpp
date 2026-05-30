@@ -229,8 +229,7 @@ void assert_singleton_projection_messages_do_not_repeat(const std::vector<Gs1Run
         GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE,
         GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE,
         GS1_ENGINE_MESSAGE_SITE_PHONE_PANEL_STATE,
-        GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE,
-        GS1_ENGINE_MESSAGE_SITE_RESULT_READY};
+        GS1_ENGINE_MESSAGE_SITE_PROTECTION_OVERLAY_STATE};
 
     for (const auto type : k_singleton_projection_types)
     {

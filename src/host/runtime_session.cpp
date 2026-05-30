@@ -329,43 +329,6 @@ bool Gs1RuntimeSession::submit_site_scene_ready()
     return true;
 }
 
-bool Gs1RuntimeSession::pop_runtime_message(Gs1RuntimeMessage& out_message)
-{
-    if (runtime_ == nullptr)
-    {
-        last_error_ = "Runtime session is not running.";
-        return false;
-    }
-
-    const Gs1RuntimeApi& api = loader_.api();
-    if (api.pop_runtime_message == nullptr)
-    {
-        last_error_ = "Gameplay DLL is missing runtime message entry points.";
-        return false;
-    }
-
-    out_message = {};
-    const Gs1Status status = api.pop_runtime_message(runtime_, &out_message);
-    if (status == GS1_STATUS_OK)
-    {
-        last_error_.clear();
-        return true;
-    }
-    if (status == GS1_STATUS_BUFFER_EMPTY)
-    {
-        last_error_.clear();
-        return false;
-    }
-
-    last_error_ = "gs1_pop_runtime_message failed with status " + std::to_string(static_cast<unsigned>(status));
-    return false;
-}
-
-bool Gs1RuntimeSession::pop_engine_message(Gs1EngineMessage& out_message)
-{
-    return pop_runtime_message(out_message);
-}
-
 bool Gs1RuntimeSession::get_game_state_view(Gs1GameStateView& out_view)
 {
     if (runtime_ == nullptr)

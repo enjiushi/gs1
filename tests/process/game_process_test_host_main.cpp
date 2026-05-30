@@ -2,16 +2,44 @@
 
 #include "host/adapter_metadata_catalog.h"
 #include "host/runtime_dll_loader.h"
-#include "smoke_log.h"
 
 #include <cstdlib>
 #include <filesystem>
+#include <cstdio>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
 namespace
 {
+std::ofstream g_log_stream {};
+
+void write_process_log(FILE* stream, const std::string& text)
+{
+    if (stream != nullptr)
+    {
+        std::fputs(text.c_str(), stream);
+        std::fflush(stream);
+    }
+    if (g_log_stream.is_open())
+    {
+        g_log_stream << text;
+        g_log_stream.flush();
+    }
+}
+
+void process_info(const std::string& text)
+{
+    write_process_log(stdout, text);
+}
+
+void process_error(const std::string& text)
+{
+    write_process_log(stderr, text);
+}
+
 struct HostOptions final
 {
     std::filesystem::path dll_path {};
@@ -159,9 +187,10 @@ bool create_runtime(
     const Gs1Status status = api.create_runtime(&create_desc, &out_runtime);
     if (status != GS1_STATUS_OK || out_runtime == nullptr)
     {
-        smoke_log::errorf(
-            "Failed to create gameplay runtime for process tests (status=%d).\n",
-            static_cast<int>(status));
+        process_error(
+            "Failed to create gameplay runtime for process tests (status=" +
+            std::to_string(static_cast<int>(status)) +
+            ").\n");
         return false;
     }
 
@@ -215,33 +244,30 @@ int main(int argc, char** argv)
     }
 
     const auto log_path = repo_root / "out" / "logs" / "game_process_test_host_latest.log";
-    const bool logging_ready = smoke_log::initialize_file_sink(log_path);
-    if (!logging_ready)
+    g_log_stream.open(log_path, std::ios::out | std::ios::trunc);
+    if (!g_log_stream.is_open())
     {
-        smoke_log::errorf("Failed to open log file: %s\n", log_path.string().c_str());
+        process_error("Failed to open log file: " + log_path.string() + "\n");
     }
     else
     {
-        smoke_log::infof("Writing game-process test log to %s\n", log_path.string().c_str());
+        process_info("Writing game-process test log to " + log_path.string() + "\n");
     }
 
     RuntimeDllLoader loader {};
     if (!loader.load(options.dll_path.c_str()))
     {
-        smoke_log::errorf("%s\n", loader.last_error().c_str());
-        smoke_log::shutdown_file_sink();
+        process_error(loader.last_error() + "\n");
+        g_log_stream.close();
         return 1;
     }
 
     const auto& api = loader.api();
-    const auto log_mode = options.verbose_logging
-        ? SmokeEngineHost::LogMode::Verbose
-        : SmokeEngineHost::LogMode::ActivityOnly;
 
     bool succeeded = true;
     for (const auto& scenario : selected_scenarios)
     {
-        smoke_log::infof("[PROCESS] starting scenario=%s\n", scenario.name);
+        process_info(std::string("[PROCESS] starting scenario=") + scenario.name + "\n");
 
         Gs1RuntimeHandle* runtime = nullptr;
         if (!create_runtime(api, repo_root, runtime))
@@ -250,19 +276,21 @@ int main(int argc, char** argv)
             break;
         }
 
-        const int exit_code = scenario.run(api, runtime, log_mode, options.run_options);
+        const int exit_code = scenario.run(api, runtime, options.verbose_logging, options.run_options);
         api.destroy_runtime(runtime);
 
         if (exit_code != 0)
         {
-            smoke_log::errorf("[PROCESS] scenario=%s failed with exit code %d\n", scenario.name, exit_code);
+            process_error(
+                std::string("[PROCESS] scenario=") + scenario.name +
+                " failed with exit code " + std::to_string(exit_code) + "\n");
             succeeded = false;
             break;
         }
 
-        smoke_log::infof("[PROCESS] scenario=%s passed\n", scenario.name);
+        process_info(std::string("[PROCESS] scenario=") + scenario.name + " passed\n");
     }
 
-    smoke_log::shutdown_file_sink();
+    g_log_stream.close();
     return succeeded ? 0 : 1;
 }

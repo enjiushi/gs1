@@ -70,6 +70,7 @@ private:
         std::unordered_map<std::uint64_t, ProjectedButtonRecord>& registry,
         const std::unordered_set<std::uint64_t>& desired_keys);
     [[nodiscard]] godot::String protection_mode_label(Gs1GodotProtectionOverlayMode mode) const;
+    void refresh_site_result_from_game_state_view();
     [[nodiscard]] godot::String site_result_text() const;
 
     godot::Control* owner_control_ {nullptr};
@@ -88,5 +89,12 @@ private:
     SubmitGameplayActionFn submit_gameplay_action_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> protection_selector_buttons_registry_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> site_result_buttons_registry_ {};
-    std::optional<Gs1EngineMessageSiteResultData> site_result_ {};
+    struct SiteResultView final
+    {
+        std::uint32_t site_id {0U};
+        Gs1SiteAttemptResult result {GS1_SITE_ATTEMPT_RESULT_NONE};
+        std::uint16_t newly_revealed_site_count {0U};
+    };
+
+    std::optional<SiteResultView> site_result_ {};
 };

@@ -231,35 +231,6 @@ gs1_enable_internal_pch(gs1_game)
 if(GS1_BUILD_TESTS)
     enable_testing()
 
-    set(GS1_SMOKE_HOST_COMMON_SOURCES
-        tests/smoke/smoke_engine_host.cpp
-        tests/smoke/smoke_log.cpp
-        tests/smoke/smoke_live_state_json.cpp
-        tests/smoke/visual_smoke_silent_onboarding.cpp
-        ${GS1_CONTENT_RUNTIME_SOURCES})
-
-    add_library(gs1_smoke_support STATIC
-        ${GS1_SMOKE_HOST_COMMON_SOURCES})
-
-    target_include_directories(gs1_smoke_support
-        PUBLIC
-            ${CMAKE_CURRENT_SOURCE_DIR}/include
-            ${CMAKE_CURRENT_SOURCE_DIR}/src
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/smoke
-        PRIVATE
-            ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
-
-    target_compile_definitions(gs1_smoke_support
-        PRIVATE
-            ${GS1_CONTENT_TABLE_DIR_DEFINITION})
-
-    target_link_libraries(gs1_smoke_support
-        PRIVATE
-            gs1_host_bridge
-            flecs)
-
-    gs1_enable_strict_warnings(gs1_smoke_support)
-
     add_library(gs1_system_test_suite OBJECT
         src/testing/system_test_asset.cpp
         src/testing/system_test_registry.cpp
@@ -283,18 +254,6 @@ if(GS1_BUILD_TESTS)
 
     gs1_enable_strict_warnings(gs1_system_test_suite)
     gs1_enable_internal_pch(gs1_system_test_suite)
-
-    # Build the text smoke host executable separately from the DLL.
-    # This executable loads the gameplay DLL at runtime instead of linking to it.
-    add_executable(gs1_smoke_host
-        tests/smoke/smoke_host_main.cpp
-        tests/smoke/smoke_script_runner.cpp)
-
-    # Build the live visual smoke host in parallel to the text smoke host.
-    # This host is a manual visual adapter and is not part of the script-driven smoke test path.
-    add_executable(gs1_visual_smoke_host
-        tests/smoke/visual_smoke_host_main.cpp
-        tests/smoke/smoke_live_http_server.cpp)
 
     add_executable(gs1_game_process_test_host
         tests/process/game_process_test_host_main.cpp
@@ -320,20 +279,8 @@ if(GS1_BUILD_TESTS)
     add_executable(gs1_godot_regional_site_selection_policy_test
         tests/runtime/godot_regional_site_selection_policy_test.cpp)
 
-    add_executable(gs1_runtime_message_chain_test
-        tests/runtime/game_runtime_message_chain_test.cpp)
-
     add_executable(gs1_runtime_semantic_message_stack_test
         tests/runtime/game_runtime_semantic_message_stack_test.cpp)
-
-    add_executable(gs1_runtime_system_trait_metadata_test
-        tests/runtime/runtime_system_trait_metadata_test.cpp)
-
-    add_executable(gs1_timed_modifier_projection_test
-        tests/runtime/timed_modifier_projection_test.cpp)
-
-    add_executable(gs1_site_system_message_flow_test
-        tests/runtime/site_system_message_flow_test.cpp)
 
     add_executable(gs1_state_manager_test
         tests/runtime/state_manager_test.cpp)
@@ -341,15 +288,7 @@ if(GS1_BUILD_TESTS)
     add_executable(gs1_local_weather_perf_probe
         tests/runtime/local_weather_perf_probe.cpp)
 
-    add_executable(gs1_runtime_performance_test
-        tests/runtime/game_runtime_performance_test.cpp)
-
-    add_executable(gs1_smoke_engine_host_threading_test
-        tests/runtime/smoke_engine_host_threading_test.cpp)
-
-    target_link_libraries(gs1_smoke_host PRIVATE gs1_smoke_support)
-    target_link_libraries(gs1_visual_smoke_host PRIVATE gs1_smoke_support ws2_32 winmm)
-    target_link_libraries(gs1_game_process_test_host PRIVATE gs1_smoke_support)
+    target_link_libraries(gs1_game_process_test_host PRIVATE gs1_host_bridge)
     target_include_directories(gs1_godot_debug_http_protocol_test
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -365,21 +304,11 @@ if(GS1_BUILD_TESTS)
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_CURRENT_SOURCE_DIR}/engines/godot/native)
     target_link_libraries(gs1_runtime_projection_test PRIVATE gs1_gameplay_core gs1_host_bridge)
-    target_link_libraries(gs1_runtime_message_chain_test PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_runtime_semantic_message_stack_test PRIVATE gs1_gameplay_core)
-    target_link_libraries(gs1_runtime_system_trait_metadata_test PRIVATE gs1_gameplay_core)
-    target_link_libraries(gs1_timed_modifier_projection_test PRIVATE gs1_gameplay_core)
-    target_link_libraries(gs1_site_system_message_flow_test PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_state_manager_test PRIVATE gs1_gameplay_core)
     target_link_libraries(gs1_local_weather_perf_probe PRIVATE gs1_gameplay_core)
-    target_link_libraries(gs1_runtime_performance_test PRIVATE gs1_gameplay_core)
-    target_link_libraries(gs1_smoke_engine_host_threading_test PRIVATE gs1_smoke_support)
     target_link_libraries(gs1_system_test_host PRIVATE gs1_gameplay_core)
 
-    # Ensure the DLL is built before the smoke host is run.
-    # This is a build-order dependency, not a link-time dependency.
-    add_dependencies(gs1_smoke_host gs1_game)
-    add_dependencies(gs1_visual_smoke_host gs1_game)
     add_dependencies(gs1_game_process_test_host gs1_game)
 
     gs1_enable_strict_warnings(gs1_game_process_test_host)
@@ -389,22 +318,9 @@ if(GS1_BUILD_TESTS)
     gs1_enable_strict_warnings(gs1_godot_regional_map_click_policy_test)
     gs1_enable_strict_warnings(gs1_godot_regional_site_selection_policy_test)
     gs1_enable_strict_warnings(gs1_runtime_projection_test)
-    gs1_enable_strict_warnings(gs1_runtime_message_chain_test)
     gs1_enable_strict_warnings(gs1_runtime_semantic_message_stack_test)
-    gs1_enable_strict_warnings(gs1_timed_modifier_projection_test)
-    gs1_enable_strict_warnings(gs1_site_system_message_flow_test)
     gs1_enable_strict_warnings(gs1_state_manager_test)
     gs1_enable_strict_warnings(gs1_local_weather_perf_probe)
-    gs1_enable_strict_warnings(gs1_runtime_performance_test)
-    gs1_enable_strict_warnings(gs1_smoke_engine_host_threading_test)
-
-    # Run the smoke host with the built DLL path and the default smoke script.
-    add_test(
-        NAME gs1_smoke_host
-        COMMAND gs1_smoke_host
-            $<TARGET_FILE:gs1_game>
-            tests/smoke/scripts/main_menu_to_site_active.smoke)
-
     add_test(
         NAME gs1_godot_debug_http_protocol_test
         COMMAND gs1_godot_debug_http_protocol_test)
@@ -426,35 +342,12 @@ if(GS1_BUILD_TESTS)
         COMMAND gs1_runtime_projection_test)
 
     add_test(
-        NAME gs1_runtime_message_chain_test
-        COMMAND gs1_runtime_message_chain_test)
-
-    add_test(
         NAME gs1_runtime_semantic_message_stack_test
         COMMAND gs1_runtime_semantic_message_stack_test)
 
     add_test(
-        NAME gs1_timed_modifier_projection_test
-        COMMAND gs1_timed_modifier_projection_test)
-
-    add_test(
-        NAME gs1_site_system_message_flow_test
-        COMMAND gs1_site_system_message_flow_test)
-
-    add_test(
         NAME gs1_state_manager_test
         COMMAND gs1_state_manager_test)
-
-    add_test(
-        NAME gs1_smoke_engine_host_threading_test
-        COMMAND gs1_smoke_engine_host_threading_test)
-
-    add_test(
-        NAME gs1_visual_smoke_silent_onboarding
-        COMMAND gs1_visual_smoke_host
-            $<TARGET_FILE:gs1_game>
-            --silent-onboarding
-            --max-frames 18000)
 
     add_test(
         NAME gs1_game_process_site1_onboarding
@@ -478,8 +371,6 @@ if(GS1_BUILD_TESTS)
         COMMAND ${GS1_SYSTEM_TEST_HOST_COMMAND})
 
     # Resolve the default script path relative to the repository root.
-    set_tests_properties(gs1_smoke_host PROPERTIES
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_runtime_projection_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_godot_debug_http_protocol_test PROPERTIES
@@ -490,19 +381,10 @@ if(GS1_BUILD_TESTS)
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_godot_regional_site_selection_policy_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-    set_tests_properties(gs1_runtime_message_chain_test PROPERTIES
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_runtime_semantic_message_stack_test PROPERTIES
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-    set_tests_properties(gs1_site_system_message_flow_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_tests_properties(gs1_state_manager_test PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-    set_tests_properties(gs1_smoke_engine_host_threading_test PROPERTIES
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-    set_tests_properties(gs1_visual_smoke_silent_onboarding PROPERTIES
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        TIMEOUT 120)
     set_tests_properties(gs1_game_process_site1_onboarding PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         TIMEOUT 120

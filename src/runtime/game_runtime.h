@@ -95,7 +95,6 @@ public:
     [[nodiscard]] Gs1Status submit_site_scene_ready();
     [[nodiscard]] Gs1Status run_phase1(const Gs1Phase1Request& request, Gs1Phase1Result& out_result);
     [[nodiscard]] Gs1Status run_phase2(const Gs1Phase2Request& request, Gs1Phase2Result& out_result);
-    [[nodiscard]] Gs1Status pop_runtime_message(Gs1RuntimeMessage& out_message);
     [[nodiscard]] Gs1Status get_game_state_view(Gs1GameStateView& out_view);
     [[nodiscard]] Gs1Status query_site_tile_view(std::uint32_t tile_index, Gs1SiteTileView& out_tile) const;
     [[nodiscard]] Gs1Status get_profiling_snapshot(Gs1RuntimeProfilingSnapshot& out_snapshot) const noexcept;
@@ -119,11 +118,6 @@ public:
     [[nodiscard]] const GameState& state() const noexcept { return state_manager_.game_state(); }
     [[nodiscard]] StateManager& state_manager() noexcept { return state_manager_; }
     [[nodiscard]] const StateManager& state_manager() const noexcept { return state_manager_; }
-    [[nodiscard]] std::deque<Gs1RuntimeMessage>& runtime_messages() noexcept { return state().runtime_messages; }
-    [[nodiscard]] const std::deque<Gs1RuntimeMessage>& runtime_messages() const noexcept
-    {
-        return state().runtime_messages;
-    }
     void set_site_world(const SiteWorldHandle& site_world) noexcept { site_world_ = site_world; }
     void set_site_world(std::nullptr_t) noexcept { site_world_ = nullptr; }
     [[nodiscard]] SiteWorld* site_world() noexcept { return site_world_.get(); }

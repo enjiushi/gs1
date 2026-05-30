@@ -459,7 +459,6 @@ struct SplitRuntimeFixture final
         Gs1AppState app_state,
         const std::optional<CampaignState>& campaign,
         const std::optional<SiteRunState>& active_site_run,
-        const std::deque<Gs1RuntimeMessage>& runtime_messages,
         const GameMessageQueue& message_queue,
         double fixed_step_seconds,
         SiteMoveDirectionInput move_direction)
@@ -467,7 +466,6 @@ struct SplitRuntimeFixture final
         state = {};
         state.fixed_step_seconds = fixed_step_seconds;
         state.app_state = app_state;
-        state.runtime_messages = runtime_messages;
         emitted_game_messages = message_queue;
         state.move_direction = RuntimeMoveDirectionSnapshot {
             move_direction.world_move_x,
@@ -497,11 +495,9 @@ struct SplitRuntimeFixture final
         Gs1AppState& app_state,
         std::optional<CampaignState>& campaign,
         std::optional<SiteRunState>& active_site_run,
-        std::deque<Gs1RuntimeMessage>& runtime_messages,
         GameMessageQueue& message_queue)
     {
         app_state = state.app_state.get();
-        runtime_messages = state.runtime_messages;
         message_queue = emitted_game_messages;
         site_world = invocation.site_world_handle();
         if (state.campaign_core.has_value())
@@ -538,7 +534,6 @@ inline Gs1Status invoke_system_message(
     Gs1AppState& app_state,
     std::optional<CampaignState>& campaign,
     std::optional<SiteRunState>& active_site_run,
-    std::deque<Gs1RuntimeMessage>& runtime_messages,
     GameMessageQueue& message_queue,
     double fixed_step_seconds = k_default_fixed_step_seconds,
     SiteMoveDirectionInput move_direction = {})
@@ -548,37 +543,14 @@ inline Gs1Status invoke_system_message(
         app_state,
         campaign,
         active_site_run,
-        runtime_messages,
         message_queue,
         fixed_step_seconds,
         move_direction);
     auto invocation = fixture.make_invocation(move_direction);
     System system {};
     const auto status = dispatch_game_message_to_typed_handler(system, invocation, message);
-    fixture.sync(invocation, app_state, campaign, active_site_run, runtime_messages, message_queue);
+    fixture.sync(invocation, app_state, campaign, active_site_run, message_queue);
     return status;
-}
-
-template <typename System>
-inline Gs1Status invoke_system_message(
-    const GameMessage& message,
-    Gs1AppState& app_state,
-    std::optional<CampaignState>& campaign,
-    std::optional<SiteRunState>& active_site_run,
-    GameMessageQueue& message_queue,
-    double fixed_step_seconds = k_default_fixed_step_seconds,
-    SiteMoveDirectionInput move_direction = {})
-{
-    std::deque<Gs1RuntimeMessage> runtime_messages {};
-    return invoke_system_message<System>(
-        message,
-        app_state,
-        campaign,
-        active_site_run,
-        runtime_messages,
-        message_queue,
-        fixed_step_seconds,
-        move_direction);
 }
 
 template <typename System>
@@ -590,14 +562,12 @@ inline Gs1Status invoke_system_message(
     Gs1AppState app_state = context.campaign.app_state;
     std::optional<CampaignState> campaign {context.campaign};
     std::optional<SiteRunState> active_site_run {};
-    std::deque<Gs1RuntimeMessage> runtime_messages {};
     GameMessageQueue message_queue {};
     const auto status = invoke_system_message<System>(
         message,
         app_state,
         campaign,
         active_site_run,
-        runtime_messages,
         message_queue,
         fixed_step_seconds);
     context.campaign = std::move(campaign.value());
@@ -610,13 +580,11 @@ inline Gs1Status invoke_system_message(
     const GameMessage& message,
     double fixed_step_seconds = k_default_fixed_step_seconds)
 {
-    std::deque<Gs1RuntimeMessage> runtime_messages {};
     return invoke_system_message<SystemTag>(
         message,
         context.app_state,
         context.campaign,
         context.active_site_run,
-        runtime_messages,
         context.message_queue,
         fixed_step_seconds);
 }
@@ -628,14 +596,12 @@ inline Gs1Status invoke_system_message(
 {
     std::optional<CampaignState> campaign {context.campaign};
     std::optional<SiteRunState> active_site_run {context.site_run};
-    std::deque<Gs1RuntimeMessage> runtime_messages {};
     Gs1AppState app_state = GS1_APP_STATE_SITE_ACTIVE;
     const auto status = invoke_system_message<SystemTag>(
         message,
         app_state,
         campaign,
         active_site_run,
-        runtime_messages,
         context.message_queue,
         context.fixed_step_seconds,
         context.move_direction);
@@ -649,7 +615,6 @@ inline void invoke_system_run(
     Gs1AppState& app_state,
     std::optional<CampaignState>& campaign,
     std::optional<SiteRunState>& active_site_run,
-    std::deque<Gs1RuntimeMessage>& runtime_messages,
     GameMessageQueue& message_queue,
     double fixed_step_seconds = k_default_fixed_step_seconds,
     SiteMoveDirectionInput move_direction = {})
@@ -659,34 +624,13 @@ inline void invoke_system_run(
         app_state,
         campaign,
         active_site_run,
-        runtime_messages,
         message_queue,
         fixed_step_seconds,
         move_direction);
     auto invocation = fixture.make_invocation(move_direction);
     System system {};
     system.run(invocation);
-    fixture.sync(invocation, app_state, campaign, active_site_run, runtime_messages, message_queue);
-}
-
-template <typename System>
-inline void invoke_system_run(
-    Gs1AppState& app_state,
-    std::optional<CampaignState>& campaign,
-    std::optional<SiteRunState>& active_site_run,
-    GameMessageQueue& message_queue,
-    double fixed_step_seconds = k_default_fixed_step_seconds,
-    SiteMoveDirectionInput move_direction = {})
-{
-    std::deque<Gs1RuntimeMessage> runtime_messages {};
-    invoke_system_run<System>(
-        app_state,
-        campaign,
-        active_site_run,
-        runtime_messages,
-        message_queue,
-        fixed_step_seconds,
-        move_direction);
+    fixture.sync(invocation, app_state, campaign, active_site_run, message_queue);
 }
 
 template <typename System>
@@ -697,13 +641,11 @@ inline void invoke_system_run(
     Gs1AppState app_state = context.campaign.app_state;
     std::optional<CampaignState> campaign {context.campaign};
     std::optional<SiteRunState> active_site_run {};
-    std::deque<Gs1RuntimeMessage> runtime_messages {};
     GameMessageQueue message_queue {};
     invoke_system_run<System>(
         app_state,
         campaign,
         active_site_run,
-        runtime_messages,
         message_queue,
         fixed_step_seconds);
     context.campaign = std::move(campaign.value());
@@ -714,14 +656,12 @@ inline void invoke_system_run(gs1::CampaignFixedStepContext& context)
 {
     std::optional<CampaignState> campaign {context.campaign};
     std::optional<SiteRunState> active_site_run {};
-    std::deque<Gs1RuntimeMessage> runtime_messages {};
     Gs1AppState app_state = campaign->app_state;
     GameMessageQueue message_queue {};
     invoke_system_run<SystemTag>(
         app_state,
         campaign,
         active_site_run,
-        runtime_messages,
         message_queue,
         context.fixed_step_seconds);
     context.campaign = std::move(campaign.value());
@@ -732,13 +672,11 @@ inline void invoke_system_run(SiteSystemHarness<SystemTag>& context)
 {
     std::optional<CampaignState> campaign {context.campaign};
     std::optional<SiteRunState> active_site_run {context.site_run};
-    std::deque<Gs1RuntimeMessage> runtime_messages {};
     Gs1AppState app_state = GS1_APP_STATE_SITE_ACTIVE;
     invoke_system_run<SystemTag>(
         app_state,
         campaign,
         active_site_run,
-        runtime_messages,
         context.message_queue,
         context.fixed_step_seconds,
         context.move_direction);

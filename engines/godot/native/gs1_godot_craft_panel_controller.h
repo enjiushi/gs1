@@ -37,7 +37,7 @@ public:
     void set_submit_craft_option_callback(SubmitCraftOptionFn callback);
     void handle_craft_option_pressed(std::int64_t button_key);
     [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
-    void handle_engine_message(const Gs1EngineMessage& message) override;
+    void handle_engine_message(const Gs1GodotEngineMessage& message) override;
     void handle_runtime_message_reset() override;
 
 protected:
@@ -95,7 +95,6 @@ private:
     godot::Control* owner_control_ {nullptr};
     Gs1GodotAdapterService* adapter_service_ {nullptr};
     std::optional<PlacementPreviewState> placement_preview_ {};
-    std::optional<Gs1EngineMessagePlacementFailureData> placement_failure_ {};
     std::optional<CraftContextState> craft_context_ {};
     SubmitCraftOptionFn submit_craft_option_ {};
     std::unordered_map<std::uint64_t, ProjectedButtonRecord> craft_option_buttons_ {};

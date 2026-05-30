@@ -12,13 +12,33 @@
 #include <unordered_set>
 #include <vector>
 
+struct Gs1GodotEngineMessage final
+{
+    unsigned char payload[GS1_MESSAGE_PAYLOAD_BYTE_COUNT];
+    Gs1EngineMessageType type {GS1_ENGINE_MESSAGE_NONE};
+
+    template <typename PayloadData>
+    [[nodiscard]] PayloadData& emplace_payload() noexcept
+    {
+        static_assert(sizeof(PayloadData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
+        auto* ptr = std::construct_at(reinterpret_cast<PayloadData*>(payload), PayloadData {});
+        return *std::launder(ptr);
+    }
+
+    template <typename PayloadData>
+    [[nodiscard]] const PayloadData& payload_as() const noexcept
+    {
+        return *std::launder(reinterpret_cast<const PayloadData*>(payload));
+    }
+};
+
 class IGs1GodotEngineMessageSubscriber
 {
 public:
     virtual ~IGs1GodotEngineMessageSubscriber() = default;
 
     [[nodiscard]] virtual bool handles_engine_message(Gs1EngineMessageType type) const noexcept = 0;
-    virtual void handle_engine_message(const Gs1EngineMessage& message) = 0;
+    virtual void handle_engine_message(const Gs1GodotEngineMessage& message) = 0;
     virtual void handle_runtime_message_reset() = 0;
 };
 
@@ -138,10 +158,9 @@ private:
     void ensure_runtime_started();
     void fail_runtime_session(const char* fallback_error_message);
     [[nodiscard]] bool drain_debug_http_commands();
-    bool drain_projection_messages();
     bool poll_gameplay_state_notifications();
     void notify_runtime_message_reset();
-    void dispatch_engine_message(Gs1EngineMessage&& message);
+    void dispatch_engine_message(Gs1GodotEngineMessage&& message);
     [[nodiscard]] bool submit_gameplay_action(const Gs1GameplayAction& action);
     [[nodiscard]] bool handle_local_gameplay_action(const Gs1GameplayAction& action);
     [[nodiscard]] bool handle_local_storage_view(

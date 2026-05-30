@@ -541,7 +541,7 @@ private:
     void apply_campaign_resources(const Gs1RuntimeMessage& message);
     void apply_hud_state(const Gs1RuntimeMessage& message);
     void apply_site_action_update(const Gs1RuntimeMessage& message);
-    void apply_site_result_ready(const Gs1RuntimeMessage& message);
+    [[nodiscard]] std::optional<SiteResultProjection> site_result_from_game_state_view() const;
     void apply_one_shot_cue(const Gs1RuntimeMessage& message);
     void publish_live_state_snapshot();
     void queue_live_state_patch(std::uint32_t field_mask);
@@ -593,7 +593,6 @@ private:
     std::optional<CampaignResourcesProjection> campaign_resources_ {};
     std::optional<HudProjection> hud_state_ {};
     std::optional<SiteActionProjection> site_action_ {};
-    std::optional<SiteResultProjection> site_result_ {};
     std::vector<OneShotCueProjection> recent_one_shot_cues_ {};
     std::uint64_t next_one_shot_cue_sequence_id_ {0};
     std::uint32_t phase1_fixed_steps_executed_ {0};

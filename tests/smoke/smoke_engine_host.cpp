@@ -126,8 +126,6 @@ const char* message_type_name(Gs1EngineMessageType type)
         return "HUD_STATE";
     case GS1_ENGINE_MESSAGE_NOTIFICATION_PUSH:
         return "NOTIFICATION_PUSH";
-    case GS1_ENGINE_MESSAGE_SITE_RESULT_READY:
-        return "SITE_RESULT_READY";
     case GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE:
         return "PLAY_ONE_SHOT_CUE";
     case GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES:
@@ -599,7 +597,7 @@ SmokeEngineHost::LiveStateSnapshot SmokeEngineHost::capture_frame_live_state_sna
     snapshot.campaign_resources = campaign_resources_;
     snapshot.hud_state = hud_state_;
     snapshot.site_action = site_action_;
-    snapshot.site_result = site_result_;
+    snapshot.site_result = site_result_from_game_state_view();
     snapshot.recent_one_shot_cues = recent_one_shot_cues_;
     return snapshot;
 }
@@ -990,14 +988,12 @@ void SmokeEngineHost::flush_engine_messages(const char* stage_label)
                 active_site_snapshot_.reset();
                 hud_state_.reset();
                 site_action_.reset();
-                site_result_.reset();
             }
             else if (current_app_state_ == GS1_APP_STATE_SITE_ACTIVE ||
                 current_app_state_ == GS1_APP_STATE_SITE_LOADING ||
                 current_app_state_ == GS1_APP_STATE_SITE_PAUSED)
             {
                 pending_site_scene_ready_ack_ = current_app_state_ == GS1_APP_STATE_SITE_LOADING;
-                site_result_.reset();
             }
             live_state_patch_mask =
                 LiveStatePatchField_AppState |
@@ -1180,10 +1176,6 @@ void SmokeEngineHost::flush_engine_messages(const char* stage_label)
         case GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE:
             apply_site_action_update(message);
             live_state_patch_mask = LiveStatePatchField_SiteAction;
-            break;
-        case GS1_ENGINE_MESSAGE_SITE_RESULT_READY:
-            apply_site_result_ready(message);
-            live_state_patch_mask = LiveStatePatchField_SiteResult;
             break;
         case GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE:
             apply_one_shot_cue(message);
@@ -2229,14 +2221,43 @@ void SmokeEngineHost::apply_site_action_update(const Gs1RuntimeMessage& message)
     site_action_ = projection;
 }
 
-void SmokeEngineHost::apply_site_result_ready(const Gs1RuntimeMessage& message)
+std::optional<SmokeEngineHost::SiteResultProjection> SmokeEngineHost::site_result_from_game_state_view() const
 {
-    const auto& payload = message.payload_as<Gs1EngineMessageSiteResultData>();
+    if (api_ == nullptr || runtime_ == nullptr)
+    {
+        return std::nullopt;
+    }
+
+    Gs1GameStateView view {};
+    view.struct_size = sizeof(Gs1GameStateView);
+    if (api_->get_game_state_view(runtime_, &view) != GS1_STATUS_OK ||
+        view.app_state != GS1_APP_STATE_SITE_RESULT ||
+        view.has_active_site == 0U ||
+        view.active_site == nullptr)
+    {
+        return std::nullopt;
+    }
+
+    const auto& site = *view.active_site;
     SiteResultProjection projection {};
-    projection.site_id = payload.site_id;
-    projection.result = payload.result;
-    projection.newly_revealed_site_count = payload.newly_revealed_site_count;
-    site_result_ = projection;
+    projection.site_id = site.site_id;
+    projection.newly_revealed_site_count =
+        static_cast<std::uint16_t>(site.result_newly_revealed_site_count);
+
+    switch (site.run_status)
+    {
+    case 1U:
+        projection.result = GS1_SITE_ATTEMPT_RESULT_COMPLETED;
+        break;
+    case 2U:
+        projection.result = GS1_SITE_ATTEMPT_RESULT_FAILED;
+        break;
+    default:
+        projection.result = GS1_SITE_ATTEMPT_RESULT_NONE;
+        break;
+    }
+
+    return projection;
 }
 
 void SmokeEngineHost::apply_one_shot_cue(const Gs1RuntimeMessage& message)
@@ -2573,16 +2594,6 @@ std::string SmokeEngineHost::describe_message(const Gs1RuntimeMessage& message)
         description += " village=" + std::to_string(payload.village_reputation);
         description += " forestry=" + std::to_string(payload.forestry_reputation);
         description += " university=" + std::to_string(payload.university_reputation);
-        break;
-    }
-
-    case GS1_ENGINE_MESSAGE_SITE_RESULT_READY:
-    {
-        const auto& payload = message.payload_as<Gs1EngineMessageSiteResultData>();
-        description += " site=" + std::to_string(payload.site_id);
-        description += " result=";
-        description += site_attempt_result_name(payload.result);
-        description += " revealed=" + std::to_string(payload.newly_revealed_site_count);
         break;
     }
 

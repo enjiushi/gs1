@@ -226,21 +226,6 @@ template <typename System>
 using runtime_subscribed_messages_t = typename runtime_subscribed_messages<System>::type;
 
 template <typename System, typename = void>
-struct runtime_emitted_runtime_messages
-{
-    using type = type_list<>;
-};
-
-template <typename System>
-struct runtime_emitted_runtime_messages<System, std::void_t<typename System::emitted_runtime_messages>>
-{
-    using type = typename System::emitted_runtime_messages;
-};
-
-template <typename System>
-using runtime_emitted_runtime_messages_t = typename runtime_emitted_runtime_messages<System>::type;
-
-template <typename System, typename = void>
 struct runtime_profile_system_id
 {
     static constexpr std::optional<Gs1RuntimeProfileSystemId> value = std::nullopt;
@@ -271,54 +256,6 @@ struct runtime_fixed_step_order<System, std::void_t<decltype(System::fixed_step_
 template <typename System>
 inline constexpr std::optional<std::uint32_t> runtime_fixed_step_order_v =
     runtime_fixed_step_order<System>::value;
-
-template <typename SystemPack>
-struct runtime_emitted_runtime_message_manifest;
-
-template <typename... Systems>
-struct runtime_emitted_runtime_message_manifest<system_pack<Systems...>>
-{
-    using type = type_list_unique_t<type_list_concat_t<runtime_emitted_runtime_messages_t<Systems>...>>;
-};
-
-template <typename SystemPack>
-using runtime_emitted_runtime_message_manifest_t =
-    typename runtime_emitted_runtime_message_manifest<SystemPack>::type;
-
-template <typename Message, typename SystemPack>
-struct runtime_emitted_runtime_message_manifest_contains;
-
-template <typename Message, typename... Systems>
-struct runtime_emitted_runtime_message_manifest_contains<Message, system_pack<Systems...>>
-    : std::bool_constant<
-          (type_list_contains_v<Message, runtime_emitted_runtime_messages_t<Systems>> || ...)>
-{
-};
-
-template <typename Message, typename SystemPack>
-inline constexpr bool runtime_emitted_runtime_message_manifest_contains_v =
-    runtime_emitted_runtime_message_manifest_contains<Message, SystemPack>::value;
-
-template <typename SystemPack, typename MessageList>
-struct runtime_emitted_runtime_message_manifest_covers;
-
-template <typename SystemPack>
-struct runtime_emitted_runtime_message_manifest_covers<SystemPack, type_list<>>
-    : std::true_type
-{
-};
-
-template <typename SystemPack, typename Message, typename... Rest>
-struct runtime_emitted_runtime_message_manifest_covers<SystemPack, type_list<Message, Rest...>>
-    : std::bool_constant<
-          runtime_emitted_runtime_message_manifest_contains_v<Message, SystemPack> &&
-          runtime_emitted_runtime_message_manifest_covers<SystemPack, type_list<Rest...>>::value>
-{
-};
-
-template <typename SystemPack, typename MessageList>
-inline constexpr bool runtime_emitted_runtime_message_manifest_covers_v =
-    runtime_emitted_runtime_message_manifest_covers<SystemPack, MessageList>::value;
 
 template <typename System>
 [[nodiscard]] std::optional<Gs1RuntimeProfileSystemId> runtime_profile_system_id_for(

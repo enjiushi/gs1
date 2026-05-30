@@ -25,7 +25,7 @@ int main()
         GS1_GODOT_SCREEN_KIND_REGIONAL_MAP,
         GS1_GODOT_SCREEN_KIND_SITE_SESSION));
 
-    assert(gs1_godot_engine_message_requires_exclusive_subscriber(
+    assert(!gs1_godot_engine_message_requires_exclusive_subscriber(
         GS1_ENGINE_MESSAGE_BEGIN_REGIONAL_MAP_SNAPSHOT));
     assert(!gs1_godot_engine_message_requires_exclusive_subscriber(
         GS1_ENGINE_MESSAGE_REGIONAL_MAP_SITE_UPSERT));

@@ -147,7 +147,7 @@ void Gs1GodotAdapterService::bump_ui_session_revision(std::uint32_t dirty_flags)
         return;
     }
 
-    Gs1EngineMessage message {};
+    Gs1GodotEngineMessage message {};
     message.type = GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY;
     auto& payload = message.emplace_payload<Gs1EngineMessagePresentationDirtyData>();
     payload.dirty_flags = dirty_flags;
@@ -263,11 +263,6 @@ void Gs1GodotAdapterService::begin_frame(double delta_seconds)
         return;
     }
 
-    if (!drain_projection_messages())
-    {
-        fail_runtime_session("Failed to drain runtime phase 1 projection messages.");
-        return;
-    }
     if (!poll_gameplay_state_notifications())
     {
         fail_runtime_session("Failed to poll runtime phase 1 gameplay state notifications.");
@@ -433,11 +428,6 @@ void Gs1GodotAdapterService::ensure_runtime_started()
         return;
     }
 
-    if (!drain_projection_messages())
-    {
-        fail_runtime_session("Failed to drain startup projection messages.");
-        return;
-    }
     if (!poll_gameplay_state_notifications())
     {
         fail_runtime_session("Failed to poll startup gameplay state notifications.");
@@ -507,34 +497,6 @@ bool Gs1GodotAdapterService::drain_debug_http_commands()
     return true;
 }
 
-bool Gs1GodotAdapterService::drain_projection_messages()
-{
-    if (!runtime_session_.is_running())
-    {
-        last_error_ = "Runtime session is not ready to drain engine messages.";
-        return false;
-    }
-
-    Gs1EngineMessage message {};
-    while (true)
-    {
-        if (!runtime_session_.pop_engine_message(message))
-        {
-            const std::string& session_error = runtime_session_.last_error();
-            if (session_error.empty())
-            {
-                break;
-            }
-            last_error_ = session_error;
-            return false;
-        }
-
-        dispatch_engine_message(std::move(message));
-    }
-
-    return true;
-}
-
 bool Gs1GodotAdapterService::poll_gameplay_state_notifications()
 {
     if (!runtime_session_.is_running())
@@ -555,7 +517,7 @@ bool Gs1GodotAdapterService::poll_gameplay_state_notifications()
     if (!has_dispatched_gameplay_app_state_ ||
         last_dispatched_gameplay_app_state_ != view.app_state)
     {
-        Gs1EngineMessage app_state_message {};
+        Gs1GodotEngineMessage app_state_message {};
         app_state_message.type = GS1_ENGINE_MESSAGE_SET_APP_STATE;
         auto& payload = app_state_message.emplace_payload<Gs1EngineMessageSetAppStateData>();
         payload.app_state = view.app_state;
@@ -584,7 +546,7 @@ void Gs1GodotAdapterService::notify_runtime_message_reset()
     }
 }
 
-void Gs1GodotAdapterService::dispatch_engine_message(Gs1EngineMessage&& message)
+void Gs1GodotAdapterService::dispatch_engine_message(Gs1GodotEngineMessage&& message)
 {
     const std::vector<IGs1GodotEngineMessageSubscriber*> subscribers =
         subscribers_by_message_[bucket_index(message.type)];

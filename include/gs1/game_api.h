@@ -56,10 +56,6 @@ GS1_API Gs1Status gs1_run_phase2(
     const Gs1Phase2Request* request,
     Gs1Phase2Result* out_result) GS1_NOEXCEPT;
 
-GS1_API Gs1Status gs1_pop_runtime_message(
-    Gs1RuntimeHandle* runtime,
-    Gs1RuntimeMessage* out_message) GS1_NOEXCEPT;
-
 GS1_API Gs1Status gs1_get_game_state_view(
     Gs1RuntimeHandle* runtime,
     Gs1GameStateView* out_view) GS1_NOEXCEPT;

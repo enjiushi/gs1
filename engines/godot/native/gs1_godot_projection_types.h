@@ -79,7 +79,6 @@ using Gs1RuntimePlacementFailureProjection = Gs1EngineMessagePlacementFailureDat
 using Gs1RuntimeTaskProjection = Gs1EngineMessageTaskData;
 using Gs1RuntimePhoneListingProjection = Gs1EngineMessagePhoneListingData;
 using Gs1RuntimeModifierProjection = Gs1EngineMessageSiteModifierData;
-using Gs1RuntimeSiteResultProjection = Gs1EngineMessageSiteResultData;
 
 struct Gs1RuntimeOneShotCueProjection final
 {

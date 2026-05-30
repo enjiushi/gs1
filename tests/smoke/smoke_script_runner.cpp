@@ -244,10 +244,6 @@ std::optional<Gs1EngineMessageType> parse_engine_message_type(const std::string&
     {
         return GS1_ENGINE_MESSAGE_HUD_STATE;
     }
-    if (value == "SITE_RESULT_READY")
-    {
-        return GS1_ENGINE_MESSAGE_SITE_RESULT_READY;
-    }
     if (value == "LOG_TEXT")
     {
         return GS1_ENGINE_MESSAGE_LOG_TEXT;

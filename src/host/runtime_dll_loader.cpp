@@ -97,7 +97,6 @@ bool RuntimeDllLoader::load(const wchar_t* dll_path)
         load_symbol(api_.submit_site_scene_ready, "gs1_submit_site_scene_ready") &&
         load_symbol(api_.run_phase1, "gs1_run_phase1") &&
         load_symbol(api_.run_phase2, "gs1_run_phase2") &&
-        load_symbol(api_.pop_runtime_message, "gs1_pop_runtime_message") &&
         load_symbol(api_.get_game_state_view, "gs1_get_game_state_view") &&
         load_symbol(api_.query_site_tile_view, "gs1_query_site_tile_view") &&
         load_symbol(api_.get_runtime_profiling_snapshot, "gs1_get_runtime_profiling_snapshot") &&

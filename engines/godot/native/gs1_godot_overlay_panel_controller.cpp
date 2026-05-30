@@ -261,7 +261,6 @@ bool Gs1GodotOverlayPanelController::handles_engine_message(Gs1EngineMessageType
     {
     case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
     case GS1_ENGINE_MESSAGE_SET_APP_STATE:
-    case GS1_ENGINE_MESSAGE_SITE_RESULT_READY:
         return true;
     default:
         return false;
@@ -275,22 +274,11 @@ void Gs1GodotOverlayPanelController::handle_engine_message(const Gs1EngineMessag
     case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
     case GS1_ENGINE_MESSAGE_SET_APP_STATE:
         break;
-    case GS1_ENGINE_MESSAGE_SITE_RESULT_READY:
-        site_result_ = message.payload_as<Gs1EngineMessageSiteResultData>();
-        break;
     default:
         break;
     }
 
-    if (adapter_service_ != nullptr)
-    {
-        Gs1GameStateView view {};
-        if (adapter_service_->get_game_state_view(view) && view.app_state != GS1_APP_STATE_SITE_RESULT)
-        {
-            site_result_.reset();
-        }
-    }
-
+    refresh_site_result_from_game_state_view();
     update_overlay_state_label();
     update_protection_selector();
     update_site_result();
@@ -379,6 +367,45 @@ void Gs1GodotOverlayPanelController::update_protection_selector()
         protection_selector_buttons_,
         protection_selector_buttons_registry_,
         button_specs);
+}
+
+void Gs1GodotOverlayPanelController::refresh_site_result_from_game_state_view()
+{
+    site_result_.reset();
+
+    if (adapter_service_ == nullptr)
+    {
+        return;
+    }
+
+    Gs1GameStateView view {};
+    if (!adapter_service_->get_game_state_view(view) ||
+        view.app_state != GS1_APP_STATE_SITE_RESULT ||
+        view.has_active_site == 0U ||
+        view.active_site == nullptr)
+    {
+        return;
+    }
+
+    const Gs1SiteStateView& site = *view.active_site;
+    SiteResultView result {};
+    result.site_id = site.site_id;
+    result.newly_revealed_site_count = static_cast<std::uint16_t>(site.result_newly_revealed_site_count);
+
+    switch (site.run_status)
+    {
+    case 1U:
+        result.result = GS1_SITE_ATTEMPT_RESULT_COMPLETED;
+        break;
+    case 2U:
+        result.result = GS1_SITE_ATTEMPT_RESULT_FAILED;
+        break;
+    default:
+        result.result = GS1_SITE_ATTEMPT_RESULT_NONE;
+        break;
+    }
+
+    site_result_ = result;
 }
 
 void Gs1GodotOverlayPanelController::update_site_result()
