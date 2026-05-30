@@ -385,18 +385,6 @@ const char* DeviceWeatherContributionSystem::name() const noexcept
     return access().system_name.data();
 }
 
-GameMessageSubscriptionSpan DeviceWeatherContributionSystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::SiteRunStarted,
-        GameMessageType::SiteDevicePlaced,
-        GameMessageType::SiteDeviceBroken,
-        GameMessageType::SiteDeviceRepaired,
-        GameMessageType::SiteDeviceConditionChanged,
-    };
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan DeviceWeatherContributionSystem::subscribed_host_messages() const noexcept
 {
     return {};

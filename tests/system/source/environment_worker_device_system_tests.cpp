@@ -101,13 +101,6 @@ void run_local_weather_pipeline(
     invoke_system_run<LocalWeatherResolveSystem>(local_weather_context);
 }
 
-template <typename System>
-bool system_subscribes_to_message(GameMessageType type)
-{
-    System system {};
-    return gs1::runtime_subscription_contains(system.subscribed_game_messages(), type);
-}
-
 void prototype_site_run_seeds_site_one_desert_ephedra_patches_near_camp(
     gs1::testing::SystemTestExecutionContext& context)
 {

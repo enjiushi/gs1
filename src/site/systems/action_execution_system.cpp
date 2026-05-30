@@ -3377,18 +3377,6 @@ const char* ActionExecutionSystem::name() const noexcept
     return "ActionExecutionSystem";
 }
 
-GameMessageSubscriptionSpan ActionExecutionSystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::StartSiteAction,
-        GameMessageType::CancelSiteAction,
-        GameMessageType::PlacementModeCursorMoved,
-        GameMessageType::PlacementReservationAccepted,
-        GameMessageType::PlacementReservationRejected,
-    };
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan ActionExecutionSystem::subscribed_host_messages() const noexcept
 {
     return {};

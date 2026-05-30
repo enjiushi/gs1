@@ -20,7 +20,6 @@ namespace gs1
 inline constexpr std::size_t k_runtime_host_message_type_count =
     static_cast<std::size_t>(GS1_HOST_EVENT_SITE_SCENE_READY) + 1U;
 
-using GameMessageSubscriptionSpan = std::span<const GameMessageType>;
 using HostMessageSubscriptionSpan = std::span<const Gs1HostMessageType>;
 
 class IRuntimeSystem
@@ -29,18 +28,9 @@ public:
     virtual ~IRuntimeSystem() = default;
 
     [[nodiscard]] virtual const char* name() const noexcept = 0;
-    [[nodiscard]] virtual GameMessageSubscriptionSpan subscribed_game_messages() const noexcept = 0;
     [[nodiscard]] virtual HostMessageSubscriptionSpan subscribed_host_messages() const noexcept = 0;
     [[nodiscard]] virtual std::optional<Gs1RuntimeProfileSystemId> profile_system_id() const noexcept = 0;
     [[nodiscard]] virtual std::optional<std::uint32_t> fixed_step_order() const noexcept = 0;
-    [[nodiscard]] virtual Gs1Status process_game_message(
-        RuntimeInvocation& invocation,
-        const GameMessage& message)
-    {
-        (void)invocation;
-        (void)message;
-        return GS1_STATUS_OK;
-    }
     [[nodiscard]] virtual Gs1Status process_host_message(
         RuntimeInvocation& invocation,
         const Gs1HostMessage& message)
@@ -57,7 +47,6 @@ public:
     }
 };
 
-using RuntimeGameMessageSubscribers = std::array<std::vector<IRuntimeSystem*>, k_game_message_type_count>;
 using RuntimeHostMessageSubscribers =
     std::array<std::vector<IRuntimeSystem*>, k_runtime_host_message_type_count>;
 
@@ -330,6 +319,41 @@ struct runtime_emitted_runtime_message_manifest<system_pack<Systems...>>
 template <typename SystemPack>
 using runtime_emitted_runtime_message_manifest_t =
     typename runtime_emitted_runtime_message_manifest<SystemPack>::type;
+
+template <typename Message, typename SystemPack>
+struct runtime_emitted_runtime_message_manifest_contains;
+
+template <typename Message, typename... Systems>
+struct runtime_emitted_runtime_message_manifest_contains<Message, system_pack<Systems...>>
+    : std::bool_constant<
+          (type_list_contains_v<Message, runtime_emitted_runtime_messages_t<Systems>> || ...)>
+{
+};
+
+template <typename Message, typename SystemPack>
+inline constexpr bool runtime_emitted_runtime_message_manifest_contains_v =
+    runtime_emitted_runtime_message_manifest_contains<Message, SystemPack>::value;
+
+template <typename SystemPack, typename MessageList>
+struct runtime_emitted_runtime_message_manifest_covers;
+
+template <typename SystemPack>
+struct runtime_emitted_runtime_message_manifest_covers<SystemPack, type_list<>>
+    : std::true_type
+{
+};
+
+template <typename SystemPack, typename Message, typename... Rest>
+struct runtime_emitted_runtime_message_manifest_covers<SystemPack, type_list<Message, Rest...>>
+    : std::bool_constant<
+          runtime_emitted_runtime_message_manifest_contains_v<Message, SystemPack> &&
+          runtime_emitted_runtime_message_manifest_covers<SystemPack, type_list<Rest...>>::value>
+{
+};
+
+template <typename SystemPack, typename MessageList>
+inline constexpr bool runtime_emitted_runtime_message_manifest_covers_v =
+    runtime_emitted_runtime_message_manifest_covers<SystemPack, MessageList>::value;
 
 template <typename System>
 [[nodiscard]] std::optional<Gs1RuntimeProfileSystemId> runtime_profile_system_id_for(

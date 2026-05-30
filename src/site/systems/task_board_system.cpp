@@ -58,6 +58,25 @@ struct TaskBoardCampaignReadSlices final
     return SiteWorldAccess<TaskBoardSystem> {invocation};
 }
 
+void push_one_shot_cue_runtime_message(
+    RuntimeInvocation& invocation,
+    Gs1OneShotCueKind cue_kind,
+    std::uint32_t subject_id,
+    std::uint32_t arg0 = 0U,
+    std::uint32_t arg1 = 0U)
+{
+    Gs1RuntimeMessage message {};
+    message.type = GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE;
+    auto& payload = message.emplace_payload<Gs1EngineMessageOneShotCueData>();
+    payload.subject_id = subject_id;
+    payload.world_x = 0.0f;
+    payload.world_y = 0.0f;
+    payload.arg0 = arg0;
+    payload.arg1 = arg1;
+    payload.cue_kind = cue_kind;
+    invocation.push_runtime_message(message);
+}
+
 constexpr double k_progress_epsilon = 0.0001;
 constexpr std::uint32_t k_cash_points_per_in_game_hour = 25U;
 constexpr std::uint32_t k_reward_budget_multiplier_percent = 115U;
@@ -2248,6 +2267,13 @@ void handle_task_reward_claim_requested(
         mark_task_projection_dirty(invocation);
     }
 
+    push_one_shot_cue_runtime_message(
+        invocation,
+        GS1_ONE_SHOT_CUE_TASK_REWARD_CLAIMED,
+        claimed_task_instance_id,
+        claimed_task_template_id,
+        reward_candidate_count);
+
 }
 
 void handle_restoration_progress(
@@ -2657,6 +2683,13 @@ void handle_inventory_craft_completed(
             (void)task;
             return task_template_def.progress_kind == TaskProgressKind::CraftAnyItem;
         });
+
+    push_one_shot_cue_runtime_message(
+        invocation,
+        GS1_ONE_SHOT_CUE_CRAFT_OUTPUT_STORED,
+        payload.output_storage_id,
+        payload.output_item_id,
+        quantity);
 }
 
 void handle_inventory_item_use_completed(
@@ -2744,34 +2777,6 @@ void handle_money_award_requested(
 const char* TaskBoardSystem::name() const noexcept
 {
     return "TaskBoardSystem";
-}
-
-GameMessageSubscriptionSpan TaskBoardSystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::SiteRunStarted,
-        GameMessageType::SiteRefreshTick,
-        GameMessageType::TaskAcceptRequested,
-        GameMessageType::TaskRewardClaimRequested,
-        GameMessageType::RestorationProgressChanged,
-        GameMessageType::TileEcologyChanged,
-        GameMessageType::TileEcologyBatchChanged,
-        GameMessageType::LivingPlantStabilityChanged,
-        GameMessageType::SiteTileStateChanged,
-        GameMessageType::WorkerMetersChanged,
-        GameMessageType::PhoneListingPurchased,
-        GameMessageType::PhoneListingSold,
-        GameMessageType::InventoryTransferCompleted,
-        GameMessageType::InventoryItemSubmitted,
-        GameMessageType::InventoryItemUseCompleted,
-        GameMessageType::InventoryCraftCompleted,
-        GameMessageType::SiteTilePlantingCompleted,
-        GameMessageType::SiteActionCompleted,
-        GameMessageType::SiteDevicePlaced,
-        GameMessageType::SiteDeviceConditionChanged,
-        GameMessageType::EconomyMoneyAwardRequested,
-    };
-    return subscriptions;
 }
 
 HostMessageSubscriptionSpan TaskBoardSystem::subscribed_host_messages() const noexcept

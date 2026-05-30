@@ -315,12 +315,6 @@ const char* LocalWeatherResolveSystem::name() const noexcept
     return access().system_name.data();
 }
 
-GameMessageSubscriptionSpan LocalWeatherResolveSystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {GameMessageType::SiteRunStarted};
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan LocalWeatherResolveSystem::subscribed_host_messages() const noexcept
 {
     return {};

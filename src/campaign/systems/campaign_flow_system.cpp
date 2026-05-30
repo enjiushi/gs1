@@ -311,20 +311,6 @@ const char* CampaignFlowSystem::name() const noexcept
     return "CampaignFlowSystem";
 }
 
-GameMessageSubscriptionSpan CampaignFlowSystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::OpenMainMenu,
-        GameMessageType::StartNewCampaign,
-        GameMessageType::SelectDeploymentSite,
-        GameMessageType::ClearDeploymentSiteSelection,
-        GameMessageType::StartSiteAttempt,
-        GameMessageType::ReturnToRegionalMap,
-        GameMessageType::SiteAttemptEnded,
-    };
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan CampaignFlowSystem::subscribed_host_messages() const noexcept
 {
     return {};

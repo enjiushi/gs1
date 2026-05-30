@@ -37,11 +37,6 @@ const char* FactionReputationSystem::name() const noexcept
     return "FactionReputationSystem";
 }
 
-GameMessageSubscriptionSpan FactionReputationSystem::subscribed_game_messages() const noexcept
-{
-    return {};
-}
-
 HostMessageSubscriptionSpan FactionReputationSystem::subscribed_host_messages() const noexcept
 {
     return {};

@@ -31,7 +31,8 @@ public:
         SiteDevicePlacedMessage,
         SiteDeviceConditionChangedMessage,
         EconomyMoneyAwardRequestedMessage>;
-    using emitted_runtime_messages = type_list<>;
+    using emitted_runtime_messages =
+        type_list<runtime_message_type_constant<GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE>>;
     static constexpr std::optional<Gs1RuntimeProfileSystemId> profile_id =
         GS1_RUNTIME_PROFILE_SYSTEM_TASK_BOARD;
     static constexpr std::optional<std::uint32_t> fixed_step_order_value = 16U;
@@ -42,7 +43,6 @@ public:
     }
 
     [[nodiscard]] const char* name() const noexcept override;
-    [[nodiscard]] GameMessageSubscriptionSpan subscribed_game_messages() const noexcept override;
     [[nodiscard]] HostMessageSubscriptionSpan subscribed_host_messages() const noexcept override;
     [[nodiscard]] std::optional<Gs1RuntimeProfileSystemId> profile_system_id() const noexcept override;
     [[nodiscard]] std::optional<std::uint32_t> fixed_step_order() const noexcept override;

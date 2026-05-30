@@ -15,11 +15,6 @@ const char* CampaignTimeSystem::name() const noexcept
     return "CampaignTimeSystem";
 }
 
-GameMessageSubscriptionSpan CampaignTimeSystem::subscribed_game_messages() const noexcept
-{
-    return {};
-}
-
 HostMessageSubscriptionSpan CampaignTimeSystem::subscribed_host_messages() const noexcept
 {
     return {};

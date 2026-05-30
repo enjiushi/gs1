@@ -664,15 +664,6 @@ const char* WorkerConditionSystem::name() const noexcept
     return access().system_name.data();
 }
 
-GameMessageSubscriptionSpan WorkerConditionSystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::SiteRunStarted,
-        GameMessageType::WorkerMeterDeltaRequested,
-        GameMessageType::InventoryItemUseCompleted};
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan WorkerConditionSystem::subscribed_host_messages() const noexcept
 {
     return {};

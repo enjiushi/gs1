@@ -119,6 +119,33 @@ namespace
 inline constexpr std::uint32_t k_inline_game_message_warn_depth = 4U;
 static_assert(GameSystems::size == 25U, "Update GameSystems when the runtime system list changes.");
 
+template <typename... Systems>
+consteval bool runtime_fixed_step_orders_within_game_system_pack(
+    system_pack<Systems...>) noexcept
+{
+    return (((!runtime_fixed_step_order_v<Systems>.has_value()) ||
+             (runtime_fixed_step_order_v<Systems>.value() < GameSystems::size)) &&
+            ...);
+}
+
+static_assert(
+    runtime_fixed_step_orders_within_game_system_pack(GameSystems {}),
+    "Fixed-step system order values must fit inside the active GameSystems pack size.");
+
+template <std::uint32_t Order, typename AppendFn>
+void append_fixed_step_systems_for_declared_order(AppendFn&& append_fn)
+{
+    for_each_type<typename GameSystems::list>(
+        [&]<typename System>()
+        {
+            if constexpr (runtime_fixed_step_order_v<System>.has_value() &&
+                          runtime_fixed_step_order_v<System>.value() == Order)
+            {
+                append_fn.template operator()<System>();
+            }
+        });
+}
+
 [[nodiscard]] std::string unescape_json_string(std::string_view value)
 {
     std::string result;
@@ -460,7 +487,6 @@ RuntimeInvocation::RuntimeInvocation(GameRuntime& runtime) noexcept
     , fixed_step_seconds_(&runtime.state().fixed_step_seconds.get())
     , site_world_(runtime.site_world_)
     , runtime_messages_(&runtime.state().runtime_messages)
-    , game_messages_(&runtime.state().message_queue)
 {
 }
 
@@ -469,7 +495,6 @@ RuntimeInvocation::RuntimeInvocation(GameState& state) noexcept
     , app_state_(&state.app_state.get())
     , fixed_step_seconds_(&state.fixed_step_seconds.get())
     , runtime_messages_(&state.runtime_messages)
-    , game_messages_(&state.message_queue)
 {
 }
 
@@ -483,7 +508,6 @@ RuntimeInvocation::RuntimeInvocation(
     , fixed_step_seconds_(&state.fixed_step_seconds.get())
     , site_world_(std::move(site_world))
     , runtime_messages_(&state.runtime_messages)
-    , game_messages_(&state.message_queue)
 {
 }
 
@@ -501,7 +525,6 @@ RuntimeInvocation::RuntimeInvocation(
     , fixed_step_seconds_(&state.fixed_step_seconds.get())
     , site_world_(std::move(site_world))
     , runtime_messages_(&state.runtime_messages)
-    , game_messages_(&state.message_queue)
 {
     move_direction_ = RuntimeMoveDirectionSnapshot {
         move_direction_x,
@@ -513,15 +536,8 @@ RuntimeInvocation::RuntimeInvocation(
 
 void RuntimeInvocation::push_game_message(const GameMessage& message)
 {
-    if (runtime_ != nullptr)
-    {
-        const auto status = runtime_->dispatch_game_message_inline(message);
-        assert(status == GS1_STATUS_OK);
-        (void)status;
-        return;
-    }
-
-    game_messages_->push_back(message);
+    assert(runtime_ == nullptr);
+    owned_state_->message_queue.push_back(message);
 }
 
 void RuntimeInvocation::install_campaign_state(const CampaignState& campaign)
@@ -760,17 +776,13 @@ void GameRuntime::initialize_system_registry()
         subscribers.clear();
     }
 
-    const auto append_system = [this]<typename System>()
+    const auto append_fixed_step_system = [this]<typename System>()
     {
         auto& system = std::get<System>(systems_);
-        const auto fixed_step_order = runtime_fixed_step_order_for<System>(system);
-        if (fixed_step_order.has_value())
-        {
-            fixed_step_systems_.push_back(GameRuntime::FixedStepSystemEntry {
-                .system = &system,
-                .profile_id = runtime_profile_system_id_for<System>(system),
-                .order = *fixed_step_order});
-        }
+        fixed_step_systems_.push_back(GameRuntime::FixedStepSystemEntry {
+            .system = &system,
+            .profile_id = runtime_profile_system_id_for<System>(system),
+            .order = runtime_fixed_step_order_v<System>.value()});
     };
 
     const auto register_subscribers = [this]<typename System>()
@@ -783,16 +795,14 @@ void GameRuntime::initialize_system_registry()
             system);
     };
 
-    for_each_type<typename GameSystems::list>(append_system);
-    for_each_type<typename GameSystems::list>(register_subscribers);
+    [&]<std::size_t... Orders>(std::index_sequence<Orders...>)
+    {
+        (append_fixed_step_systems_for_declared_order<static_cast<std::uint32_t>(Orders)>(
+             append_fixed_step_system),
+         ...);
+    }(std::make_index_sequence<GameSystems::size> {});
 
-    std::sort(
-        fixed_step_systems_.begin(),
-        fixed_step_systems_.end(),
-        [](const FixedStepSystemEntry& lhs, const FixedStepSystemEntry& rhs)
-        {
-            return lhs.order < rhs.order;
-        });
+    for_each_type<typename GameSystems::list>(register_subscribers);
 }
 
 Gs1Status GameRuntime::submit_host_messages(
@@ -880,7 +890,6 @@ Gs1Status GameRuntime::run_phase1(const Gs1Phase1Request& request, Gs1Phase1Resu
         out_result.fixed_steps_executed += 1U;
     }
 
-    status = dispatch_queued_messages();
     state().move_direction = RuntimeMoveDirectionSnapshot {};
     out_result.runtime_messages_queued = static_cast<std::uint32_t>(state().runtime_messages.size());
     finish_phase();
@@ -903,13 +912,6 @@ Gs1Status GameRuntime::run_phase2(const Gs1Phase2Request& request, Gs1Phase2Resu
     out_result = {};
     out_result.struct_size = sizeof(Gs1Phase2Result);
     auto status = dispatch_host_messages(out_result.processed_host_message_count);
-    if (status != GS1_STATUS_OK)
-    {
-        finish_phase();
-        return status;
-    }
-
-    status = dispatch_queued_messages();
     if (status != GS1_STATUS_OK)
     {
         finish_phase();
@@ -957,11 +959,6 @@ Gs1Status GameRuntime::query_site_tile_view(std::uint32_t tile_index, Gs1SiteTil
         : GS1_STATUS_INVALID_ARGUMENT;
 }
 
-Gs1Status GameRuntime::handle_message(const GameMessage& message)
-{
-    return dispatch_game_message_inline(message);
-}
-
 #ifndef NDEBUG
 void GameRuntime::push_debug_semantic_game_message(std::string_view message_name)
 {
@@ -1002,221 +999,6 @@ void GameRuntime::print_debug_semantic_game_message_stack() const
 }
 #endif
 
-Gs1Status GameRuntime::dispatch_queued_messages()
-{
-    while (!state().message_queue.empty())
-    {
-        const auto message = state().message_queue.front();
-        state().message_queue.pop_front();
-
-        const auto status = dispatch_subscribed_message(message);
-        if (status != GS1_STATUS_OK)
-        {
-            return status;
-        }
-
-    }
-
-    return GS1_STATUS_OK;
-}
-
-Gs1Status GameRuntime::dispatch_game_message_inline(const GameMessage& message)
-{
-    RuntimeInlineGameMessageScope depth_scope {*this};
-#ifndef NDEBUG
-    RuntimeSemanticGameMessageScope semantic_scope {*this, debug_game_message_type_name(message.type)};
-#endif
-
-    if (inline_game_message_depth_ == k_inline_game_message_warn_depth)
-    {
-        std::fprintf(
-            stderr,
-            "Warning: internal GameMessage inline dispatch depth reached %u for type=%u.\n",
-            inline_game_message_depth_,
-            static_cast<unsigned>(message.type));
-#ifndef NDEBUG
-        print_debug_semantic_game_message_stack();
-#endif
-    }
-
-    assert(
-        inline_game_message_depth_ <= k_inline_game_message_warn_depth &&
-        "Internal GameMessage inline dispatch depth exceeded limit 4.");
-
-    return dispatch_subscribed_message(message);
-}
-
-Gs1Status GameRuntime::dispatch_subscribed_message(const GameMessage& message)
-{
-    if (!is_valid_message_type(message.type) || message.type == GameMessageType::Count)
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    switch (message.type)
-    {
-    case GameMessageType::OpenMainMenu:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<OpenMainMenuMessage>());
-    case GameMessageType::StartNewCampaign:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<StartNewCampaignMessage>());
-    case GameMessageType::SelectDeploymentSite:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<SelectDeploymentSiteMessage>());
-    case GameMessageType::ClearDeploymentSiteSelection:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<ClearDeploymentSiteSelectionMessage>());
-    case GameMessageType::DeploymentSiteSelectionChanged:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<DeploymentSiteSelectionChangedMessage>());
-    case GameMessageType::ProgressionEventOccurred:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<ProgressionEventOccurredMessage>());
-    case GameMessageType::PurchaseEntrySelected:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<PurchaseEntrySelectedMessage>());
-    case GameMessageType::TargetGranted:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<TargetGrantedMessage>());
-    case GameMessageType::CampaignReputationAwardRequested:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<CampaignReputationAwardRequestedMessage>());
-    case GameMessageType::FactionReputationAwardRequested:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<FactionReputationAwardRequestedMessage>());
-    case GameMessageType::TechnologyNodeClaimRequested:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<TechnologyNodeClaimRequestedMessage>());
-    case GameMessageType::TechnologyNodeRefundRequested:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<TechnologyNodeRefundRequestedMessage>());
-    case GameMessageType::StartSiteAttempt:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<StartSiteAttemptMessage>());
-    case GameMessageType::ReturnToRegionalMap:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<ReturnToRegionalMapMessage>());
-    case GameMessageType::SiteAttemptEnded:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteAttemptEndedMessage>());
-    case GameMessageType::SiteRunStarted:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteRunStartedMessage>());
-    case GameMessageType::SiteSceneActivated:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteSceneActivatedMessage>());
-    case GameMessageType::StartSiteAction:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<StartSiteActionMessage>());
-    case GameMessageType::PhoneListingPurchased:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<PhoneListingPurchasedMessage>());
-    case GameMessageType::PhoneListingSold:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<PhoneListingSoldMessage>());
-    case GameMessageType::InventoryTransferCompleted:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<InventoryTransferCompletedMessage>());
-    case GameMessageType::InventoryItemSubmitted:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<InventoryItemSubmittedMessage>());
-    case GameMessageType::InventoryItemUseCompleted:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<InventoryItemUseCompletedMessage>());
-    case GameMessageType::InventoryCraftCompleted:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<InventoryCraftCompletedMessage>());
-    case GameMessageType::EconomyMoneyAwardRequested:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<EconomyMoneyAwardRequestedMessage>());
-    case GameMessageType::SiteUnlockableRevealRequested:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteUnlockableRevealRequestedMessage>());
-    case GameMessageType::RunModifierAwardRequested:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<RunModifierAwardRequestedMessage>());
-    case GameMessageType::SiteRefreshTick:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteRefreshTickMessage>());
-    case GameMessageType::TaskAcceptRequested:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<TaskAcceptRequestedMessage>());
-    case GameMessageType::TaskRewardClaimRequested:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<TaskRewardClaimRequestedMessage>());
-    case GameMessageType::SiteModifierEndRequested:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<SiteModifierEndRequestedMessage>());
-    case GameMessageType::PhoneListingPurchaseRequested:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<PhoneListingPurchaseRequestedMessage>());
-    case GameMessageType::PhoneListingSaleRequested:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<PhoneListingSaleRequestedMessage>());
-    case GameMessageType::InventoryDeliveryBatchRequested:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<InventoryDeliveryBatchRequestedMessage>());
-    case GameMessageType::InventoryDeliveryRequested:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<InventoryDeliveryRequestedMessage>());
-    case GameMessageType::InventoryWorkerPackInsertRequested:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<InventoryWorkerPackInsertRequestedMessage>());
-    case GameMessageType::InventoryItemUseRequested:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<InventoryItemUseRequestedMessage>());
-    case GameMessageType::InventoryItemConsumeRequested:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<InventoryItemConsumeRequestedMessage>());
-    case GameMessageType::InventoryGlobalItemConsumeRequested:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<InventoryGlobalItemConsumeRequestedMessage>());
-    case GameMessageType::InventoryTransferRequested:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<InventoryTransferRequestedMessage>());
-    case GameMessageType::InventoryItemSubmitRequested:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<InventoryItemSubmitRequestedMessage>());
-    case GameMessageType::InventoryCraftContextRequested:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<CraftContextRequestedMessage>());
-    case GameMessageType::SiteGroundCoverPlaced:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteGroundCoverPlacedMessage>());
-    case GameMessageType::SiteTilePlantingCompleted:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<SiteTilePlantingCompletedMessage>());
-    case GameMessageType::SiteTileWatered:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteTileWateredMessage>());
-    case GameMessageType::SiteTileBurialCleared:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteTileBurialClearedMessage>());
-    case GameMessageType::SiteTileHarvested:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteTileHarvestedMessage>());
-    case GameMessageType::SiteDevicePlaced:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteDevicePlacedMessage>());
-    case GameMessageType::SiteDeviceBroken:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteDeviceBrokenMessage>());
-    case GameMessageType::SiteDeviceRepaired:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteDeviceRepairedMessage>());
-    case GameMessageType::SiteDeviceConditionChanged:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<SiteDeviceConditionChangedMessage>());
-    case GameMessageType::WorkerMeterDeltaRequested:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<WorkerMeterDeltaRequestedMessage>());
-    case GameMessageType::WorkerMetersChanged:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<WorkerMetersChangedMessage>());
-    case GameMessageType::TileEcologyChanged:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<TileEcologyChangedMessage>());
-    case GameMessageType::TileEcologyBatchChanged:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<TileEcologyBatchChangedMessage>());
-    case GameMessageType::LivingPlantStabilityChanged:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<LivingPlantStabilityChangedMessage>());
-    case GameMessageType::SiteTileStateChanged:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteTileStateChangedMessage>());
-    case GameMessageType::RestorationProgressChanged:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<RestorationProgressChangedMessage>());
-    case GameMessageType::SiteActionCompleted:
-        return dispatch_typed_game_message_to_subscribers(message.payload_as<SiteActionCompletedMessage>());
-    case GameMessageType::PlacementReservationRequested:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<PlacementReservationRequestedMessage>());
-    case GameMessageType::PlacementReservationAccepted:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<PlacementReservationAcceptedMessage>());
-    case GameMessageType::PlacementReservationRejected:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<PlacementReservationRejectedMessage>());
-    case GameMessageType::PlacementReservationReleased:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<PlacementReservationReleasedMessage>());
-    case GameMessageType::InventoryCraftCommitRequested:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<InventoryCraftCommitRequestedMessage>());
-    case GameMessageType::ContractorHireRequested:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<ContractorHireRequestedMessage>());
-    case GameMessageType::SiteUnlockablePurchaseRequested:
-        return dispatch_typed_game_message_to_subscribers(
-            message.payload_as<SiteUnlockablePurchaseRequestedMessage>());
-    default:
-        break;
-    }
-
-    return GS1_STATUS_OK;
-}
-
 Gs1Status GameRuntime::dispatch_host_messages(std::uint32_t& out_processed_count)
 {
     out_processed_count = 0U;
@@ -1233,11 +1015,6 @@ Gs1Status GameRuntime::dispatch_host_messages(std::uint32_t& out_processed_count
             return status;
         }
 
-        const auto dispatch_status = dispatch_queued_messages();
-        if (dispatch_status != GS1_STATUS_OK)
-        {
-            return dispatch_status;
-        }
     }
 
     return GS1_STATUS_OK;

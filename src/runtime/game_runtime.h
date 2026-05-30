@@ -117,8 +117,6 @@ public:
     [[nodiscard]] const GameState& state() const noexcept { return state_manager_.game_state(); }
     [[nodiscard]] StateManager& state_manager() noexcept { return state_manager_; }
     [[nodiscard]] const StateManager& state_manager() const noexcept { return state_manager_; }
-    [[nodiscard]] GameMessageQueue& message_queue() noexcept { return state().message_queue; }
-    [[nodiscard]] const GameMessageQueue& message_queue() const noexcept { return state().message_queue; }
     [[nodiscard]] std::deque<Gs1RuntimeMessage>& runtime_messages() noexcept { return state().runtime_messages; }
     [[nodiscard]] const std::deque<Gs1RuntimeMessage>& runtime_messages() const noexcept
     {
@@ -128,7 +126,6 @@ public:
     void set_site_world(std::nullptr_t) noexcept { site_world_ = nullptr; }
     [[nodiscard]] SiteWorld* site_world() noexcept { return site_world_.get(); }
     [[nodiscard]] const SiteWorld* site_world() const noexcept { return site_world_.get(); }
-    [[nodiscard]] Gs1Status handle_message(const GameMessage& message);
     template <typename Message>
     [[nodiscard]] Gs1Status handle_message(const Message& message);
     friend struct GameRuntimeProjectionTestAccess;
@@ -161,16 +158,13 @@ private:
 
     void initialize_system_registry();
     [[nodiscard]] Gs1Status dispatch_host_messages(std::uint32_t& out_processed_count);
-    [[nodiscard]] Gs1Status dispatch_queued_messages();
     [[nodiscard]] Gs1Status dispatch_subscribed_host_message(const Gs1HostMessage& message);
     [[nodiscard]] std::optional<Gs1Status> dispatch_runtime_translated_host_message(
         const Gs1HostMessage& message);
-    [[nodiscard]] Gs1Status dispatch_subscribed_message(const GameMessage& message);
     void install_campaign_state(const CampaignState& campaign);
     void install_site_run_state(const SiteRunState& site_run);
     void clear_site_run_state();
     void run_fixed_step();
-    [[nodiscard]] Gs1Status dispatch_game_message_inline(const GameMessage& message);
     template <typename Message>
     [[nodiscard]] Gs1Status dispatch_game_message_inline(const Message& message);
     template <typename Message>
@@ -249,70 +243,48 @@ inline Gs1Status GameRuntime::handle_message(const Message& message)
 template <typename Message>
 inline Gs1Status GameRuntime::dispatch_game_message_inline(const Message& message)
 {
-    if constexpr (!typed_gameplay_dispatch_traits<Message>::enabled)
+    static_assert(
+        typed_gameplay_dispatch_traits<Message>::enabled,
+        "GameRuntime internal gameplay dispatch requires a typed gameplay dispatch trait.");
+
+    struct InlineDepthScope final
     {
-        return dispatch_game_message_inline(make_game_message(message));
-    }
-    else
-    {
-        struct InlineDepthScope final
+        explicit InlineDepthScope(GameRuntime& runtime) noexcept
+            : runtime_(&runtime)
         {
-            explicit InlineDepthScope(GameRuntime& runtime) noexcept
-                : runtime_(&runtime)
-            {
-                ++runtime_->inline_game_message_depth_;
-            }
-
-            ~InlineDepthScope()
-            {
-                if (runtime_ != nullptr && runtime_->inline_game_message_depth_ > 0U)
-                {
-                    --runtime_->inline_game_message_depth_;
-                }
-            }
-
-            GameRuntime* runtime_ {nullptr};
-        };
-
-        struct MutationScope final
-        {
-            MutationScope(StateManager& state_manager, IRuntimeSystem& system)
-                : state_manager_(&state_manager)
-            {
-                state_manager_->push_current_mutating_system(&system);
-            }
-
-            ~MutationScope()
-            {
-                if (state_manager_ != nullptr)
-                {
-                    state_manager_->pop_current_mutating_system();
-                }
-            }
-
-            StateManager* state_manager_ {nullptr};
-        };
-
-        InlineDepthScope depth_scope {*this};
-        RuntimeSemanticGameMessageScope semantic_scope {*this, runtime_debug_type_name<Message>()};
-        constexpr std::uint32_t warn_depth = 4U;
-
-        if (inline_game_message_depth_ == warn_depth)
-        {
-            std::fprintf(
-                stderr,
-                "Warning: internal typed gameplay message inline dispatch depth reached %u.\n",
-                inline_game_message_depth_);
-#ifndef NDEBUG
-            print_debug_semantic_game_message_stack();
-#endif
+            ++runtime_->inline_game_message_depth_;
         }
-        assert(
-            inline_game_message_depth_ <= warn_depth &&
-            "Internal typed gameplay message inline dispatch depth exceeded limit 4.");
 
-        return dispatch_typed_game_message_to_subscribers(message);
+        ~InlineDepthScope()
+        {
+            if (runtime_ != nullptr && runtime_->inline_game_message_depth_ > 0U)
+            {
+                --runtime_->inline_game_message_depth_;
+            }
+        }
+
+        GameRuntime* runtime_ {nullptr};
+    };
+
+    InlineDepthScope depth_scope {*this};
+    RuntimeSemanticGameMessageScope semantic_scope {*this, runtime_debug_type_name<Message>()};
+    constexpr std::uint32_t warn_depth = 4U;
+
+    if (inline_game_message_depth_ == warn_depth)
+    {
+        std::fprintf(
+            stderr,
+            "Warning: internal typed gameplay message inline dispatch depth reached %u.\n",
+            inline_game_message_depth_);
+#ifndef NDEBUG
+        print_debug_semantic_game_message_stack();
+#endif
     }
+    assert(
+        inline_game_message_depth_ <= warn_depth &&
+        "Internal typed gameplay message inline dispatch depth exceeded limit 4.");
+
+    return dispatch_typed_game_message_to_subscribers(message);
 }
 
 template <typename Message>

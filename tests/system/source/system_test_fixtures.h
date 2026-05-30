@@ -385,6 +385,280 @@ inline CampaignSystemContext make_campaign_context(CampaignState& campaign) noex
     return CampaignSystemContext {campaign};
 }
 
+template <typename System, typename Message>
+inline constexpr bool system_declares_message_subscription_v =
+    requires { typename System::subscribed_messages; } &&
+    type_list_contains_v<Message, typename System::subscribed_messages>;
+
+template <typename System, typename Message>
+inline Gs1Status invoke_typed_system_message(
+    System& system,
+    RuntimeInvocation& invocation,
+    const Message& message)
+{
+    if constexpr (requires(System& candidate, RuntimeInvocation& runtime_invocation, const Message& payload) {
+                      { candidate.handle(runtime_invocation, payload) } -> std::convertible_to<Gs1Status>;
+                  })
+    {
+        return system.handle(invocation, message);
+    }
+    else
+    {
+        (void)system;
+        (void)invocation;
+        (void)message;
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+}
+
+#define GS1_TEST_TYPED_MESSAGE_CASE(EnumValue, MessageType) \
+    case GameMessageType::EnumValue: \
+        return invoke_typed_system_message(system, invocation, message.payload_as<MessageType>())
+
+template <typename System>
+inline Gs1Status dispatch_compat_game_message_to_typed_handler(
+    System& system,
+    RuntimeInvocation& invocation,
+    const GameMessage& message)
+{
+    switch (message.type)
+    {
+        GS1_TEST_TYPED_MESSAGE_CASE(OpenMainMenu, OpenMainMenuMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(StartNewCampaign, StartNewCampaignMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SelectDeploymentSite, SelectDeploymentSiteMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(ClearDeploymentSiteSelection, ClearDeploymentSiteSelectionMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(DeploymentSiteSelectionChanged, DeploymentSiteSelectionChangedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(ProgressionEventOccurred, ProgressionEventOccurredMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(PurchaseEntrySelected, PurchaseEntrySelectedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(TargetGranted, TargetGrantedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(CampaignReputationAwardRequested, CampaignReputationAwardRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(FactionReputationAwardRequested, FactionReputationAwardRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(TechnologyNodeClaimRequested, TechnologyNodeClaimRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(TechnologyNodeRefundRequested, TechnologyNodeRefundRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(StartSiteAttempt, StartSiteAttemptMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(ReturnToRegionalMap, ReturnToRegionalMapMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteAttemptEnded, SiteAttemptEndedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteRunStarted, SiteRunStartedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteSceneActivated, SiteSceneActivatedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(StartSiteAction, StartSiteActionMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(CancelSiteAction, CancelSiteActionMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(PhoneListingPurchased, PhoneListingPurchasedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(PhoneListingSold, PhoneListingSoldMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(InventoryTransferCompleted, InventoryTransferCompletedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(InventoryItemSubmitted, InventoryItemSubmittedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(InventoryItemUseCompleted, InventoryItemUseCompletedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(InventoryCraftCompleted, InventoryCraftCompletedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(EconomyMoneyAwardRequested, EconomyMoneyAwardRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteUnlockableRevealRequested, SiteUnlockableRevealRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(RunModifierAwardRequested, RunModifierAwardRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteRefreshTick, SiteRefreshTickMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(TaskAcceptRequested, TaskAcceptRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(TaskRewardClaimRequested, TaskRewardClaimRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteModifierEndRequested, SiteModifierEndRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(PhoneListingPurchaseRequested, PhoneListingPurchaseRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(PhoneListingSaleRequested, PhoneListingSaleRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(InventoryDeliveryRequested, InventoryDeliveryRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(InventoryDeliveryBatchRequested, InventoryDeliveryBatchRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(InventoryWorkerPackInsertRequested, InventoryWorkerPackInsertRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(InventoryItemUseRequested, InventoryItemUseRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(InventoryItemConsumeRequested, InventoryItemConsumeRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(InventoryGlobalItemConsumeRequested, InventoryGlobalItemConsumeRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(InventoryTransferRequested, InventoryTransferRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(InventoryItemSubmitRequested, InventoryItemSubmitRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(InventorySlotTapped, InventorySlotTappedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(InventoryCraftContextRequested, CraftContextRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(PlacementModeCursorMoved, PlacementModeCursorMovedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(InventoryCraftCommitRequested, InventoryCraftCommitRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(ContractorHireRequested, ContractorHireRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteUnlockablePurchaseRequested, SiteUnlockablePurchaseRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteGroundCoverPlaced, SiteGroundCoverPlacedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteTilePlantingCompleted, SiteTilePlantingCompletedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteTileWatered, SiteTileWateredMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteTileBurialCleared, SiteTileBurialClearedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteTileHarvested, SiteTileHarvestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteDevicePlaced, SiteDevicePlacedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteDeviceBroken, SiteDeviceBrokenMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteDeviceRepaired, SiteDeviceRepairedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteDeviceConditionChanged, SiteDeviceConditionChangedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(WorkerMeterDeltaRequested, WorkerMeterDeltaRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(WorkerMetersChanged, WorkerMetersChangedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(TileEcologyChanged, TileEcologyChangedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(TileEcologyBatchChanged, TileEcologyBatchChangedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(LivingPlantStabilityChanged, LivingPlantStabilityChangedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteTileStateChanged, SiteTileStateChangedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(RestorationProgressChanged, RestorationProgressChangedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(SiteActionCompleted, SiteActionCompletedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(PlacementReservationRequested, PlacementReservationRequestedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(PlacementReservationAccepted, PlacementReservationAcceptedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(PlacementReservationRejected, PlacementReservationRejectedMessage);
+        GS1_TEST_TYPED_MESSAGE_CASE(PlacementReservationReleased, PlacementReservationReleasedMessage);
+    case GameMessageType::Count:
+    case GameMessageType::CampaignCashDeltaRequested:
+    case GameMessageType::PresentLog:
+    case GameMessageType::SiteActionStarted:
+    case GameMessageType::SiteActionFailed:
+    case GameMessageType::PlacementModeCommitRejected:
+    default:
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+}
+
+template <typename System>
+inline constexpr bool system_subscribes_to_message(GameMessageType type) noexcept
+{
+    switch (type)
+    {
+    case GameMessageType::OpenMainMenu:
+        return system_declares_message_subscription_v<System, OpenMainMenuMessage>;
+    case GameMessageType::StartNewCampaign:
+        return system_declares_message_subscription_v<System, StartNewCampaignMessage>;
+    case GameMessageType::SelectDeploymentSite:
+        return system_declares_message_subscription_v<System, SelectDeploymentSiteMessage>;
+    case GameMessageType::ClearDeploymentSiteSelection:
+        return system_declares_message_subscription_v<System, ClearDeploymentSiteSelectionMessage>;
+    case GameMessageType::DeploymentSiteSelectionChanged:
+        return system_declares_message_subscription_v<System, DeploymentSiteSelectionChangedMessage>;
+    case GameMessageType::ProgressionEventOccurred:
+        return system_declares_message_subscription_v<System, ProgressionEventOccurredMessage>;
+    case GameMessageType::PurchaseEntrySelected:
+        return system_declares_message_subscription_v<System, PurchaseEntrySelectedMessage>;
+    case GameMessageType::TargetGranted:
+        return system_declares_message_subscription_v<System, TargetGrantedMessage>;
+    case GameMessageType::CampaignReputationAwardRequested:
+        return system_declares_message_subscription_v<System, CampaignReputationAwardRequestedMessage>;
+    case GameMessageType::FactionReputationAwardRequested:
+        return system_declares_message_subscription_v<System, FactionReputationAwardRequestedMessage>;
+    case GameMessageType::TechnologyNodeClaimRequested:
+        return system_declares_message_subscription_v<System, TechnologyNodeClaimRequestedMessage>;
+    case GameMessageType::TechnologyNodeRefundRequested:
+        return system_declares_message_subscription_v<System, TechnologyNodeRefundRequestedMessage>;
+    case GameMessageType::StartSiteAttempt:
+        return system_declares_message_subscription_v<System, StartSiteAttemptMessage>;
+    case GameMessageType::ReturnToRegionalMap:
+        return system_declares_message_subscription_v<System, ReturnToRegionalMapMessage>;
+    case GameMessageType::SiteAttemptEnded:
+        return system_declares_message_subscription_v<System, SiteAttemptEndedMessage>;
+    case GameMessageType::SiteRunStarted:
+        return system_declares_message_subscription_v<System, SiteRunStartedMessage>;
+    case GameMessageType::SiteSceneActivated:
+        return system_declares_message_subscription_v<System, SiteSceneActivatedMessage>;
+    case GameMessageType::StartSiteAction:
+        return system_declares_message_subscription_v<System, StartSiteActionMessage>;
+    case GameMessageType::CancelSiteAction:
+        return system_declares_message_subscription_v<System, CancelSiteActionMessage>;
+    case GameMessageType::PhoneListingPurchased:
+        return system_declares_message_subscription_v<System, PhoneListingPurchasedMessage>;
+    case GameMessageType::PhoneListingSold:
+        return system_declares_message_subscription_v<System, PhoneListingSoldMessage>;
+    case GameMessageType::InventoryTransferCompleted:
+        return system_declares_message_subscription_v<System, InventoryTransferCompletedMessage>;
+    case GameMessageType::InventoryItemSubmitted:
+        return system_declares_message_subscription_v<System, InventoryItemSubmittedMessage>;
+    case GameMessageType::InventoryItemUseCompleted:
+        return system_declares_message_subscription_v<System, InventoryItemUseCompletedMessage>;
+    case GameMessageType::InventoryCraftCompleted:
+        return system_declares_message_subscription_v<System, InventoryCraftCompletedMessage>;
+    case GameMessageType::EconomyMoneyAwardRequested:
+        return system_declares_message_subscription_v<System, EconomyMoneyAwardRequestedMessage>;
+    case GameMessageType::SiteUnlockableRevealRequested:
+        return system_declares_message_subscription_v<System, SiteUnlockableRevealRequestedMessage>;
+    case GameMessageType::RunModifierAwardRequested:
+        return system_declares_message_subscription_v<System, RunModifierAwardRequestedMessage>;
+    case GameMessageType::SiteRefreshTick:
+        return system_declares_message_subscription_v<System, SiteRefreshTickMessage>;
+    case GameMessageType::TaskAcceptRequested:
+        return system_declares_message_subscription_v<System, TaskAcceptRequestedMessage>;
+    case GameMessageType::TaskRewardClaimRequested:
+        return system_declares_message_subscription_v<System, TaskRewardClaimRequestedMessage>;
+    case GameMessageType::SiteModifierEndRequested:
+        return system_declares_message_subscription_v<System, SiteModifierEndRequestedMessage>;
+    case GameMessageType::PhoneListingPurchaseRequested:
+        return system_declares_message_subscription_v<System, PhoneListingPurchaseRequestedMessage>;
+    case GameMessageType::PhoneListingSaleRequested:
+        return system_declares_message_subscription_v<System, PhoneListingSaleRequestedMessage>;
+    case GameMessageType::InventoryDeliveryRequested:
+        return system_declares_message_subscription_v<System, InventoryDeliveryRequestedMessage>;
+    case GameMessageType::InventoryDeliveryBatchRequested:
+        return system_declares_message_subscription_v<System, InventoryDeliveryBatchRequestedMessage>;
+    case GameMessageType::InventoryWorkerPackInsertRequested:
+        return system_declares_message_subscription_v<System, InventoryWorkerPackInsertRequestedMessage>;
+    case GameMessageType::InventoryItemUseRequested:
+        return system_declares_message_subscription_v<System, InventoryItemUseRequestedMessage>;
+    case GameMessageType::InventoryItemConsumeRequested:
+        return system_declares_message_subscription_v<System, InventoryItemConsumeRequestedMessage>;
+    case GameMessageType::InventoryGlobalItemConsumeRequested:
+        return system_declares_message_subscription_v<System, InventoryGlobalItemConsumeRequestedMessage>;
+    case GameMessageType::InventoryTransferRequested:
+        return system_declares_message_subscription_v<System, InventoryTransferRequestedMessage>;
+    case GameMessageType::InventoryItemSubmitRequested:
+        return system_declares_message_subscription_v<System, InventoryItemSubmitRequestedMessage>;
+    case GameMessageType::InventorySlotTapped:
+        return system_declares_message_subscription_v<System, InventorySlotTappedMessage>;
+    case GameMessageType::InventoryCraftContextRequested:
+        return system_declares_message_subscription_v<System, CraftContextRequestedMessage>;
+    case GameMessageType::PlacementModeCursorMoved:
+        return system_declares_message_subscription_v<System, PlacementModeCursorMovedMessage>;
+    case GameMessageType::InventoryCraftCommitRequested:
+        return system_declares_message_subscription_v<System, InventoryCraftCommitRequestedMessage>;
+    case GameMessageType::ContractorHireRequested:
+        return system_declares_message_subscription_v<System, ContractorHireRequestedMessage>;
+    case GameMessageType::SiteUnlockablePurchaseRequested:
+        return system_declares_message_subscription_v<System, SiteUnlockablePurchaseRequestedMessage>;
+    case GameMessageType::SiteGroundCoverPlaced:
+        return system_declares_message_subscription_v<System, SiteGroundCoverPlacedMessage>;
+    case GameMessageType::SiteTilePlantingCompleted:
+        return system_declares_message_subscription_v<System, SiteTilePlantingCompletedMessage>;
+    case GameMessageType::SiteTileWatered:
+        return system_declares_message_subscription_v<System, SiteTileWateredMessage>;
+    case GameMessageType::SiteTileBurialCleared:
+        return system_declares_message_subscription_v<System, SiteTileBurialClearedMessage>;
+    case GameMessageType::SiteTileHarvested:
+        return system_declares_message_subscription_v<System, SiteTileHarvestedMessage>;
+    case GameMessageType::SiteDevicePlaced:
+        return system_declares_message_subscription_v<System, SiteDevicePlacedMessage>;
+    case GameMessageType::SiteDeviceBroken:
+        return system_declares_message_subscription_v<System, SiteDeviceBrokenMessage>;
+    case GameMessageType::SiteDeviceRepaired:
+        return system_declares_message_subscription_v<System, SiteDeviceRepairedMessage>;
+    case GameMessageType::SiteDeviceConditionChanged:
+        return system_declares_message_subscription_v<System, SiteDeviceConditionChangedMessage>;
+    case GameMessageType::WorkerMeterDeltaRequested:
+        return system_declares_message_subscription_v<System, WorkerMeterDeltaRequestedMessage>;
+    case GameMessageType::WorkerMetersChanged:
+        return system_declares_message_subscription_v<System, WorkerMetersChangedMessage>;
+    case GameMessageType::TileEcologyChanged:
+        return system_declares_message_subscription_v<System, TileEcologyChangedMessage>;
+    case GameMessageType::TileEcologyBatchChanged:
+        return system_declares_message_subscription_v<System, TileEcologyBatchChangedMessage>;
+    case GameMessageType::LivingPlantStabilityChanged:
+        return system_declares_message_subscription_v<System, LivingPlantStabilityChangedMessage>;
+    case GameMessageType::SiteTileStateChanged:
+        return system_declares_message_subscription_v<System, SiteTileStateChangedMessage>;
+    case GameMessageType::RestorationProgressChanged:
+        return system_declares_message_subscription_v<System, RestorationProgressChangedMessage>;
+    case GameMessageType::SiteActionCompleted:
+        return system_declares_message_subscription_v<System, SiteActionCompletedMessage>;
+    case GameMessageType::PlacementReservationRequested:
+        return system_declares_message_subscription_v<System, PlacementReservationRequestedMessage>;
+    case GameMessageType::PlacementReservationAccepted:
+        return system_declares_message_subscription_v<System, PlacementReservationAcceptedMessage>;
+    case GameMessageType::PlacementReservationRejected:
+        return system_declares_message_subscription_v<System, PlacementReservationRejectedMessage>;
+    case GameMessageType::PlacementReservationReleased:
+        return system_declares_message_subscription_v<System, PlacementReservationReleasedMessage>;
+    case GameMessageType::Count:
+    case GameMessageType::CampaignCashDeltaRequested:
+    case GameMessageType::PresentLog:
+    case GameMessageType::SiteActionStarted:
+    case GameMessageType::SiteActionFailed:
+    case GameMessageType::PlacementModeCommitRejected:
+    default:
+        return false;
+    }
+}
+
+#undef GS1_TEST_TYPED_MESSAGE_CASE
+
 struct SplitRuntimeFixture final
 {
     GameState state {};
@@ -489,7 +763,7 @@ inline Gs1Status invoke_system_message(
         move_direction);
     auto invocation = fixture.make_invocation(move_direction);
     System system {};
-    const auto status = system.process_game_message(invocation, message);
+    const auto status = dispatch_compat_game_message_to_typed_handler(system, invocation, message);
     fixture.sync(invocation, app_state, campaign, active_site_run, runtime_messages, message_queue);
     return status;
 }

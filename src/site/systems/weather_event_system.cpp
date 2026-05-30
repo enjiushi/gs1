@@ -369,12 +369,6 @@ const char* WeatherEventSystem::name() const noexcept
     return access().system_name.data();
 }
 
-GameMessageSubscriptionSpan WeatherEventSystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {GameMessageType::SiteRunStarted};
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan WeatherEventSystem::subscribed_host_messages() const noexcept
 {
     return {};

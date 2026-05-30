@@ -14,33 +14,15 @@
 namespace
 {
 using gs1::GameMessage;
-using gs1::GameMessageSubscriptionSpan;
 using gs1::HostMessageSubscriptionSpan;
 using gs1::IRuntimeSystem;
 using gs1::RuntimeInvocation;
 using gs1::StateManager;
 using gs1::StateSetId;
 
-struct StateManagerTestAccess
-{
-    static void push_current_mutating_system(StateManager& state_manager, IRuntimeSystem& system)
-    {
-        state_manager.push_current_mutating_system(&system);
-    }
-
-    static void pop_current_mutating_system(StateManager& state_manager)
-    {
-        state_manager.pop_current_mutating_system();
-    }
-};
-
 struct StubSystemBase : IRuntimeSystem
 {
     [[nodiscard]] const char* name() const noexcept override { return "StubSystem"; }
-    [[nodiscard]] GameMessageSubscriptionSpan subscribed_game_messages() const noexcept override
-    {
-        return {};
-    }
     [[nodiscard]] HostMessageSubscriptionSpan subscribed_host_messages() const noexcept override
     {
         return {};
@@ -52,10 +34,6 @@ struct StubSystemBase : IRuntimeSystem
     [[nodiscard]] std::optional<std::uint32_t> fixed_step_order() const noexcept override
     {
         return std::nullopt;
-    }
-    [[nodiscard]] Gs1Status process_game_message(RuntimeInvocation&, const GameMessage&) override
-    {
-        return GS1_STATUS_OK;
     }
     [[nodiscard]] Gs1Status process_host_message(RuntimeInvocation&, const Gs1HostMessage&) override
     {
@@ -94,6 +72,22 @@ struct DuplicateCampaignCoreOwnerSystem final : StubSystemBase
     }
 };
 }  // namespace
+
+namespace gs1
+{
+struct StateManagerTestAccess
+{
+    static void push_current_mutating_system(StateManager& state_manager, IRuntimeSystem& system)
+    {
+        state_manager.push_current_mutating_system(&system);
+    }
+
+    static void pop_current_mutating_system(StateManager& state_manager)
+    {
+        state_manager.pop_current_mutating_system();
+    }
+};
+}  // namespace gs1
 
 int main()
 {
@@ -134,13 +128,13 @@ int main()
     assert(state_manager.active_resolver(StateSetId::SiteRunMeta) == nullptr);
     assert(state_manager.current_mutating_system() == nullptr);
 
-    StateManagerTestAccess::push_current_mutating_system(state_manager, campaign_core_owner);
+    gs1::StateManagerTestAccess::push_current_mutating_system(state_manager, campaign_core_owner);
     assert(state_manager.current_mutating_system() == &campaign_core_owner);
-    StateManagerTestAccess::push_current_mutating_system(state_manager, campaign_technology_owner);
+    gs1::StateManagerTestAccess::push_current_mutating_system(state_manager, campaign_technology_owner);
     assert(state_manager.current_mutating_system() == &campaign_technology_owner);
-    StateManagerTestAccess::pop_current_mutating_system(state_manager);
+    gs1::StateManagerTestAccess::pop_current_mutating_system(state_manager);
     assert(state_manager.current_mutating_system() == &campaign_core_owner);
-    StateManagerTestAccess::pop_current_mutating_system(state_manager);
+    gs1::StateManagerTestAccess::pop_current_mutating_system(state_manager);
     assert(state_manager.current_mutating_system() == nullptr);
 
     Gs1RuntimeCreateDesc create_desc {};

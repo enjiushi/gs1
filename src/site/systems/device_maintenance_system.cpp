@@ -299,16 +299,6 @@ const char* DeviceMaintenanceSystem::name() const noexcept
     return access().system_name.data();
 }
 
-GameMessageSubscriptionSpan DeviceMaintenanceSystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::SiteRunStarted,
-        GameMessageType::SiteDevicePlaced,
-        GameMessageType::SiteDeviceRepaired,
-    };
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan DeviceMaintenanceSystem::subscribed_host_messages() const noexcept
 {
     return {};

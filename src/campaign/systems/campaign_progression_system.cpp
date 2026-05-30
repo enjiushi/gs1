@@ -276,16 +276,6 @@ const char* CampaignProgressionSystem::name() const noexcept
     return "CampaignProgressionSystem";
 }
 
-GameMessageSubscriptionSpan CampaignProgressionSystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::ProgressionEventOccurred,
-        GameMessageType::PurchaseEntrySelected,
-        GameMessageType::CampaignReputationAwardRequested,
-        GameMessageType::FactionReputationAwardRequested};
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan CampaignProgressionSystem::subscribed_host_messages() const noexcept
 {
     return {};

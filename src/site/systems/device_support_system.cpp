@@ -103,11 +103,6 @@ const char* DeviceSupportSystem::name() const noexcept
     return access().system_name.data();
 }
 
-GameMessageSubscriptionSpan DeviceSupportSystem::subscribed_game_messages() const noexcept
-{
-    return {};
-}
-
 HostMessageSubscriptionSpan DeviceSupportSystem::subscribed_host_messages() const noexcept
 {
     return {};

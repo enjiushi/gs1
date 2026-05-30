@@ -222,16 +222,6 @@ const char* PlacementValidationSystem::name() const noexcept
     return access().system_name.data();
 }
 
-GameMessageSubscriptionSpan PlacementValidationSystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::SiteRunStarted,
-        GameMessageType::PlacementReservationRequested,
-        GameMessageType::PlacementReservationReleased,
-    };
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan PlacementValidationSystem::subscribed_host_messages() const noexcept
 {
     return {};

@@ -115,12 +115,6 @@ const char* CampDurabilitySystem::name() const noexcept
     return access().system_name.data();
 }
 
-GameMessageSubscriptionSpan CampDurabilitySystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {GameMessageType::SiteRunStarted};
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan CampDurabilitySystem::subscribed_host_messages() const noexcept
 {
     return {};

@@ -230,13 +230,6 @@ const char* SiteCompletionSystem::name() const noexcept
     return access().system_name.data();
 }
 
-GameMessageSubscriptionSpan SiteCompletionSystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::SiteAttemptEnded};
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan SiteCompletionSystem::subscribed_host_messages() const noexcept
 {
     return {};

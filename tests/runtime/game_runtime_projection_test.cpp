@@ -37,6 +37,7 @@ struct GameRuntimeProjectionTestAccess
         write_site_run_state_to_state_sets(site_run.value(), runtime.state(), runtime.state_manager());
         runtime.site_world_ = site_run->site_world;
     }
+
 };
 }  // namespace gs1
 
@@ -200,11 +201,117 @@ void progression_events_update_campaign_view_and_progression_entries()
 
     assert(found_unlocked_entry);
 }
+
+void translated_site_host_messages_mutate_authoritative_runtime_state()
+{
+    Gs1RuntimeCreateDesc create_desc {};
+    create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    create_desc.api_version = gs1::k_api_version;
+    create_desc.fixed_step_seconds = 1.0 / 60.0;
+    create_desc.adapter_config_json_utf8 = nullptr;
+
+    GameRuntime runtime {create_desc};
+    bootstrap_site_one(runtime);
+
+    auto site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
+    const auto worker_position_before = gs1::site_world_access::worker_position(site_run.value());
+
+    gs1::GameRuntimeProjectionTestAccess::mutate_active_site_run(
+        runtime,
+        [](SiteRunState& active_site_run)
+        {
+            auto ecology = gs1::site_world_access::tile_ecology(active_site_run, TileCoord {0, 0});
+            ecology.plant_id = gs1::PlantId {gs1::k_plant_ordos_wormwood};
+            ecology.plant_density = 80.0f;
+            gs1::site_world_access::set_tile_ecology(active_site_run, TileCoord {0, 0}, ecology);
+        });
+
+    {
+        Gs1HostMessage move_event {};
+        move_event.type = GS1_HOST_EVENT_SITE_MOVE_DIRECTION;
+        move_event.payload.site_move_direction.world_move_x = 1.0f;
+        move_event.payload.site_move_direction.world_move_y = 0.0f;
+        move_event.payload.site_move_direction.world_move_z = 0.0f;
+        assert(runtime.submit_host_messages(&move_event, 1U) == GS1_STATUS_OK);
+
+        Gs1Phase1Request request {};
+        request.struct_size = sizeof(Gs1Phase1Request);
+        request.real_delta_seconds = 1.0 / 60.0;
+        Gs1Phase1Result result {};
+        assert(runtime.run_phase1(request, result) == GS1_STATUS_OK);
+        assert(result.processed_host_message_count == 1U);
+        assert(result.fixed_steps_executed == 1U);
+    }
+
+    site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
+    const auto worker_position_after = gs1::site_world_access::worker_position(site_run.value());
+    assert(worker_position_after.tile_x > worker_position_before.tile_x);
+
+    {
+        Gs1HostMessage context_event {};
+        context_event.type = GS1_HOST_EVENT_SITE_CONTEXT_REQUEST;
+        context_event.payload.site_context_request.tile_x = 1;
+        context_event.payload.site_context_request.tile_y = 0;
+        assert(runtime.submit_host_messages(&context_event, 1U) == GS1_STATUS_OK);
+        run_phase2(runtime);
+    }
+
+    site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
+    assert(site_run->craft.context.occupied);
+    assert(site_run->craft.context.tile_coord.x == 1);
+    assert(site_run->craft.context.tile_coord.y == 0);
+
+    {
+        Gs1HostMessage tap_event {};
+        tap_event.type = GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP;
+        tap_event.payload.site_inventory_slot_tap.storage_id = site_run->inventory.worker_pack_storage_id;
+        tap_event.payload.site_inventory_slot_tap.slot_index = 0U;
+        tap_event.payload.site_inventory_slot_tap.container_kind = GS1_INVENTORY_CONTAINER_WORKER_PACK;
+        assert(runtime.submit_host_messages(&tap_event, 1U) == GS1_STATUS_OK);
+        run_phase2(runtime);
+    }
+
+    site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
+
+    {
+        Gs1HostMessage action_event {};
+        action_event.type = GS1_HOST_EVENT_SITE_ACTION_REQUEST;
+        action_event.payload.site_action_request.action_kind = GS1_SITE_ACTION_WATER;
+        action_event.payload.site_action_request.target_tile_x = 0;
+        action_event.payload.site_action_request.target_tile_y = 0;
+        action_event.payload.site_action_request.quantity = 1U;
+        assert(runtime.submit_host_messages(&action_event, 1U) == GS1_STATUS_OK);
+        run_phase2(runtime);
+    }
+
+    site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
+    assert(site_run->site_action.current_action_id.has_value());
+    assert(site_run->site_action.action_kind == gs1::ActionKind::Water);
+
+    {
+        Gs1HostMessage cancel_event {};
+        cancel_event.type = GS1_HOST_EVENT_SITE_ACTION_CANCEL;
+        cancel_event.payload.site_action_cancel.flags = GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION;
+        assert(runtime.submit_host_messages(&cancel_event, 1U) == GS1_STATUS_OK);
+        run_phase2(runtime);
+    }
+
+    site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
+    assert(!site_run->site_action.current_action_id.has_value());
+    assert(site_run->site_action.action_kind == gs1::ActionKind::None);
+}
 }  // namespace
 
 int main()
 {
     campaign_and_site_state_view_exposes_current_runtime_state();
     progression_events_update_campaign_view_and_progression_entries();
+    translated_site_host_messages_mutate_authoritative_runtime_state();
     return 0;
 }

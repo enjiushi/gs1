@@ -37,11 +37,6 @@ const char* SiteTimeSystem::name() const noexcept
     return access().system_name.data();
 }
 
-GameMessageSubscriptionSpan SiteTimeSystem::subscribed_game_messages() const noexcept
-{
-    return {};
-}
-
 HostMessageSubscriptionSpan SiteTimeSystem::subscribed_host_messages() const noexcept
 {
     return {};

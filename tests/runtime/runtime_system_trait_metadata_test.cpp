@@ -30,6 +30,7 @@
 #include "site/systems/weather_event_system.h"
 #include "site/systems/worker_condition_system.h"
 
+#include <array>
 #include <optional>
 #include <type_traits>
 
@@ -45,6 +46,18 @@ struct GameRuntimeProjectionTestAccess
     {
         return runtime.host_message_subscribers_[static_cast<std::size_t>(type)].size();
     }
+
+    [[nodiscard]] static std::size_t fixed_step_system_count(const GameRuntime& runtime)
+    {
+        return runtime.fixed_step_systems_.size();
+    }
+
+    [[nodiscard]] static std::uint32_t fixed_step_order(
+        const GameRuntime& runtime,
+        std::size_t index)
+    {
+        return runtime.fixed_step_systems_[index].order;
+    }
 };
 }  // namespace gs1
 
@@ -54,7 +67,6 @@ using gs1::CampaignFlowSystem;
 using gs1::GameSystems;
 using gs1::GameMessage;
 using gs1::GameMessageType;
-using gs1::GameMessageSubscriptionSpan;
 using gs1::GameRuntime;
 using gs1::HostMessageSubscriptionSpan;
 using gs1::IRuntimeSystem;
@@ -63,6 +75,9 @@ using gs1::SiteTimeSystem;
 using gs1::StartNewCampaignMessage;
 using gs1::TechnologyState;
 using gs1::type_list_size_v;
+
+constexpr std::array<std::uint32_t, 20U> k_expected_fixed_step_orders {
+    0U, 1U, 2U, 3U, 4U, 5U, 6U, 7U, 8U, 9U, 10U, 11U, 12U, 13U, 14U, 15U, 16U, 17U, 19U, 20U};
 
 using ExpectedRuntimeMessageManifest = gs1::type_list<
     gs1::runtime_message_type_constant<GS1_ENGINE_MESSAGE_SITE_ACTION_UPDATE>,
@@ -94,10 +109,6 @@ constexpr bool typed_dispatch_has_subscribers_v =
 struct FallbackOnlySystem final : IRuntimeSystem
 {
     [[nodiscard]] const char* name() const noexcept override { return "FallbackOnlySystem"; }
-    [[nodiscard]] GameMessageSubscriptionSpan subscribed_game_messages() const noexcept override
-    {
-        return {};
-    }
     [[nodiscard]] HostMessageSubscriptionSpan subscribed_host_messages() const noexcept override
     {
         return {};
@@ -109,10 +120,6 @@ struct FallbackOnlySystem final : IRuntimeSystem
     [[nodiscard]] std::optional<std::uint32_t> fixed_step_order() const noexcept override
     {
         return 42U;
-    }
-    [[nodiscard]] Gs1Status process_game_message(RuntimeInvocation&, const GameMessage&) override
-    {
-        return GS1_STATUS_OK;
     }
     [[nodiscard]] Gs1Status process_host_message(RuntimeInvocation&, const Gs1HostMessage&) override
     {
@@ -149,6 +156,9 @@ int main()
                   GameSystems::tuple_type>);
     static_assert(std::is_same_v<
                   gs1::runtime_emitted_runtime_message_manifest_t<GameSystems>,
+                  ExpectedRuntimeMessageManifest>);
+    static_assert(gs1::runtime_emitted_runtime_message_manifest_covers_v<
+                  GameSystems,
                   ExpectedRuntimeMessageManifest>);
     static_assert(has_typed_dispatch_v<gs1::StartNewCampaignMessage>);
     static_assert(has_typed_dispatch_v<gs1::TaskAcceptRequestedMessage>);
@@ -244,18 +254,28 @@ int main()
     {
         return 11;
     }
-
-    GameMessage start_campaign_message {};
-    start_campaign_message.type = GameMessageType::StartNewCampaign;
-    start_campaign_message.set_payload(StartNewCampaignMessage {42ULL, 30U});
-    if (runtime.handle_message(start_campaign_message) != GS1_STATUS_OK)
+    if (gs1::GameRuntimeProjectionTestAccess::fixed_step_system_count(runtime) !=
+        k_expected_fixed_step_orders.size())
     {
         return 12;
+    }
+    for (std::size_t index = 0; index < k_expected_fixed_step_orders.size(); ++index)
+    {
+        if (gs1::GameRuntimeProjectionTestAccess::fixed_step_order(runtime, index) !=
+            k_expected_fixed_step_orders[index])
+        {
+            return static_cast<int>(13 + index);
+        }
+    }
+
+    if (runtime.handle_message(StartNewCampaignMessage {42ULL, 30U}) != GS1_STATUS_OK)
+    {
+        return 40;
     }
 
     if (!runtime.state().campaign_core.has_value())
     {
-        return 13;
+        return 41;
     }
 
     GameRuntime host_runtime {create_desc};
@@ -263,37 +283,37 @@ int main()
             host_runtime,
             GS1_HOST_EVENT_GAMEPLAY_ACTION) != 0U)
     {
-        return 14;
+        return 42;
     }
     if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
             host_runtime,
             GS1_HOST_EVENT_SITE_MOVE_DIRECTION) != 0U)
     {
-        return 15;
+        return 43;
     }
     if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
             host_runtime,
             GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP) != 0U)
     {
-        return 16;
+        return 44;
     }
     if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
             host_runtime,
             GS1_HOST_EVENT_SITE_CONTEXT_REQUEST) != 0U)
     {
-        return 17;
+        return 45;
     }
     if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
             host_runtime,
             GS1_HOST_EVENT_SITE_ACTION_REQUEST) != 0U)
     {
-        return 18;
+        return 46;
     }
     if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
             host_runtime,
             GS1_HOST_EVENT_SITE_ACTION_CANCEL) != 0U)
     {
-        return 19;
+        return 47;
     }
 
     Gs1HostMessage host_message {};
@@ -305,7 +325,7 @@ int main()
         45ULL};
     if (host_runtime.submit_host_messages(&host_message, 1U) != GS1_STATUS_OK)
     {
-        return 20;
+        return 48;
     }
 
     Gs1Phase2Request phase2_request {};
@@ -313,12 +333,12 @@ int main()
     Gs1Phase2Result phase2_result {};
     if (host_runtime.run_phase2(phase2_request, phase2_result) != GS1_STATUS_OK)
     {
-        return 21;
+        return 49;
     }
 
     if (!host_runtime.state().campaign_core.has_value())
     {
-        return 22;
+        return 50;
     }
 
     host_message.payload.gameplay_action.action = Gs1GameplayAction {
@@ -328,17 +348,17 @@ int main()
         0ULL};
     if (host_runtime.submit_host_messages(&host_message, 1U) != GS1_STATUS_OK)
     {
-        return 23;
+        return 51;
     }
 
     if (host_runtime.run_phase2(phase2_request, phase2_result) != GS1_STATUS_OK)
     {
-        return 24;
+        return 52;
     }
 
     if (!host_runtime.state().campaign_technology.has_value())
     {
-        return 25;
+        return 53;
     }
 
     return 0;

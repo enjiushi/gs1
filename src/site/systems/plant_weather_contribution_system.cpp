@@ -662,16 +662,6 @@ const char* PlantWeatherContributionSystem::name() const noexcept
     return access().system_name.data();
 }
 
-GameMessageSubscriptionSpan PlantWeatherContributionSystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::SiteRunStarted,
-        GameMessageType::TileEcologyChanged,
-        GameMessageType::TileEcologyBatchChanged,
-    };
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan PlantWeatherContributionSystem::subscribed_host_messages() const noexcept
 {
     return {};

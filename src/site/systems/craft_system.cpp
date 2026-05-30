@@ -203,17 +203,6 @@ const char* CraftSystem::name() const noexcept
     return "CraftSystem";
 }
 
-GameMessageSubscriptionSpan CraftSystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::SiteRunStarted,
-        GameMessageType::SiteDevicePlaced,
-        GameMessageType::SiteDeviceBroken,
-        GameMessageType::InventoryCraftContextRequested,
-    };
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan CraftSystem::subscribed_host_messages() const noexcept
 {
     return {};

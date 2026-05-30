@@ -335,13 +335,6 @@ void seed_site_one_inventory(gs1::CampaignState& campaign, gs1::SiteRunState& si
     (void)status;
 }
 
-template <typename System>
-bool system_subscribes_to_message(GameMessageType type)
-{
-    System system {};
-    return gs1::runtime_subscription_contains(system.subscribed_game_messages(), type);
-}
-
 void inventory_site_one_seed_is_applied_once(gs1::testing::SystemTestExecutionContext& context)
 {
     auto campaign = make_campaign();

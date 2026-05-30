@@ -29,19 +29,6 @@ const char* EcologySystem::name() const noexcept
     return access().system_name.data();
 }
 
-GameMessageSubscriptionSpan EcologySystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::SiteRunStarted,
-        GameMessageType::SiteGroundCoverPlaced,
-        GameMessageType::SiteTilePlantingCompleted,
-        GameMessageType::SiteTileWatered,
-        GameMessageType::SiteTileBurialCleared,
-        GameMessageType::SiteTileHarvested,
-    };
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan EcologySystem::subscribed_host_messages() const noexcept
 {
     return {};

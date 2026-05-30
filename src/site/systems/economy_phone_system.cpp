@@ -803,21 +803,6 @@ const char* EconomyPhoneSystem::name() const noexcept
     return "EconomyPhoneSystem";
 }
 
-GameMessageSubscriptionSpan EconomyPhoneSystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::SiteRunStarted,
-        GameMessageType::SiteRefreshTick,
-        GameMessageType::EconomyMoneyAwardRequested,
-        GameMessageType::PhoneListingPurchaseRequested,
-        GameMessageType::PhoneListingSaleRequested,
-        GameMessageType::ContractorHireRequested,
-        GameMessageType::SiteUnlockableRevealRequested,
-        GameMessageType::SiteUnlockablePurchaseRequested,
-    };
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan EconomyPhoneSystem::subscribed_host_messages() const noexcept
 {
     return {};

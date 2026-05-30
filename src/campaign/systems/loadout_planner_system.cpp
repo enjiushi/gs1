@@ -142,14 +142,6 @@ const char* LoadoutPlannerSystem::name() const noexcept
     return "LoadoutPlannerSystem";
 }
 
-GameMessageSubscriptionSpan LoadoutPlannerSystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::DeploymentSiteSelectionChanged,
-    };
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan LoadoutPlannerSystem::subscribed_host_messages() const noexcept
 {
     return {};

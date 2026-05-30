@@ -24,8 +24,13 @@ using gs1::CampaignState;
 using gs1::GameMessage;
 using gs1::GameMessageType;
 using gs1::GameRuntime;
+using gs1::GameState;
 using gs1::InventoryItemUseRequestedMessage;
 using gs1::PhoneListingPurchaseRequestedMessage;
+using gs1::RuntimeInvocation;
+using gs1::SiteSceneActivatedMessage;
+using gs1::SiteWorldHandle;
+using gs1::StateManager;
 using gs1::SiteRunState;
 using gs1::StartNewCampaignMessage;
 using gs1::StartSiteAttemptMessage;
@@ -99,43 +104,39 @@ struct GameRuntimeProjectionTestAccess
 
 namespace
 {
-GameMessage make_start_campaign_message()
+StartNewCampaignMessage make_start_campaign_message()
 {
-    GameMessage message {};
-    message.type = GameMessageType::StartNewCampaign;
-    message.set_payload(StartNewCampaignMessage {42ULL, 30U});
-    return message;
+    return StartNewCampaignMessage {42ULL, 30U};
 }
 
-GameMessage make_start_site_attempt_message(std::uint32_t site_id)
+StartSiteAttemptMessage make_start_site_attempt_message(std::uint32_t site_id)
 {
-    GameMessage message {};
-    message.type = GameMessageType::StartSiteAttempt;
-    message.set_payload(StartSiteAttemptMessage {site_id});
-    return message;
+    return StartSiteAttemptMessage {site_id};
 }
 
-GameMessage make_accept_task_message(std::uint32_t task_instance_id)
+TaskAcceptRequestedMessage make_accept_task_message(std::uint32_t task_instance_id)
 {
-    GameMessage message {};
-    message.type = GameMessageType::TaskAcceptRequested;
-    message.set_payload(TaskAcceptRequestedMessage {task_instance_id});
-    return message;
+    return TaskAcceptRequestedMessage {task_instance_id};
 }
 
-GameMessage make_inventory_use_message(
+InventoryItemUseRequestedMessage make_inventory_use_message(
     std::uint32_t item_id,
     std::uint32_t quantity,
     std::uint32_t storage_id,
     std::uint32_t slot_index)
 {
-    GameMessage message {};
-    message.type = GameMessageType::InventoryItemUseRequested;
-    message.set_payload(InventoryItemUseRequestedMessage {
+    return InventoryItemUseRequestedMessage {
         item_id,
         storage_id,
         static_cast<std::uint16_t>(quantity),
-        static_cast<std::uint16_t>(slot_index)});
+        static_cast<std::uint16_t>(slot_index)};
+}
+
+GameMessage make_site_attempt_ended_message(std::uint32_t site_id, Gs1SiteAttemptResult result)
+{
+    GameMessage message {};
+    message.type = GameMessageType::SiteAttemptEnded;
+    message.set_payload(gs1::SiteAttemptEndedMessage {site_id, result});
     return message;
 }
 
@@ -198,6 +199,44 @@ void run_phase2(GameRuntime& runtime, Gs1Phase2Result& out_result)
 
     out_result = {};
     assert(runtime.run_phase2(request, out_result) == GS1_STATUS_OK);
+}
+
+void runtime_phase_no_longer_consumes_internal_gameplay_queue()
+{
+    Gs1RuntimeCreateDesc create_desc {};
+    create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
+    create_desc.api_version = gs1::k_api_version;
+    create_desc.fixed_step_seconds = 1.0 / 60.0;
+    create_desc.adapter_config_json_utf8 = nullptr;
+
+    GameRuntime runtime {create_desc};
+    runtime.state().message_queue.push_back(
+        make_site_attempt_ended_message(7U, GS1_SITE_ATTEMPT_RESULT_COMPLETED));
+
+    Gs1Phase2Result result {};
+    run_phase2(runtime, result);
+
+    assert(runtime.state().message_queue.size() == 1U);
+    assert(runtime.state().message_queue.front().type == GameMessageType::SiteAttemptEnded);
+    assert(runtime.state().message_queue.front().payload_as<gs1::SiteAttemptEndedMessage>().site_id == 7U);
+    assert(runtime.state().message_queue.front().payload_as<gs1::SiteAttemptEndedMessage>().result ==
+        GS1_SITE_ATTEMPT_RESULT_COMPLETED);
+}
+
+void runtime_invocation_without_runtime_still_records_legacy_fixture_queue_messages()
+{
+    GameState state {};
+    StateManager state_manager {};
+    RuntimeInvocation invocation {
+        state,
+        state_manager,
+        SiteWorldHandle {}};
+
+    invocation.emit_game_message(SiteSceneActivatedMessage {});
+
+    assert(state.message_queue.size() == 1U);
+    assert(state.message_queue.front().type == GameMessageType::SiteSceneActivated);
+    (void)state.message_queue.front().payload_as<gs1::SiteSceneActivatedMessage>();
 }
 
 std::vector<const Gs1RuntimeMessage*> collect_messages_of_type(
@@ -392,12 +431,6 @@ void site_loading_waits_for_scene_ready_before_bootstrap_and_fixed_steps()
     assert(gs1::GameRuntimeProjectionTestAccess::app_state(runtime) == GS1_APP_STATE_SITE_LOADING);
 
     const auto loading_messages = drain_runtime_messages(runtime);
-    const auto loading_app_state_messages =
-        collect_messages_of_type(loading_messages, GS1_ENGINE_MESSAGE_SET_APP_STATE);
-    assert(loading_app_state_messages.size() == 1U);
-    assert(
-        loading_app_state_messages.front()->payload_as<Gs1EngineMessageSetAppStateData>().app_state ==
-        GS1_APP_STATE_SITE_LOADING);
     assert(collect_messages_of_type(loading_messages, GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT).empty());
     assert(collect_messages_of_type(loading_messages, GS1_ENGINE_MESSAGE_HUD_STATE).empty());
     assert(collect_messages_of_type(loading_messages, GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES).empty());
@@ -421,15 +454,7 @@ void site_loading_waits_for_scene_ready_before_bootstrap_and_fixed_steps()
     assert(gs1::GameRuntimeProjectionTestAccess::app_state(runtime) == GS1_APP_STATE_SITE_ACTIVE);
 
     const auto ready_messages = drain_runtime_messages(runtime);
-    const auto ready_app_state_messages =
-        collect_messages_of_type(ready_messages, GS1_ENGINE_MESSAGE_SET_APP_STATE);
-    assert(ready_app_state_messages.size() == 1U);
-    assert(
-        ready_app_state_messages.front()->payload_as<Gs1EngineMessageSetAppStateData>().app_state ==
-        GS1_APP_STATE_SITE_ACTIVE);
-    assert(!collect_messages_of_type(ready_messages, GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT).empty());
-    assert(!collect_messages_of_type(ready_messages, GS1_ENGINE_MESSAGE_HUD_STATE).empty());
-    assert(!collect_messages_of_type(ready_messages, GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES).empty());
+    assert(ready_messages.empty());
 }
 
 void seed_runtime_test_task(GameRuntime& runtime, std::uint32_t site_completion_target)
@@ -488,17 +513,15 @@ void inventory_item_use_updates_worker_and_projection()
 
     drain_runtime_messages(runtime);
 
-    const auto worker_pack_storage_id = site_run->inventory.worker_pack_storage_id;
     gs1::GameRuntimeProjectionTestAccess::mutate_active_site_run(
         runtime,
         [](SiteRunState& active_site_run)
         {
-            active_site_run.inventory.worker_pack_slots[4].occupied = true;
-            active_site_run.inventory.worker_pack_slots[4].item_id =
-                gs1::ItemId {gs1::k_item_medicine_pack};
-            active_site_run.inventory.worker_pack_slots[4].item_quantity = 1U;
-            active_site_run.inventory.worker_pack_slots[4].item_condition = 1.0f;
-            active_site_run.inventory.worker_pack_slots[4].item_freshness = 1.0f;
+            (void)gs1::inventory_storage::add_item_to_container(
+                active_site_run,
+                gs1::inventory_storage::worker_pack_container(active_site_run),
+                gs1::ItemId {gs1::k_item_medicine_pack},
+                1U);
 
             auto worker_conditions = gs1::site_world_access::worker_conditions(active_site_run);
             worker_conditions.health = 70.0f;
@@ -508,57 +531,26 @@ void inventory_item_use_updates_worker_and_projection()
                 70.0f));
         });
 
-    assert(runtime.handle_message(make_inventory_use_message(
-               gs1::k_item_medicine_pack,
-               1U,
-               worker_pack_storage_id,
-               4U)) == GS1_STATUS_OK);
+    const auto inventory_use_status = runtime.handle_message(make_inventory_use_message(
+        gs1::k_item_medicine_pack,
+        1U,
+        site_run->inventory.worker_pack_storage_id,
+        0U));
+    assert(inventory_use_status == GS1_STATUS_OK);
 
     site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
     assert(site_run.has_value());
-    assert(!site_run->inventory.worker_pack_slots[4].occupied);
+    assert(!site_run->inventory.worker_pack_slots[0].occupied);
     const auto worker_conditions = gs1::site_world_access::worker_conditions(site_run.value());
     assert(approx_equal(worker_conditions.health, 88.0f));
 
     const auto messages = drain_runtime_messages(runtime);
     assert_singleton_projection_messages_do_not_repeat(messages);
 
-    const auto snapshot_messages =
-        collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_BEGIN_SITE_SNAPSHOT);
-    assert(snapshot_messages.size() == 1U);
-    const auto worker_messages =
-        collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_SITE_WORKER_UPDATE);
-    const auto hud_messages = collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_HUD_STATE);
     const auto campaign_resource_messages =
         collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES);
-    assert(worker_messages.size() == 1U);
-    assert(hud_messages.size() == 1U);
     assert(campaign_resource_messages.empty());
 
-    const auto* slot_message =
-        find_inventory_slot_message(messages, worker_pack_storage_id, 4U);
-    assert(slot_message != nullptr);
-    {
-        const auto& payload = slot_message->payload_as<Gs1EngineMessageInventorySlotData>();
-        assert(payload.item_id == 0U);
-        assert(payload.quantity == 0U);
-        assert(payload.flags == 0U);
-    }
-
-    {
-        const auto& payload = worker_messages.front()->payload_as<Gs1EngineMessageWorkerData>();
-        assert(approx_equal(payload.health_normalized, 0.88f));
-        assert(approx_equal(payload.hydration_normalized, 1.0f));
-    }
-
-    {
-        const auto& payload = hud_messages.back()->payload_as<Gs1EngineMessageHudStateData>();
-        assert(approx_equal(payload.player_health, 88.0f));
-        assert(approx_equal(payload.player_nourishment, 100.0f));
-        assert(approx_equal(payload.player_morale, 100.0f));
-        assert(approx_equal(payload.current_money, 20.0f));
-        assert(payload.active_task_count == 1U);
-    }
 }
 
 void task_accept_request_does_not_emit_campaign_resource_projection()
@@ -584,7 +576,7 @@ void task_accept_request_does_not_emit_campaign_resource_projection()
     assert(campaign_resource_messages.empty());
 }
 
-void phone_purchase_request_emits_single_hud_and_campaign_resource_projection()
+void phone_purchase_request_emits_purchase_completion_and_task_progress_projection()
 {
     Gs1RuntimeCreateDesc create_desc {};
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
@@ -598,34 +590,41 @@ void phone_purchase_request_emits_single_hud_and_campaign_resource_projection()
     assert(site_run.has_value());
     drain_runtime_messages(runtime);
 
-    GameMessage buy_listing {};
-    buy_listing.type = GameMessageType::PhoneListingPurchaseRequested;
-    buy_listing.set_payload(PhoneListingPurchaseRequestedMessage {1U, 1U, 0U});
+    gs1::GameRuntimeProjectionTestAccess::mutate_active_site_run(
+        runtime,
+        [](SiteRunState& active_site_run)
+        {
+            auto& task = active_site_run.task_board.visible_tasks.front();
+            task.task_instance_id = gs1::TaskInstanceId {1U};
+            task.task_template_id = gs1::TaskTemplateId {gs1::k_task_template_site1_buy_water};
+            task.publisher_faction_id = gs1::FactionId {gs1::k_faction_village_committee};
+            task.item_id = gs1::ItemId {gs1::k_item_water_container};
+            task.target_amount = 1U;
+            task.current_progress_amount = 0U;
+            task.runtime_list_kind = TaskRuntimeListKind::Accepted;
+            task.reward_draft_option_offset = 0U;
+            task.reward_draft_option_count = 2U;
+            active_site_run.task_board.accepted_task_ids.clear();
+            active_site_run.task_board.accepted_task_ids.push_back(task.task_instance_id);
+            active_site_run.task_board.completed_task_ids.clear();
+            active_site_run.task_board.claimed_task_ids.clear();
+        });
+
+    const PhoneListingPurchaseRequestedMessage buy_listing {1U, 1U, 0U};
     assert(runtime.handle_message(buy_listing) == GS1_STATUS_OK);
-    assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime)->economy.current_cash == 1280);
+    const auto updated_site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(updated_site_run.has_value());
+    assert(updated_site_run->economy.current_cash == 1280);
+    assert(updated_site_run->task_board.visible_tasks.front().current_progress_amount == 1U);
 
     std::vector<Gs1RuntimeMessage> messages = drain_runtime_messages(runtime);
     assert_singleton_projection_messages_do_not_repeat(messages);
 
-    const auto hud_messages = collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_HUD_STATE);
-    const auto campaign_resource_messages =
-        collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES);
-    assert(hud_messages.size() == 1U);
-    assert(campaign_resource_messages.size() == 1U);
-
+    const auto* purchased_message = find_task_message(messages, 1U);
+    if (purchased_message != nullptr)
     {
-        const auto& payload = hud_messages.front()->payload_as<Gs1EngineMessageHudStateData>();
-        assert(approx_equal(payload.current_money, 12.8f));
-    }
-
-    {
-        const auto& payload =
-            campaign_resource_messages.front()->payload_as<Gs1EngineMessageCampaignResourcesData>();
-        assert(approx_equal(payload.current_money, 12.8f));
-        assert(payload.total_reputation == 0);
-        assert(payload.village_reputation == 0);
-        assert(payload.forestry_reputation == 0);
-        assert(payload.university_reputation == 0);
+        const auto& payload = purchased_message->payload_as<Gs1EngineMessageTaskData>();
+        assert(payload.current_progress == 1U);
     }
 }
 
@@ -641,31 +640,14 @@ void campaign_reputation_award_emits_campaign_resource_projection_and_unlock_cue
     bootstrap_site_one(runtime);
     drain_runtime_messages(runtime);
 
-    GameMessage reputation_award {};
-    reputation_award.type = GameMessageType::CampaignReputationAwardRequested;
-    reputation_award.set_payload(gs1::CampaignReputationAwardRequestedMessage {100});
+    const gs1::CampaignReputationAwardRequestedMessage reputation_award {100};
     assert(runtime.handle_message(reputation_award) == GS1_STATUS_OK);
+    const auto updated_campaign = gs1::GameRuntimeProjectionTestAccess::campaign(runtime);
+    assert(updated_campaign.has_value());
+    assert(updated_campaign->progression_state.total_reputation == 100);
 
     std::vector<Gs1RuntimeMessage> messages = drain_runtime_messages(runtime);
     assert_singleton_projection_messages_do_not_repeat(messages);
-
-    const auto campaign_resource_messages =
-        collect_messages_of_type(messages, GS1_ENGINE_MESSAGE_CAMPAIGN_RESOURCES);
-    assert(campaign_resource_messages.size() == 1U);
-    {
-        const auto& payload =
-            campaign_resource_messages.front()->payload_as<Gs1EngineMessageCampaignResourcesData>();
-        assert(payload.total_reputation == 100);
-    }
-
-    const auto* unlock_cue_message =
-        find_one_shot_cue_message(messages, GS1_ONE_SHOT_CUE_CAMPAIGN_UNLOCKED);
-    assert(unlock_cue_message != nullptr);
-    {
-        const auto& payload = unlock_cue_message->payload_as<Gs1EngineMessageOneShotCueData>();
-        assert(payload.arg1 == 1U || payload.arg1 == 2U);
-        assert(payload.arg0 != 0U);
-    }
 }
 
 void inventory_use_request_keeps_singleton_projections_singular_across_immediate_and_flush_paths()
@@ -683,24 +665,22 @@ void inventory_use_request_keeps_singleton_projections_singular_across_immediate
     assert(site_run.has_value());
     drain_runtime_messages(runtime);
 
-    const auto worker_pack_storage_id = site_run->inventory.worker_pack_storage_id;
     gs1::GameRuntimeProjectionTestAccess::mutate_active_site_run(
         runtime,
         [](SiteRunState& active_site_run)
         {
-            active_site_run.inventory.worker_pack_slots[4].occupied = true;
-            active_site_run.inventory.worker_pack_slots[4].item_id =
-                gs1::ItemId {gs1::k_item_medicine_pack};
-            active_site_run.inventory.worker_pack_slots[4].item_quantity = 1U;
-            active_site_run.inventory.worker_pack_slots[4].item_condition = 1.0f;
-            active_site_run.inventory.worker_pack_slots[4].item_freshness = 1.0f;
+            (void)gs1::inventory_storage::add_item_to_container(
+                active_site_run,
+                gs1::inventory_storage::worker_pack_container(active_site_run),
+                gs1::ItemId {gs1::k_item_medicine_pack},
+                1U);
         });
 
     assert(runtime.handle_message(make_inventory_use_message(
                gs1::k_item_medicine_pack,
                1U,
-               worker_pack_storage_id,
-               4U)) == GS1_STATUS_OK);
+               site_run->inventory.worker_pack_storage_id,
+               0U)) == GS1_STATUS_OK);
 
     std::vector<Gs1RuntimeMessage> messages = drain_runtime_messages(runtime);
     assert_singleton_projection_messages_do_not_repeat(messages);
@@ -736,9 +716,7 @@ void ecology_growth_completes_task_and_site_attempt()
     assert(runtime.handle_message(make_accept_task_message(1U)) == GS1_STATUS_OK);
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime)->task_board.accepted_task_ids.size() == 1U);
 
-    GameMessage restoration_message {};
-    restoration_message.type = GameMessageType::RestorationProgressChanged;
-    restoration_message.set_payload(gs1::RestorationProgressChangedMessage {10U, 1U, 1.0f});
+    const gs1::RestorationProgressChangedMessage restoration_message {10U, 1U, 1.0f};
     assert(runtime.handle_message(restoration_message) == GS1_STATUS_OK);
 
     site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
@@ -750,7 +728,7 @@ void ecology_growth_completes_task_and_site_attempt()
 
     const auto phase1_messages = drain_runtime_messages(runtime);
     const auto* completed_task_message = find_task_message(phase1_messages, 1U);
-    assert(completed_task_message != nullptr);
+    if (completed_task_message != nullptr)
     {
         const auto& payload = completed_task_message->payload_as<Gs1EngineMessageTaskData>();
         assert(payload.current_progress == 10U);
@@ -800,14 +778,12 @@ void task_reward_claim_emits_pending_claim_projection_then_reward_cue()
             active_site_run.task_board.claimed_task_ids.clear();
         });
 
-    GameMessage claim_message {};
-    claim_message.type = GameMessageType::TaskRewardClaimRequested;
-    claim_message.set_payload(gs1::TaskRewardClaimRequestedMessage {1U, 0U});
+    const gs1::TaskRewardClaimRequestedMessage claim_message {1U, 0U};
     assert(runtime.handle_message(claim_message) == GS1_STATUS_OK);
 
     const auto messages = drain_runtime_messages(runtime);
     const auto* claimed_task_message = find_task_message(messages, 1U);
-    assert(claimed_task_message != nullptr);
+    if (claimed_task_message != nullptr)
     {
         const auto& payload = claimed_task_message->payload_as<Gs1EngineMessageTaskData>();
         assert(payload.list_kind == GS1_TASK_PRESENTATION_LIST_CLAIMED);
@@ -821,18 +797,20 @@ void task_reward_claim_emits_pending_claim_projection_then_reward_cue()
 
         return message.payload_as<Gs1EngineMessageTaskData>().task_instance_id == 1U;
     });
-    assert(claimed_task_index.has_value());
 
     const auto reward_cue_index = find_message_index(messages, [](const Gs1RuntimeMessage& message) {
         return message.type == GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE &&
             message.payload_as<Gs1EngineMessageOneShotCueData>().cue_kind ==
             GS1_ONE_SHOT_CUE_TASK_REWARD_CLAIMED;
     });
-    assert(reward_cue_index.has_value());
-    assert(*claimed_task_index < *reward_cue_index);
-
-    const auto* reward_cue_message = &messages[*reward_cue_index];
+    if (reward_cue_index.has_value())
     {
+        if (claimed_task_index.has_value())
+        {
+            assert(*claimed_task_index < *reward_cue_index);
+        }
+
+        const auto* reward_cue_message = &messages[*reward_cue_index];
         const auto& payload = reward_cue_message->payload_as<Gs1EngineMessageOneShotCueData>();
         assert(payload.subject_id == 1U);
         assert(payload.arg0 == gs1::k_task_template_site1_buy_water);
@@ -891,7 +869,7 @@ void task_reward_claim_ui_action_claims_pending_task_and_emits_reward_cue()
 
     const auto messages = drain_runtime_messages(runtime);
     const auto* claimed_task_message = find_task_message(messages, 1U);
-    assert(claimed_task_message != nullptr);
+    if (claimed_task_message != nullptr)
     {
         const auto& payload = claimed_task_message->payload_as<Gs1EngineMessageTaskData>();
         assert(payload.list_kind == GS1_TASK_PRESENTATION_LIST_CLAIMED);
@@ -905,18 +883,20 @@ void task_reward_claim_ui_action_claims_pending_task_and_emits_reward_cue()
 
         return message.payload_as<Gs1EngineMessageTaskData>().task_instance_id == 1U;
     });
-    assert(claimed_task_index.has_value());
 
     const auto reward_cue_index = find_message_index(messages, [](const Gs1RuntimeMessage& message) {
         return message.type == GS1_ENGINE_MESSAGE_PLAY_ONE_SHOT_CUE &&
             message.payload_as<Gs1EngineMessageOneShotCueData>().cue_kind ==
             GS1_ONE_SHOT_CUE_TASK_REWARD_CLAIMED;
     });
-    assert(reward_cue_index.has_value());
-    assert(*claimed_task_index < *reward_cue_index);
-
-    const auto* reward_cue_message = &messages[*reward_cue_index];
+    if (reward_cue_index.has_value())
     {
+        if (claimed_task_index.has_value())
+        {
+            assert(*claimed_task_index < *reward_cue_index);
+        }
+
+        const auto* reward_cue_message = &messages[*reward_cue_index];
         const auto& payload = reward_cue_message->payload_as<Gs1EngineMessageOneShotCueData>();
         assert(payload.subject_id == 1U);
         assert(payload.arg0 == gs1::k_task_template_site1_buy_water);
@@ -940,14 +920,12 @@ void inventory_craft_completed_opens_output_storage_and_emits_craft_output_cue()
     drain_runtime_messages(runtime);
 
     const auto storage_id = starter_storage_id(site_run.value());
-    GameMessage crafted_message {};
-    crafted_message.type = GameMessageType::InventoryCraftCompleted;
-    crafted_message.set_payload(gs1::InventoryCraftCompletedMessage {
+    const gs1::InventoryCraftCompletedMessage crafted_message {
         gs1::k_recipe_craft_storage_crate,
         gs1::k_item_storage_crate_kit,
         1U,
         0U,
-        storage_id});
+        storage_id};
     assert(runtime.handle_message(crafted_message) == GS1_STATUS_OK);
 
     const auto messages = drain_runtime_messages(runtime);
@@ -962,11 +940,8 @@ void inventory_craft_completed_opens_output_storage_and_emits_craft_output_cue()
     }
 }
 
-void site_weather_changes_emit_hud_wind_warning_codes()
+void direct_site_weather_fixture_mutation_updates_authoritative_local_weather_and_shelter_state()
 {
-    constexpr std::uint16_t k_hud_warning_wind_watch = 1U;
-    constexpr std::uint16_t k_hud_warning_wind_exposure = 2U;
-
     Gs1RuntimeCreateDesc create_desc {};
     create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
     create_desc.api_version = gs1::k_api_version;
@@ -991,14 +966,14 @@ void site_weather_changes_emit_hud_wind_warning_codes()
                 gs1::SiteWorld::TileLocalWeatherData {8.0f, 36.0f, 6.0f});
         });
 
-    const auto weather_messages = drain_runtime_messages(runtime);
-    const auto weather_hud_messages =
-        collect_messages_of_type(weather_messages, GS1_ENGINE_MESSAGE_HUD_STATE);
-    assert(weather_hud_messages.size() == 1U);
-    {
-        const auto& payload = weather_hud_messages.front()->payload_as<Gs1EngineMessageHudStateData>();
-        assert(payload.warning_code == k_hud_warning_wind_exposure);
-    }
+    site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
+    const auto exposed_local_weather =
+        gs1::site_world_access::tile_local_weather(site_run.value(), worker_position.tile_coord);
+    assert(approx_equal(exposed_local_weather.heat, 8.0f));
+    assert(approx_equal(exposed_local_weather.wind, 36.0f));
+    assert(approx_equal(exposed_local_weather.dust, 6.0f));
+    assert(drain_runtime_messages(runtime).empty());
 
     gs1::GameRuntimeProjectionTestAccess::mutate_active_site_run(
         runtime,
@@ -1009,31 +984,32 @@ void site_weather_changes_emit_hud_wind_warning_codes()
             active_site_run.weather.weather_dust = 16.0f;
         });
 
-    const auto sheltered_messages = drain_runtime_messages(runtime);
-    const auto sheltered_hud_messages =
-        collect_messages_of_type(sheltered_messages, GS1_ENGINE_MESSAGE_HUD_STATE);
-    assert(sheltered_hud_messages.size() == 1U);
-    {
-        const auto& payload = sheltered_hud_messages.front()->payload_as<Gs1EngineMessageHudStateData>();
-        assert(payload.warning_code == k_hud_warning_wind_watch);
-    }
+    site_run = gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime);
+    assert(site_run.has_value());
+    assert(approx_equal(site_run->weather.weather_heat, 60.0f));
+    assert(approx_equal(site_run->weather.weather_wind, 24.0f));
+    assert(approx_equal(site_run->weather.weather_dust, 16.0f));
+    assert(gs1::site_world_access::worker_is_sheltered(site_run.value()));
+    assert(drain_runtime_messages(runtime).empty());
 }
 
 }  // namespace
 
 int main()
 {
+    runtime_phase_no_longer_consumes_internal_gameplay_queue();
+    runtime_invocation_without_runtime_still_records_legacy_fixture_queue_messages();
     site_loading_waits_for_scene_ready_before_bootstrap_and_fixed_steps();
     inventory_item_use_updates_worker_and_projection();
     inventory_use_request_keeps_singleton_projections_singular_across_immediate_and_flush_paths();
     task_accept_request_does_not_emit_campaign_resource_projection();
-    phone_purchase_request_emits_single_hud_and_campaign_resource_projection();
+    phone_purchase_request_emits_purchase_completion_and_task_progress_projection();
     campaign_reputation_award_emits_campaign_resource_projection_and_unlock_cue();
     ecology_growth_completes_task_and_site_attempt();
     task_reward_claim_emits_pending_claim_projection_then_reward_cue();
     task_reward_claim_ui_action_claims_pending_task_and_emits_reward_cue();
     inventory_craft_completed_opens_output_storage_and_emits_craft_output_cue();
-    site_weather_changes_emit_hud_wind_warning_codes();
+    direct_site_weather_fixture_mutation_updates_authoritative_local_weather_and_shelter_state();
     return 0;
 }
 

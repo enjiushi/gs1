@@ -1183,17 +1183,6 @@ const char* ModifierSystem::name() const noexcept
     return access().system_name.data();
 }
 
-GameMessageSubscriptionSpan ModifierSystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::SiteRunStarted,
-        GameMessageType::RunModifierAwardRequested,
-        GameMessageType::InventoryItemUseCompleted,
-        GameMessageType::SiteModifierEndRequested,
-    };
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan ModifierSystem::subscribed_host_messages() const noexcept
 {
     return {};

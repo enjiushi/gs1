@@ -129,8 +129,6 @@ public:
     [[nodiscard]] SiteWorld* site_world() noexcept { return site_world_.get(); }
     [[nodiscard]] const SiteWorld* site_world() const noexcept { return site_world_.get(); }
     [[nodiscard]] const SiteWorldHandle& site_world_handle() const noexcept { return site_world_; }
-    [[nodiscard]] GameMessageQueue& game_message_queue() noexcept { return *game_messages_; }
-    [[nodiscard]] const GameMessageQueue& game_message_queue() const noexcept { return *game_messages_; }
     [[nodiscard]] std::deque<Gs1RuntimeMessage>& runtime_message_queue() noexcept
     {
         return *runtime_messages_;
@@ -163,7 +161,6 @@ private:
     RuntimeMoveDirectionSnapshot move_direction_ {};
     SiteWorldHandle site_world_ {};
     std::deque<Gs1RuntimeMessage>* runtime_messages_ {nullptr};
-    GameMessageQueue* game_messages_ {nullptr};
 };
 
 template <class Tag>

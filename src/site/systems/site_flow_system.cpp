@@ -51,11 +51,6 @@ const char* SiteFlowSystem::name() const noexcept
     return access().system_name.data();
 }
 
-GameMessageSubscriptionSpan SiteFlowSystem::subscribed_game_messages() const noexcept
-{
-    return {};
-}
-
 HostMessageSubscriptionSpan SiteFlowSystem::subscribed_host_messages() const noexcept
 {
     return {};

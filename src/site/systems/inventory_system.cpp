@@ -1420,27 +1420,6 @@ const char* InventorySystem::name() const noexcept
     return "InventorySystem";
 }
 
-GameMessageSubscriptionSpan InventorySystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::StartSiteAction,
-        GameMessageType::SiteRunStarted,
-        GameMessageType::SiteDevicePlaced,
-        GameMessageType::SiteDeviceBroken,
-        GameMessageType::InventoryDeliveryRequested,
-        GameMessageType::InventoryDeliveryBatchRequested,
-        GameMessageType::InventoryWorkerPackInsertRequested,
-        GameMessageType::InventoryItemUseRequested,
-        GameMessageType::InventoryItemConsumeRequested,
-        GameMessageType::InventoryGlobalItemConsumeRequested,
-        GameMessageType::InventoryTransferRequested,
-        GameMessageType::InventoryItemSubmitRequested,
-        GameMessageType::InventorySlotTapped,
-        GameMessageType::InventoryCraftCommitRequested,
-    };
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan InventorySystem::subscribed_host_messages() const noexcept
 {
     return {};

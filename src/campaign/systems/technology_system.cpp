@@ -178,17 +178,6 @@ const char* TechnologySystem::name() const noexcept
     return "TechnologySystem";
 }
 
-GameMessageSubscriptionSpan TechnologySystem::subscribed_game_messages() const noexcept
-{
-    static constexpr GameMessageType subscriptions[] = {
-        GameMessageType::TargetGranted,
-        GameMessageType::ProgressionEventOccurred,
-        GameMessageType::CampaignReputationAwardRequested,
-        GameMessageType::TechnologyNodeClaimRequested,
-        GameMessageType::TechnologyNodeRefundRequested};
-    return subscriptions;
-}
-
 HostMessageSubscriptionSpan TechnologySystem::subscribed_host_messages() const noexcept
 {
     return {};
