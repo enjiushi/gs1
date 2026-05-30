@@ -1,5 +1,5 @@
 #include "gs1_godot_adapter_service.h"
-#include "gs1_godot_engine_message_policy.h"
+#include "gs1_godot_notification_policy.h"
 
 #include "host/adapter_metadata_catalog.h"
 
@@ -147,13 +147,13 @@ void Gs1GodotAdapterService::bump_ui_session_revision(std::uint32_t dirty_flags)
         return;
     }
 
-    Gs1GodotEngineMessage message {};
-    message.type = GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY;
-    auto& payload = message.emplace_payload<Gs1EngineMessagePresentationDirtyData>();
+    Gs1GodotNotification message {};
+    message.type = GS1_GODOT_NOTIFICATION_PRESENTATION_DIRTY;
+    auto& payload = message.emplace_payload<Gs1GodotPresentationDirtyNotification>();
     payload.dirty_flags = dirty_flags;
     payload.reserved0 = 0U;
     payload.revision = ui_session_state_.revision;
-    dispatch_engine_message(std::move(message));
+    dispatch_notification(std::move(message));
 }
 
 void Gs1GodotAdapterService::sync_phone_badges_from_view(const Gs1GameStateView& view)
@@ -298,14 +298,14 @@ void Gs1GodotAdapterService::finish_frame()
     last_error_.clear();
 }
 
-void Gs1GodotAdapterService::subscribe(Gs1EngineMessageType type, IGs1GodotEngineMessageSubscriber& subscriber)
+void Gs1GodotAdapterService::subscribe(Gs1GodotNotificationType type, IGs1GodotNotificationSubscriber& subscriber)
 {
     remember_subscriber(subscriber);
     auto& bucket = subscribers_by_message_[bucket_index(type)];
     if (std::find(bucket.begin(), bucket.end(), &subscriber) == bucket.end())
     {
 #ifndef NDEBUG
-        if (gs1_godot_engine_message_requires_exclusive_subscriber(type))
+        if (gs1_godot_notification_requires_exclusive_subscriber(type))
         {
             assert(bucket.empty() && "Snapshot-style engine messages must have exactly one subscribing controller.");
         }
@@ -314,13 +314,13 @@ void Gs1GodotAdapterService::subscribe(Gs1EngineMessageType type, IGs1GodotEngin
     }
 }
 
-void Gs1GodotAdapterService::subscribe_matching_messages(IGs1GodotEngineMessageSubscriber& subscriber)
+void Gs1GodotAdapterService::subscribe_matching_messages(IGs1GodotNotificationSubscriber& subscriber)
 {
     remember_subscriber(subscriber);
     for (std::size_t type_value = 0; type_value < k_message_bucket_count; ++type_value)
     {
-        const auto type = static_cast<Gs1EngineMessageType>(type_value);
-        if (!subscriber.handles_engine_message(type))
+        const auto type = static_cast<Gs1GodotNotificationType>(type_value);
+        if (!subscriber.handles_notification(type))
         {
             continue;
         }
@@ -328,7 +328,7 @@ void Gs1GodotAdapterService::subscribe_matching_messages(IGs1GodotEngineMessageS
         if (std::find(bucket.begin(), bucket.end(), &subscriber) == bucket.end())
         {
 #ifndef NDEBUG
-            if (gs1_godot_engine_message_requires_exclusive_subscriber(type))
+            if (gs1_godot_notification_requires_exclusive_subscriber(type))
             {
                 assert(bucket.empty() && "Snapshot-style engine messages must have exactly one subscribing controller.");
             }
@@ -338,13 +338,13 @@ void Gs1GodotAdapterService::subscribe_matching_messages(IGs1GodotEngineMessageS
     }
 }
 
-void Gs1GodotAdapterService::unsubscribe(Gs1EngineMessageType type, IGs1GodotEngineMessageSubscriber& subscriber)
+void Gs1GodotAdapterService::unsubscribe(Gs1GodotNotificationType type, IGs1GodotNotificationSubscriber& subscriber)
 {
     auto& bucket = subscribers_by_message_[bucket_index(type)];
     bucket.erase(std::remove(bucket.begin(), bucket.end(), &subscriber), bucket.end());
 }
 
-void Gs1GodotAdapterService::unsubscribe_matching_messages(IGs1GodotEngineMessageSubscriber& subscriber)
+void Gs1GodotAdapterService::unsubscribe_matching_messages(IGs1GodotNotificationSubscriber& subscriber)
 {
     for (auto& bucket : subscribers_by_message_)
     {
@@ -352,7 +352,7 @@ void Gs1GodotAdapterService::unsubscribe_matching_messages(IGs1GodotEngineMessag
     }
 }
 
-void Gs1GodotAdapterService::unsubscribe_all(IGs1GodotEngineMessageSubscriber& subscriber)
+void Gs1GodotAdapterService::unsubscribe_all(IGs1GodotNotificationSubscriber& subscriber)
 {
     unsubscribe_matching_messages(subscriber);
     known_subscribers_.erase(&subscriber);
@@ -517,11 +517,11 @@ bool Gs1GodotAdapterService::poll_gameplay_state_notifications()
     if (!has_dispatched_gameplay_app_state_ ||
         last_dispatched_gameplay_app_state_ != view.app_state)
     {
-        Gs1GodotEngineMessage app_state_message {};
-        app_state_message.type = GS1_ENGINE_MESSAGE_SET_APP_STATE;
-        auto& payload = app_state_message.emplace_payload<Gs1EngineMessageSetAppStateData>();
+        Gs1GodotNotification app_state_message {};
+        app_state_message.type = GS1_GODOT_NOTIFICATION_SET_APP_STATE;
+        auto& payload = app_state_message.emplace_payload<Gs1GodotAppStateNotification>();
         payload.app_state = view.app_state;
-        dispatch_engine_message(std::move(app_state_message));
+        dispatch_notification(std::move(app_state_message));
         last_dispatched_gameplay_app_state_ = view.app_state;
         has_dispatched_gameplay_app_state_ = true;
     }
@@ -537,7 +537,7 @@ void Gs1GodotAdapterService::notify_runtime_message_reset()
     has_dispatched_gameplay_app_state_ = false;
     last_dispatched_gameplay_app_state_ = GS1_APP_STATE_BOOT;
     reset_ui_session_state();
-    for (IGs1GodotEngineMessageSubscriber* subscriber : known_subscribers_)
+    for (IGs1GodotNotificationSubscriber* subscriber : known_subscribers_)
     {
         if (subscriber != nullptr)
         {
@@ -546,15 +546,15 @@ void Gs1GodotAdapterService::notify_runtime_message_reset()
     }
 }
 
-void Gs1GodotAdapterService::dispatch_engine_message(Gs1GodotEngineMessage&& message)
+void Gs1GodotAdapterService::dispatch_notification(Gs1GodotNotification&& message)
 {
-    const std::vector<IGs1GodotEngineMessageSubscriber*> subscribers =
+    const std::vector<IGs1GodotNotificationSubscriber*> subscribers =
         subscribers_by_message_[bucket_index(message.type)];
-    for (IGs1GodotEngineMessageSubscriber* subscriber : subscribers)
+    for (IGs1GodotNotificationSubscriber* subscriber : subscribers)
     {
         if (subscriber != nullptr)
         {
-            subscriber->handle_engine_message(message);
+            subscriber->handle_notification(message);
         }
     }
 }
@@ -934,7 +934,7 @@ std::string Gs1GodotAdapterService::compute_default_project_config_root() const
     return globalize_res_path("res://gs1/runtime").string();
 }
 
-void Gs1GodotAdapterService::remember_subscriber(IGs1GodotEngineMessageSubscriber& subscriber)
+void Gs1GodotAdapterService::remember_subscriber(IGs1GodotNotificationSubscriber& subscriber)
 {
     if (known_subscribers_.insert(&subscriber).second)
     {
@@ -942,7 +942,7 @@ void Gs1GodotAdapterService::remember_subscriber(IGs1GodotEngineMessageSubscribe
     }
 }
 
-std::size_t Gs1GodotAdapterService::bucket_index(Gs1EngineMessageType type) noexcept
+std::size_t Gs1GodotAdapterService::bucket_index(Gs1GodotNotificationType type) noexcept
 {
     return static_cast<std::size_t>(type);
 }

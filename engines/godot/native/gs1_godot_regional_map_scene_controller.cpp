@@ -207,10 +207,10 @@ void Gs1GodotRegionalMapSceneController::cache_ui_references()
     }
 }
 
-bool Gs1GodotRegionalMapSceneController::handles_engine_message(Gs1EngineMessageType type) const noexcept
+bool Gs1GodotRegionalMapSceneController::handles_notification(Gs1GodotNotificationType type) const noexcept
 {
-    return type == GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY ||
-        type == GS1_ENGINE_MESSAGE_SET_APP_STATE;
+    return type == GS1_GODOT_NOTIFICATION_PRESENTATION_DIRTY ||
+        type == GS1_GODOT_NOTIFICATION_SET_APP_STATE;
 }
 
 void Gs1GodotRegionalMapSceneController::reset_regional_map_state() noexcept
@@ -249,10 +249,10 @@ void Gs1GodotRegionalMapSceneController::refresh_from_game_state_view()
     sort_regional_map_sites(sites_);
 }
 
-void Gs1GodotRegionalMapSceneController::handle_engine_message(const Gs1EngineMessage& message)
+void Gs1GodotRegionalMapSceneController::handle_notification(const Gs1GodotNotification& message)
 {
-    if (message.type == GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY ||
-        message.type == GS1_ENGINE_MESSAGE_SET_APP_STATE)
+    if (message.type == GS1_GODOT_NOTIFICATION_PRESENTATION_DIRTY ||
+        message.type == GS1_GODOT_NOTIFICATION_SET_APP_STATE)
     {
         refresh_from_game_state_view();
         refresh_regional_map();

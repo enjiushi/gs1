@@ -10,7 +10,7 @@
 
 class Gs1GodotRegionalMapUiController final
     : public godot::Control
-    , public IGs1GodotEngineMessageSubscriber
+    , public IGs1GodotNotificationSubscriber
 {
     GDCLASS(Gs1GodotRegionalMapUiController, godot::Control)
 
@@ -22,8 +22,8 @@ public:
     void _exit_tree() override;
     void set_ui_root_path(const godot::NodePath& path);
     [[nodiscard]] godot::NodePath get_ui_root_path() const;
-    [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
-    void handle_engine_message(const Gs1EngineMessage& message) override;
+    [[nodiscard]] bool handles_notification(Gs1GodotNotificationType type) const noexcept override;
+    void handle_notification(const Gs1GodotNotification& message) override;
     void handle_runtime_message_reset() override;
 
 protected:

@@ -137,32 +137,32 @@ Control* Gs1GodotTaskPanelController::resolve_owner_control()
     return owner_control_;
 }
 
-bool Gs1GodotTaskPanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept
+bool Gs1GodotTaskPanelController::handles_notification(Gs1GodotNotificationType type) const noexcept
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
+    case GS1_GODOT_NOTIFICATION_PRESENTATION_DIRTY:
+    case GS1_GODOT_NOTIFICATION_SET_APP_STATE:
         return true;
     default:
         return false;
     }
 }
 
-void Gs1GodotTaskPanelController::handle_engine_message(const Gs1EngineMessage& message)
+void Gs1GodotTaskPanelController::handle_notification(const Gs1GodotNotification& message)
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
+    case GS1_GODOT_NOTIFICATION_PRESENTATION_DIRTY:
     {
-        const auto& payload = message.payload_as<Gs1EngineMessagePresentationDirtyData>();
+        const auto& payload = message.payload_as<Gs1GodotPresentationDirtyNotification>();
         if ((payload.dirty_flags & GS1_PRESENTATION_DIRTY_SITE) != 0U)
         {
             refresh_from_game_state_view();
         }
         break;
     }
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
+    case GS1_GODOT_NOTIFICATION_SET_APP_STATE:
         refresh_from_game_state_view();
         break;
     default:

@@ -292,22 +292,22 @@ bool Gs1GodotRegionalTechTreePanelController::is_panel_visible() const
     return panel_ != nullptr && panel_->is_visible();
 }
 
-bool Gs1GodotRegionalTechTreePanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept
+bool Gs1GodotRegionalTechTreePanelController::handles_notification(Gs1GodotNotificationType type) const noexcept
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
+    case GS1_GODOT_NOTIFICATION_PRESENTATION_DIRTY:
+    case GS1_GODOT_NOTIFICATION_SET_APP_STATE:
         return true;
     default:
         return false;
     }
 }
 
-void Gs1GodotRegionalTechTreePanelController::handle_engine_message(const Gs1EngineMessage& message)
+void Gs1GodotRegionalTechTreePanelController::handle_notification(const Gs1GodotNotification& message)
 {
-    if (message.type == GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY ||
-        message.type == GS1_ENGINE_MESSAGE_SET_APP_STATE)
+    if (message.type == GS1_GODOT_NOTIFICATION_PRESENTATION_DIRTY ||
+        message.type == GS1_GODOT_NOTIFICATION_SET_APP_STATE)
     {
         refresh_from_game_state_view();
     }

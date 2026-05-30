@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gs1/types.h"
+#include "gs1_godot_notification_types.h"
 
 #include <cstdint>
 #include <optional>
@@ -47,14 +47,14 @@ struct Gs1RuntimeProgressionViewProjection final
     std::vector<Gs1RuntimeProgressionEntryProjection> entries {};
 };
 
-using Gs1RuntimeRegionalMapSiteProjection = Gs1EngineMessageRegionalMapSiteData;
-using Gs1RuntimeRegionalMapLinkProjection = Gs1EngineMessageRegionalMapLinkData;
-using Gs1RuntimeTileProjection = Gs1EngineMessageSiteTileData;
-using Gs1RuntimeWorkerProjection = Gs1EngineMessageWorkerData;
-using Gs1RuntimeCampProjection = Gs1EngineMessageCampData;
-using Gs1RuntimeWeatherProjection = Gs1EngineMessageWeatherData;
-using Gs1RuntimeInventoryStorageProjection = Gs1EngineMessageInventoryStorageData;
-using Gs1RuntimeInventorySlotProjection = Gs1EngineMessageInventorySlotData;
+using Gs1RuntimeRegionalMapSiteProjection = Gs1GodotRegionalMapSiteProjection;
+using Gs1RuntimeRegionalMapLinkProjection = Gs1GodotRegionalMapLinkProjection;
+using Gs1RuntimeTileProjection = Gs1GodotSiteTileProjection;
+using Gs1RuntimeWorkerProjection = Gs1GodotWorkerProjection;
+using Gs1RuntimeCampProjection = Gs1GodotCampProjection;
+using Gs1RuntimeWeatherProjection = Gs1GodotWeatherProjection;
+using Gs1RuntimeInventoryStorageProjection = Gs1GodotInventoryStorageProjection;
+using Gs1RuntimeInventorySlotProjection = Gs1GodotInventorySlotProjection;
 
 struct Gs1RuntimeInventoryViewProjection final
 {
@@ -63,7 +63,7 @@ struct Gs1RuntimeInventoryViewProjection final
     std::vector<Gs1RuntimeInventorySlotProjection> slots {};
 };
 
-using Gs1RuntimeCraftContextOptionProjection = Gs1EngineMessageCraftContextOptionData;
+using Gs1RuntimeCraftContextOptionProjection = Gs1GodotCraftContextOptionProjection;
 
 struct Gs1RuntimeCraftContextProjection final
 {
@@ -73,12 +73,12 @@ struct Gs1RuntimeCraftContextProjection final
     std::vector<Gs1RuntimeCraftContextOptionProjection> options {};
 };
 
-using Gs1RuntimePlacementPreviewProjection = Gs1EngineMessagePlacementPreviewData;
-using Gs1RuntimePlacementPreviewTileProjection = Gs1EngineMessagePlacementPreviewTileData;
-using Gs1RuntimePlacementFailureProjection = Gs1EngineMessagePlacementFailureData;
-using Gs1RuntimeTaskProjection = Gs1EngineMessageTaskData;
-using Gs1RuntimePhoneListingProjection = Gs1EngineMessagePhoneListingData;
-using Gs1RuntimeModifierProjection = Gs1EngineMessageSiteModifierData;
+using Gs1RuntimePlacementPreviewProjection = Gs1GodotPlacementPreviewProjection;
+using Gs1RuntimePlacementPreviewTileProjection = Gs1GodotPlacementPreviewTileProjection;
+using Gs1RuntimePlacementFailureProjection = Gs1GodotPlacementFailureNotification;
+using Gs1RuntimeTaskProjection = Gs1GodotTaskProjection;
+using Gs1RuntimePhoneListingProjection = Gs1GodotPhoneListingProjection;
+using Gs1RuntimeModifierProjection = Gs1GodotSiteModifierProjection;
 
 struct Gs1RuntimeOneShotCueProjection final
 {

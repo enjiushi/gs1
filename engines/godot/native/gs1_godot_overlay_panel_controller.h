@@ -20,7 +20,7 @@
 
 class Gs1GodotOverlayPanelController final
     : public godot::Control
-    , public IGs1GodotEngineMessageSubscriber
+    , public IGs1GodotNotificationSubscriber
 {
     GDCLASS(Gs1GodotOverlayPanelController, godot::Control)
 
@@ -37,8 +37,8 @@ public:
     void set_submit_gameplay_action_callback(SubmitGameplayActionFn callback);
     void handle_overlay_mode_pressed(std::int64_t mode);
     void handle_projected_button_pressed(std::int64_t button_key);
-    [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
-    void handle_engine_message(const Gs1EngineMessage& message) override;
+    [[nodiscard]] bool handles_notification(Gs1GodotNotificationType type) const noexcept override;
+    void handle_notification(const Gs1GodotNotification& message) override;
     void handle_runtime_message_reset() override;
 
 protected:

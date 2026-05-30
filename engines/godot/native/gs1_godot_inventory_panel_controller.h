@@ -23,7 +23,7 @@
 
 class Gs1GodotInventoryPanelController final
     : public godot::Control
-    , public IGs1GodotEngineMessageSubscriber
+    , public IGs1GodotNotificationSubscriber
 {
     GDCLASS(Gs1GodotInventoryPanelController, godot::Control)
 
@@ -38,8 +38,8 @@ public:
 
     void cache_ui_references(godot::Control& owner);
     void set_submit_inventory_slot_tap_callback(SubmitInventorySlotTapFn callback);
-    [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
-    void handle_engine_message(const Gs1EngineMessage& message) override;
+    [[nodiscard]] bool handles_notification(Gs1GodotNotificationType type) const noexcept override;
+    void handle_notification(const Gs1GodotNotification& message) override;
     void handle_runtime_message_reset() override;
     void handle_slot_pressed(std::int64_t slot_key);
 

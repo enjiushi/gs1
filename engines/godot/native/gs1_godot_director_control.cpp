@@ -105,7 +105,7 @@ void Gs1GodotDirectorControl::_bind_methods()
 void Gs1GodotDirectorControl::_ready()
 {
     set_process(true);
-    adapter_service_.subscribe(GS1_ENGINE_MESSAGE_SET_APP_STATE, *this);
+    adapter_service_.subscribe(GS1_GODOT_NOTIFICATION_SET_APP_STATE, *this);
     cache_nodes();
     ensure_active_scene();
 }
@@ -524,18 +524,18 @@ bool Gs1GodotDirectorControl::should_async_load_transition(ScreenKind kind) cons
                 active_screen_kind_ == GS1_GODOT_SCREEN_KIND_REGIONAL_MAP));
 }
 
-bool Gs1GodotDirectorControl::handles_engine_message(Gs1EngineMessageType type) const noexcept
+bool Gs1GodotDirectorControl::handles_notification(Gs1GodotNotificationType type) const noexcept
 {
-    return type == GS1_ENGINE_MESSAGE_SET_APP_STATE;
+    return type == GS1_GODOT_NOTIFICATION_SET_APP_STATE;
 }
 
-void Gs1GodotDirectorControl::handle_engine_message(const Gs1EngineMessage& message)
+void Gs1GodotDirectorControl::handle_notification(const Gs1GodotNotification& message)
 {
-    if (message.type != GS1_ENGINE_MESSAGE_SET_APP_STATE)
+    if (message.type != GS1_GODOT_NOTIFICATION_SET_APP_STATE)
     {
         return;
     }
-    last_app_state_ = static_cast<int>(message.payload_as<Gs1EngineMessageSetAppStateData>().app_state);
+    last_app_state_ = static_cast<int>(message.payload_as<Gs1GodotAppStateNotification>().app_state);
     ensure_active_scene();
 }
 

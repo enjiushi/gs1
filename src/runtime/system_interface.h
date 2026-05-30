@@ -31,9 +31,6 @@ public:
     }
 };
 
-template <Gs1RuntimeMessageType MessageType>
-using runtime_message_type_constant = std::integral_constant<Gs1RuntimeMessageType, MessageType>;
-
 inline constexpr StateSetId k_site_component_run_meta_state_sets[] = {
     StateSetId::SiteRunMeta};
 inline constexpr StateSetId k_site_component_time_state_sets[] = {

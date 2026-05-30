@@ -195,16 +195,16 @@ void Gs1GodotRegionalMapHudController::handle_tech_button_pressed()
     submit_gameplay_action_(action.type, action.target_id, action.arg0, action.arg1);
 }
 
-bool Gs1GodotRegionalMapHudController::handles_engine_message(Gs1EngineMessageType type) const noexcept
+bool Gs1GodotRegionalMapHudController::handles_notification(Gs1GodotNotificationType type) const noexcept
 {
-    return type == GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY ||
-        type == GS1_ENGINE_MESSAGE_SET_APP_STATE;
+    return type == GS1_GODOT_NOTIFICATION_PRESENTATION_DIRTY ||
+        type == GS1_GODOT_NOTIFICATION_SET_APP_STATE;
 }
 
-void Gs1GodotRegionalMapHudController::handle_engine_message(const Gs1EngineMessage& message)
+void Gs1GodotRegionalMapHudController::handle_notification(const Gs1GodotNotification& message)
 {
-    if (message.type == GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY ||
-        message.type == GS1_ENGINE_MESSAGE_SET_APP_STATE)
+    if (message.type == GS1_GODOT_NOTIFICATION_PRESENTATION_DIRTY ||
+        message.type == GS1_GODOT_NOTIFICATION_SET_APP_STATE)
     {
         refresh_from_game_state_view();
         apply_selected_site_summary();

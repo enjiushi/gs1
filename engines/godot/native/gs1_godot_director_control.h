@@ -23,7 +23,7 @@
 
 #include <vector>
 
-class Gs1GodotDirectorControl final : public godot::Control, public IGs1GodotEngineMessageSubscriber
+class Gs1GodotDirectorControl final : public godot::Control, public IGs1GodotNotificationSubscriber
 {
     GDCLASS(Gs1GodotDirectorControl, godot::Control)
 
@@ -54,8 +54,8 @@ public:
     [[nodiscard]] Gs1GodotAdapterService& adapter_service() noexcept { return adapter_service_; }
     [[nodiscard]] const Gs1GodotAdapterService& adapter_service() const noexcept { return adapter_service_; }
 
-    [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
-    void handle_engine_message(const Gs1EngineMessage& message) override;
+    [[nodiscard]] bool handles_notification(Gs1GodotNotificationType type) const noexcept override;
+    void handle_notification(const Gs1GodotNotification& message) override;
     void handle_runtime_message_reset() override;
 
 protected:

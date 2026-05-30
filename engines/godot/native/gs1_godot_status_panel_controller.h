@@ -9,7 +9,7 @@
 
 class Gs1GodotStatusPanelController final
     : public godot::Control
-    , public IGs1GodotEngineMessageSubscriber
+    , public IGs1GodotNotificationSubscriber
 {
     GDCLASS(Gs1GodotStatusPanelController, godot::Control)
 
@@ -21,8 +21,8 @@ public:
     void _exit_tree() override;
 
     void cache_ui_references(godot::Control& owner);
-    [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
-    void handle_engine_message(const Gs1EngineMessage& message) override;
+    [[nodiscard]] bool handles_notification(Gs1GodotNotificationType type) const noexcept override;
+    void handle_notification(const Gs1GodotNotification& message) override;
     void handle_runtime_message_reset() override;
     void set_last_action_message(const godot::String& message);
 

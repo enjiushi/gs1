@@ -2,6 +2,7 @@
 
 #include "gs1_godot_debug_http_protocol.h"
 #include "gs1_godot_debug_http_server.h"
+#include "gs1_godot_notification_types.h"
 #include "host/runtime_session.h"
 
 #include <array>
@@ -12,33 +13,13 @@
 #include <unordered_set>
 #include <vector>
 
-struct Gs1GodotEngineMessage final
-{
-    unsigned char payload[GS1_MESSAGE_PAYLOAD_BYTE_COUNT];
-    Gs1EngineMessageType type {GS1_ENGINE_MESSAGE_NONE};
-
-    template <typename PayloadData>
-    [[nodiscard]] PayloadData& emplace_payload() noexcept
-    {
-        static_assert(sizeof(PayloadData) <= GS1_MESSAGE_PAYLOAD_BYTE_COUNT);
-        auto* ptr = std::construct_at(reinterpret_cast<PayloadData*>(payload), PayloadData {});
-        return *std::launder(ptr);
-    }
-
-    template <typename PayloadData>
-    [[nodiscard]] const PayloadData& payload_as() const noexcept
-    {
-        return *std::launder(reinterpret_cast<const PayloadData*>(payload));
-    }
-};
-
-class IGs1GodotEngineMessageSubscriber
+class IGs1GodotNotificationSubscriber
 {
 public:
-    virtual ~IGs1GodotEngineMessageSubscriber() = default;
+    virtual ~IGs1GodotNotificationSubscriber() = default;
 
-    [[nodiscard]] virtual bool handles_engine_message(Gs1EngineMessageType type) const noexcept = 0;
-    virtual void handle_engine_message(const Gs1GodotEngineMessage& message) = 0;
+    [[nodiscard]] virtual bool handles_notification(Gs1GodotNotificationType type) const noexcept = 0;
+    virtual void handle_notification(const Gs1GodotNotification& message) = 0;
     virtual void handle_runtime_message_reset() = 0;
 };
 
@@ -116,11 +97,11 @@ public:
     void begin_frame(double delta_seconds);
     void finish_frame();
 
-    void subscribe(Gs1EngineMessageType type, IGs1GodotEngineMessageSubscriber& subscriber);
-    void subscribe_matching_messages(IGs1GodotEngineMessageSubscriber& subscriber);
-    void unsubscribe(Gs1EngineMessageType type, IGs1GodotEngineMessageSubscriber& subscriber);
-    void unsubscribe_matching_messages(IGs1GodotEngineMessageSubscriber& subscriber);
-    void unsubscribe_all(IGs1GodotEngineMessageSubscriber& subscriber);
+    void subscribe(Gs1GodotNotificationType type, IGs1GodotNotificationSubscriber& subscriber);
+    void subscribe_matching_messages(IGs1GodotNotificationSubscriber& subscriber);
+    void unsubscribe(Gs1GodotNotificationType type, IGs1GodotNotificationSubscriber& subscriber);
+    void unsubscribe_matching_messages(IGs1GodotNotificationSubscriber& subscriber);
+    void unsubscribe_all(IGs1GodotNotificationSubscriber& subscriber);
 
     [[nodiscard]] bool submit_gameplay_action(std::int64_t action_type, std::int64_t target_id = 0, std::int64_t arg0 = 0, std::int64_t arg1 = 0);
     [[nodiscard]] bool submit_move_direction(double world_move_x, double world_move_y, double world_move_z);
@@ -160,7 +141,7 @@ private:
     [[nodiscard]] bool drain_debug_http_commands();
     bool poll_gameplay_state_notifications();
     void notify_runtime_message_reset();
-    void dispatch_engine_message(Gs1GodotEngineMessage&& message);
+    void dispatch_notification(Gs1GodotNotification&& message);
     [[nodiscard]] bool submit_gameplay_action(const Gs1GameplayAction& action);
     [[nodiscard]] bool handle_local_gameplay_action(const Gs1GameplayAction& action);
     [[nodiscard]] bool handle_local_storage_view(
@@ -175,16 +156,16 @@ private:
     void refresh_project_config_root();
     [[nodiscard]] std::string compute_default_gameplay_dll_path() const;
     [[nodiscard]] std::string compute_default_project_config_root() const;
-    void remember_subscriber(IGs1GodotEngineMessageSubscriber& subscriber);
-    [[nodiscard]] static std::size_t bucket_index(Gs1EngineMessageType type) noexcept;
+    void remember_subscriber(IGs1GodotNotificationSubscriber& subscriber);
+    [[nodiscard]] static std::size_t bucket_index(Gs1GodotNotificationType type) noexcept;
 
 private:
     std::filesystem::path gameplay_dll_path_ {};
     std::filesystem::path project_config_root_ {};
     Gs1AdapterConfigBlob adapter_config_ {};
     Gs1RuntimeSession runtime_session_ {};
-    std::array<std::vector<IGs1GodotEngineMessageSubscriber*>, k_message_bucket_count> subscribers_by_message_ {};
-    std::unordered_set<IGs1GodotEngineMessageSubscriber*> known_subscribers_ {};
+    std::array<std::vector<IGs1GodotNotificationSubscriber*>, k_message_bucket_count> subscribers_by_message_ {};
+    std::unordered_set<IGs1GodotNotificationSubscriber*> known_subscribers_ {};
     Gs1GodotDebugHttpServer debug_http_server_ {};
     bool debug_http_server_checked_ {false};
     bool phase2_pending_ {false};

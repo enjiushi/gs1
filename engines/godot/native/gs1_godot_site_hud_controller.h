@@ -15,7 +15,7 @@
 
 class Gs1GodotSiteHudController final
     : public godot::Control
-    , public IGs1GodotEngineMessageSubscriber
+    , public IGs1GodotNotificationSubscriber
 {
     GDCLASS(Gs1GodotSiteHudController, godot::Control)
 
@@ -43,8 +43,8 @@ public:
     void handle_protection_pressed();
     void handle_tech_pressed();
 
-    [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
-    void handle_engine_message(const Gs1EngineMessage& message) override;
+    [[nodiscard]] bool handles_notification(Gs1GodotNotificationType type) const noexcept override;
+    void handle_notification(const Gs1GodotNotification& message) override;
     void handle_runtime_message_reset() override;
 
 protected:

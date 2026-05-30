@@ -20,7 +20,7 @@
 
 class Gs1GodotCraftPanelController final
     : public godot::Control
-    , public IGs1GodotEngineMessageSubscriber
+    , public IGs1GodotNotificationSubscriber
 {
     GDCLASS(Gs1GodotCraftPanelController, godot::Control)
 
@@ -36,8 +36,8 @@ public:
     void cache_ui_references(godot::Control& owner);
     void set_submit_craft_option_callback(SubmitCraftOptionFn callback);
     void handle_craft_option_pressed(std::int64_t button_key);
-    [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
-    void handle_engine_message(const Gs1GodotEngineMessage& message) override;
+    [[nodiscard]] bool handles_notification(Gs1GodotNotificationType type) const noexcept override;
+    void handle_notification(const Gs1GodotNotification& message) override;
     void handle_runtime_message_reset() override;
 
 protected:

@@ -255,24 +255,24 @@ void Gs1GodotOverlayPanelController::handle_projected_button_pressed(std::int64_
         as_int(button->get_meta("arg1", 0), 0));
 }
 
-bool Gs1GodotOverlayPanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept
+bool Gs1GodotOverlayPanelController::handles_notification(Gs1GodotNotificationType type) const noexcept
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
+    case GS1_GODOT_NOTIFICATION_PRESENTATION_DIRTY:
+    case GS1_GODOT_NOTIFICATION_SET_APP_STATE:
         return true;
     default:
         return false;
     }
 }
 
-void Gs1GodotOverlayPanelController::handle_engine_message(const Gs1EngineMessage& message)
+void Gs1GodotOverlayPanelController::handle_notification(const Gs1GodotNotification& message)
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
+    case GS1_GODOT_NOTIFICATION_PRESENTATION_DIRTY:
+    case GS1_GODOT_NOTIFICATION_SET_APP_STATE:
         break;
     default:
         break;

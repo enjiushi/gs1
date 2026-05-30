@@ -167,24 +167,24 @@ void Gs1GodotCraftPanelController::submit_craft_option(int tile_x, int tile_y, i
     }
 }
 
-bool Gs1GodotCraftPanelController::handles_engine_message(Gs1EngineMessageType type) const noexcept
+bool Gs1GodotCraftPanelController::handles_notification(Gs1GodotNotificationType type) const noexcept
 {
     switch (type)
     {
-    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
+    case GS1_GODOT_NOTIFICATION_PRESENTATION_DIRTY:
+    case GS1_GODOT_NOTIFICATION_SET_APP_STATE:
         return true;
     default:
         return false;
     }
 }
 
-void Gs1GodotCraftPanelController::handle_engine_message(const Gs1GodotEngineMessage& message)
+void Gs1GodotCraftPanelController::handle_notification(const Gs1GodotNotification& message)
 {
     switch (message.type)
     {
-    case GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY:
-    case GS1_ENGINE_MESSAGE_SET_APP_STATE:
+    case GS1_GODOT_NOTIFICATION_PRESENTATION_DIRTY:
+    case GS1_GODOT_NOTIFICATION_SET_APP_STATE:
         refresh_from_game_state_view();
         break;
     default:

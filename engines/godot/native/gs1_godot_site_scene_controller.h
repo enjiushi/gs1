@@ -25,7 +25,7 @@ class Label3D;
 class StandardMaterial3D;
 }
 
-class Gs1GodotSiteSceneController final : public godot::Control, public IGs1GodotEngineMessageSubscriber
+class Gs1GodotSiteSceneController final : public godot::Control, public IGs1GodotNotificationSubscriber
 {
     GDCLASS(Gs1GodotSiteSceneController, godot::Control)
 
@@ -36,8 +36,8 @@ public:
     void _ready() override;
     void _exit_tree() override;
 
-    [[nodiscard]] bool handles_engine_message(Gs1EngineMessageType type) const noexcept override;
-    void handle_engine_message(const Gs1EngineMessage& message) override;
+    [[nodiscard]] bool handles_notification(Gs1GodotNotificationType type) const noexcept override;
+    void handle_notification(const Gs1GodotNotification& message) override;
     void handle_runtime_message_reset() override;
 
 protected:
@@ -102,10 +102,10 @@ private:
     void cache_adapter_service();
     void refresh_from_game_state_view();
     void apply_site_snapshot_end();
-    void apply_site_tile_upsert(const Gs1EngineMessageSiteTileData& payload);
-    void apply_site_worker_update(const Gs1EngineMessageWorkerData& payload);
-    void apply_site_plant_visual_upsert(const Gs1EngineMessageSitePlantVisualData& payload);
-    void apply_site_device_visual_upsert(const Gs1EngineMessageSiteDeviceVisualData& payload);
+    void apply_site_tile_upsert(const Gs1GodotSiteTileProjection& payload);
+    void apply_site_worker_update(const Gs1GodotWorkerProjection& payload);
+    void apply_site_plant_visual_upsert(const Gs1GodotSitePlantVisualProjection& payload);
+    void apply_site_device_visual_upsert(const Gs1GodotSiteDeviceVisualProjection& payload);
 
     void clear_visuals();
     void clear_tiles();

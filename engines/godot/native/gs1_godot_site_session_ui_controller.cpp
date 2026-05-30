@@ -212,16 +212,16 @@ void Gs1GodotSiteSessionUiController::bind_button(BaseButton* button, const Call
     button->connect("pressed", callback);
 }
 
-bool Gs1GodotSiteSessionUiController::handles_engine_message(Gs1EngineMessageType type) const noexcept
+bool Gs1GodotSiteSessionUiController::handles_notification(Gs1GodotNotificationType type) const noexcept
 {
-    return type == GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY ||
-        type == GS1_ENGINE_MESSAGE_SET_APP_STATE;
+    return type == GS1_GODOT_NOTIFICATION_PRESENTATION_DIRTY ||
+        type == GS1_GODOT_NOTIFICATION_SET_APP_STATE;
 }
 
-void Gs1GodotSiteSessionUiController::handle_engine_message(const Gs1EngineMessage& message)
+void Gs1GodotSiteSessionUiController::handle_notification(const Gs1GodotNotification& message)
 {
-    if (message.type == GS1_ENGINE_MESSAGE_PRESENTATION_DIRTY ||
-        message.type == GS1_ENGINE_MESSAGE_SET_APP_STATE)
+    if (message.type == GS1_GODOT_NOTIFICATION_PRESENTATION_DIRTY ||
+        message.type == GS1_GODOT_NOTIFICATION_SET_APP_STATE)
     {
         refresh_from_game_state_view();
         if (current_app_state_ < APP_STATE_SITE_LOADING || current_app_state_ > APP_STATE_SITE_RESULT)
