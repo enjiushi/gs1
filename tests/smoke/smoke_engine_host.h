@@ -67,11 +67,11 @@ public:
 
     void update(double delta_seconds);
     void queue_ui_action(const Gs1UiAction& action);
-    void queue_site_action_request(const Gs1HostEventSiteActionRequestData& action);
-    void queue_site_action_cancel(const Gs1HostEventSiteActionCancelData& action);
-    void queue_site_storage_view(const Gs1HostEventSiteStorageViewData& request);
-    void queue_site_inventory_slot_tap(const Gs1HostEventSiteInventorySlotTapData& request);
-    void queue_site_context_request(const Gs1HostEventSiteContextRequestData& request);
+    void queue_site_action_request(const Gs1SiteActionRequestCommand& action);
+    void queue_site_action_cancel(const Gs1SiteActionCancelCommand& action);
+    void queue_site_storage_view(const Gs1SiteStorageViewRequest& request);
+    void queue_site_inventory_slot_tap(const Gs1SiteInventorySlotTapCommand& request);
+    void queue_site_context_request(const Gs1SiteContextRequestCommand& request);
     void queue_site_move_direction(float world_move_x, float world_move_y, float world_move_z);
     [[nodiscard]] std::vector<std::string> consume_pending_live_state_patches();
     [[nodiscard]] LiveStateSnapshot capture_live_state_snapshot() const;
@@ -102,6 +102,28 @@ public:
     [[nodiscard]] bool saw_message(Gs1EngineMessageType type) const noexcept;
 
 public:
+    struct PendingRuntimeCommand final
+    {
+        enum class Kind : std::uint8_t
+        {
+            GameplayAction,
+            SiteActionRequest,
+            SiteActionCancel,
+            SiteInventorySlotTap,
+            SiteContextRequest,
+            SiteMoveDirection,
+            SiteSceneReady
+        };
+
+        Kind kind {Kind::GameplayAction};
+        Gs1GameplayAction gameplay_action {};
+        Gs1SiteActionRequestCommand site_action_request {};
+        Gs1SiteActionCancelCommand site_action_cancel {};
+        Gs1SiteInventorySlotTapCommand site_inventory_slot_tap {};
+        Gs1SiteContextRequestCommand site_context_request {};
+        Gs1SiteMoveDirectionCommand site_move_direction {};
+    };
+
     struct ActiveUiElement final
     {
         std::uint32_t element_id {0};
@@ -471,15 +493,13 @@ private:
     void queue_pre_phase1_ui_action_if_ready();
     void queue_between_phase_ui_action_if_ready();
     void queue_between_phase_site_scene_ready_if_needed();
-    void submit_host_messages(
-        std::vector<Gs1HostMessage>& events,
-        const char* stage_label);
+    void apply_local_storage_view_request(const Gs1SiteStorageViewRequest& request);
     void apply_inflight_script_directive();
     void resolve_inflight_script_directive();
     void clear_inflight_script_directive();
     void fail_inflight_script_directive(const std::string& message);
     void flush_engine_messages(const char* stage_label);
-    [[nodiscard]] bool try_queue_ui_action_from_directive(std::vector<Gs1HostMessage>& destination);
+    [[nodiscard]] bool try_queue_ui_action_from_directive(std::vector<PendingRuntimeCommand>& destination);
     [[nodiscard]] bool resolve_available_ui_action(
         const Gs1UiAction& requested_action,
         Gs1UiAction& out_action) const;
@@ -535,24 +555,27 @@ private:
         std::uint32_t from_site_id,
         std::uint32_t to_site_id) noexcept;
     [[nodiscard]] static std::string describe_message(const Gs1RuntimeMessage& message);
-    static Gs1HostMessage make_ui_action_event(const Gs1UiAction& action) noexcept;
-    static Gs1HostMessage make_site_scene_ready_event() noexcept;
-    static Gs1HostMessage make_site_move_direction_event(
+    static PendingRuntimeCommand make_ui_action_command(const Gs1UiAction& action) noexcept;
+    static PendingRuntimeCommand make_site_scene_ready_command() noexcept;
+    static PendingRuntimeCommand make_site_move_direction_command(
         float world_move_x,
         float world_move_y,
         float world_move_z) noexcept;
+    void submit_pending_commands(
+        std::vector<PendingRuntimeCommand>& commands,
+        const char* stage_label);
 
 private:
     const Gs1RuntimeApi* api_ {nullptr};
     Gs1RuntimeHandle* runtime_ {nullptr};
     LogMode log_mode_ {LogMode::Verbose};
     mutable std::mutex incoming_commands_mutex_ {};
-    std::vector<Gs1HostMessage> incoming_pre_phase1_host_events_ {};
+    std::vector<PendingRuntimeCommand> incoming_pre_phase1_commands_ {};
     mutable std::mutex published_state_mutex_ {};
     LiveStateSnapshot published_live_state_snapshot_ {};
     std::vector<std::string> published_live_state_patches_ {};
-    std::vector<Gs1HostMessage> frame_pre_phase1_host_events_ {};
-    std::vector<Gs1HostMessage> pending_between_phase_host_events_ {};
+    std::vector<PendingRuntimeCommand> frame_pre_phase1_commands_ {};
+    std::vector<PendingRuntimeCommand> pending_between_phase_commands_ {};
     std::vector<std::string> message_logs_ {};
     std::vector<std::string> current_frame_message_entries_ {};
     std::uint32_t frame_live_state_patch_mask_ {0U};

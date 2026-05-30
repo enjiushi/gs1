@@ -178,11 +178,6 @@ const char* TechnologySystem::name() const noexcept
     return "TechnologySystem";
 }
 
-HostMessageSubscriptionSpan TechnologySystem::subscribed_host_messages() const noexcept
-{
-    return {};
-}
-
 std::optional<Gs1RuntimeProfileSystemId> TechnologySystem::profile_system_id() const noexcept
 {
     return GS1_RUNTIME_PROFILE_SYSTEM_TECHNOLOGY;

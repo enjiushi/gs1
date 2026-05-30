@@ -385,11 +385,6 @@ const char* DeviceWeatherContributionSystem::name() const noexcept
     return access().system_name.data();
 }
 
-HostMessageSubscriptionSpan DeviceWeatherContributionSystem::subscribed_host_messages() const noexcept
-{
-    return {};
-}
-
 std::optional<Gs1RuntimeProfileSystemId> DeviceWeatherContributionSystem::profile_system_id() const noexcept
 {
     return GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE;

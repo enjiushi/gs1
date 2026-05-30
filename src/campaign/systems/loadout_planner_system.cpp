@@ -142,11 +142,6 @@ const char* LoadoutPlannerSystem::name() const noexcept
     return "LoadoutPlannerSystem";
 }
 
-HostMessageSubscriptionSpan LoadoutPlannerSystem::subscribed_host_messages() const noexcept
-{
-    return {};
-}
-
 std::optional<Gs1RuntimeProfileSystemId> LoadoutPlannerSystem::profile_system_id() const noexcept
 {
     return GS1_RUNTIME_PROFILE_SYSTEM_LOADOUT_PLANNER;

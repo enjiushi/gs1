@@ -60,13 +60,6 @@ StartSiteAttemptMessage make_start_site_attempt_message(std::uint32_t site_id)
     return StartSiteAttemptMessage {site_id};
 }
 
-Gs1HostMessage make_site_scene_ready_event()
-{
-    Gs1HostMessage event {};
-    event.type = GS1_HOST_EVENT_SITE_SCENE_READY;
-    return event;
-}
-
 void run_phase2(GameRuntime& runtime)
 {
     Gs1Phase2Request request {};
@@ -96,8 +89,7 @@ void bootstrap_site_one(GameRuntime& runtime)
     const auto start_site_status = runtime.handle_message(make_start_site_attempt_message(site_id));
     assert(start_site_status == GS1_STATUS_OK);
 
-    const auto ready_event = make_site_scene_ready_event();
-    assert(runtime.submit_host_messages(&ready_event, 1U) == GS1_STATUS_OK);
+    assert(runtime.submit_site_scene_ready() == GS1_STATUS_OK);
     run_phase2(runtime);
     (void)read_view(runtime);
 }
@@ -228,12 +220,11 @@ void translated_site_host_messages_mutate_authoritative_runtime_state()
         });
 
     {
-        Gs1HostMessage move_event {};
-        move_event.type = GS1_HOST_EVENT_SITE_MOVE_DIRECTION;
-        move_event.payload.site_move_direction.world_move_x = 1.0f;
-        move_event.payload.site_move_direction.world_move_y = 0.0f;
-        move_event.payload.site_move_direction.world_move_z = 0.0f;
-        assert(runtime.submit_host_messages(&move_event, 1U) == GS1_STATUS_OK);
+        Gs1SiteMoveDirectionCommand move_command {};
+        move_command.world_move_x = 1.0f;
+        move_command.world_move_y = 0.0f;
+        move_command.world_move_z = 0.0f;
+        assert(runtime.submit_site_move_direction(move_command) == GS1_STATUS_OK);
 
         Gs1Phase1Request request {};
         request.struct_size = sizeof(Gs1Phase1Request);
@@ -250,11 +241,10 @@ void translated_site_host_messages_mutate_authoritative_runtime_state()
     assert(worker_position_after.tile_x > worker_position_before.tile_x);
 
     {
-        Gs1HostMessage context_event {};
-        context_event.type = GS1_HOST_EVENT_SITE_CONTEXT_REQUEST;
-        context_event.payload.site_context_request.tile_x = 1;
-        context_event.payload.site_context_request.tile_y = 0;
-        assert(runtime.submit_host_messages(&context_event, 1U) == GS1_STATUS_OK);
+        Gs1SiteContextRequestCommand context_command {};
+        context_command.tile_x = 1;
+        context_command.tile_y = 0;
+        assert(runtime.submit_site_context_request(context_command) == GS1_STATUS_OK);
         run_phase2(runtime);
     }
 
@@ -265,12 +255,11 @@ void translated_site_host_messages_mutate_authoritative_runtime_state()
     assert(site_run->craft.context.tile_coord.y == 0);
 
     {
-        Gs1HostMessage tap_event {};
-        tap_event.type = GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP;
-        tap_event.payload.site_inventory_slot_tap.storage_id = site_run->inventory.worker_pack_storage_id;
-        tap_event.payload.site_inventory_slot_tap.slot_index = 0U;
-        tap_event.payload.site_inventory_slot_tap.container_kind = GS1_INVENTORY_CONTAINER_WORKER_PACK;
-        assert(runtime.submit_host_messages(&tap_event, 1U) == GS1_STATUS_OK);
+        Gs1SiteInventorySlotTapCommand tap_command {};
+        tap_command.storage_id = site_run->inventory.worker_pack_storage_id;
+        tap_command.slot_index = 0U;
+        tap_command.container_kind = GS1_INVENTORY_CONTAINER_WORKER_PACK;
+        assert(runtime.submit_site_inventory_slot_tap(tap_command) == GS1_STATUS_OK);
         run_phase2(runtime);
     }
 
@@ -278,13 +267,12 @@ void translated_site_host_messages_mutate_authoritative_runtime_state()
     assert(site_run.has_value());
 
     {
-        Gs1HostMessage action_event {};
-        action_event.type = GS1_HOST_EVENT_SITE_ACTION_REQUEST;
-        action_event.payload.site_action_request.action_kind = GS1_SITE_ACTION_WATER;
-        action_event.payload.site_action_request.target_tile_x = 0;
-        action_event.payload.site_action_request.target_tile_y = 0;
-        action_event.payload.site_action_request.quantity = 1U;
-        assert(runtime.submit_host_messages(&action_event, 1U) == GS1_STATUS_OK);
+        Gs1SiteActionRequestCommand action_command {};
+        action_command.action_kind = GS1_SITE_ACTION_WATER;
+        action_command.target_tile_x = 0;
+        action_command.target_tile_y = 0;
+        action_command.quantity = 1U;
+        assert(runtime.submit_site_action_request(action_command) == GS1_STATUS_OK);
         run_phase2(runtime);
     }
 
@@ -294,10 +282,9 @@ void translated_site_host_messages_mutate_authoritative_runtime_state()
     assert(site_run->site_action.action_kind == gs1::ActionKind::Water);
 
     {
-        Gs1HostMessage cancel_event {};
-        cancel_event.type = GS1_HOST_EVENT_SITE_ACTION_CANCEL;
-        cancel_event.payload.site_action_cancel.flags = GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION;
-        assert(runtime.submit_host_messages(&cancel_event, 1U) == GS1_STATUS_OK);
+        Gs1SiteActionCancelCommand cancel_command {};
+        cancel_command.flags = GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION;
+        assert(runtime.submit_site_action_cancel(cancel_command) == GS1_STATUS_OK);
         run_phase2(runtime);
     }
 

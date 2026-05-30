@@ -230,11 +230,6 @@ const char* SiteCompletionSystem::name() const noexcept
     return access().system_name.data();
 }
 
-HostMessageSubscriptionSpan SiteCompletionSystem::subscribed_host_messages() const noexcept
-{
-    return {};
-}
-
 std::optional<Gs1RuntimeProfileSystemId> SiteCompletionSystem::profile_system_id() const noexcept
 {
     return GS1_RUNTIME_PROFILE_SYSTEM_SITE_COMPLETION;

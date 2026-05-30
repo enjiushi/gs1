@@ -265,35 +265,9 @@ std::size_t message_type_index(GameMessageType type) noexcept
     return static_cast<std::size_t>(type);
 }
 
-std::size_t host_message_type_index(Gs1HostMessageType type) noexcept
-{
-    return static_cast<std::size_t>(type);
-}
-
-bool is_valid_host_message_type(Gs1HostMessageType type) noexcept
-{
-    return host_message_type_index(type) < (static_cast<std::size_t>(GS1_HOST_EVENT_SITE_SCENE_READY) + 1U);
-}
-
 bool is_valid_message_type(GameMessageType type) noexcept
 {
     return message_type_index(type) < k_game_message_type_count;
-}
-
-template <typename EnumType, typename SubscriberArray>
-void append_runtime_subscribers(
-    SubscriberArray& subscribers_by_type,
-    std::span<const EnumType> subscribed_types,
-    IRuntimeSystem& system)
-{
-    for (const EnumType type : subscribed_types)
-    {
-        const auto index = static_cast<std::size_t>(type);
-        if (index < subscribers_by_type.size())
-        {
-            subscribers_by_type[index].push_back(&system);
-        }
-    }
 }
 
 bool is_valid_profile_system_id(Gs1RuntimeProfileSystemId system_id) noexcept
@@ -771,10 +745,6 @@ void GameRuntime::initialize_system_registry()
 #endif
 
     fixed_step_systems_.clear();
-    for (auto& subscribers : host_message_subscribers_)
-    {
-        subscribers.clear();
-    }
 
     const auto append_fixed_step_system = [this]<typename System>()
     {
@@ -789,10 +759,6 @@ void GameRuntime::initialize_system_registry()
     {
         auto& system = std::get<System>(systems_);
         state_manager_.register_resolver(system);
-        append_runtime_subscribers(
-            host_message_subscribers_,
-            system.subscribed_host_messages(),
-            system);
     };
 
     [&]<std::size_t... Orders>(std::index_sequence<Orders...>)
@@ -805,20 +771,65 @@ void GameRuntime::initialize_system_registry()
     for_each_type<typename GameSystems::list>(register_subscribers);
 }
 
-Gs1Status GameRuntime::submit_host_messages(
-    const Gs1HostMessage* messages,
-    std::uint32_t message_count)
+Gs1Status GameRuntime::submit_gameplay_action(const Gs1GameplayAction& action)
 {
-    if (message_count > 0U && messages == nullptr)
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
+    PendingHostCommand command {};
+    command.kind = PendingHostCommand::Kind::GameplayAction;
+    command.gameplay_action = action;
+    pending_host_commands_.push_back(command);
+    return GS1_STATUS_OK;
+}
 
-    for (std::uint32_t i = 0; i < message_count; ++i)
-    {
-        host_messages_.push_back(messages[i]);
-    }
+Gs1Status GameRuntime::submit_site_move_direction(const Gs1SiteMoveDirectionCommand& command)
+{
+    auto pending = PendingHostCommand {};
+    pending.kind = PendingHostCommand::Kind::SiteMoveDirection;
+    pending.site_move_direction = command;
+    pending_host_commands_.push_back(pending);
+    return GS1_STATUS_OK;
+}
 
+Gs1Status GameRuntime::submit_site_action_request(const Gs1SiteActionRequestCommand& command)
+{
+    auto pending = PendingHostCommand {};
+    pending.kind = PendingHostCommand::Kind::SiteActionRequest;
+    pending.site_action_request = command;
+    pending_host_commands_.push_back(pending);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status GameRuntime::submit_site_action_cancel(const Gs1SiteActionCancelCommand& command)
+{
+    auto pending = PendingHostCommand {};
+    pending.kind = PendingHostCommand::Kind::SiteActionCancel;
+    pending.site_action_cancel = command;
+    pending_host_commands_.push_back(pending);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status GameRuntime::submit_site_context_request(const Gs1SiteContextRequestCommand& command)
+{
+    auto pending = PendingHostCommand {};
+    pending.kind = PendingHostCommand::Kind::SiteContextRequest;
+    pending.site_context_request = command;
+    pending_host_commands_.push_back(pending);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status GameRuntime::submit_site_inventory_slot_tap(const Gs1SiteInventorySlotTapCommand& command)
+{
+    auto pending = PendingHostCommand {};
+    pending.kind = PendingHostCommand::Kind::SiteInventorySlotTap;
+    pending.site_inventory_slot_tap = command;
+    pending_host_commands_.push_back(pending);
+    return GS1_STATUS_OK;
+}
+
+Gs1Status GameRuntime::submit_site_scene_ready()
+{
+    PendingHostCommand command {};
+    command.kind = PendingHostCommand::Kind::SiteSceneReady;
+    pending_host_commands_.push_back(command);
     return GS1_STATUS_OK;
 }
 
@@ -1003,47 +1014,13 @@ Gs1Status GameRuntime::dispatch_host_messages(std::uint32_t& out_processed_count
 {
     out_processed_count = 0U;
 
-    while (!host_messages_.empty())
+    while (!pending_host_commands_.empty())
     {
-        const auto message = host_messages_.front();
-        host_messages_.pop_front();
+        const auto command = pending_host_commands_.front();
+        pending_host_commands_.pop_front();
         out_processed_count += 1U;
 
-        const auto status = dispatch_subscribed_host_message(message);
-        if (status != GS1_STATUS_OK)
-        {
-            return status;
-        }
-
-    }
-
-    return GS1_STATUS_OK;
-}
-
-Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& message)
-{
-    if (!is_valid_host_message_type(message.type))
-    {
-        return GS1_STATUS_INVALID_ARGUMENT;
-    }
-
-    if (const auto translated_status = dispatch_runtime_translated_host_message(message);
-        translated_status.has_value())
-    {
-        return *translated_status;
-    }
-
-    RuntimeInvocation invocation {*this};
-    const auto& subscribers = host_message_subscribers_[host_message_type_index(message.type)];
-    for (IRuntimeSystem* system : subscribers)
-    {
-        if (system == nullptr)
-        {
-            continue;
-        }
-
-        RuntimeMutationScope mutation_scope {state_manager_, *system};
-        const auto status = system->process_host_message(invocation, message);
+        const auto status = dispatch_pending_host_command(command);
         if (status != GS1_STATUS_OK)
         {
             return status;
@@ -1053,10 +1030,11 @@ Gs1Status GameRuntime::dispatch_subscribed_host_message(const Gs1HostMessage& me
     return GS1_STATUS_OK;
 }
 
-std::optional<Gs1Status> GameRuntime::dispatch_runtime_translated_host_message(
-    const Gs1HostMessage& message)
+Gs1Status GameRuntime::dispatch_pending_host_command(const PendingHostCommand& command)
 {
-    if (message.type == GS1_HOST_EVENT_SITE_SCENE_READY)
+    switch (command.kind)
+    {
+    case PendingHostCommand::Kind::SiteSceneReady:
     {
         if (!state().site_run_meta.has_value())
         {
@@ -1075,9 +1053,9 @@ std::optional<Gs1Status> GameRuntime::dispatch_runtime_translated_host_message(
         return GS1_STATUS_OK;
     }
 
-    if (message.type == GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP)
+    case PendingHostCommand::Kind::SiteInventorySlotTap:
     {
-        const auto& payload = message.payload.site_inventory_slot_tap;
+        const auto& payload = command.site_inventory_slot_tap;
         return dispatch_game_message_inline(InventorySlotTappedMessage {
             payload.storage_id,
             payload.item_instance_id,
@@ -1087,14 +1065,14 @@ std::optional<Gs1Status> GameRuntime::dispatch_runtime_translated_host_message(
             payload.companion_storage_id});
     }
 
-    if (message.type == GS1_HOST_EVENT_SITE_MOVE_DIRECTION)
+    case PendingHostCommand::Kind::SiteMoveDirection:
     {
         if (!state().site_run_meta.has_value() || site_world() == nullptr)
         {
             return GS1_STATUS_OK;
         }
 
-        const auto& payload = message.payload.site_move_direction;
+        const auto& payload = command.site_move_direction;
         RuntimePrivilegedStateMutation privileged {state_manager_};
         auto& move_direction = state_manager_.state<StateSetId::MoveDirection>(state());
         move_direction.world_move_x = payload.world_move_x;
@@ -1104,14 +1082,14 @@ std::optional<Gs1Status> GameRuntime::dispatch_runtime_translated_host_message(
         return GS1_STATUS_OK;
     }
 
-    if (message.type == GS1_HOST_EVENT_SITE_CONTEXT_REQUEST)
+    case PendingHostCommand::Kind::SiteContextRequest:
     {
         if (!state().site_run_meta.has_value())
         {
             return GS1_STATUS_OK;
         }
 
-        const auto& payload = message.payload.site_context_request;
+        const auto& payload = command.site_context_request;
         const auto& action_meta =
             state_manager_.query<StateSetId::SiteActionMeta>(state());
         if (action_meta.has_value() && action_meta->placement_mode.active)
@@ -1128,9 +1106,9 @@ std::optional<Gs1Status> GameRuntime::dispatch_runtime_translated_host_message(
             payload.flags});
     }
 
-    if (message.type == GS1_HOST_EVENT_SITE_ACTION_REQUEST)
+    case PendingHostCommand::Kind::SiteActionRequest:
     {
-        const auto& payload = message.payload.site_action_request;
+        const auto& payload = command.site_action_request;
         if (payload.action_kind == GS1_SITE_ACTION_NONE)
         {
             return GS1_STATUS_INVALID_ARGUMENT;
@@ -1147,9 +1125,9 @@ std::optional<Gs1Status> GameRuntime::dispatch_runtime_translated_host_message(
             payload.item_id});
     }
 
-    if (message.type == GS1_HOST_EVENT_SITE_ACTION_CANCEL)
+    case PendingHostCommand::Kind::SiteActionCancel:
     {
-        const auto& payload = message.payload.site_action_cancel;
+        const auto& payload = command.site_action_cancel;
         if (payload.action_id == 0U &&
             (payload.flags &
                 (GS1_SITE_ACTION_CANCEL_FLAG_CURRENT_ACTION |
@@ -1163,120 +1141,119 @@ std::optional<Gs1Status> GameRuntime::dispatch_runtime_translated_host_message(
             payload.flags});
     }
 
-    if (message.type != GS1_HOST_EVENT_GAMEPLAY_ACTION)
+    case PendingHostCommand::Kind::GameplayAction:
     {
-        return std::nullopt;
+        const auto& action = command.gameplay_action;
+        switch (action.type)
+        {
+        case GS1_GAMEPLAY_ACTION_START_NEW_CAMPAIGN:
+            return dispatch_game_message_inline(
+                StartNewCampaignMessage {action.arg0, static_cast<std::uint32_t>(action.arg1)});
+
+        case GS1_GAMEPLAY_ACTION_SELECT_DEPLOYMENT_SITE:
+            if (action.target_id == 0U)
+            {
+                return GS1_STATUS_INVALID_ARGUMENT;
+            }
+            return dispatch_game_message_inline(SelectDeploymentSiteMessage {action.target_id});
+
+        case GS1_GAMEPLAY_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
+            return dispatch_game_message_inline(ClearDeploymentSiteSelectionMessage {});
+
+        case GS1_GAMEPLAY_ACTION_START_SITE_ATTEMPT:
+            if (action.target_id == 0U)
+            {
+                return GS1_STATUS_INVALID_ARGUMENT;
+            }
+            return dispatch_game_message_inline(StartSiteAttemptMessage {action.target_id});
+
+        case GS1_GAMEPLAY_ACTION_RETURN_TO_REGIONAL_MAP:
+            return dispatch_game_message_inline(ReturnToRegionalMapMessage {});
+
+        case GS1_GAMEPLAY_ACTION_CLAIM_TECHNOLOGY_NODE:
+            if (action.target_id == 0U || action.arg0 == 0U ||
+                action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
+            {
+                return GS1_STATUS_INVALID_ARGUMENT;
+            }
+            return dispatch_game_message_inline(TechnologyNodeClaimRequestedMessage {
+                action.target_id,
+                static_cast<std::uint32_t>(action.arg0)});
+
+        case GS1_GAMEPLAY_ACTION_REFUND_TECHNOLOGY_NODE:
+            if (action.target_id == 0U)
+            {
+                return GS1_STATUS_INVALID_ARGUMENT;
+            }
+            return dispatch_game_message_inline(TechnologyNodeRefundRequestedMessage {
+                action.target_id});
+
+        case GS1_GAMEPLAY_ACTION_ACCEPT_TASK:
+            if (action.target_id == 0U)
+            {
+                return GS1_STATUS_INVALID_ARGUMENT;
+            }
+            return dispatch_game_message_inline(TaskAcceptRequestedMessage {action.target_id});
+
+        case GS1_GAMEPLAY_ACTION_CLAIM_TASK_REWARD:
+            if (action.target_id == 0U ||
+                action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
+            {
+                return GS1_STATUS_INVALID_ARGUMENT;
+            }
+            return dispatch_game_message_inline(TaskRewardClaimRequestedMessage {
+                action.target_id,
+                static_cast<std::uint32_t>(action.arg0)});
+
+        case GS1_GAMEPLAY_ACTION_END_SITE_MODIFIER:
+            if (action.target_id == 0U)
+            {
+                return GS1_STATUS_INVALID_ARGUMENT;
+            }
+            return dispatch_game_message_inline(SiteModifierEndRequestedMessage {action.target_id});
+
+        case GS1_GAMEPLAY_ACTION_BUY_PHONE_LISTING:
+            if (action.target_id == 0U)
+            {
+                return GS1_STATUS_INVALID_ARGUMENT;
+            }
+            return dispatch_game_message_inline(PhoneListingPurchaseRequestedMessage {
+                action.target_id,
+                static_cast<std::uint16_t>(action.arg0),
+                0U});
+
+        case GS1_GAMEPLAY_ACTION_SELL_PHONE_LISTING:
+            if (action.target_id == 0U)
+            {
+                return GS1_STATUS_INVALID_ARGUMENT;
+            }
+            return dispatch_game_message_inline(PhoneListingSaleRequestedMessage {
+                action.target_id,
+                static_cast<std::uint16_t>(action.arg0),
+                0U});
+
+        case GS1_GAMEPLAY_ACTION_HIRE_CONTRACTOR:
+            if (action.target_id == 0U ||
+                action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
+            {
+                return GS1_STATUS_INVALID_ARGUMENT;
+            }
+            return dispatch_game_message_inline(ContractorHireRequestedMessage {
+                action.target_id,
+                static_cast<std::uint32_t>(action.arg0)});
+
+        case GS1_GAMEPLAY_ACTION_PURCHASE_SITE_UNLOCKABLE:
+            if (action.target_id == 0U)
+            {
+                return GS1_STATUS_INVALID_ARGUMENT;
+            }
+            return dispatch_game_message_inline(SiteUnlockablePurchaseRequestedMessage {
+                action.target_id});
+
+        default:
+            return GS1_STATUS_OK;
+        }
     }
-
-    const auto& action = message.payload.gameplay_action.action;
-    switch (action.type)
-    {
-    case GS1_GAMEPLAY_ACTION_START_NEW_CAMPAIGN:
-        return dispatch_game_message_inline(
-            StartNewCampaignMessage {action.arg0, static_cast<std::uint32_t>(action.arg1)});
-
-    case GS1_GAMEPLAY_ACTION_SELECT_DEPLOYMENT_SITE:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return dispatch_game_message_inline(SelectDeploymentSiteMessage {action.target_id});
-
-    case GS1_GAMEPLAY_ACTION_CLEAR_DEPLOYMENT_SITE_SELECTION:
-        return dispatch_game_message_inline(ClearDeploymentSiteSelectionMessage {});
-
-    case GS1_GAMEPLAY_ACTION_START_SITE_ATTEMPT:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return dispatch_game_message_inline(StartSiteAttemptMessage {action.target_id});
-
-    case GS1_GAMEPLAY_ACTION_RETURN_TO_REGIONAL_MAP:
-        return dispatch_game_message_inline(ReturnToRegionalMapMessage {});
-
-    case GS1_GAMEPLAY_ACTION_CLAIM_TECHNOLOGY_NODE:
-        if (action.target_id == 0U || action.arg0 == 0U ||
-            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return dispatch_game_message_inline(TechnologyNodeClaimRequestedMessage {
-            action.target_id,
-            static_cast<std::uint32_t>(action.arg0)});
-
-    case GS1_GAMEPLAY_ACTION_REFUND_TECHNOLOGY_NODE:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return dispatch_game_message_inline(TechnologyNodeRefundRequestedMessage {
-            action.target_id});
-
-    case GS1_GAMEPLAY_ACTION_ACCEPT_TASK:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return dispatch_game_message_inline(TaskAcceptRequestedMessage {action.target_id});
-
-    case GS1_GAMEPLAY_ACTION_CLAIM_TASK_REWARD:
-        if (action.target_id == 0U ||
-            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return dispatch_game_message_inline(TaskRewardClaimRequestedMessage {
-            action.target_id,
-            static_cast<std::uint32_t>(action.arg0)});
-
-    case GS1_GAMEPLAY_ACTION_END_SITE_MODIFIER:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return dispatch_game_message_inline(SiteModifierEndRequestedMessage {action.target_id});
-
-    case GS1_GAMEPLAY_ACTION_BUY_PHONE_LISTING:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return dispatch_game_message_inline(PhoneListingPurchaseRequestedMessage {
-            action.target_id,
-            static_cast<std::uint16_t>(action.arg0),
-            0U});
-
-    case GS1_GAMEPLAY_ACTION_SELL_PHONE_LISTING:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return dispatch_game_message_inline(PhoneListingSaleRequestedMessage {
-            action.target_id,
-            static_cast<std::uint16_t>(action.arg0),
-            0U});
-
-    case GS1_GAMEPLAY_ACTION_HIRE_CONTRACTOR:
-        if (action.target_id == 0U ||
-            action.arg0 > static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()))
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return dispatch_game_message_inline(ContractorHireRequestedMessage {
-            action.target_id,
-            static_cast<std::uint32_t>(action.arg0)});
-
-    case GS1_GAMEPLAY_ACTION_PURCHASE_SITE_UNLOCKABLE:
-        if (action.target_id == 0U)
-        {
-            return GS1_STATUS_INVALID_ARGUMENT;
-        }
-        return dispatch_game_message_inline(SiteUnlockablePurchaseRequestedMessage {
-            action.target_id});
-
-    default:
-        return std::nullopt;
     }
 }
 

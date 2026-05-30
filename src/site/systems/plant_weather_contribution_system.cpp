@@ -662,11 +662,6 @@ const char* PlantWeatherContributionSystem::name() const noexcept
     return access().system_name.data();
 }
 
-HostMessageSubscriptionSpan PlantWeatherContributionSystem::subscribed_host_messages() const noexcept
-{
-    return {};
-}
-
 std::optional<Gs1RuntimeProfileSystemId> PlantWeatherContributionSystem::profile_system_id() const noexcept
 {
     return GS1_RUNTIME_PROFILE_SYSTEM_LOCAL_WEATHER_RESOLVE;

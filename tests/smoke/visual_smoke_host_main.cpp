@@ -386,7 +386,7 @@ void run_live_mode(
                 return;
             }
 
-            Gs1HostEventSiteActionRequestData action {};
+            Gs1SiteActionRequestCommand action {};
             action.action_kind = action_kind.value();
             action.flags = static_cast<std::uint8_t>(
                 extract_number_field<std::uint32_t>(body, "flags").value_or(0U));
@@ -403,7 +403,7 @@ void run_live_mode(
             session.host.queue_site_action_request(action);
         },
         [&session](const std::string& body) {
-            Gs1HostEventSiteActionCancelData action {};
+            Gs1SiteActionCancelCommand action {};
             action.action_id = extract_number_field<std::uint32_t>(body, "actionId").value_or(0U);
             action.flags = extract_number_field<std::uint32_t>(body, "flags").value_or(0U);
 
@@ -422,7 +422,7 @@ void run_live_mode(
                 return;
             }
 
-            Gs1HostEventSiteStorageViewData request {};
+            Gs1SiteStorageViewRequest request {};
             request.storage_id = extract_number_field<std::uint32_t>(body, "storageId").value_or(0U);
             request.event_kind = event_kind.value();
 
@@ -435,7 +435,7 @@ void run_live_mode(
                 return;
             }
 
-            Gs1HostEventSiteInventorySlotTapData request {};
+            Gs1SiteInventorySlotTapCommand request {};
             request.storage_id = extract_number_field<std::uint32_t>(body, "storageId").value_or(0U);
             request.item_instance_id =
                 extract_number_field<std::uint32_t>(body, "itemInstanceId").value_or(0U);
@@ -446,7 +446,7 @@ void run_live_mode(
             session.host.queue_site_inventory_slot_tap(request);
         },
         [&session](const std::string& body) {
-            Gs1HostEventSiteContextRequestData request {};
+            Gs1SiteContextRequestCommand request {};
             request.tile_x = extract_number_field<std::int32_t>(body, "tileX").value_or(0);
             request.tile_y = extract_number_field<std::int32_t>(body, "tileY").value_or(0);
             request.flags = extract_number_field<std::uint32_t>(body, "flags").value_or(0U);

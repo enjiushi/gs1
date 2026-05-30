@@ -3377,11 +3377,6 @@ const char* ActionExecutionSystem::name() const noexcept
     return "ActionExecutionSystem";
 }
 
-HostMessageSubscriptionSpan ActionExecutionSystem::subscribed_host_messages() const noexcept
-{
-    return {};
-}
-
 std::optional<Gs1RuntimeProfileSystemId> ActionExecutionSystem::profile_system_id() const noexcept
 {
     return GS1_RUNTIME_PROFILE_SYSTEM_ACTION_EXECUTION;

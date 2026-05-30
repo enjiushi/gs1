@@ -34,8 +34,13 @@ public:
     [[nodiscard]] bool run_phase1(double delta_seconds, Gs1Phase1Result& out_phase1);
     [[nodiscard]] bool run_phase2(Gs1Phase2Result& out_phase2);
     [[nodiscard]] bool update(double delta_seconds, Gs1Phase1Result& out_phase1, Gs1Phase2Result& out_phase2);
-    [[nodiscard]] bool submit_host_messages(const Gs1HostMessage* messages, std::uint32_t message_count);
-    [[nodiscard]] bool submit_host_events(const Gs1HostEvent* messages, std::uint32_t message_count);
+    [[nodiscard]] bool submit_gameplay_action(const Gs1GameplayAction& action);
+    [[nodiscard]] bool submit_site_move_direction(const Gs1SiteMoveDirectionCommand& command);
+    [[nodiscard]] bool submit_site_action_request(const Gs1SiteActionRequestCommand& command);
+    [[nodiscard]] bool submit_site_action_cancel(const Gs1SiteActionCancelCommand& command);
+    [[nodiscard]] bool submit_site_context_request(const Gs1SiteContextRequestCommand& command);
+    [[nodiscard]] bool submit_site_inventory_slot_tap(const Gs1SiteInventorySlotTapCommand& command);
+    [[nodiscard]] bool submit_site_scene_ready();
     [[nodiscard]] bool pop_runtime_message(Gs1RuntimeMessage& out_message);
     [[nodiscard]] bool pop_engine_message(Gs1EngineMessage& out_message);
     [[nodiscard]] bool get_game_state_view(Gs1GameStateView& out_view);

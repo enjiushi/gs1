@@ -402,13 +402,13 @@ void SmokeEngineHost::drain_incoming_commands()
 {
     std::scoped_lock lock {incoming_commands_mutex_};
 
-    if (!incoming_pre_phase1_host_events_.empty())
+    if (!incoming_pre_phase1_commands_.empty())
     {
-        frame_pre_phase1_host_events_.insert(
-            frame_pre_phase1_host_events_.end(),
-            incoming_pre_phase1_host_events_.begin(),
-            incoming_pre_phase1_host_events_.end());
-        incoming_pre_phase1_host_events_.clear();
+        frame_pre_phase1_commands_.insert(
+            frame_pre_phase1_commands_.end(),
+            incoming_pre_phase1_commands_.begin(),
+            incoming_pre_phase1_commands_.end());
+        incoming_pre_phase1_commands_.clear();
     }
 }
 
@@ -424,7 +424,7 @@ void SmokeEngineHost::update(double delta_seconds)
     drain_incoming_commands();
 
     apply_inflight_script_directive();
-    submit_host_messages(frame_pre_phase1_host_events_, "pre_phase1");
+    submit_pending_commands(frame_pre_phase1_commands_, "pre_phase1");
 
     Gs1Phase1Request phase1_request {};
     phase1_request.struct_size = sizeof(Gs1Phase1Request);
@@ -452,7 +452,7 @@ void SmokeEngineHost::update(double delta_seconds)
 
     queue_between_phase_site_scene_ready_if_needed();
     queue_between_phase_ui_action_if_ready();
-    submit_host_messages(pending_between_phase_host_events_, "between_phases");
+    submit_pending_commands(pending_between_phase_commands_, "between_phases");
 
     Gs1Phase2Request phase2_request {};
     phase2_request.struct_size = sizeof(Gs1Phase2Request);
@@ -488,70 +488,74 @@ void SmokeEngineHost::update(double delta_seconds)
 void SmokeEngineHost::queue_ui_action(const Gs1UiAction& action)
 {
     std::scoped_lock lock {incoming_commands_mutex_};
-    incoming_pre_phase1_host_events_.push_back(make_ui_action_event(action));
+    incoming_pre_phase1_commands_.push_back(make_ui_action_command(action));
 }
 
-void SmokeEngineHost::queue_site_action_request(const Gs1HostEventSiteActionRequestData& action)
+void SmokeEngineHost::queue_site_action_request(const Gs1SiteActionRequestCommand& action)
 {
-    Gs1HostMessage event {};
-    event.type = GS1_HOST_EVENT_SITE_ACTION_REQUEST;
-    event.payload.site_action_request = action;
+    PendingRuntimeCommand command {};
+    command.kind = PendingRuntimeCommand::Kind::SiteActionRequest;
+    command.site_action_request = action;
     std::scoped_lock lock {incoming_commands_mutex_};
-    incoming_pre_phase1_host_events_.push_back(event);
+    incoming_pre_phase1_commands_.push_back(command);
 }
 
-void SmokeEngineHost::queue_site_action_cancel(const Gs1HostEventSiteActionCancelData& action)
+void SmokeEngineHost::queue_site_action_cancel(const Gs1SiteActionCancelCommand& action)
 {
-    Gs1HostMessage event {};
-    event.type = GS1_HOST_EVENT_SITE_ACTION_CANCEL;
-    event.payload.site_action_cancel = action;
+    PendingRuntimeCommand command {};
+    command.kind = PendingRuntimeCommand::Kind::SiteActionCancel;
+    command.site_action_cancel = action;
     std::scoped_lock lock {incoming_commands_mutex_};
-    incoming_pre_phase1_host_events_.push_back(event);
+    incoming_pre_phase1_commands_.push_back(command);
 }
 
-void SmokeEngineHost::queue_site_storage_view(const Gs1HostEventSiteStorageViewData& request)
+void SmokeEngineHost::queue_site_storage_view(const Gs1SiteStorageViewRequest& request)
 {
-    Gs1HostMessage event {};
-    event.type = GS1_HOST_EVENT_SITE_STORAGE_VIEW;
-    event.payload.site_storage_view = request;
     std::scoped_lock lock {incoming_commands_mutex_};
-    incoming_pre_phase1_host_events_.push_back(event);
+    apply_local_storage_view_request(request);
 }
 
-void SmokeEngineHost::queue_site_inventory_slot_tap(const Gs1HostEventSiteInventorySlotTapData& request)
+void SmokeEngineHost::queue_site_inventory_slot_tap(const Gs1SiteInventorySlotTapCommand& request)
 {
-    Gs1HostMessage event {};
-    event.type = GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP;
-    event.payload.site_inventory_slot_tap = request;
+    PendingRuntimeCommand command {};
+    command.kind = PendingRuntimeCommand::Kind::SiteInventorySlotTap;
+    command.site_inventory_slot_tap = request;
+    if (command.site_inventory_slot_tap.companion_storage_id == 0U &&
+        active_site_snapshot_.has_value() &&
+        active_site_snapshot_->opened_storage.has_value())
+    {
+        command.site_inventory_slot_tap.companion_storage_id =
+            active_site_snapshot_->opened_storage->storage_id;
+    }
     std::scoped_lock lock {incoming_commands_mutex_};
-    incoming_pre_phase1_host_events_.push_back(event);
+    incoming_pre_phase1_commands_.push_back(command);
 }
 
-void SmokeEngineHost::queue_site_context_request(const Gs1HostEventSiteContextRequestData& request)
+void SmokeEngineHost::queue_site_context_request(const Gs1SiteContextRequestCommand& request)
 {
-    Gs1HostMessage event {};
-    event.type = GS1_HOST_EVENT_SITE_CONTEXT_REQUEST;
-    event.payload.site_context_request = request;
+    PendingRuntimeCommand command {};
+    command.kind = PendingRuntimeCommand::Kind::SiteContextRequest;
+    command.site_context_request = request;
     std::scoped_lock lock {incoming_commands_mutex_};
-    incoming_pre_phase1_host_events_.push_back(event);
+    incoming_pre_phase1_commands_.push_back(command);
 }
 
 void SmokeEngineHost::queue_site_move_direction(float world_move_x, float world_move_y, float world_move_z)
 {
     std::scoped_lock lock {incoming_commands_mutex_};
     const auto duplicate = std::find_if(
-        incoming_pre_phase1_host_events_.begin(),
-        incoming_pre_phase1_host_events_.end(),
-        [](const Gs1HostMessage& event) {
-            return event.type == GS1_HOST_EVENT_SITE_MOVE_DIRECTION;
+        incoming_pre_phase1_commands_.begin(),
+        incoming_pre_phase1_commands_.end(),
+        [](const PendingRuntimeCommand& command) {
+            return command.kind == PendingRuntimeCommand::Kind::SiteMoveDirection;
         });
-    if (duplicate != incoming_pre_phase1_host_events_.end())
+    if (duplicate != incoming_pre_phase1_commands_.end())
     {
-        *duplicate = make_site_move_direction_event(world_move_x, world_move_y, world_move_z);
+        *duplicate = make_site_move_direction_command(world_move_x, world_move_y, world_move_z);
         return;
     }
 
-    incoming_pre_phase1_host_events_.push_back(make_site_move_direction_event(
+    incoming_pre_phase1_commands_.push_back(make_site_move_direction_command(
         world_move_x,
         world_move_y,
         world_move_z));
@@ -650,12 +654,12 @@ bool SmokeEngineHost::saw_message(Gs1EngineMessageType type) const noexcept
 
 void SmokeEngineHost::queue_pre_phase1_ui_action_if_ready()
 {
-    (void)try_queue_ui_action_from_directive(frame_pre_phase1_host_events_);
+    (void)try_queue_ui_action_from_directive(frame_pre_phase1_commands_);
 }
 
 void SmokeEngineHost::queue_between_phase_ui_action_if_ready()
 {
-    (void)try_queue_ui_action_from_directive(pending_between_phase_host_events_);
+    (void)try_queue_ui_action_from_directive(pending_between_phase_commands_);
 }
 
 void SmokeEngineHost::queue_between_phase_site_scene_ready_if_needed()
@@ -665,35 +669,167 @@ void SmokeEngineHost::queue_between_phase_site_scene_ready_if_needed()
         return;
     }
 
-    pending_between_phase_host_events_.push_back(make_site_scene_ready_event());
+    pending_between_phase_commands_.push_back(make_site_scene_ready_command());
     pending_site_scene_ready_ack_ = false;
 }
 
-void SmokeEngineHost::submit_host_messages(
-    std::vector<Gs1HostMessage>& events,
-    const char* stage_label)
+void SmokeEngineHost::apply_local_storage_view_request(const Gs1SiteStorageViewRequest& request)
 {
-    if (events.empty())
+    if (!active_site_snapshot_.has_value())
     {
         return;
     }
 
-    const auto submit_start = std::chrono::steady_clock::now();
-    const auto status = api_->submit_host_messages(
-        runtime_,
-        events.data(),
-        static_cast<std::uint32_t>(events.size()));
-    current_frame_gameplay_dll_seconds_ += elapsed_seconds(submit_start, std::chrono::steady_clock::now());
-    assert(status == GS1_STATUS_OK);
+    auto& site_snapshot = active_site_snapshot_.value();
+    const auto is_worker_pack_storage = [&]() noexcept
+    {
+        for (const auto& slot : site_snapshot.worker_pack_slots)
+        {
+            if (slot.storage_id != 0U)
+            {
+                return request.storage_id == slot.storage_id;
+            }
+        }
+        return request.storage_id == 0U;
+    }();
+
+    if (request.event_kind == GS1_INVENTORY_VIEW_EVENT_CLOSE)
+    {
+        bool changed = false;
+        if (request.storage_id == 0U || is_worker_pack_storage)
+        {
+            changed = changed || site_snapshot.worker_pack_open;
+            site_snapshot.worker_pack_open = false;
+        }
+        if (request.storage_id == 0U ||
+            (site_snapshot.opened_storage.has_value() &&
+                site_snapshot.opened_storage->storage_id == request.storage_id))
+        {
+            changed = changed || site_snapshot.opened_storage.has_value();
+            site_snapshot.opened_storage.reset();
+        }
+        if (changed)
+        {
+            queue_live_state_patch(LiveStatePatchField_SiteStateInventory);
+        }
+        return;
+    }
+
+    if (request.event_kind != GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT)
+    {
+        return;
+    }
+
+    if (is_worker_pack_storage)
+    {
+        site_snapshot.worker_pack_open = true;
+        site_snapshot.opened_storage.reset();
+        queue_live_state_patch(LiveStatePatchField_SiteStateInventory);
+        return;
+    }
+
+    SiteInventoryViewProjection opened_storage {};
+    opened_storage.storage_id = request.storage_id;
+    for (const auto& storage : site_snapshot.inventory_storages)
+    {
+        if (storage.storage_id == request.storage_id)
+        {
+            opened_storage.slot_count = storage.slot_count;
+            break;
+        }
+    }
+
+    Gs1GameStateView view {};
+    view.struct_size = sizeof(Gs1GameStateView);
+    if (api_->get_game_state_view(runtime_, &view) == GS1_STATUS_OK &&
+        view.has_active_site != 0U &&
+        view.active_site != nullptr)
+    {
+        const auto& site_view = *view.active_site;
+        for (std::uint32_t index = 0U; index < site_view.storage_slot_count; ++index)
+        {
+            const auto& slot_view = site_view.storage_slots[index];
+            if (slot_view.storage_id != request.storage_id)
+            {
+                continue;
+            }
+
+            SiteInventorySlotProjection projection {};
+            projection.item_id = slot_view.item_id;
+            projection.item_instance_id = slot_view.item_instance_id;
+            projection.storage_id = slot_view.storage_id;
+            projection.condition = slot_view.condition;
+            projection.freshness = slot_view.freshness;
+            projection.container_owner_id = 0U;
+            projection.quantity = slot_view.quantity;
+            projection.slot_index = slot_view.slot_index;
+            projection.container_tile_x = 0;
+            projection.container_tile_y = 0;
+            projection.container_kind = slot_view.container_kind;
+            projection.flags = slot_view.occupied ? 1U : 0U;
+            opened_storage.slots.push_back(projection);
+        }
+    }
+
+    std::sort(
+        opened_storage.slots.begin(),
+        opened_storage.slots.end(),
+        [](const SiteInventorySlotProjection& lhs, const SiteInventorySlotProjection& rhs) {
+            return lhs.slot_index < rhs.slot_index;
+        });
+    site_snapshot.worker_pack_open = false;
+    site_snapshot.opened_storage = std::move(opened_storage);
+    queue_live_state_patch(LiveStatePatchField_SiteStateInventory);
+}
+
+void SmokeEngineHost::submit_pending_commands(
+    std::vector<PendingRuntimeCommand>& commands,
+    const char* stage_label)
+{
+    if (commands.empty())
+    {
+        return;
+    }
+
+    for (const PendingRuntimeCommand& command : commands)
+    {
+        const auto submit_start = std::chrono::steady_clock::now();
+        Gs1Status status = GS1_STATUS_OK;
+        switch (command.kind)
+        {
+        case PendingRuntimeCommand::Kind::GameplayAction:
+            status = api_->submit_gameplay_action(runtime_, &command.gameplay_action);
+            break;
+        case PendingRuntimeCommand::Kind::SiteActionRequest:
+            status = api_->submit_site_action_request(runtime_, &command.site_action_request);
+            break;
+        case PendingRuntimeCommand::Kind::SiteActionCancel:
+            status = api_->submit_site_action_cancel(runtime_, &command.site_action_cancel);
+            break;
+        case PendingRuntimeCommand::Kind::SiteInventorySlotTap:
+            status = api_->submit_site_inventory_slot_tap(runtime_, &command.site_inventory_slot_tap);
+            break;
+        case PendingRuntimeCommand::Kind::SiteContextRequest:
+            status = api_->submit_site_context_request(runtime_, &command.site_context_request);
+            break;
+        case PendingRuntimeCommand::Kind::SiteMoveDirection:
+            status = api_->submit_site_move_direction(runtime_, &command.site_move_direction);
+            break;
+        case PendingRuntimeCommand::Kind::SiteSceneReady:
+            status = api_->submit_site_scene_ready(runtime_);
+            break;
+        }
+        current_frame_gameplay_dll_seconds_ += elapsed_seconds(submit_start, std::chrono::steady_clock::now());
+        assert(status == GS1_STATUS_OK);
+    }
     if (log_mode_ == LogMode::Verbose)
     {
-        smoke_log::infof("[ENGINE][FRAME %llu] submit_host_messages stage=%s status=%u count=%u\n",
+        smoke_log::infof("[ENGINE][FRAME %llu] submit_pending_commands stage=%s count=%u\n",
             static_cast<unsigned long long>(frame_number_),
             stage_label,
-            static_cast<unsigned>(status),
-            static_cast<unsigned>(events.size()));
+            static_cast<unsigned>(commands.size()));
     }
-    events.clear();
+    commands.clear();
 }
 
 void SmokeEngineHost::apply_inflight_script_directive()
@@ -1097,7 +1233,7 @@ void SmokeEngineHost::flush_engine_messages(const char* stage_label)
     }
 }
 
-bool SmokeEngineHost::try_queue_ui_action_from_directive(std::vector<Gs1HostMessage>& destination)
+bool SmokeEngineHost::try_queue_ui_action_from_directive(std::vector<PendingRuntimeCommand>& destination)
 {
     if (!inflight_script_directive_.has_value() || inflight_script_directive_started_)
     {
@@ -1115,7 +1251,7 @@ bool SmokeEngineHost::try_queue_ui_action_from_directive(std::vector<Gs1HostMess
         return false;
     }
 
-    destination.push_back(make_ui_action_event(resolved_action));
+    destination.push_back(make_ui_action_command(resolved_action));
     inflight_script_directive_started_ = true;
     smoke_log::infof("[ENGINE][FRAME %llu] queued ui_action=%s target=%u\n",
         static_cast<unsigned long long>(frame_number_),
@@ -2470,32 +2606,32 @@ std::string SmokeEngineHost::describe_message(const Gs1RuntimeMessage& message)
     return description;
 }
 
-Gs1HostMessage SmokeEngineHost::make_ui_action_event(const Gs1UiAction& action) noexcept
+SmokeEngineHost::PendingRuntimeCommand SmokeEngineHost::make_ui_action_command(const Gs1UiAction& action) noexcept
 {
-    Gs1HostMessage event {};
-    event.type = GS1_HOST_EVENT_UI_ACTION;
-    event.payload.ui_action.action = action;
-    return event;
+    PendingRuntimeCommand command {};
+    command.kind = PendingRuntimeCommand::Kind::GameplayAction;
+    command.gameplay_action = action;
+    return command;
 }
 
-Gs1HostMessage SmokeEngineHost::make_site_scene_ready_event() noexcept
+SmokeEngineHost::PendingRuntimeCommand SmokeEngineHost::make_site_scene_ready_command() noexcept
 {
-    Gs1HostMessage event {};
-    event.type = GS1_HOST_EVENT_SITE_SCENE_READY;
-    return event;
+    PendingRuntimeCommand command {};
+    command.kind = PendingRuntimeCommand::Kind::SiteSceneReady;
+    return command;
 }
 
-Gs1HostMessage SmokeEngineHost::make_site_move_direction_event(
+SmokeEngineHost::PendingRuntimeCommand SmokeEngineHost::make_site_move_direction_command(
     float world_move_x,
     float world_move_y,
     float world_move_z) noexcept
 {
-    Gs1HostMessage event {};
-    event.type = GS1_HOST_EVENT_SITE_MOVE_DIRECTION;
-    event.payload.site_move_direction.world_move_x = world_move_x;
-    event.payload.site_move_direction.world_move_y = world_move_y;
-    event.payload.site_move_direction.world_move_z = world_move_z;
-    return event;
+    PendingRuntimeCommand command {};
+    command.kind = PendingRuntimeCommand::Kind::SiteMoveDirection;
+    command.site_move_direction.world_move_x = world_move_x;
+    command.site_move_direction.world_move_y = world_move_y;
+    command.site_move_direction.world_move_z = world_move_z;
+    return command;
 }
 
 

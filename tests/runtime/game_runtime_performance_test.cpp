@@ -187,13 +187,6 @@ StartSiteAttemptMessage make_start_site_attempt_message(std::uint32_t site_id)
     return StartSiteAttemptMessage {site_id};
 }
 
-Gs1HostMessage make_site_scene_ready_event()
-{
-    Gs1HostMessage event {};
-    event.type = GS1_HOST_EVENT_SITE_SCENE_READY;
-    return event;
-}
-
 void drain_runtime_messages(GameRuntime& runtime)
 {
     Gs1RuntimeMessage message {};
@@ -215,8 +208,7 @@ void bootstrap_site_one(GameRuntime& runtime)
         gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).has_value(),
         "active site run was not created");
 
-    const auto ready_event = make_site_scene_ready_event();
-    require_ok(runtime.submit_host_messages(&ready_event, 1U), "submitting site scene ready message");
+    require_ok(runtime.submit_site_scene_ready(), "submitting site scene ready message");
     Gs1Phase2Request phase2_request {};
     phase2_request.struct_size = sizeof(Gs1Phase2Request);
     Gs1Phase2Result phase2_result {};

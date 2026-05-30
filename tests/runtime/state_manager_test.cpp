@@ -14,7 +14,6 @@
 namespace
 {
 using gs1::GameMessage;
-using gs1::HostMessageSubscriptionSpan;
 using gs1::IRuntimeSystem;
 using gs1::RuntimeInvocation;
 using gs1::StateManager;
@@ -23,10 +22,6 @@ using gs1::StateSetId;
 struct StubSystemBase : IRuntimeSystem
 {
     [[nodiscard]] const char* name() const noexcept override { return "StubSystem"; }
-    [[nodiscard]] HostMessageSubscriptionSpan subscribed_host_messages() const noexcept override
-    {
-        return {};
-    }
     [[nodiscard]] std::optional<Gs1RuntimeProfileSystemId> profile_system_id() const noexcept override
     {
         return std::nullopt;
@@ -34,10 +29,6 @@ struct StubSystemBase : IRuntimeSystem
     [[nodiscard]] std::optional<std::uint32_t> fixed_step_order() const noexcept override
     {
         return std::nullopt;
-    }
-    [[nodiscard]] Gs1Status process_host_message(RuntimeInvocation&, const Gs1HostMessage&) override
-    {
-        return GS1_STATUS_OK;
     }
     void run(RuntimeInvocation&) override {}
 };

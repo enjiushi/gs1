@@ -369,11 +369,6 @@ const char* WeatherEventSystem::name() const noexcept
     return access().system_name.data();
 }
 
-HostMessageSubscriptionSpan WeatherEventSystem::subscribed_host_messages() const noexcept
-{
-    return {};
-}
-
 std::optional<Gs1RuntimeProfileSystemId> WeatherEventSystem::profile_system_id() const noexcept
 {
     return GS1_RUNTIME_PROFILE_SYSTEM_WEATHER_EVENT;

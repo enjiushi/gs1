@@ -311,11 +311,6 @@ const char* CampaignFlowSystem::name() const noexcept
     return "CampaignFlowSystem";
 }
 
-HostMessageSubscriptionSpan CampaignFlowSystem::subscribed_host_messages() const noexcept
-{
-    return {};
-}
-
 std::optional<Gs1RuntimeProfileSystemId> CampaignFlowSystem::profile_system_id() const noexcept
 {
     return GS1_RUNTIME_PROFILE_SYSTEM_CAMPAIGN_FLOW;

@@ -29,11 +29,6 @@ const char* EcologySystem::name() const noexcept
     return access().system_name.data();
 }
 
-HostMessageSubscriptionSpan EcologySystem::subscribed_host_messages() const noexcept
-{
-    return {};
-}
-
 std::optional<Gs1RuntimeProfileSystemId> EcologySystem::profile_system_id() const noexcept
 {
     return GS1_RUNTIME_PROFILE_SYSTEM_ECOLOGY;

@@ -88,9 +88,13 @@ class GameRuntime final
 public:
     explicit GameRuntime(Gs1RuntimeCreateDesc create_desc);
 
-    [[nodiscard]] Gs1Status submit_host_messages(
-        const Gs1HostMessage* messages,
-        std::uint32_t message_count);
+    [[nodiscard]] Gs1Status submit_gameplay_action(const Gs1GameplayAction& action);
+    [[nodiscard]] Gs1Status submit_site_move_direction(const Gs1SiteMoveDirectionCommand& command);
+    [[nodiscard]] Gs1Status submit_site_action_request(const Gs1SiteActionRequestCommand& command);
+    [[nodiscard]] Gs1Status submit_site_action_cancel(const Gs1SiteActionCancelCommand& command);
+    [[nodiscard]] Gs1Status submit_site_context_request(const Gs1SiteContextRequestCommand& command);
+    [[nodiscard]] Gs1Status submit_site_inventory_slot_tap(const Gs1SiteInventorySlotTapCommand& command);
+    [[nodiscard]] Gs1Status submit_site_scene_ready();
     [[nodiscard]] Gs1Status run_phase1(const Gs1Phase1Request& request, Gs1Phase1Result& out_result);
     [[nodiscard]] Gs1Status run_phase2(const Gs1Phase2Request& request, Gs1Phase2Result& out_result);
     [[nodiscard]] Gs1Status pop_runtime_message(Gs1RuntimeMessage& out_message);
@@ -134,6 +138,28 @@ public:
     friend class RuntimeSemanticGameMessageScope;
 
 private:
+    struct PendingHostCommand final
+    {
+        enum class Kind : std::uint8_t
+        {
+            GameplayAction,
+            SiteMoveDirection,
+            SiteActionRequest,
+            SiteActionCancel,
+            SiteContextRequest,
+            SiteInventorySlotTap,
+            SiteSceneReady
+        };
+
+        Kind kind {Kind::GameplayAction};
+        Gs1GameplayAction gameplay_action {};
+        Gs1SiteMoveDirectionCommand site_move_direction {};
+        Gs1SiteActionRequestCommand site_action_request {};
+        Gs1SiteActionCancelCommand site_action_cancel {};
+        Gs1SiteContextRequestCommand site_context_request {};
+        Gs1SiteInventorySlotTapCommand site_inventory_slot_tap {};
+    };
+
     struct TimingAccumulator final
     {
         std::uint64_t sample_count {0U};
@@ -158,9 +184,7 @@ private:
 
     void initialize_system_registry();
     [[nodiscard]] Gs1Status dispatch_host_messages(std::uint32_t& out_processed_count);
-    [[nodiscard]] Gs1Status dispatch_subscribed_host_message(const Gs1HostMessage& message);
-    [[nodiscard]] std::optional<Gs1Status> dispatch_runtime_translated_host_message(
-        const Gs1HostMessage& message);
+    [[nodiscard]] Gs1Status dispatch_pending_host_command(const PendingHostCommand& command);
     void install_campaign_state(const CampaignState& campaign);
     void install_site_run_state(const SiteRunState& site_run);
     void clear_site_run_state();
@@ -187,10 +211,9 @@ private:
     StateManager state_manager_ {};
     GameState& state_;
     RuntimeGameStateViewCache state_view_cache_ {};
-    std::deque<Gs1HostMessage> host_messages_ {};
+    std::deque<PendingHostCommand> pending_host_commands_ {};
     GameSystems::tuple_type systems_ {};
     std::vector<FixedStepSystemEntry> fixed_step_systems_ {};
-    RuntimeHostMessageSubscribers host_message_subscribers_ {};
     TimingAccumulator phase1_timing_ {};
     TimingAccumulator phase2_timing_ {};
     TimingAccumulator fixed_step_timing_ {};

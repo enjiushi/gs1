@@ -37,11 +37,6 @@ const char* FactionReputationSystem::name() const noexcept
     return "FactionReputationSystem";
 }
 
-HostMessageSubscriptionSpan FactionReputationSystem::subscribed_host_messages() const noexcept
-{
-    return {};
-}
-
 std::optional<Gs1RuntimeProfileSystemId> FactionReputationSystem::profile_system_id() const noexcept
 {
     return GS1_RUNTIME_PROFILE_SYSTEM_FACTION_REPUTATION;

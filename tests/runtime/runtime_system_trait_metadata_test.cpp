@@ -40,13 +40,6 @@ struct GameRuntimeProjectionTestAccess
 {
     using system_storage_type = decltype(std::declval<GameRuntime&>().systems_);
 
-    [[nodiscard]] static std::size_t host_message_subscriber_count(
-        const GameRuntime& runtime,
-        Gs1HostMessageType type)
-    {
-        return runtime.host_message_subscribers_[static_cast<std::size_t>(type)].size();
-    }
-
     [[nodiscard]] static std::size_t fixed_step_system_count(const GameRuntime& runtime)
     {
         return runtime.fixed_step_systems_.size();
@@ -68,7 +61,6 @@ using gs1::GameSystems;
 using gs1::GameMessage;
 using gs1::GameMessageType;
 using gs1::GameRuntime;
-using gs1::HostMessageSubscriptionSpan;
 using gs1::IRuntimeSystem;
 using gs1::RuntimeInvocation;
 using gs1::SiteTimeSystem;
@@ -109,10 +101,6 @@ constexpr bool typed_dispatch_has_subscribers_v =
 struct FallbackOnlySystem final : IRuntimeSystem
 {
     [[nodiscard]] const char* name() const noexcept override { return "FallbackOnlySystem"; }
-    [[nodiscard]] HostMessageSubscriptionSpan subscribed_host_messages() const noexcept override
-    {
-        return {};
-    }
     [[nodiscard]] std::optional<Gs1RuntimeProfileSystemId> profile_system_id() const noexcept override
     {
         return GS1_RUNTIME_PROFILE_SYSTEM_SITE_FLOW;
@@ -120,10 +108,6 @@ struct FallbackOnlySystem final : IRuntimeSystem
     [[nodiscard]] std::optional<std::uint32_t> fixed_step_order() const noexcept override
     {
         return 42U;
-    }
-    [[nodiscard]] Gs1Status process_host_message(RuntimeInvocation&, const Gs1HostMessage&) override
-    {
-        return GS1_STATUS_OK;
     }
     void run(RuntimeInvocation&) override {}
 };
@@ -224,47 +208,17 @@ int main()
     create_desc.fixed_step_seconds = 1.0 / 60.0;
 
     GameRuntime runtime {create_desc};
-    if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
-            runtime,
-            GS1_HOST_EVENT_SITE_MOVE_DIRECTION) != 0U)
-    {
-        return 7;
-    }
-    if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
-            runtime,
-            GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP) != 0U)
-    {
-        return 8;
-    }
-    if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
-            runtime,
-            GS1_HOST_EVENT_SITE_CONTEXT_REQUEST) != 0U)
-    {
-        return 9;
-    }
-    if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
-            runtime,
-            GS1_HOST_EVENT_SITE_ACTION_REQUEST) != 0U)
-    {
-        return 10;
-    }
-    if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
-            runtime,
-            GS1_HOST_EVENT_SITE_ACTION_CANCEL) != 0U)
-    {
-        return 11;
-    }
     if (gs1::GameRuntimeProjectionTestAccess::fixed_step_system_count(runtime) !=
         k_expected_fixed_step_orders.size())
     {
-        return 12;
+        return 7;
     }
     for (std::size_t index = 0; index < k_expected_fixed_step_orders.size(); ++index)
     {
         if (gs1::GameRuntimeProjectionTestAccess::fixed_step_order(runtime, index) !=
             k_expected_fixed_step_orders[index])
         {
-            return static_cast<int>(13 + index);
+            return static_cast<int>(8 + index);
         }
     }
 
@@ -279,53 +233,14 @@ int main()
     }
 
     GameRuntime host_runtime {create_desc};
-    if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
-            host_runtime,
-            GS1_HOST_EVENT_GAMEPLAY_ACTION) != 0U)
-    {
-        return 42;
-    }
-    if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
-            host_runtime,
-            GS1_HOST_EVENT_SITE_MOVE_DIRECTION) != 0U)
-    {
-        return 43;
-    }
-    if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
-            host_runtime,
-            GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP) != 0U)
-    {
-        return 44;
-    }
-    if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
-            host_runtime,
-            GS1_HOST_EVENT_SITE_CONTEXT_REQUEST) != 0U)
-    {
-        return 45;
-    }
-    if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
-            host_runtime,
-            GS1_HOST_EVENT_SITE_ACTION_REQUEST) != 0U)
-    {
-        return 46;
-    }
-    if (gs1::GameRuntimeProjectionTestAccess::host_message_subscriber_count(
-            host_runtime,
-            GS1_HOST_EVENT_SITE_ACTION_CANCEL) != 0U)
-    {
-        return 47;
-    }
-
-    Gs1HostMessage host_message {};
-    host_message.type = GS1_HOST_EVENT_GAMEPLAY_ACTION;
-    host_message.payload.gameplay_action.action = Gs1GameplayAction {
+    const Gs1GameplayAction start_campaign_action {
         GS1_GAMEPLAY_ACTION_START_NEW_CAMPAIGN,
         0U,
         77ULL,
         45ULL};
-    if (host_runtime.submit_host_messages(&host_message, 1U) != GS1_STATUS_OK)
+    if (host_runtime.submit_gameplay_action(start_campaign_action) != GS1_STATUS_OK)
     {
-        return 48;
+        return 42;
     }
 
     Gs1Phase2Request phase2_request {};
@@ -333,32 +248,32 @@ int main()
     Gs1Phase2Result phase2_result {};
     if (host_runtime.run_phase2(phase2_request, phase2_result) != GS1_STATUS_OK)
     {
-        return 49;
+        return 43;
     }
 
     if (!host_runtime.state().campaign_core.has_value())
     {
-        return 50;
+        return 44;
     }
 
-    host_message.payload.gameplay_action.action = Gs1GameplayAction {
+    const Gs1GameplayAction claim_technology_action {
         GS1_GAMEPLAY_ACTION_CLAIM_TECHNOLOGY_NODE,
         1U,
         1ULL,
         0ULL};
-    if (host_runtime.submit_host_messages(&host_message, 1U) != GS1_STATUS_OK)
+    if (host_runtime.submit_gameplay_action(claim_technology_action) != GS1_STATUS_OK)
     {
-        return 51;
+        return 45;
     }
 
     if (host_runtime.run_phase2(phase2_request, phase2_result) != GS1_STATUS_OK)
     {
-        return 52;
+        return 46;
     }
 
     if (!host_runtime.state().campaign_technology.has_value())
     {
-        return 53;
+        return 47;
     }
 
     return 0;

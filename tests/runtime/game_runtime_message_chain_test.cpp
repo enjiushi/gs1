@@ -140,21 +140,6 @@ GameMessage make_site_attempt_ended_message(std::uint32_t site_id, Gs1SiteAttemp
     return message;
 }
 
-Gs1HostMessage make_ui_action_event(const Gs1UiAction& action)
-{
-    Gs1HostMessage event {};
-    event.type = GS1_HOST_EVENT_UI_ACTION;
-    event.payload.ui_action.action = action;
-    return event;
-}
-
-Gs1HostMessage make_site_scene_ready_event()
-{
-    Gs1HostMessage event {};
-    event.type = GS1_HOST_EVENT_SITE_SCENE_READY;
-    return event;
-}
-
 std::vector<Gs1RuntimeMessage> drain_runtime_messages(GameRuntime& runtime)
 {
     std::vector<Gs1RuntimeMessage> messages {};
@@ -403,8 +388,7 @@ void bootstrap_site_one(GameRuntime& runtime)
     assert(runtime.handle_message(make_start_site_attempt_message(site_id)) == GS1_STATUS_OK);
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).has_value());
 
-    const auto ready_event = make_site_scene_ready_event();
-    assert(runtime.submit_host_messages(&ready_event, 1U) == GS1_STATUS_OK);
+    assert(runtime.submit_site_scene_ready() == GS1_STATUS_OK);
     Gs1Phase2Result ready_result {};
     run_phase2(runtime, ready_result);
     assert(gs1::GameRuntimeProjectionTestAccess::app_state(runtime) == GS1_APP_STATE_SITE_ACTIVE);
@@ -447,8 +431,7 @@ void site_loading_waits_for_scene_ready_before_bootstrap_and_fixed_steps()
         0.0);
     assert(drain_runtime_messages(runtime).empty());
 
-    const auto ready_event = make_site_scene_ready_event();
-    assert(runtime.submit_host_messages(&ready_event, 1U) == GS1_STATUS_OK);
+    assert(runtime.submit_site_scene_ready() == GS1_STATUS_OK);
     Gs1Phase2Result ready_result {};
     run_phase2(runtime, ready_result);
     assert(gs1::GameRuntimeProjectionTestAccess::app_state(runtime) == GS1_APP_STATE_SITE_ACTIVE);
@@ -860,10 +843,8 @@ void task_reward_claim_ui_action_claims_pending_task_and_emits_reward_cue()
     Gs1UiAction claim_action {};
     claim_action.type = GS1_UI_ACTION_CLAIM_TASK_REWARD;
     claim_action.target_id = 1U;
-    const auto claim_event = make_ui_action_event(claim_action);
-
     Gs1Phase1Result claim_result {};
-    assert(runtime.submit_host_messages(&claim_event, 1U) == GS1_STATUS_OK);
+    assert(runtime.submit_gameplay_action(claim_action) == GS1_STATUS_OK);
     run_phase1(runtime, 0.0, claim_result);
     assert(claim_result.processed_host_message_count == 1U);
 

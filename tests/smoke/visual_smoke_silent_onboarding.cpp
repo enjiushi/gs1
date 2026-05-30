@@ -745,7 +745,7 @@ private:
             return;
         }
 
-        Gs1HostEventSiteActionCancelData cancel {};
+        Gs1SiteActionCancelCommand cancel {};
         cancel.flags = GS1_SITE_ACTION_CANCEL_FLAG_PLACEMENT_MODE;
         host.queue_site_action_cancel(cancel);
         pending_placement_.reset();
@@ -855,7 +855,7 @@ private:
             return TickResult::Running;
         }
 
-        Gs1HostEventSiteActionRequestData action {};
+        Gs1SiteActionRequestCommand action {};
         action.action_kind = GS1_SITE_ACTION_HARVEST;
         action.quantity = 1U;
         action.target_tile_x = tile->first;
@@ -918,7 +918,7 @@ private:
                 station_tile->second,
                 output_item_id))
         {
-            Gs1HostEventSiteContextRequestData request {};
+            Gs1SiteContextRequestCommand request {};
             request.tile_x = station_tile->first;
             request.tile_y = station_tile->second;
             host.queue_site_context_request(request);
@@ -926,7 +926,7 @@ private:
             return;
         }
 
-        Gs1HostEventSiteActionRequestData action {};
+        Gs1SiteActionRequestCommand action {};
         action.action_kind = GS1_SITE_ACTION_CRAFT;
         action.flags = GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM;
         action.quantity = 1U;
@@ -958,7 +958,7 @@ private:
             find_opened_storage_slot(snapshot, storage_id.value(), item_id);
         if (!storage_slot.has_value())
         {
-            Gs1HostEventSiteStorageViewData request {};
+            Gs1SiteStorageViewRequest request {};
             request.storage_id = storage_id.value();
             request.event_kind = GS1_INVENTORY_VIEW_EVENT_OPEN_SNAPSHOT;
             host.queue_site_storage_view(request);
@@ -966,7 +966,7 @@ private:
             return;
         }
 
-        Gs1HostEventSiteInventorySlotTapData request {};
+        Gs1SiteInventorySlotTapCommand request {};
         request.storage_id = storage_slot->storage_id;
         request.item_instance_id = storage_slot->item_instance_id;
         request.slot_index = static_cast<std::uint16_t>(storage_slot->slot_index);
@@ -1014,7 +1014,7 @@ private:
                 return TickResult::Running;
             }
 
-            Gs1HostEventSiteActionRequestData action {};
+            Gs1SiteActionRequestCommand action {};
             action.action_kind = action_kind;
             action.flags = static_cast<std::uint8_t>(
                 GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM |
@@ -1035,7 +1035,7 @@ private:
                 return TickResult::Running;
             }
 
-            Gs1HostEventSiteActionRequestData action {};
+            Gs1SiteActionRequestCommand action {};
             action.action_kind = action_kind;
             action.flags = GS1_SITE_ACTION_REQUEST_FLAG_HAS_ITEM;
             action.quantity = 1U;
@@ -1054,7 +1054,7 @@ private:
                 return TickResult::Running;
             }
 
-            Gs1HostEventSiteContextRequestData request {};
+            Gs1SiteContextRequestCommand request {};
             request.tile_x = candidate.x;
             request.tile_y = candidate.y;
             host.queue_site_context_request(request);

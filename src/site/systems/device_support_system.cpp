@@ -103,11 +103,6 @@ const char* DeviceSupportSystem::name() const noexcept
     return access().system_name.data();
 }
 
-HostMessageSubscriptionSpan DeviceSupportSystem::subscribed_host_messages() const noexcept
-{
-    return {};
-}
-
 std::optional<Gs1RuntimeProfileSystemId> DeviceSupportSystem::profile_system_id() const noexcept
 {
     return GS1_RUNTIME_PROFILE_SYSTEM_DEVICE_SUPPORT;

@@ -222,11 +222,6 @@ const char* PlacementValidationSystem::name() const noexcept
     return access().system_name.data();
 }
 
-HostMessageSubscriptionSpan PlacementValidationSystem::subscribed_host_messages() const noexcept
-{
-    return {};
-}
-
 std::optional<Gs1RuntimeProfileSystemId> PlacementValidationSystem::profile_system_id() const noexcept
 {
     return GS1_RUNTIME_PROFILE_SYSTEM_PLACEMENT_VALIDATION;

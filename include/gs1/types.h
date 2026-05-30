@@ -48,19 +48,6 @@ enum Gs1SiteState : std::uint8_t
     GS1_SITE_STATE_COMPLETED = 2
 };
 
-enum Gs1HostEventType : std::uint8_t
-{
-    GS1_HOST_EVENT_NONE = 0,
-    GS1_HOST_EVENT_GAMEPLAY_ACTION = 1,
-    GS1_HOST_EVENT_SITE_MOVE_DIRECTION = 2,
-    GS1_HOST_EVENT_SITE_ACTION_REQUEST = 3,
-    GS1_HOST_EVENT_SITE_ACTION_CANCEL = 4,
-    GS1_HOST_EVENT_SITE_STORAGE_VIEW = 5,
-    GS1_HOST_EVENT_SITE_CONTEXT_REQUEST = 6,
-    GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP = 7,
-    GS1_HOST_EVENT_SITE_SCENE_READY = 8
-};
-
 enum Gs1UiSetupId : std::uint8_t
 {
     GS1_UI_SETUP_NONE = 0,
@@ -516,19 +503,14 @@ struct Gs1GameplayAction
 
 using Gs1UiAction = Gs1GameplayAction;
 
-struct Gs1HostEventGameplayActionData
-{
-    Gs1GameplayAction action;
-};
-
-struct Gs1HostEventSiteMoveDirectionData
+struct Gs1SiteMoveDirectionCommand
 {
     float world_move_x;
     float world_move_y;
     float world_move_z;
 };
 
-struct Gs1HostEventSiteActionRequestData
+struct Gs1SiteActionRequestCommand
 {
     Gs1SiteActionKind action_kind;
     std::uint8_t flags;
@@ -540,7 +522,7 @@ struct Gs1HostEventSiteActionRequestData
     std::uint32_t item_id;
 };
 
-struct Gs1HostEventSiteActionCancelData
+struct Gs1SiteActionCancelCommand
 {
     std::uint32_t action_id;
     std::uint32_t flags;
@@ -548,7 +530,7 @@ struct Gs1HostEventSiteActionCancelData
     std::uint64_t reserved1;
 };
 
-struct Gs1HostEventSiteStorageViewData
+struct Gs1SiteStorageViewRequest
 {
     std::uint32_t storage_id;
     Gs1InventoryViewEventKind event_kind;
@@ -557,7 +539,7 @@ struct Gs1HostEventSiteStorageViewData
     std::uint64_t reserved2;
 };
 
-struct Gs1HostEventSiteContextRequestData
+struct Gs1SiteContextRequestCommand
 {
     std::int32_t tile_x;
     std::int32_t tile_y;
@@ -566,7 +548,7 @@ struct Gs1HostEventSiteContextRequestData
     std::uint64_t reserved1;
 };
 
-struct Gs1HostEventSiteInventorySlotTapData
+struct Gs1SiteInventorySlotTapCommand
 {
     std::uint32_t storage_id;
     std::uint32_t item_instance_id;
@@ -576,56 +558,6 @@ struct Gs1HostEventSiteInventorySlotTapData
     std::uint32_t companion_storage_id;
     std::uint32_t reserved1;
 };
-
-struct Gs1HostEventSiteSceneReadyData
-{
-    std::uint64_t reserved0;
-    std::uint64_t reserved1;
-    std::uint64_t reserved2;
-};
-
-struct Gs1HostEventEmptyData
-{
-    std::uint64_t reserved0;
-    std::uint64_t reserved1;
-};
-
-union Gs1HostEventPayload
-{
-    Gs1HostEventGameplayActionData gameplay_action;
-    Gs1HostEventGameplayActionData ui_action;
-    Gs1HostEventSiteMoveDirectionData site_move_direction;
-    Gs1HostEventSiteActionRequestData site_action_request;
-    Gs1HostEventSiteActionCancelData site_action_cancel;
-    Gs1HostEventSiteStorageViewData site_storage_view;
-    Gs1HostEventSiteContextRequestData site_context_request;
-    Gs1HostEventSiteInventorySlotTapData site_inventory_slot_tap;
-    Gs1HostEventSiteSceneReadyData site_scene_ready;
-    Gs1HostEventEmptyData empty;
-};
-
-using Gs1HostMessageType = Gs1HostEventType;
-using Gs1HostMessageGameplayActionData = Gs1HostEventGameplayActionData;
-using Gs1HostMessageUiActionData = Gs1HostEventGameplayActionData;
-using Gs1HostMessageSiteMoveDirectionData = Gs1HostEventSiteMoveDirectionData;
-using Gs1HostMessageSiteActionRequestData = Gs1HostEventSiteActionRequestData;
-using Gs1HostMessageSiteActionCancelData = Gs1HostEventSiteActionCancelData;
-using Gs1HostMessageSiteStorageViewData = Gs1HostEventSiteStorageViewData;
-using Gs1HostMessageSiteContextRequestData = Gs1HostEventSiteContextRequestData;
-using Gs1HostMessageSiteInventorySlotTapData = Gs1HostEventSiteInventorySlotTapData;
-using Gs1HostMessageSiteSceneReadyData = Gs1HostEventSiteSceneReadyData;
-using Gs1HostMessageEmptyData = Gs1HostEventEmptyData;
-using Gs1HostMessagePayload = Gs1HostEventPayload;
-
-inline constexpr Gs1HostMessageType GS1_HOST_EVENT_UI_ACTION = GS1_HOST_EVENT_GAMEPLAY_ACTION;
-
-struct Gs1HostMessage
-{
-    Gs1HostMessageType type;
-    Gs1HostMessagePayload payload;
-};
-
-using Gs1HostEvent = Gs1HostMessage;
 
 struct Gs1Phase1Request
 {
@@ -1140,20 +1072,12 @@ GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeTimingStats);
 GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeProfileSystemStats);
 GS1_ASSERT_TRIVIAL_SCHEMA(Gs1RuntimeProfilingSnapshot);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1GameplayAction, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventGameplayActionData, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteMoveDirectionData, 12U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteActionRequestData, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteActionCancelData, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteStorageViewData, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteContextRequestData, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteInventorySlotTapData, 20U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventSiteSceneReadyData, 24U);
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostEventEmptyData, 16U);
-static_assert(std::is_standard_layout_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain standard layout.");
-static_assert(std::is_trivial_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain trivial.");
-static_assert(std::is_trivially_copyable_v<Gs1HostEventPayload>, "Gs1HostEventPayload must remain trivially copyable.");
-static_assert(sizeof(Gs1HostEventPayload) == 24U, "Gs1HostEventPayload size changed; revisit event packing.");
-GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1HostMessage, 32U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1SiteMoveDirectionCommand, 12U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1SiteActionRequestCommand, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1SiteActionCancelCommand, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1SiteStorageViewRequest, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1SiteContextRequestCommand, 24U);
+GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1SiteInventorySlotTapCommand, 20U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase1Request, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase1Result, 16U);
 GS1_ASSERT_TRIVIAL_SCHEMA_LAYOUT(Gs1Phase2Request, 4U);

@@ -147,7 +147,7 @@ bool Gs1RuntimeSession::update(double delta_seconds, Gs1Phase1Result& out_phase1
     return true;
 }
 
-bool Gs1RuntimeSession::submit_host_messages(const Gs1HostMessage* messages, std::uint32_t message_count)
+bool Gs1RuntimeSession::submit_gameplay_action(const Gs1GameplayAction& action)
 {
     if (runtime_ == nullptr)
     {
@@ -155,23 +155,17 @@ bool Gs1RuntimeSession::submit_host_messages(const Gs1HostMessage* messages, std
         return false;
     }
 
-    if (message_count > 0U && messages == nullptr)
-    {
-        last_error_ = "Host message buffer is null.";
-        return false;
-    }
-
     const Gs1RuntimeApi& api = loader_.api();
-    if (api.submit_host_messages == nullptr)
+    if (api.submit_gameplay_action == nullptr)
     {
-        last_error_ = "Gameplay DLL is missing host message entry points.";
+        last_error_ = "Gameplay DLL is missing gameplay action entry points.";
         return false;
     }
 
-    const Gs1Status status = api.submit_host_messages(runtime_, messages, message_count);
+    const Gs1Status status = api.submit_gameplay_action(runtime_, &action);
     if (status != GS1_STATUS_OK)
     {
-        last_error_ = "gs1_submit_host_messages failed with status " + std::to_string(static_cast<unsigned>(status));
+        last_error_ = "gs1_submit_gameplay_action failed with status " + std::to_string(static_cast<unsigned>(status));
         return false;
     }
 
@@ -179,9 +173,160 @@ bool Gs1RuntimeSession::submit_host_messages(const Gs1HostMessage* messages, std
     return true;
 }
 
-bool Gs1RuntimeSession::submit_host_events(const Gs1HostEvent* messages, std::uint32_t message_count)
+bool Gs1RuntimeSession::submit_site_move_direction(const Gs1SiteMoveDirectionCommand& command)
 {
-    return submit_host_messages(messages, message_count);
+    if (runtime_ == nullptr)
+    {
+        last_error_ = "Runtime session is not running.";
+        return false;
+    }
+
+    const Gs1RuntimeApi& api = loader_.api();
+    if (api.submit_site_move_direction == nullptr)
+    {
+        last_error_ = "Gameplay DLL is missing site move direction entry points.";
+        return false;
+    }
+
+    const Gs1Status status = api.submit_site_move_direction(runtime_, &command);
+    if (status != GS1_STATUS_OK)
+    {
+        last_error_ = "gs1_submit_site_move_direction failed with status " + std::to_string(static_cast<unsigned>(status));
+        return false;
+    }
+
+    last_error_.clear();
+    return true;
+}
+
+bool Gs1RuntimeSession::submit_site_action_request(const Gs1SiteActionRequestCommand& command)
+{
+    if (runtime_ == nullptr)
+    {
+        last_error_ = "Runtime session is not running.";
+        return false;
+    }
+
+    const Gs1RuntimeApi& api = loader_.api();
+    if (api.submit_site_action_request == nullptr)
+    {
+        last_error_ = "Gameplay DLL is missing site action request entry points.";
+        return false;
+    }
+
+    const Gs1Status status = api.submit_site_action_request(runtime_, &command);
+    if (status != GS1_STATUS_OK)
+    {
+        last_error_ = "gs1_submit_site_action_request failed with status " + std::to_string(static_cast<unsigned>(status));
+        return false;
+    }
+
+    last_error_.clear();
+    return true;
+}
+
+bool Gs1RuntimeSession::submit_site_action_cancel(const Gs1SiteActionCancelCommand& command)
+{
+    if (runtime_ == nullptr)
+    {
+        last_error_ = "Runtime session is not running.";
+        return false;
+    }
+
+    const Gs1RuntimeApi& api = loader_.api();
+    if (api.submit_site_action_cancel == nullptr)
+    {
+        last_error_ = "Gameplay DLL is missing site action cancel entry points.";
+        return false;
+    }
+
+    const Gs1Status status = api.submit_site_action_cancel(runtime_, &command);
+    if (status != GS1_STATUS_OK)
+    {
+        last_error_ = "gs1_submit_site_action_cancel failed with status " + std::to_string(static_cast<unsigned>(status));
+        return false;
+    }
+
+    last_error_.clear();
+    return true;
+}
+
+bool Gs1RuntimeSession::submit_site_context_request(const Gs1SiteContextRequestCommand& command)
+{
+    if (runtime_ == nullptr)
+    {
+        last_error_ = "Runtime session is not running.";
+        return false;
+    }
+
+    const Gs1RuntimeApi& api = loader_.api();
+    if (api.submit_site_context_request == nullptr)
+    {
+        last_error_ = "Gameplay DLL is missing site context request entry points.";
+        return false;
+    }
+
+    const Gs1Status status = api.submit_site_context_request(runtime_, &command);
+    if (status != GS1_STATUS_OK)
+    {
+        last_error_ = "gs1_submit_site_context_request failed with status " + std::to_string(static_cast<unsigned>(status));
+        return false;
+    }
+
+    last_error_.clear();
+    return true;
+}
+
+bool Gs1RuntimeSession::submit_site_inventory_slot_tap(const Gs1SiteInventorySlotTapCommand& command)
+{
+    if (runtime_ == nullptr)
+    {
+        last_error_ = "Runtime session is not running.";
+        return false;
+    }
+
+    const Gs1RuntimeApi& api = loader_.api();
+    if (api.submit_site_inventory_slot_tap == nullptr)
+    {
+        last_error_ = "Gameplay DLL is missing site inventory slot tap entry points.";
+        return false;
+    }
+
+    const Gs1Status status = api.submit_site_inventory_slot_tap(runtime_, &command);
+    if (status != GS1_STATUS_OK)
+    {
+        last_error_ = "gs1_submit_site_inventory_slot_tap failed with status " + std::to_string(static_cast<unsigned>(status));
+        return false;
+    }
+
+    last_error_.clear();
+    return true;
+}
+
+bool Gs1RuntimeSession::submit_site_scene_ready()
+{
+    if (runtime_ == nullptr)
+    {
+        last_error_ = "Runtime session is not running.";
+        return false;
+    }
+
+    const Gs1RuntimeApi& api = loader_.api();
+    if (api.submit_site_scene_ready == nullptr)
+    {
+        last_error_ = "Gameplay DLL is missing site scene ready entry points.";
+        return false;
+    }
+
+    const Gs1Status status = api.submit_site_scene_ready(runtime_);
+    if (status != GS1_STATUS_OK)
+    {
+        last_error_ = "gs1_submit_site_scene_ready failed with status " + std::to_string(static_cast<unsigned>(status));
+        return false;
+    }
+
+    last_error_.clear();
+    return true;
 }
 
 bool Gs1RuntimeSession::pop_runtime_message(Gs1RuntimeMessage& out_message)

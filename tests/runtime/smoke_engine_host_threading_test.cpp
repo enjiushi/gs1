@@ -13,11 +13,33 @@
 
 namespace
 {
+enum class SubmittedCommandKind : std::uint8_t
+{
+    GameplayAction,
+    SiteMoveDirection,
+    SiteActionRequest,
+    SiteActionCancel,
+    SiteInventorySlotTap,
+    SiteContextRequest,
+    SiteSceneReady
+};
+
+struct SubmittedCommand final
+{
+    SubmittedCommandKind kind {SubmittedCommandKind::GameplayAction};
+    Gs1GameplayAction gameplay_action {};
+    Gs1SiteMoveDirectionCommand site_move_direction {};
+    Gs1SiteActionRequestCommand site_action_request {};
+    Gs1SiteActionCancelCommand site_action_cancel {};
+    Gs1SiteInventorySlotTapCommand site_inventory_slot_tap {};
+    Gs1SiteContextRequestCommand site_context_request {};
+};
+
 struct FakeRuntimeState final
 {
     std::deque<Gs1RuntimeMessage> engine_messages {};
-    std::vector<Gs1HostMessage> submitted_host_events {};
-    std::uint32_t last_submitted_host_event_count {0};
+    std::vector<SubmittedCommand> submitted_commands {};
+    std::uint32_t pending_submitted_command_count {0};
     std::uint32_t run_phase1_call_count {0};
     std::uint32_t run_phase2_call_count {0};
 };
@@ -28,17 +50,98 @@ FakeRuntimeState& fake_runtime(Gs1RuntimeHandle* runtime) noexcept
     return *reinterpret_cast<FakeRuntimeState*>(runtime);
 }
 
-Gs1Status fake_submit_host_messages(
+Gs1Status fake_submit_gameplay_action(
     Gs1RuntimeHandle* runtime,
-    const Gs1HostMessage* events,
-    std::uint32_t event_count) noexcept
+    const Gs1GameplayAction* action) noexcept
 {
     auto& state = fake_runtime(runtime);
-    state.last_submitted_host_event_count = event_count;
-    for (std::uint32_t index = 0; index < event_count; ++index)
-    {
-        state.submitted_host_events.push_back(events[index]);
-    }
+    assert(action != nullptr);
+    SubmittedCommand command {};
+    command.kind = SubmittedCommandKind::GameplayAction;
+    command.gameplay_action = *action;
+    state.submitted_commands.push_back(command);
+    state.pending_submitted_command_count += 1U;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status fake_submit_site_move_direction(
+    Gs1RuntimeHandle* runtime,
+    const Gs1SiteMoveDirectionCommand* command) noexcept
+{
+    auto& state = fake_runtime(runtime);
+    assert(command != nullptr);
+    SubmittedCommand submitted {};
+    submitted.kind = SubmittedCommandKind::SiteMoveDirection;
+    submitted.site_move_direction = *command;
+    state.submitted_commands.push_back(submitted);
+    state.pending_submitted_command_count += 1U;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status fake_submit_site_action_request(
+    Gs1RuntimeHandle* runtime,
+    const Gs1SiteActionRequestCommand* command) noexcept
+{
+    auto& state = fake_runtime(runtime);
+    assert(command != nullptr);
+    SubmittedCommand submitted {};
+    submitted.kind = SubmittedCommandKind::SiteActionRequest;
+    submitted.site_action_request = *command;
+    state.submitted_commands.push_back(submitted);
+    state.pending_submitted_command_count += 1U;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status fake_submit_site_action_cancel(
+    Gs1RuntimeHandle* runtime,
+    const Gs1SiteActionCancelCommand* command) noexcept
+{
+    auto& state = fake_runtime(runtime);
+    assert(command != nullptr);
+    SubmittedCommand submitted {};
+    submitted.kind = SubmittedCommandKind::SiteActionCancel;
+    submitted.site_action_cancel = *command;
+    state.submitted_commands.push_back(submitted);
+    state.pending_submitted_command_count += 1U;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status fake_submit_site_inventory_slot_tap(
+    Gs1RuntimeHandle* runtime,
+    const Gs1SiteInventorySlotTapCommand* command) noexcept
+{
+    auto& state = fake_runtime(runtime);
+    assert(command != nullptr);
+    SubmittedCommand submitted {};
+    submitted.kind = SubmittedCommandKind::SiteInventorySlotTap;
+    submitted.site_inventory_slot_tap = *command;
+    state.submitted_commands.push_back(submitted);
+    state.pending_submitted_command_count += 1U;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status fake_submit_site_context_request(
+    Gs1RuntimeHandle* runtime,
+    const Gs1SiteContextRequestCommand* command) noexcept
+{
+    auto& state = fake_runtime(runtime);
+    assert(command != nullptr);
+    SubmittedCommand submitted {};
+    submitted.kind = SubmittedCommandKind::SiteContextRequest;
+    submitted.site_context_request = *command;
+    state.submitted_commands.push_back(submitted);
+    state.pending_submitted_command_count += 1U;
+    return GS1_STATUS_OK;
+}
+
+Gs1Status fake_submit_site_scene_ready(
+    Gs1RuntimeHandle* runtime) noexcept
+{
+    auto& state = fake_runtime(runtime);
+    SubmittedCommand submitted {};
+    submitted.kind = SubmittedCommandKind::SiteSceneReady;
+    state.submitted_commands.push_back(submitted);
+    state.pending_submitted_command_count += 1U;
     return GS1_STATUS_OK;
 }
 
@@ -56,7 +159,8 @@ Gs1Status fake_run_phase1(
     out_result->struct_size = sizeof(Gs1Phase1Result);
     out_result->fixed_steps_executed = request->real_delta_seconds > 0.0 ? 1U : 0U;
     out_result->runtime_messages_queued = static_cast<std::uint32_t>(state.engine_messages.size());
-    out_result->processed_host_message_count = state.last_submitted_host_event_count;
+    out_result->processed_host_message_count = state.pending_submitted_command_count;
+    state.pending_submitted_command_count = 0U;
     return GS1_STATUS_OK;
 }
 
@@ -72,7 +176,8 @@ Gs1Status fake_run_phase2(
     state.run_phase2_call_count += 1U;
 
     out_result->struct_size = sizeof(Gs1Phase2Result);
-    out_result->processed_host_message_count = 0U;
+    out_result->processed_host_message_count = state.pending_submitted_command_count;
+    state.pending_submitted_command_count = 0U;
     out_result->reserved0 = 0U;
     out_result->runtime_messages_queued = static_cast<std::uint32_t>(state.engine_messages.size());
     out_result->reserved1 = 0U;
@@ -99,7 +204,13 @@ Gs1Status fake_pop_runtime_message(
 Gs1RuntimeApi make_fake_api() noexcept
 {
     Gs1RuntimeApi api {};
-    api.submit_host_messages = &fake_submit_host_messages;
+    api.submit_gameplay_action = &fake_submit_gameplay_action;
+    api.submit_site_move_direction = &fake_submit_site_move_direction;
+    api.submit_site_action_request = &fake_submit_site_action_request;
+    api.submit_site_action_cancel = &fake_submit_site_action_cancel;
+    api.submit_site_inventory_slot_tap = &fake_submit_site_inventory_slot_tap;
+    api.submit_site_context_request = &fake_submit_site_context_request;
+    api.submit_site_scene_ready = &fake_submit_site_scene_ready;
     api.run_phase1 = &fake_run_phase1;
     api.run_phase2 = &fake_run_phase2;
     api.pop_runtime_message = &fake_pop_runtime_message;
@@ -259,9 +370,9 @@ void queued_commands_only_publish_after_update()
 
     assert(runtime_state.run_phase1_call_count == 1U);
     assert(runtime_state.run_phase2_call_count == 1U);
-    assert(runtime_state.submitted_host_events.size() == 1U);
-    assert(runtime_state.submitted_host_events.front().type == GS1_HOST_EVENT_UI_ACTION);
-    assert(runtime_state.submitted_host_events.front().payload.ui_action.action.type == GS1_UI_ACTION_START_NEW_CAMPAIGN);
+    assert(runtime_state.submitted_commands.size() == 1U);
+    assert(runtime_state.submitted_commands.front().kind == SubmittedCommandKind::GameplayAction);
+    assert(runtime_state.submitted_commands.front().gameplay_action.type == GS1_UI_ACTION_START_NEW_CAMPAIGN);
 
     const auto after_update = host.capture_live_state_snapshot();
     assert(after_update.frame_number == 1U);
@@ -293,12 +404,12 @@ void move_direction_commands_coalesce_before_the_frame_drains_them()
 
     host.update(0.0);
 
-    assert(runtime_state.submitted_host_events.size() == 1U);
-    const auto& move_event = runtime_state.submitted_host_events.front();
-    assert(move_event.type == GS1_HOST_EVENT_SITE_MOVE_DIRECTION);
-    assert(move_event.payload.site_move_direction.world_move_x == 4.0f);
-    assert(move_event.payload.site_move_direction.world_move_y == 5.0f);
-    assert(move_event.payload.site_move_direction.world_move_z == 6.0f);
+    assert(runtime_state.submitted_commands.size() == 1U);
+    const auto& move_command = runtime_state.submitted_commands.front();
+    assert(move_command.kind == SubmittedCommandKind::SiteMoveDirection);
+    assert(move_command.site_move_direction.world_move_x == 4.0f);
+    assert(move_command.site_move_direction.world_move_y == 5.0f);
+    assert(move_command.site_move_direction.world_move_z == 6.0f);
 }
 
 void update_records_frame_timing_breakdown()

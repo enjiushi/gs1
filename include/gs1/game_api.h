@@ -19,10 +19,32 @@ GS1_API Gs1Status gs1_create_runtime(
 GS1_API void gs1_destroy_runtime(
     Gs1RuntimeHandle* runtime) GS1_NOEXCEPT;
 
-GS1_API Gs1Status gs1_submit_host_messages(
+GS1_API Gs1Status gs1_submit_gameplay_action(
     Gs1RuntimeHandle* runtime,
-    const Gs1HostMessage* messages,
-    std::uint32_t message_count) GS1_NOEXCEPT;
+    const Gs1GameplayAction* action) GS1_NOEXCEPT;
+
+GS1_API Gs1Status gs1_submit_site_move_direction(
+    Gs1RuntimeHandle* runtime,
+    const Gs1SiteMoveDirectionCommand* command) GS1_NOEXCEPT;
+
+GS1_API Gs1Status gs1_submit_site_action_request(
+    Gs1RuntimeHandle* runtime,
+    const Gs1SiteActionRequestCommand* command) GS1_NOEXCEPT;
+
+GS1_API Gs1Status gs1_submit_site_action_cancel(
+    Gs1RuntimeHandle* runtime,
+    const Gs1SiteActionCancelCommand* command) GS1_NOEXCEPT;
+
+GS1_API Gs1Status gs1_submit_site_context_request(
+    Gs1RuntimeHandle* runtime,
+    const Gs1SiteContextRequestCommand* command) GS1_NOEXCEPT;
+
+GS1_API Gs1Status gs1_submit_site_inventory_slot_tap(
+    Gs1RuntimeHandle* runtime,
+    const Gs1SiteInventorySlotTapCommand* command) GS1_NOEXCEPT;
+
+GS1_API Gs1Status gs1_submit_site_scene_ready(
+    Gs1RuntimeHandle* runtime) GS1_NOEXCEPT;
 
 GS1_API Gs1Status gs1_run_phase1(
     Gs1RuntimeHandle* runtime,

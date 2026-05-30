@@ -664,11 +664,6 @@ const char* WorkerConditionSystem::name() const noexcept
     return access().system_name.data();
 }
 
-HostMessageSubscriptionSpan WorkerConditionSystem::subscribed_host_messages() const noexcept
-{
-    return {};
-}
-
 std::optional<Gs1RuntimeProfileSystemId> WorkerConditionSystem::profile_system_id() const noexcept
 {
     return GS1_RUNTIME_PROFILE_SYSTEM_WORKER_CONDITION;

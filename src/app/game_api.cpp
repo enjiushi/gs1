@@ -69,17 +69,87 @@ void gs1_destroy_runtime(Gs1RuntimeHandle* runtime) GS1_NOEXCEPT
     delete runtime;
 }
 
-Gs1Status gs1_submit_host_messages(
+Gs1Status gs1_submit_gameplay_action(
     Gs1RuntimeHandle* runtime,
-    const Gs1HostMessage* messages,
-    std::uint32_t message_count) GS1_NOEXCEPT
+    const Gs1GameplayAction* action) GS1_NOEXCEPT
+{
+    if (runtime == nullptr || action == nullptr)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    return runtime->runtime.submit_gameplay_action(*action);
+}
+
+Gs1Status gs1_submit_site_move_direction(
+    Gs1RuntimeHandle* runtime,
+    const Gs1SiteMoveDirectionCommand* command) GS1_NOEXCEPT
+{
+    if (runtime == nullptr || command == nullptr)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    return runtime->runtime.submit_site_move_direction(*command);
+}
+
+Gs1Status gs1_submit_site_action_request(
+    Gs1RuntimeHandle* runtime,
+    const Gs1SiteActionRequestCommand* command) GS1_NOEXCEPT
+{
+    if (runtime == nullptr || command == nullptr)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    return runtime->runtime.submit_site_action_request(*command);
+}
+
+Gs1Status gs1_submit_site_action_cancel(
+    Gs1RuntimeHandle* runtime,
+    const Gs1SiteActionCancelCommand* command) GS1_NOEXCEPT
+{
+    if (runtime == nullptr || command == nullptr)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    return runtime->runtime.submit_site_action_cancel(*command);
+}
+
+Gs1Status gs1_submit_site_context_request(
+    Gs1RuntimeHandle* runtime,
+    const Gs1SiteContextRequestCommand* command) GS1_NOEXCEPT
+{
+    if (runtime == nullptr || command == nullptr)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    return runtime->runtime.submit_site_context_request(*command);
+}
+
+Gs1Status gs1_submit_site_inventory_slot_tap(
+    Gs1RuntimeHandle* runtime,
+    const Gs1SiteInventorySlotTapCommand* command) GS1_NOEXCEPT
+{
+    if (runtime == nullptr || command == nullptr)
+    {
+        return GS1_STATUS_INVALID_ARGUMENT;
+    }
+
+    return runtime->runtime.submit_site_inventory_slot_tap(*command);
+}
+
+Gs1Status gs1_submit_site_scene_ready(
+    Gs1RuntimeHandle* runtime) GS1_NOEXCEPT
 {
     if (runtime == nullptr)
     {
         return GS1_STATUS_INVALID_ARGUMENT;
     }
 
-    return runtime->runtime.submit_host_messages(messages, message_count);
+    return runtime->runtime.submit_site_scene_ready();
 }
 
 Gs1Status gs1_run_phase1(

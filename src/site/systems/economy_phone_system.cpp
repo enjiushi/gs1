@@ -803,11 +803,6 @@ const char* EconomyPhoneSystem::name() const noexcept
     return "EconomyPhoneSystem";
 }
 
-HostMessageSubscriptionSpan EconomyPhoneSystem::subscribed_host_messages() const noexcept
-{
-    return {};
-}
-
 std::optional<Gs1RuntimeProfileSystemId> EconomyPhoneSystem::profile_system_id() const noexcept
 {
     return GS1_RUNTIME_PROFILE_SYSTEM_ECONOMY_PHONE;

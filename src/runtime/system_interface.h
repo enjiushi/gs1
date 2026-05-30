@@ -7,38 +7,22 @@
 #include "site/systems/site_system_context.h"
 #include "gs1/status.h"
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
 #include <type_traits>
-#include <vector>
 
 namespace gs1
 {
-inline constexpr std::size_t k_runtime_host_message_type_count =
-    static_cast<std::size_t>(GS1_HOST_EVENT_SITE_SCENE_READY) + 1U;
-
-using HostMessageSubscriptionSpan = std::span<const Gs1HostMessageType>;
-
 class IRuntimeSystem
 {
 public:
     virtual ~IRuntimeSystem() = default;
 
     [[nodiscard]] virtual const char* name() const noexcept = 0;
-    [[nodiscard]] virtual HostMessageSubscriptionSpan subscribed_host_messages() const noexcept = 0;
     [[nodiscard]] virtual std::optional<Gs1RuntimeProfileSystemId> profile_system_id() const noexcept = 0;
     [[nodiscard]] virtual std::optional<std::uint32_t> fixed_step_order() const noexcept = 0;
-    [[nodiscard]] virtual Gs1Status process_host_message(
-        RuntimeInvocation& invocation,
-        const Gs1HostMessage& message)
-    {
-        (void)invocation;
-        (void)message;
-        return GS1_STATUS_OK;
-    }
     virtual void run(RuntimeInvocation& invocation) = 0;
 
     [[nodiscard]] virtual std::span<const StateSetId> owned_state_sets() const noexcept
@@ -46,9 +30,6 @@ public:
         return {};
     }
 };
-
-using RuntimeHostMessageSubscribers =
-    std::array<std::vector<IRuntimeSystem*>, k_runtime_host_message_type_count>;
 
 template <Gs1RuntimeMessageType MessageType>
 using runtime_message_type_constant = std::integral_constant<Gs1RuntimeMessageType, MessageType>;
@@ -123,22 +104,6 @@ inline constexpr StateSetId k_site_component_device_weather_state_sets[] = {
     StateSetId::SiteDeviceWeatherContributionMeta,
     StateSetId::SiteDeviceWeatherContributionDirtyTileIndices,
     StateSetId::SiteDeviceWeatherContributionDirtyTileMask};
-
-template <typename EnumType>
-[[nodiscard]] constexpr bool runtime_subscription_contains(
-    std::span<const EnumType> subscriptions,
-    EnumType type) noexcept
-{
-    for (const EnumType subscribed_type : subscriptions)
-    {
-        if (subscribed_type == type)
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
 
 template <typename System>
 [[nodiscard]] constexpr std::span<const StateSetId> runtime_declared_owned_state_sets() noexcept

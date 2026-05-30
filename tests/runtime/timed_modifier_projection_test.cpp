@@ -70,13 +70,6 @@ StartSiteAttemptMessage make_start_site_attempt_message(std::uint32_t site_id)
     return StartSiteAttemptMessage {site_id};
 }
 
-Gs1HostMessage make_site_scene_ready_event()
-{
-    Gs1HostMessage event {};
-    event.type = GS1_HOST_EVENT_SITE_SCENE_READY;
-    return event;
-}
-
 InventoryItemUseRequestedMessage make_inventory_use_message(
     std::uint32_t item_id,
     std::uint32_t quantity,
@@ -172,8 +165,7 @@ void bootstrap_site_one(GameRuntime& runtime)
     assert(runtime.handle_message(make_start_site_attempt_message(site_id)) == GS1_STATUS_OK);
     assert(gs1::GameRuntimeProjectionTestAccess::active_site_run(runtime).has_value());
 
-    const auto ready_event = make_site_scene_ready_event();
-    assert(runtime.submit_host_messages(&ready_event, 1U) == GS1_STATUS_OK);
+    assert(runtime.submit_site_scene_ready() == GS1_STATUS_OK);
     Gs1Phase2Result ready_result {};
     run_phase2(runtime, ready_result);
 }

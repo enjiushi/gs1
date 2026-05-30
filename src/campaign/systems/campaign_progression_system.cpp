@@ -276,11 +276,6 @@ const char* CampaignProgressionSystem::name() const noexcept
     return "CampaignProgressionSystem";
 }
 
-HostMessageSubscriptionSpan CampaignProgressionSystem::subscribed_host_messages() const noexcept
-{
-    return {};
-}
-
 std::optional<Gs1RuntimeProfileSystemId> CampaignProgressionSystem::profile_system_id() const noexcept
 {
     return GS1_RUNTIME_PROFILE_SYSTEM_FACTION_REPUTATION;

@@ -605,10 +605,7 @@ bool Gs1GodotAdapterService::submit_gameplay_action(const Gs1GameplayAction& act
         return true;
     }
 
-    Gs1HostEvent event {};
-    event.type = GS1_HOST_EVENT_GAMEPLAY_ACTION;
-    event.payload.gameplay_action.action = action;
-    if (!runtime_session_.submit_host_events(&event, 1U))
+    if (!runtime_session_.submit_gameplay_action(action))
     {
         last_error_ = runtime_session_.last_error();
         return false;
@@ -628,12 +625,11 @@ bool Gs1GodotAdapterService::submit_gameplay_action(std::int64_t action_type, st
 
 bool Gs1GodotAdapterService::submit_move_direction(double world_move_x, double world_move_y, double world_move_z)
 {
-    Gs1HostEvent event {};
-    event.type = GS1_HOST_EVENT_SITE_MOVE_DIRECTION;
-    event.payload.site_move_direction.world_move_x = static_cast<float>(world_move_x);
-    event.payload.site_move_direction.world_move_y = static_cast<float>(world_move_y);
-    event.payload.site_move_direction.world_move_z = static_cast<float>(world_move_z);
-    if (!runtime_session_.submit_host_events(&event, 1U))
+    Gs1SiteMoveDirectionCommand command {};
+    command.world_move_x = static_cast<float>(world_move_x);
+    command.world_move_y = static_cast<float>(world_move_y);
+    command.world_move_z = static_cast<float>(world_move_z);
+    if (!runtime_session_.submit_site_move_direction(command))
     {
         last_error_ = runtime_session_.last_error();
         return false;
@@ -643,12 +639,11 @@ bool Gs1GodotAdapterService::submit_move_direction(double world_move_x, double w
 
 bool Gs1GodotAdapterService::submit_site_context_request(std::int64_t tile_x, std::int64_t tile_y, std::int64_t flags)
 {
-    Gs1HostEvent event {};
-    event.type = GS1_HOST_EVENT_SITE_CONTEXT_REQUEST;
-    event.payload.site_context_request.tile_x = static_cast<std::int32_t>(tile_x);
-    event.payload.site_context_request.tile_y = static_cast<std::int32_t>(tile_y);
-    event.payload.site_context_request.flags = static_cast<std::uint32_t>(flags);
-    if (!runtime_session_.submit_host_events(&event, 1U))
+    Gs1SiteContextRequestCommand command {};
+    command.tile_x = static_cast<std::int32_t>(tile_x);
+    command.tile_y = static_cast<std::int32_t>(tile_y);
+    command.flags = static_cast<std::uint32_t>(flags);
+    if (!runtime_session_.submit_site_context_request(command))
     {
         last_error_ = runtime_session_.last_error();
         return false;
@@ -666,9 +661,7 @@ bool Gs1GodotAdapterService::submit_site_action_request(
     std::int64_t secondary_subject_id,
     std::int64_t item_id)
 {
-    Gs1HostEvent event {};
-    event.type = GS1_HOST_EVENT_SITE_ACTION_REQUEST;
-    auto& request = event.payload.site_action_request;
+    Gs1SiteActionRequestCommand request {};
     request.action_kind = static_cast<Gs1SiteActionKind>(action_kind);
     request.flags = static_cast<std::uint8_t>(flags);
     request.quantity = static_cast<std::uint16_t>(quantity);
@@ -677,7 +670,7 @@ bool Gs1GodotAdapterService::submit_site_action_request(
     request.primary_subject_id = static_cast<std::uint32_t>(primary_subject_id);
     request.secondary_subject_id = static_cast<std::uint32_t>(secondary_subject_id);
     request.item_id = static_cast<std::uint32_t>(item_id);
-    if (!runtime_session_.submit_host_events(&event, 1U))
+    if (!runtime_session_.submit_site_action_request(request))
     {
         last_error_ = runtime_session_.last_error();
         return false;
@@ -687,11 +680,10 @@ bool Gs1GodotAdapterService::submit_site_action_request(
 
 bool Gs1GodotAdapterService::submit_site_action_cancel(std::int64_t action_id, std::int64_t flags)
 {
-    Gs1HostEvent event {};
-    event.type = GS1_HOST_EVENT_SITE_ACTION_CANCEL;
-    event.payload.site_action_cancel.action_id = static_cast<std::uint32_t>(action_id);
-    event.payload.site_action_cancel.flags = static_cast<std::uint32_t>(flags);
-    if (!runtime_session_.submit_host_events(&event, 1U))
+    Gs1SiteActionCancelCommand command {};
+    command.action_id = static_cast<std::uint32_t>(action_id);
+    command.flags = static_cast<std::uint32_t>(flags);
+    if (!runtime_session_.submit_site_action_cancel(command))
     {
         last_error_ = runtime_session_.last_error();
         return false;
@@ -723,14 +715,13 @@ bool Gs1GodotAdapterService::submit_site_inventory_slot_tap(
     std::int64_t slot_index,
     std::int64_t item_instance_id)
 {
-    Gs1HostEvent event {};
-    event.type = GS1_HOST_EVENT_SITE_INVENTORY_SLOT_TAP;
-    event.payload.site_inventory_slot_tap.storage_id = static_cast<std::uint32_t>(storage_id);
-    event.payload.site_inventory_slot_tap.container_kind = static_cast<Gs1InventoryContainerKind>(container_kind);
-    event.payload.site_inventory_slot_tap.slot_index = static_cast<std::uint16_t>(slot_index);
-    event.payload.site_inventory_slot_tap.item_instance_id = static_cast<std::uint32_t>(item_instance_id);
-    event.payload.site_inventory_slot_tap.companion_storage_id = ui_session_state_.inventory.opened_storage_id;
-    if (!runtime_session_.submit_host_events(&event, 1U))
+    Gs1SiteInventorySlotTapCommand command {};
+    command.storage_id = static_cast<std::uint32_t>(storage_id);
+    command.container_kind = static_cast<Gs1InventoryContainerKind>(container_kind);
+    command.slot_index = static_cast<std::uint16_t>(slot_index);
+    command.item_instance_id = static_cast<std::uint32_t>(item_instance_id);
+    command.companion_storage_id = ui_session_state_.inventory.opened_storage_id;
+    if (!runtime_session_.submit_site_inventory_slot_tap(command))
     {
         last_error_ = runtime_session_.last_error();
         return false;

@@ -10,11 +10,6 @@ const char* FailureRecoverySystem::name() const noexcept
     return access().system_name.data();
 }
 
-HostMessageSubscriptionSpan FailureRecoverySystem::subscribed_host_messages() const noexcept
-{
-    return {};
-}
-
 std::optional<Gs1RuntimeProfileSystemId> FailureRecoverySystem::profile_system_id() const noexcept
 {
     return GS1_RUNTIME_PROFILE_SYSTEM_FAILURE_RECOVERY;
