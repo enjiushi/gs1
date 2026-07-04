@@ -27,7 +27,7 @@ option(GS1_BUILD_GODOT_ADAPTER "Build the scaffolded Godot runtime extension tar
 set(GS1_DEFAULT_GODOT_SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/../godot")
 if(NOT EXISTS "${GS1_DEFAULT_GODOT_SOURCE_DIR}/core/extension/gdextension_interface.gen.h")
-    set(GS1_DEFAULT_GODOT_SOURCE_DIR "E:/godot")
+    set(GS1_DEFAULT_GODOT_SOURCE_DIR "E:/projects/godot")
 endif()
 set(GS1_GODOT_SOURCE_DIR
     "${GS1_DEFAULT_GODOT_SOURCE_DIR}"
@@ -48,6 +48,8 @@ set(
     "Semicolon-separated system filters passed to gs1_system_test_host. Empty runs all discovered system tests.")
 set(GS1_TOMLPLUSPLUS_INCLUDE_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tomlplusplus)
+set(GS1_SHARED_FRAMEWORK_RUNTIME_INCLUDE_DIR
+    ${CMAKE_CURRENT_SOURCE_DIR}/shared_framework/core/runtime/include)
 
 file(GLOB_RECURSE GS1_SYSTEM_TEST_SOURCE_FILES CONFIGURE_DEPENDS
     tests/system/source/*.cpp)
@@ -163,6 +165,7 @@ target_include_directories(gs1_host_bridge
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${GS1_SHARED_FRAMEWORK_RUNTIME_INCLUDE_DIR}
     PRIVATE
         ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
 
@@ -175,6 +178,7 @@ target_include_directories(gs1_gameplay_core
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${GS1_SHARED_FRAMEWORK_RUNTIME_INCLUDE_DIR}
     PRIVATE
         ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
 
@@ -207,7 +211,8 @@ target_include_directories(gs1_game
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${GS1_SHARED_FRAMEWORK_RUNTIME_INCLUDE_DIR})
 
 set_target_properties(gs1_game PROPERTIES
     OUTPUT_NAME "gs1_game"
@@ -240,6 +245,7 @@ if(GS1_BUILD_TESTS)
         PUBLIC
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${GS1_SHARED_FRAMEWORK_RUNTIME_INCLUDE_DIR}
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/system/source
             ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
@@ -497,6 +503,7 @@ if(GS1_BUILD_GODOT_ADAPTER)
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${GS1_SHARED_FRAMEWORK_RUNTIME_INCLUDE_DIR}
             ${GS1_GODOT_SOURCE_DIR}
             ${CMAKE_CURRENT_BINARY_DIR}/third_party/godot-cpp/gen/include
             ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})

@@ -23,11 +23,6 @@ public:
         GS1_RUNTIME_PROFILE_SYSTEM_ECONOMY_PHONE;
     static constexpr std::optional<std::uint32_t> fixed_step_order_value = 17U;
 
-    [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
-    {
-        return site_access_owned_state_sets<EconomyPhoneSystem>();
-    }
-
     [[nodiscard]] const char* name() const noexcept override;
     [[nodiscard]] std::optional<Gs1RuntimeProfileSystemId> profile_system_id() const noexcept override;
     [[nodiscard]] std::optional<std::uint32_t> fixed_step_order() const noexcept override;

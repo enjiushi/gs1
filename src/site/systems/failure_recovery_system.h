@@ -14,11 +14,6 @@ public:
         GS1_RUNTIME_PROFILE_SYSTEM_FAILURE_RECOVERY;
     static constexpr std::optional<std::uint32_t> fixed_step_order_value = 19U;
 
-    [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
-    {
-        return site_access_owned_state_sets<FailureRecoverySystem>();
-    }
-
     [[nodiscard]] const char* name() const noexcept override;
     [[nodiscard]] std::optional<Gs1RuntimeProfileSystemId> profile_system_id() const noexcept override;
     [[nodiscard]] std::optional<std::uint32_t> fixed_step_order() const noexcept override;

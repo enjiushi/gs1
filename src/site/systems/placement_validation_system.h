@@ -18,11 +18,6 @@ public:
         GS1_RUNTIME_PROFILE_SYSTEM_PLACEMENT_VALIDATION;
     static constexpr std::optional<std::uint32_t> fixed_step_order_value = std::nullopt;
 
-    [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
-    {
-        return site_access_owned_state_sets<PlacementValidationSystem>();
-    }
-
     [[nodiscard]] const char* name() const noexcept override;
     [[nodiscard]] std::optional<Gs1RuntimeProfileSystemId> profile_system_id() const noexcept override;
     [[nodiscard]] std::optional<std::uint32_t> fixed_step_order() const noexcept override;

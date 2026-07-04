@@ -1,6 +1,7 @@
 # src/campaign/systems/
 
 Campaign-level systems that react to gameplay messages and mutate only campaign-owned state.
+Ownership now flows into runtime registration through compile-time shared-framework system contracts rather than per-system runtime `owned_state_sets()` overrides.
 
 ## Usage
 - Read this file before scanning the folder in detail.

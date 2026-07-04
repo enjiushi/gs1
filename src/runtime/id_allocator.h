@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../shared_framework/core/runtime/include/shared_framework/runtime/monotonic_id.h"
+#include "shared_framework/runtime/foundation/monotonic_id.h"
 #include "support/id_types.h"
 
 namespace gs1

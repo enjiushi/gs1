@@ -6,14 +6,6 @@
 
 namespace gs1
 {
-void StateManager::register_resolver(IRuntimeSystem& system)
-{
-    for (const StateSetId state_set : system.owned_state_sets())
-    {
-        register_owned_state_set(system, state_set);
-    }
-}
-
 void StateManager::register_owned_state_set(IRuntimeSystem& system, StateSetId state_set)
 {
     const auto slot_index = index(state_set);

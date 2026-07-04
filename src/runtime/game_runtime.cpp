@@ -731,7 +731,10 @@ void GameRuntime::initialize_system_registry()
     const auto register_subscribers = [this]<typename System>()
     {
         auto& system = std::get<System>(systems_);
-        state_manager_.register_resolver(system);
+        for (const StateSetId state_set : runtime_owned_state_set_ids<System>())
+        {
+            state_manager_.register_owned_state_set(system, state_set);
+        }
     };
 
     [&]<std::size_t... Orders>(std::index_sequence<Orders...>)

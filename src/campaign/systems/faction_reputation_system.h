@@ -10,11 +10,6 @@ class FactionReputationSystem final : public IRuntimeSystem
 {
 public:
     static constexpr std::array<StateSetId, 1> k_owned_state_sets {StateSetId::CampaignFactionProgress};
-    [[nodiscard]] std::span<const StateSetId> owned_state_sets() const noexcept override
-    {
-        return k_owned_state_sets;
-    }
-
     [[nodiscard]] const char* name() const noexcept override;
     [[nodiscard]] std::optional<Gs1RuntimeProfileSystemId> profile_system_id() const noexcept override;
     [[nodiscard]] std::optional<std::uint32_t> fixed_step_order() const noexcept override;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../shared_framework/core/runtime/include/shared_framework/runtime/fixed_step_runner.h"
+#include "shared_framework/runtime/foundation/fixed_step_runner.h"
 
 namespace gs1
 {

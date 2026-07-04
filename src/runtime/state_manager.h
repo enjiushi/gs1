@@ -25,7 +25,6 @@ public:
     [[nodiscard]] GameState& game_state() noexcept { return state_; }
     [[nodiscard]] const GameState& game_state() const noexcept { return state_; }
 
-    void register_resolver(IRuntimeSystem& system);
     void register_owned_state_set(IRuntimeSystem& system, StateSetId state_set);
 
     template <StateSetId Id>

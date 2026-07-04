@@ -25,6 +25,7 @@
 #include "site/systems/task_board_system.h"
 #include "site/systems/weather_event_system.h"
 #include "site/systems/worker_condition_system.h"
+#include "runtime/shared_framework_contracts.h"
 #include "runtime/system_pack.h"
 
 namespace gs1
@@ -55,4 +56,12 @@ using GameSystems = system_pack<
     SiteFlowSystem,
     FailureRecoverySystem,
     SiteCompletionSystem>;
+
+inline constexpr bool k_game_system_contracts_valid = []() consteval
+{
+    shared_framework::runtime::validate_system_contracts<GameSystems>::validate();
+    return true;
+}();
+
+static_assert(k_game_system_contracts_valid);
 }  // namespace gs1

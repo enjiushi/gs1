@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../shared_framework/core/runtime/include/shared_framework/runtime/time_scale.h"
+#include "shared_framework/runtime/foundation/time_scale.h"
 
 namespace gs1
 {

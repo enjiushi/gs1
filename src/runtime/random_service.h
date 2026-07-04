@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../shared_framework/core/runtime/include/shared_framework/runtime/seeded_random_streams.h"
+#include "shared_framework/runtime/foundation/seeded_random_streams.h"
 
 #include <cstdint>
 #include <random>
