@@ -22,6 +22,7 @@ This file is a quick orientation guide for agents working in this repository.
 - `out/`: Generated binaries, logs, exported headers, and local browser/debug profiles.
 - `project/`: Shared project-owned configuration, gameplay content roots, and adapter-owned presentation metadata used across engine adapters, with the Godot build staging the relevant authored roots into `engines/godot/project/gs1/runtime/` for packaged runs. Read `project/guideline.md` before drilling deeper.
 - `scripts/`: PowerShell helpers for building and running smoke, process, and system tests. Read `scripts/guideline.md` before drilling deeper.
+- `shared_framework/`: Vendored snapshot of the shared upstream runtime/host/engine framework repo used across GS-series projects. Read `shared_framework/guideline.md` before drilling deeper.
 - `src/`: Gameplay/runtime implementation code grouped by ownership domain. Read `src/guideline.md` before drilling deeper.
 - `tests/`: Runtime, headless game-process, and system test code plus scripted/system-test assets, including the public-API-driven Site 1 onboarding process journey, the in-place split-state round-trip helpers used by runtime/system test fixtures, and the split inventory-ref call sites used by the last inventory-bridge cleanup. Read `tests/guideline.md` before drilling deeper.
 - `tools/`: Repository-maintenance and infrastructure helpers that are not part of the normal gameplay/test script workflow, including the Google Cloud Storage content sync/push helpers for ignored Godot assets and addons. Read `tools/guideline.md` before drilling deeper.
@@ -80,6 +81,7 @@ This file is a quick orientation guide for agents working in this repository.
 
 - When work touches Godot adapter code or its shared projection contract, verify the Godot adapter build before considering the task complete whenever the local environment has the prerequisites.
 - The default local layout is this repo plus a sibling Godot source checkout at `../godot` and the pinned `godot-cpp` submodule at `third_party/godot-cpp`.
+- On Windows, the CMake fallback path for the Godot source tree is `E:/projects/godot` when the sibling `../godot` checkout is not present.
 - On a new machine, initialize dependencies with `git submodule update --init --recursive` before running the Godot build flow.
 - Prefer using `scripts/setup_godot_build.ps1` to validate prerequisites and configure a Godot-enabled build directory on a new machine.
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../../shared_framework/core/runtime/include/shared_framework/runtime/monotonic_id.h"
 #include "support/id_types.h"
 
 namespace gs1
@@ -23,8 +24,8 @@ public:
     }
 
 private:
-    std::uint32_t next_site_run_id_ {1};
-    std::uint32_t next_task_instance_id_ {1};
-    std::uint32_t next_runtime_action_id_ {1};
+    shared_framework::runtime::MonotonicIdSource<> next_site_run_id_ {};
+    shared_framework::runtime::MonotonicIdSource<> next_task_instance_id_ {};
+    shared_framework::runtime::MonotonicIdSource<> next_runtime_action_id_ {};
 };
 }  // namespace gs1
