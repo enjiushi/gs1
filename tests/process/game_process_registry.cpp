@@ -17,7 +17,7 @@ constexpr const char* k_site1_onboarding_description =
     "Starts a new campaign, enters Site 1, and verifies the active-site onboarding task set loads.";
 
 bool run_phase1(
-    const Gs1RuntimeApi& api,
+    const shared_framework::host::RuntimeApi& api,
     Gs1RuntimeHandle* runtime,
     double delta_seconds) noexcept
 {
@@ -30,7 +30,7 @@ bool run_phase1(
 }
 
 bool run_phase2(
-    const Gs1RuntimeApi& api,
+    const shared_framework::host::RuntimeApi& api,
     Gs1RuntimeHandle* runtime) noexcept
 {
     Gs1Phase2Request request {};
@@ -41,7 +41,7 @@ bool run_phase2(
 }
 
 bool get_game_state_view(
-    const Gs1RuntimeApi& api,
+    const shared_framework::host::RuntimeApi& api,
     Gs1RuntimeHandle* runtime,
     Gs1GameStateView& out_view) noexcept
 {
@@ -51,7 +51,7 @@ bool get_game_state_view(
 }
 
 bool submit_gameplay_action(
-    const Gs1RuntimeApi& api,
+    const shared_framework::host::RuntimeApi& api,
     Gs1RuntimeHandle* runtime,
     Gs1GameplayActionType action_type,
     std::uint32_t target_id = 0U,
@@ -67,7 +67,7 @@ bool submit_gameplay_action(
 }
 
 bool submit_site_scene_ready(
-    const Gs1RuntimeApi& api,
+    const shared_framework::host::RuntimeApi& api,
     Gs1RuntimeHandle* runtime) noexcept
 {
     return api.submit_site_scene_ready(runtime) == GS1_STATUS_OK;
@@ -108,7 +108,7 @@ void log_verbose(bool enabled, const char* format, ...) noexcept
 }
 
 int run_site1_onboarding(
-    const Gs1RuntimeApi& api,
+    const shared_framework::host::RuntimeApi& api,
     Gs1RuntimeHandle* runtime,
     bool verbose_logging,
     const GameProcessTestRunOptions& options)

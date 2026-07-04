@@ -1,4 +1,4 @@
-#include "host/adapter_config_loader.h"
+#include "shared_framework/host/adapter_config_loader.h"
 
 #include <algorithm>
 #include <fstream>
@@ -137,9 +137,11 @@ std::size_t find_json_string_end(std::string_view text, std::size_t start_index)
 
     return std::string_view::npos;
 }
-}
+}  // namespace
 
-Gs1AdapterConfigBlob load_adapter_config_blob(
+namespace shared_framework::host {
+
+AdapterConfigBlob load_adapter_config_blob(
     const std::filesystem::path& project_config_root,
     const std::filesystem::path& adapter_config_directory)
 {
@@ -164,7 +166,7 @@ Gs1AdapterConfigBlob load_adapter_config_blob(
         return lhs.relative_path_utf8 < rhs.relative_path_utf8;
     });
 
-    Gs1AdapterConfigBlob blob {};
+    AdapterConfigBlob blob {};
     std::ostringstream json;
     json << "{";
     json << "\"project_config_root\":\""
@@ -227,3 +229,5 @@ std::filesystem::path extract_project_config_root_from_adapter_config_json(
 
     return std::filesystem::path {unescape_json_string(adapter_config_json_utf8.substr(value_start, value_end - value_start))};
 }
+
+}  // namespace shared_framework::host

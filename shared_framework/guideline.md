@@ -11,5 +11,5 @@ Vendored snapshot of the shared upstream runtime/host/engine framework used acro
 ## Contents
 - `UPSTREAM_VERSION.md`: Records the upstream repository revision that this vendored snapshot was copied from.
 - `README.md`: Upstream framework overview and dependency rules.
-- `core/`: Engine-free framework modules split into `runtime/` and `host/`.
-- `engines/`: Engine-specific framework modules, currently including Godot scaffolding notes.
+- `core/`: Engine-free framework modules split into `runtime/` and `host/`, with the vendored host bridge now carrying the reusable adapter-config loader, adapter-metadata catalog, DLL loader, and runtime-session implementation used by `gs1_host_bridge`.
+- `engines/`: Engine-specific framework modules, now including the first-pass vendored Godot adapter foundation snapshot with shared debug HTTP, notification/projection, scene-policy, and adapter-service source files under `engines/godot/`.

@@ -1,4 +1,4 @@
-#include "host/runtime_dll_loader.h"
+#include "shared_framework/host/runtime_dll_loader.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -63,6 +63,8 @@ std::string win32_error_message(DWORD error_code)
     return message;
 }
 }  // namespace
+
+namespace shared_framework::host {
 
 RuntimeDllLoader::~RuntimeDllLoader() noexcept
 {
@@ -130,4 +132,6 @@ bool RuntimeDllLoader::load_symbol(FunctionPointer& out_function, const char* sy
     out_function = reinterpret_cast<FunctionPointer>(symbol);
     return true;
 }
+
+}  // namespace shared_framework::host
 

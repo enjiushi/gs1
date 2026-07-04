@@ -1,5 +1,5 @@
-#include "gs1_godot_adapter_service.h"
-#include "gs1_godot_notification_policy.h"
+#include "shared_framework/godot/adapter_service.h"
+#include "shared_framework/godot/notification_policy.h"
 
 #include "shared_framework/host/adapter_metadata_catalog.h"
 

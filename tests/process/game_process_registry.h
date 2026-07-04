@@ -1,6 +1,6 @@
 #pragma once
 
-#include "host/runtime_dll_loader.h"
+#include "shared_framework/host/runtime_dll_loader.h"
 
 #include <cstdint>
 #include <string_view>
@@ -17,7 +17,7 @@ struct GameProcessScenarioDescriptor final
     const char* name {nullptr};
     const char* description {nullptr};
     int (*run)(
-        const Gs1RuntimeApi& api,
+        const shared_framework::host::RuntimeApi& api,
         Gs1RuntimeHandle* runtime,
         bool verbose_logging,
         const GameProcessTestRunOptions& options) {nullptr};

@@ -4,7 +4,8 @@
 
 #include <string>
 
-struct Gs1RuntimeApi final
+namespace shared_framework::host {
+struct RuntimeApi final
 {
     decltype(&gs1_get_api_version) get_api_version {nullptr};
     decltype(&gs1_get_build_string) get_build_string {nullptr};
@@ -37,7 +38,7 @@ public:
     [[nodiscard]] bool load(const wchar_t* dll_path);
     void unload() noexcept;
 
-    [[nodiscard]] const Gs1RuntimeApi& api() const noexcept { return api_; }
+    [[nodiscard]] const RuntimeApi& api() const noexcept { return api_; }
     [[nodiscard]] const std::string& last_error() const noexcept { return last_error_; }
 
 private:
@@ -46,7 +47,9 @@ private:
 
 private:
     void* module_ {nullptr};
-    Gs1RuntimeApi api_ {};
+    RuntimeApi api_ {};
     std::string last_error_ {};
 };
 
+
+}  // namespace shared_framework::host

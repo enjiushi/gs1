@@ -1,16 +1,18 @@
-#include "host/runtime_session.h"
+#include "shared_framework/host/runtime_session.h"
 
 #include <cassert>
 
-Gs1RuntimeSession::~Gs1RuntimeSession() noexcept
+namespace shared_framework::host {
+
+RuntimeSession::~RuntimeSession() noexcept
 {
     stop();
 }
 
-bool Gs1RuntimeSession::start(
+bool RuntimeSession::start(
     const std::filesystem::path& gameplay_dll_path,
     const std::filesystem::path& project_config_root,
-    const Gs1AdapterConfigBlob* adapter_config,
+    const AdapterConfigBlob* adapter_config,
     const double fixed_step_seconds)
 {
     stop();
@@ -21,7 +23,7 @@ bool Gs1RuntimeSession::start(
         return false;
     }
 
-    const Gs1RuntimeApi& api = loader_.api();
+    const RuntimeApi& api = loader_.api();
     if (api.get_api_version == nullptr || api.create_runtime == nullptr || api.destroy_runtime == nullptr)
     {
         last_error_ = "Gameplay DLL is missing required runtime entry points.";
@@ -55,7 +57,7 @@ bool Gs1RuntimeSession::start(
     return true;
 }
 
-void Gs1RuntimeSession::stop() noexcept
+void RuntimeSession::stop() noexcept
 {
     if (runtime_ != nullptr)
     {
@@ -70,7 +72,7 @@ void Gs1RuntimeSession::stop() noexcept
     loader_.unload();
 }
 
-bool Gs1RuntimeSession::run_phase1(double delta_seconds, Gs1Phase1Result& out_phase1)
+bool RuntimeSession::run_phase1(double delta_seconds, Gs1Phase1Result& out_phase1)
 {
     if (runtime_ == nullptr)
     {
@@ -78,7 +80,7 @@ bool Gs1RuntimeSession::run_phase1(double delta_seconds, Gs1Phase1Result& out_ph
         return false;
     }
 
-    const Gs1RuntimeApi& api = loader_.api();
+    const RuntimeApi& api = loader_.api();
     if (api.run_phase1 == nullptr)
     {
         last_error_ = "Gameplay DLL is missing phase 1 entry points.";
@@ -101,7 +103,7 @@ bool Gs1RuntimeSession::run_phase1(double delta_seconds, Gs1Phase1Result& out_ph
     return true;
 }
 
-bool Gs1RuntimeSession::run_phase2(Gs1Phase2Result& out_phase2)
+bool RuntimeSession::run_phase2(Gs1Phase2Result& out_phase2)
 {
     if (runtime_ == nullptr)
     {
@@ -109,7 +111,7 @@ bool Gs1RuntimeSession::run_phase2(Gs1Phase2Result& out_phase2)
         return false;
     }
 
-    const Gs1RuntimeApi& api = loader_.api();
+    const RuntimeApi& api = loader_.api();
     if (api.run_phase2 == nullptr)
     {
         last_error_ = "Gameplay DLL is missing phase 2 entry points.";
@@ -131,7 +133,7 @@ bool Gs1RuntimeSession::run_phase2(Gs1Phase2Result& out_phase2)
     return true;
 }
 
-bool Gs1RuntimeSession::update(double delta_seconds, Gs1Phase1Result& out_phase1, Gs1Phase2Result& out_phase2)
+bool RuntimeSession::update(double delta_seconds, Gs1Phase1Result& out_phase1, Gs1Phase2Result& out_phase2)
 {
     if (!run_phase1(delta_seconds, out_phase1))
     {
@@ -147,7 +149,7 @@ bool Gs1RuntimeSession::update(double delta_seconds, Gs1Phase1Result& out_phase1
     return true;
 }
 
-bool Gs1RuntimeSession::submit_gameplay_action(const Gs1GameplayAction& action)
+bool RuntimeSession::submit_gameplay_action(const Gs1GameplayAction& action)
 {
     if (runtime_ == nullptr)
     {
@@ -155,7 +157,7 @@ bool Gs1RuntimeSession::submit_gameplay_action(const Gs1GameplayAction& action)
         return false;
     }
 
-    const Gs1RuntimeApi& api = loader_.api();
+    const RuntimeApi& api = loader_.api();
     if (api.submit_gameplay_action == nullptr)
     {
         last_error_ = "Gameplay DLL is missing gameplay action entry points.";
@@ -173,7 +175,7 @@ bool Gs1RuntimeSession::submit_gameplay_action(const Gs1GameplayAction& action)
     return true;
 }
 
-bool Gs1RuntimeSession::submit_site_move_direction(const Gs1SiteMoveDirectionCommand& command)
+bool RuntimeSession::submit_site_move_direction(const Gs1SiteMoveDirectionCommand& command)
 {
     if (runtime_ == nullptr)
     {
@@ -181,7 +183,7 @@ bool Gs1RuntimeSession::submit_site_move_direction(const Gs1SiteMoveDirectionCom
         return false;
     }
 
-    const Gs1RuntimeApi& api = loader_.api();
+    const RuntimeApi& api = loader_.api();
     if (api.submit_site_move_direction == nullptr)
     {
         last_error_ = "Gameplay DLL is missing site move direction entry points.";
@@ -199,7 +201,7 @@ bool Gs1RuntimeSession::submit_site_move_direction(const Gs1SiteMoveDirectionCom
     return true;
 }
 
-bool Gs1RuntimeSession::submit_site_action_request(const Gs1SiteActionRequestCommand& command)
+bool RuntimeSession::submit_site_action_request(const Gs1SiteActionRequestCommand& command)
 {
     if (runtime_ == nullptr)
     {
@@ -207,7 +209,7 @@ bool Gs1RuntimeSession::submit_site_action_request(const Gs1SiteActionRequestCom
         return false;
     }
 
-    const Gs1RuntimeApi& api = loader_.api();
+    const RuntimeApi& api = loader_.api();
     if (api.submit_site_action_request == nullptr)
     {
         last_error_ = "Gameplay DLL is missing site action request entry points.";
@@ -225,7 +227,7 @@ bool Gs1RuntimeSession::submit_site_action_request(const Gs1SiteActionRequestCom
     return true;
 }
 
-bool Gs1RuntimeSession::submit_site_action_cancel(const Gs1SiteActionCancelCommand& command)
+bool RuntimeSession::submit_site_action_cancel(const Gs1SiteActionCancelCommand& command)
 {
     if (runtime_ == nullptr)
     {
@@ -233,7 +235,7 @@ bool Gs1RuntimeSession::submit_site_action_cancel(const Gs1SiteActionCancelComma
         return false;
     }
 
-    const Gs1RuntimeApi& api = loader_.api();
+    const RuntimeApi& api = loader_.api();
     if (api.submit_site_action_cancel == nullptr)
     {
         last_error_ = "Gameplay DLL is missing site action cancel entry points.";
@@ -251,7 +253,7 @@ bool Gs1RuntimeSession::submit_site_action_cancel(const Gs1SiteActionCancelComma
     return true;
 }
 
-bool Gs1RuntimeSession::submit_site_context_request(const Gs1SiteContextRequestCommand& command)
+bool RuntimeSession::submit_site_context_request(const Gs1SiteContextRequestCommand& command)
 {
     if (runtime_ == nullptr)
     {
@@ -259,7 +261,7 @@ bool Gs1RuntimeSession::submit_site_context_request(const Gs1SiteContextRequestC
         return false;
     }
 
-    const Gs1RuntimeApi& api = loader_.api();
+    const RuntimeApi& api = loader_.api();
     if (api.submit_site_context_request == nullptr)
     {
         last_error_ = "Gameplay DLL is missing site context request entry points.";
@@ -277,7 +279,7 @@ bool Gs1RuntimeSession::submit_site_context_request(const Gs1SiteContextRequestC
     return true;
 }
 
-bool Gs1RuntimeSession::submit_site_inventory_slot_tap(const Gs1SiteInventorySlotTapCommand& command)
+bool RuntimeSession::submit_site_inventory_slot_tap(const Gs1SiteInventorySlotTapCommand& command)
 {
     if (runtime_ == nullptr)
     {
@@ -285,7 +287,7 @@ bool Gs1RuntimeSession::submit_site_inventory_slot_tap(const Gs1SiteInventorySlo
         return false;
     }
 
-    const Gs1RuntimeApi& api = loader_.api();
+    const RuntimeApi& api = loader_.api();
     if (api.submit_site_inventory_slot_tap == nullptr)
     {
         last_error_ = "Gameplay DLL is missing site inventory slot tap entry points.";
@@ -303,7 +305,7 @@ bool Gs1RuntimeSession::submit_site_inventory_slot_tap(const Gs1SiteInventorySlo
     return true;
 }
 
-bool Gs1RuntimeSession::submit_site_scene_ready()
+bool RuntimeSession::submit_site_scene_ready()
 {
     if (runtime_ == nullptr)
     {
@@ -311,7 +313,7 @@ bool Gs1RuntimeSession::submit_site_scene_ready()
         return false;
     }
 
-    const Gs1RuntimeApi& api = loader_.api();
+    const RuntimeApi& api = loader_.api();
     if (api.submit_site_scene_ready == nullptr)
     {
         last_error_ = "Gameplay DLL is missing site scene ready entry points.";
@@ -329,7 +331,7 @@ bool Gs1RuntimeSession::submit_site_scene_ready()
     return true;
 }
 
-bool Gs1RuntimeSession::get_game_state_view(Gs1GameStateView& out_view)
+bool RuntimeSession::get_game_state_view(Gs1GameStateView& out_view)
 {
     if (runtime_ == nullptr)
     {
@@ -337,7 +339,7 @@ bool Gs1RuntimeSession::get_game_state_view(Gs1GameStateView& out_view)
         return false;
     }
 
-    const Gs1RuntimeApi& api = loader_.api();
+    const RuntimeApi& api = loader_.api();
     if (api.get_game_state_view == nullptr)
     {
         last_error_ = "Gameplay DLL is missing game state view entry points.";
@@ -357,7 +359,7 @@ bool Gs1RuntimeSession::get_game_state_view(Gs1GameStateView& out_view)
     return true;
 }
 
-bool Gs1RuntimeSession::query_site_tile_view(std::uint32_t tile_index, Gs1SiteTileView& out_tile)
+bool RuntimeSession::query_site_tile_view(std::uint32_t tile_index, Gs1SiteTileView& out_tile)
 {
     if (runtime_ == nullptr)
     {
@@ -365,7 +367,7 @@ bool Gs1RuntimeSession::query_site_tile_view(std::uint32_t tile_index, Gs1SiteTi
         return false;
     }
 
-    const Gs1RuntimeApi& api = loader_.api();
+    const RuntimeApi& api = loader_.api();
     if (api.query_site_tile_view == nullptr)
     {
         last_error_ = "Gameplay DLL is missing site tile query entry points.";
@@ -384,3 +386,4 @@ bool Gs1RuntimeSession::query_site_tile_view(std::uint32_t tile_index, Gs1SiteTi
     return true;
 }
 
+}  // namespace shared_framework::host

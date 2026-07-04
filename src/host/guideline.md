@@ -1,15 +1,10 @@
 # src/host/
 
-Shared engine-agnostic host bridge code used by runtime clients that load the gameplay DLL.
+Legacy host-bridge source folder retained only for guidance after the reusable host bridge moved into the vendored shared framework under `shared_framework/core/host/`.
 
 ## Usage
 - Read this file before scanning the folder in detail.
 - When files or folders in this directory change, update this file in the same change.
 
 ## Contents
-- `adapter_config_loader.h` / `adapter_config_loader.cpp`: Shared host-side helper for packaging adapter-owned config roots into a runtime-startup payload so engine adapters can pass the staged runtime package root into gameplay startup alongside any engine-specific presentation/resource config.
-- `adapter_metadata_catalog.h` / `adapter_metadata_catalog.cpp`: Shared adapter-side metadata catalog loader for presentation-only labels and descriptions such as modifiers plus progression entries, loaded from an `adapter_metadata/` root under the active project/runtime package so the gameplay DLL does not own that descriptive copy, with adapter metadata keyed directly by the same globally unique per-type ids used by gameplay content and references.
-- `runtime_dll_loader.h`: Shared function-pointer table and Win32 DLL loader for the engine-free gameplay runtime ABI, including the concrete typed host-command submit entry points plus the exported gameplay-state view and targeted tile-query entry points.
-- `runtime_dll_loader.cpp`: Win32 implementation of the shared gameplay DLL loader.
-- `runtime_session.h`: Shared gameplay-runtime session owner that loads the gameplay DLL, creates the runtime from a host-supplied shared project/runtime root plus optional adapter-config payload and fixed-step timing, exposes separate `run_phase1` and `run_phase2` entry points alongside the older combined helper, exposes typed host-command submission, and wraps the read-only gameplay-state view plus tile-query APIs.
-- `runtime_session.cpp`: Implementation of the shared gameplay-runtime session owner, including shared typed host-command submission into the gameplay DLL runtime, startup wiring for both the shared project/runtime root path and adapter-config payload passed across the runtime ABI, and the split host-side phase entry points plus gameplay-state view query wrappers after the runtime-message transport removal.
+- No local source files remain here. Use `shared_framework/core/host/` for the shared host implementation and headers.

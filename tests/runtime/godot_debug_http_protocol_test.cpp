@@ -13,7 +13,7 @@ void ui_action_string_payload_parses()
     Gs1GodotDebugHttpCommand command {};
     std::string error {};
     const bool ok = gs1_parse_godot_debug_http_command(
-        "/ui-action",
+        "/gameplay-action",
         R"({"type":"START_NEW_CAMPAIGN","targetId":7,"arg0":11,"arg1":13})",
         command,
         &error);
@@ -21,7 +21,7 @@ void ui_action_string_payload_parses()
     assert(ok);
     assert(error.empty());
     assert(command.kind == Gs1GodotDebugHttpCommandKind::GameplayAction);
-    assert(command.action_type == GS1_UI_ACTION_START_NEW_CAMPAIGN);
+    assert(command.action_type == GS1_GAMEPLAY_ACTION_START_NEW_CAMPAIGN);
     assert(command.target_id == 7);
     assert(command.arg0 == 11);
     assert(command.arg1 == 13);
@@ -93,13 +93,13 @@ void invalid_ui_action_is_rejected()
     Gs1GodotDebugHttpCommand command {};
     std::string error {};
     const bool ok = gs1_parse_godot_debug_http_command(
-        "/ui-action",
+        "/gameplay-action",
         R"({"type":"NOT_A_REAL_ACTION"})",
         command,
         &error);
 
     assert(!ok);
-    assert(error == "Missing or invalid UI action type.");
+    assert(error == "Missing or invalid gameplay action type.");
 }
 
 void regional_map_scene_uses_inventory_style_loadout_nodes()

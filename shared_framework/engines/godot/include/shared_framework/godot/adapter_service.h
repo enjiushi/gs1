@@ -1,8 +1,8 @@
 #pragma once
 
-#include "gs1_godot_debug_http_protocol.h"
-#include "gs1_godot_debug_http_server.h"
-#include "gs1_godot_notification_types.h"
+#include "shared_framework/godot/debug_http_protocol.h"
+#include "shared_framework/godot/debug_http_server.h"
+#include "shared_framework/godot/notification_types.h"
 #include "shared_framework/host/runtime_session.h"
 
 #include <array>

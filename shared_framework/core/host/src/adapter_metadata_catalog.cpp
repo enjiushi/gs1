@@ -1,4 +1,4 @@
-#include "host/adapter_metadata_catalog.h"
+#include "shared_framework/host/adapter_metadata_catalog.h"
 
 #include "toml.hpp"
 
@@ -138,14 +138,16 @@ template <typename IntegerType>
     return std::nullopt;
 }
 
-[[nodiscard]] Gs1AdapterMetadataCatalog& mutable_catalog() noexcept
+[[nodiscard]] shared_framework::host::AdapterMetadataCatalog& mutable_catalog() noexcept
 {
-    static Gs1AdapterMetadataCatalog catalog {};
+    static shared_framework::host::AdapterMetadataCatalog catalog {};
     return catalog;
 }
-}
+}  // namespace
 
-void Gs1AdapterMetadataCatalog::load_from_project_root(const std::filesystem::path& project_root)
+namespace shared_framework::host {
+
+void AdapterMetadataCatalog::load_from_project_root(const std::filesystem::path& project_root)
 {
     modifier_entries_.clear();
     reputation_unlock_entries_.clear();
@@ -157,19 +159,19 @@ void Gs1AdapterMetadataCatalog::load_from_project_root(const std::filesystem::pa
     load_technology_node_metadata(metadata_root / "technology_nodes.toml");
 }
 
-const Gs1AdapterMetadataEntry* Gs1AdapterMetadataCatalog::find(
-    const Gs1AdapterMetadataDomain domain,
+const AdapterMetadataEntry* AdapterMetadataCatalog::find(
+    const AdapterMetadataDomain domain,
     const std::uint32_t id) const noexcept
 {
-    const auto* map = [&]() -> const std::unordered_map<std::uint32_t, Gs1AdapterMetadataEntry>*
+    const auto* map = [&]() -> const std::unordered_map<std::uint32_t, AdapterMetadataEntry>*
     {
         switch (domain)
         {
-        case Gs1AdapterMetadataDomain::Modifier:
+        case AdapterMetadataDomain::Modifier:
             return &modifier_entries_;
-        case Gs1AdapterMetadataDomain::ReputationUnlock:
+        case AdapterMetadataDomain::ReputationUnlock:
             return &reputation_unlock_entries_;
-        case Gs1AdapterMetadataDomain::TechnologyNode:
+        case AdapterMetadataDomain::TechnologyNode:
             return &technology_node_entries_;
         default:
             return nullptr;
@@ -185,7 +187,7 @@ const Gs1AdapterMetadataEntry* Gs1AdapterMetadataCatalog::find(
     return found == map->end() ? nullptr : &found->second;
 }
 
-void Gs1AdapterMetadataCatalog::load_modifier_metadata(const std::filesystem::path& path)
+void AdapterMetadataCatalog::load_modifier_metadata(const std::filesystem::path& path)
 {
     const auto& document = load_toml_document(path);
     const auto& entries = require_toml_array(path, document, "modifier_presets");
@@ -195,13 +197,13 @@ void Gs1AdapterMetadataCatalog::load_modifier_metadata(const std::filesystem::pa
         const std::uint32_t modifier_id = require_toml_integer<std::uint32_t>(path, entry, "modifier_id");
         modifier_entries_.insert_or_assign(
             modifier_id,
-            Gs1AdapterMetadataEntry {
+            AdapterMetadataEntry {
                 optional_toml_string(entry, "display_name").value_or(std::string {}),
                 optional_toml_string(entry, "description").value_or(std::string {})});
     }
 }
 
-void Gs1AdapterMetadataCatalog::load_reputation_unlock_metadata(const std::filesystem::path& path)
+void AdapterMetadataCatalog::load_reputation_unlock_metadata(const std::filesystem::path& path)
 {
     const auto& document = load_toml_document(path);
     const auto& entries = require_toml_array(path, document, "reputation_unlocks");
@@ -211,13 +213,13 @@ void Gs1AdapterMetadataCatalog::load_reputation_unlock_metadata(const std::files
         const std::uint32_t unlock_id = require_toml_integer<std::uint32_t>(path, entry, "unlock_id");
         reputation_unlock_entries_.insert_or_assign(
             unlock_id,
-            Gs1AdapterMetadataEntry {
+            AdapterMetadataEntry {
                 require_toml_string(path, entry, "display_name"),
                 require_toml_string(path, entry, "description")});
     }
 }
 
-void Gs1AdapterMetadataCatalog::load_technology_node_metadata(const std::filesystem::path& path)
+void AdapterMetadataCatalog::load_technology_node_metadata(const std::filesystem::path& path)
 {
     const auto& document = load_toml_document(path);
     const auto& entries = require_toml_array(path, document, "technology_nodes");
@@ -227,13 +229,13 @@ void Gs1AdapterMetadataCatalog::load_technology_node_metadata(const std::filesys
         const std::uint32_t tech_node_id = require_toml_integer<std::uint32_t>(path, entry, "tech_node_id");
         technology_node_entries_.insert_or_assign(
             tech_node_id,
-            Gs1AdapterMetadataEntry {
+            AdapterMetadataEntry {
                 require_toml_string(path, entry, "display_name"),
                 require_toml_string(path, entry, "description")});
     }
 }
 
-const Gs1AdapterMetadataCatalog& adapter_metadata_catalog() noexcept
+const AdapterMetadataCatalog& adapter_metadata_catalog() noexcept
 {
     return mutable_catalog();
 }
@@ -242,3 +244,5 @@ void load_adapter_metadata_catalog_from_project_root(const std::filesystem::path
 {
     mutable_catalog().load_from_project_root(project_root);
 }
+
+}  // namespace shared_framework::host

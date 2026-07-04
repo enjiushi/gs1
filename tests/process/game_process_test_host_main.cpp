@@ -1,7 +1,7 @@
 #include "game_process_registry.h"
 
-#include "host/adapter_metadata_catalog.h"
-#include "host/runtime_dll_loader.h"
+#include "shared_framework/host/adapter_metadata_catalog.h"
+#include "shared_framework/host/runtime_dll_loader.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -169,7 +169,7 @@ std::vector<GameProcessScenarioDescriptor> collect_selected_scenarios(const Host
 }
 
 bool create_runtime(
-    const Gs1RuntimeApi& api,
+    const shared_framework::host::RuntimeApi& api,
     const std::filesystem::path& repo_root,
     Gs1RuntimeHandle*& out_runtime)
 {
@@ -179,7 +179,7 @@ bool create_runtime(
     create_desc.fixed_step_seconds = 1.0 / 60.0;
 
     const std::string project_config_root = (repo_root / "project").string();
-    load_adapter_metadata_catalog_from_project_root(project_config_root);
+    shared_framework::host::load_adapter_metadata_catalog_from_project_root(project_config_root);
     create_desc.project_config_root_utf8 = project_config_root.c_str();
     create_desc.adapter_config_json_utf8 = nullptr;
 
@@ -254,7 +254,7 @@ int main(int argc, char** argv)
         process_info("Writing game-process test log to " + log_path.string() + "\n");
     }
 
-    RuntimeDllLoader loader {};
+    shared_framework::host::RuntimeDllLoader loader {};
     if (!loader.load(options.dll_path.c_str()))
     {
         process_error(loader.last_error() + "\n");
