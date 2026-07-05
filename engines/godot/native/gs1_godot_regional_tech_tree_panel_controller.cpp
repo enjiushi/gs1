@@ -5,7 +5,7 @@
 
 #include "content/defs/faction_defs.h"
 #include "content/defs/technology_defs.h"
-#include "shared_framework/host/adapter_metadata_catalog.h"
+#include "gs1/host/adapter_metadata_catalog.h"
 
 #include <godot_cpp/classes/center_container.hpp>
 #include <godot_cpp/classes/color_rect.hpp>
@@ -1206,8 +1206,8 @@ Gs1GodotRegionalTechTreePanelController::technology_ui_for(std::uint32_t tech_no
     {
         entry.title = node_def->display_name.empty() ? String("Technology") : string_from_view(node_def->display_name);
         entry.faction_name = faction_name_for(static_cast<int>(node_def->faction_id.value));
-        const auto* metadata = shared_framework::host::adapter_metadata_catalog().find(
-            shared_framework::host::AdapterMetadataDomain::TechnologyNode,
+        const auto* metadata = gs1::host::adapter_metadata_catalog().find(
+            gs1::host::AdapterMetadataDomain::TechnologyNode,
             node_def->tech_node_id.value);
         const String description = (metadata == nullptr || metadata->description.empty())
             ? String("No authored description yet.")
@@ -1241,8 +1241,8 @@ Gs1GodotRegionalTechTreePanelController::unlockable_ui_for(std::uint32_t unlock_
     {
         entry.title = string_from_view(unlock_def->display_name);
         entry.content_kind = static_cast<int>(unlockable_content_kind_from_def(*unlock_def));
-        const auto* metadata = shared_framework::host::adapter_metadata_catalog().find(
-            shared_framework::host::AdapterMetadataDomain::ReputationUnlock,
+        const auto* metadata = gs1::host::adapter_metadata_catalog().find(
+            gs1::host::AdapterMetadataDomain::ReputationUnlock,
             unlock_def->unlock_id);
         const String description = (metadata == nullptr || metadata->description.empty())
             ? String("No authored description yet.")

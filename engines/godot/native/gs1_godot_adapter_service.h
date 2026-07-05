@@ -1,9 +1,9 @@
 #pragma once
 
 #include "gs1_godot_debug_http_protocol.h"
-#include "gs1_godot_debug_http_server.h"
 #include "gs1_godot_notification_types.h"
-#include "shared_framework/host/runtime_session.h"
+#include "gs1/host/runtime_session.h"
+#include "shared_framework/godot/debug_http_server.h"
 
 #include <array>
 #include <cstdint>
@@ -162,11 +162,11 @@ private:
 private:
     std::filesystem::path gameplay_dll_path_ {};
     std::filesystem::path project_config_root_ {};
-    shared_framework::host::AdapterConfigBlob adapter_config_ {};
-    shared_framework::host::RuntimeSession runtime_session_ {};
+    gs1::host::AdapterConfigBlob adapter_config_ {};
+    gs1::host::RuntimeSession runtime_session_ {};
     std::array<std::vector<IGs1GodotNotificationSubscriber*>, k_message_bucket_count> subscribers_by_message_ {};
     std::unordered_set<IGs1GodotNotificationSubscriber*> known_subscribers_ {};
-    Gs1GodotDebugHttpServer debug_http_server_ {};
+    shared_framework::godot::DebugHttpServer debug_http_server_ {};
     bool debug_http_server_checked_ {false};
     bool phase2_pending_ {false};
     double pending_phase1_delta_seconds_ {1.0 / 60.0};

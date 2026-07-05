@@ -4,8 +4,9 @@ This document defines the standard process for extracting, maintaining, and reus
 
 ## Goals
 
-- Keep reusable runtime and host infrastructure in a shared upstream repository.
-- Keep reusable Godot adapter scaffolding in the same shared upstream repository under `engines/godot/`.
+- Keep reusable engine-agnostic runtime infrastructure in a shared upstream repository.
+- Keep reusable Godot-side adapter/bootstrap infrastructure in the same shared upstream repository under `engines/godot/`.
+- Keep game-specific runtime state, content, ABI payloads, and adapter semantics in each game repo.
 - Let each game repo vendor a copy of the shared framework instead of depending on a submodule.
 - Allow each game repo to choose and pin its own `godot-cpp` version.
 - Promote reusable improvements back into the shared framework in small stable batches during development instead of waiting until a game is finished.
@@ -18,48 +19,34 @@ The shared framework upstream repo should use this shape:
 shared_framework/
   core/
     runtime/
-    host/
   engines/
     godot/
 ```
 
 ### `core/runtime/`
 
-Reusable engine-free runtime framework:
+Reusable engine-agnostic runtime framework:
 
 - runtime loop and fixed-step execution
-- system registration and lifecycle
+- system registration and lifecycle scaffolding
 - global/runtime state ownership framework
 - state-set claim and resolver registration
 - internal message routing infrastructure
-- runtime ABI foundation that is not tied to one game's content or UI
+- runtime ABI foundation that is not tied to one game's content, engine, or adapter
 
-This layer should not depend on Godot headers.
-
-### `core/host/`
-
-Reusable engine-free host bridge framework:
-
-- runtime DLL loading
-- runtime session wrapper
-- host-to-runtime startup/config payload plumbing
-- read-only runtime view/query bridge helpers
-
-This layer should not depend on Godot headers.
+This layer must not depend on Godot headers or any game-owned headers.
 
 ### `engines/godot/`
 
-Reusable Godot-native adapter framework:
+Reusable Godot-native framework:
 
-- GDExtension bootstrap
-- runtime-session ownership inside Godot
-- scene/director flow scaffolding
-- stable gameplay-id to Godot-object reconciliation helpers
-- generic snapshot/delta projection helpers
-- generic controller/service base patterns
-- optional Godot-only debug tools
+- GDExtension bootstrap helpers
+- Godot-side runtime DLL bootstrap/config loading helpers
+- reusable scene/director/controller scaffolding
+- optional Godot-only debug tools such as the loopback HTTP server
+- other adapter helpers that are reusable across multiple games but still intrinsically Godot-specific
 
-This layer may depend on Godot headers and `godot-cpp`.
+This layer may depend on Godot headers and `godot-cpp`, but it must not depend on `gs1` or `gs2` headers.
 
 ## Dependency Policy
 
@@ -67,9 +54,11 @@ The shared framework repo owns framework code only. It should not own the concre
 
 ### Rules
 
-- `core/runtime/` must remain free of Godot dependencies.
-- `core/host/` must remain free of Godot dependencies.
+- `core/runtime/` must remain engine-agnostic.
 - `engines/godot/` may require `godot-cpp` and Godot headers.
+- Shared framework code must not include `gs1`, `gs2`, or any other game-owned headers.
+- If a helper is only reusable inside Godot, keep it under `engines/godot/` rather than forcing it into `core/`.
+- If a helper is not actually reusable across games, keep it in the owning game repo even if it looks infrastructural.
 - Each game repo is responsible for choosing and pinning its own compatible `godot-cpp` version.
 
 ### Recommended `godot-cpp` Layout Per Game Repo
@@ -98,11 +87,11 @@ When starting a new Godot-based game project:
 4. Add the game's own `third_party/godot-cpp/` dependency or configure an equivalent external dependency path.
 5. Wire the game build so:
    - the gameplay/runtime DLL uses `shared_framework/core/runtime/`
-   - the host bridge uses `shared_framework/core/host/`
    - the Godot adapter/plugin uses `shared_framework/engines/godot/`
-6. Add the game's own systems, state, content contracts, state-view shaping, and game-specific Godot scenes/controllers on top of the framework.
-7. Keep reusable framework changes local only until they are proven stable.
-8. Promote stable reusable improvements back into the shared framework upstream repo in small focused commits.
+6. Keep any non-Godot host/bootstrap code in the game repo unless it becomes truly cross-game and engine-agnostic.
+7. Add the game's own systems, state, content contracts, state-view shaping, and game-specific Godot scenes/controllers on top of the framework.
+8. Keep reusable framework changes local only until they are proven stable.
+9. Promote stable reusable improvements back into the shared framework upstream repo in small focused commits.
 
 ## Vendored Copy Policy
 
@@ -133,12 +122,12 @@ When applying this process to an existing game such as `gs1`, use this order:
 2. Create the shared framework upstream repo with the target folder layout.
 3. Extract the framework-only code into:
    - `core/runtime/`
-   - `core/host/`
    - `engines/godot/`
-4. Keep game-specific systems, content rules, state views, and game-specific Godot controllers in `gs1`.
-5. Vendor the resulting shared framework snapshot back into `gs1`.
-6. Verify `gs1` still builds and runs against the vendored framework.
-7. Create `gs2` from a fresh copy of the shared framework plus its own game-specific code.
+4. Remove anything from the shared framework that still depends on a game-owned header, symbol family, project path, or DLL name.
+5. Keep game-specific systems, content rules, state views, non-reusable host bootstrap, and game-specific Godot controllers in `gs1`.
+6. Vendor the resulting shared framework snapshot back into `gs1`.
+7. Verify `gs1` still builds and runs against the vendored framework.
+8. Create `gs2` from a fresh copy of the shared framework plus its own game-specific code.
 
 ## Extraction Guidance
 
@@ -146,20 +135,21 @@ When applying this process to an existing game such as `gs1`, use this order:
 
 - runtime loop and execution shell
 - state claim / resolver / ownership framework
-- host runtime session and DLL loading framework
-- generic runtime/host transport foundations
+- generic runtime ABI and transport foundations
 - Godot extension bootstrap and generic adapter scaffolding
-- stable object reconciliation patterns
+- shared Godot-side config/bootstrap/debug helpers
+- stable object reconciliation and scene-director patterns
 
-### Leave Game-Specific At First
+### Leave Game-Specific
 
 - game rules and domain systems
 - content tables and validation specific to one game
 - game-specific runtime messages and action enums
 - game-specific state-view shaping
 - game-specific Godot scene layout and panel/controller logic
+- non-reusable host bootstrap or project-path conventions
 
-The initial goal is to share framework scaffolding before trying to share gameplay systems.
+The goal is to share real framework scaffolding without dragging game-owned policy into the shared repo.
 
 ## Future Engine Support
 
@@ -171,10 +161,9 @@ Example future shape:
 shared_framework/
   core/
     runtime/
-    host/
   engines/
     godot/
     ue/
 ```
 
-Common code should be pushed down into `core/` whenever it no longer requires engine headers or engine-owned types.
+Common code should be pushed down into `core/` only when it no longer requires engine headers, engine-owned types, or game-owned policy.

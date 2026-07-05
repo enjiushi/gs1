@@ -1,7 +1,7 @@
 #include "game_process_registry.h"
 
-#include "shared_framework/host/adapter_metadata_catalog.h"
-#include "shared_framework/host/runtime_dll_loader.h"
+#include "gs1/host/adapter_metadata_catalog.h"
+#include "gs1/host/runtime_dll_loader.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -169,23 +169,23 @@ std::vector<GameProcessScenarioDescriptor> collect_selected_scenarios(const Host
 }
 
 bool create_runtime(
-    const shared_framework::host::RuntimeApi& api,
+    const gs1::host::RuntimeApi& api,
     const std::filesystem::path& repo_root,
-    Gs1RuntimeHandle*& out_runtime)
+    gs1::host::RuntimeHostHandle*& out_runtime)
 {
-    Gs1RuntimeCreateDesc create_desc {};
-    create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
-    create_desc.api_version = api.get_api_version();
+    GsRuntimeCreateDesc create_desc {};
+    create_desc.struct_size = sizeof(GsRuntimeCreateDesc);
+    create_desc.api_version = api.bootstrap.get_api_version();
     create_desc.fixed_step_seconds = 1.0 / 60.0;
 
     const std::string project_config_root = (repo_root / "project").string();
-    shared_framework::host::load_adapter_metadata_catalog_from_project_root(project_config_root);
+    gs1::host::load_adapter_metadata_catalog_from_project_root(project_config_root);
     create_desc.project_config_root_utf8 = project_config_root.c_str();
     create_desc.adapter_config_json_utf8 = nullptr;
 
     out_runtime = nullptr;
-    const Gs1Status status = api.create_runtime(&create_desc, &out_runtime);
-    if (status != GS1_STATUS_OK || out_runtime == nullptr)
+    const GsStatus status = api.bootstrap.create_runtime(&create_desc, &out_runtime);
+    if (status != GS_STATUS_OK || out_runtime == nullptr)
     {
         process_error(
             "Failed to create gameplay runtime for process tests (status=" +
@@ -254,7 +254,7 @@ int main(int argc, char** argv)
         process_info("Writing game-process test log to " + log_path.string() + "\n");
     }
 
-    shared_framework::host::RuntimeDllLoader loader {};
+    gs1::host::RuntimeDllLoader loader {};
     if (!loader.load(options.dll_path.c_str()))
     {
         process_error(loader.last_error() + "\n");
@@ -269,7 +269,7 @@ int main(int argc, char** argv)
     {
         process_info(std::string("[PROCESS] starting scenario=") + scenario.name + "\n");
 
-        Gs1RuntimeHandle* runtime = nullptr;
+        gs1::host::RuntimeHostHandle* runtime = nullptr;
         if (!create_runtime(api, repo_root, runtime))
         {
             succeeded = false;
@@ -277,7 +277,7 @@ int main(int argc, char** argv)
         }
 
         const int exit_code = scenario.run(api, runtime, options.verbose_logging, options.run_options);
-        api.destroy_runtime(runtime);
+        api.bootstrap.destroy_runtime(runtime);
 
         if (exit_code != 0)
         {

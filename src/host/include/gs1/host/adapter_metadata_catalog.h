@@ -7,7 +7,7 @@
 #include <string_view>
 #include <unordered_map>
 
-namespace shared_framework::host {
+namespace gs1::host {
 enum class AdapterMetadataDomain : std::uint8_t
 {
     Modifier = 0,
@@ -46,4 +46,4 @@ private:
 void load_adapter_metadata_catalog_from_project_root(const std::filesystem::path& project_root);
 
 
-}  // namespace shared_framework::host
+}  // namespace gs1::host

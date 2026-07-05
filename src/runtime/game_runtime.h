@@ -198,7 +198,6 @@ private:
 
 private:
     Gs1RuntimeCreateDesc create_desc_ {};
-    std::string adapter_config_json_utf8_ {};
     SiteWorldHandle site_world_ {};
     StateManager state_manager_ {};
     GameState& state_;

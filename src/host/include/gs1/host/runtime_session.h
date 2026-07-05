@@ -1,13 +1,13 @@
 #pragma once
 
-#include "shared_framework/host/adapter_config_loader.h"
-#include "shared_framework/host/runtime_dll_loader.h"
+#include "gs1/host/adapter_config_blob.h"
+#include "gs1/host/runtime_dll_loader.h"
 
 #include <filesystem>
 #include <optional>
 #include <string>
 
-namespace shared_framework::host {
+namespace gs1::host {
 class RuntimeSession final
 {
 public:
@@ -30,7 +30,7 @@ public:
     {
         return runtime_ != nullptr ? &loader_.api() : nullptr;
     }
-    [[nodiscard]] Gs1RuntimeHandle* runtime() const noexcept { return runtime_; }
+    [[nodiscard]] RuntimeHostHandle* runtime() const noexcept { return runtime_; }
 
     [[nodiscard]] bool run_phase1(double delta_seconds, Gs1Phase1Result& out_phase1);
     [[nodiscard]] bool run_phase2(Gs1Phase2Result& out_phase2);
@@ -47,11 +47,11 @@ public:
 
 private:
     RuntimeDllLoader loader_ {};
-    Gs1RuntimeHandle* runtime_ {nullptr};
+    RuntimeHostHandle* runtime_ {nullptr};
     std::filesystem::path gameplay_dll_path_ {};
     std::string project_config_root_utf8_ {};
     std::string adapter_config_json_utf8_ {};
     std::string last_error_ {};
 };
 
-}  // namespace shared_framework::host
+}  // namespace gs1::host

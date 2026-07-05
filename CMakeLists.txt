@@ -48,10 +48,12 @@ set(
     "Semicolon-separated system filters passed to gs1_system_test_host. Empty runs all discovered system tests.")
 set(GS1_TOMLPLUSPLUS_INCLUDE_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tomlplusplus)
-set(GS1_SHARED_FRAMEWORK_HOST_INCLUDE_DIR
-    ${CMAKE_CURRENT_SOURCE_DIR}/shared_framework/core/host/include)
+set(GS1_HOST_BRIDGE_INCLUDE_DIR
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/host/include)
 set(GS1_SHARED_FRAMEWORK_RUNTIME_INCLUDE_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/shared_framework/core/runtime/include)
+set(GS1_SHARED_FRAMEWORK_GODOT_INCLUDE_DIR
+    ${CMAKE_CURRENT_SOURCE_DIR}/shared_framework/engines/godot/include)
 
 file(GLOB_RECURSE GS1_SYSTEM_TEST_SOURCE_FILES CONFIGURE_DEPENDS
     tests/system/source/*.cpp)
@@ -158,16 +160,15 @@ add_library(gs1_gameplay_core STATIC
     ${GS1_GAMEPLAY_CORE_SOURCES})
 
 add_library(gs1_host_bridge STATIC
-    shared_framework/core/host/src/adapter_config_loader.cpp
-    shared_framework/core/host/src/adapter_metadata_catalog.cpp
-    shared_framework/core/host/src/runtime_dll_loader.cpp
-    shared_framework/core/host/src/runtime_session.cpp)
+    src/host/adapter_metadata_catalog.cpp
+    src/host/runtime_dll_loader.cpp
+    src/host/runtime_session.cpp)
 
 target_include_directories(gs1_host_bridge
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${GS1_SHARED_FRAMEWORK_HOST_INCLUDE_DIR}
+        ${GS1_HOST_BRIDGE_INCLUDE_DIR}
         ${GS1_SHARED_FRAMEWORK_RUNTIME_INCLUDE_DIR}
     PRIVATE
         ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
@@ -181,7 +182,7 @@ target_include_directories(gs1_gameplay_core
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${GS1_SHARED_FRAMEWORK_HOST_INCLUDE_DIR}
+        ${GS1_HOST_BRIDGE_INCLUDE_DIR}
         ${GS1_SHARED_FRAMEWORK_RUNTIME_INCLUDE_DIR}
     PRIVATE
         ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})
@@ -208,7 +209,9 @@ add_library(gs1_game SHARED
 
 # Export public DLL symbols when compiling the gameplay library itself.
 target_compile_definitions(gs1_game
-    PRIVATE GS1_BUILD_DLL=1)
+    PRIVATE
+        GS1_BUILD_DLL=1
+        GS_BUILD_DLL=1)
 
 # Public headers form the engine-facing SDK. Private headers stay internal.
 target_include_directories(gs1_game
@@ -223,7 +226,8 @@ set_target_properties(gs1_game PROPERTIES
     WINDOWS_EXPORT_ALL_SYMBOLS OFF)
 
 target_link_libraries(gs1_game
-    PRIVATE gs1_gameplay_core)
+    PRIVATE
+        gs1_gameplay_core)
 
 # Install the DLL/import library and the public headers as the gameplay SDK output.
 install(TARGETS gs1_game
@@ -249,7 +253,7 @@ if(GS1_BUILD_TESTS)
         PUBLIC
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_CURRENT_SOURCE_DIR}/src
-            ${GS1_SHARED_FRAMEWORK_HOST_INCLUDE_DIR}
+            ${GS1_HOST_BRIDGE_INCLUDE_DIR}
             ${GS1_SHARED_FRAMEWORK_RUNTIME_INCLUDE_DIR}
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/system/source
@@ -479,9 +483,12 @@ if(GS1_BUILD_GODOT_ADAPTER)
     add_library(gs1_godot_adapter SHARED
         engines/godot/native/gs1_godot_extension_entry.cpp
         engines/godot/native/gs1_godot_adapter_service.cpp
+        shared_framework/engines/godot/src/adapter_config_loader.cpp
+        shared_framework/engines/godot/src/debug_http_server.cpp
+        shared_framework/engines/godot/src/runtime_bootstrap_dll_loader.cpp
+        shared_framework/engines/godot/src/scene_director_framework.cpp
         engines/godot/native/gs1_godot_controller_context.cpp
         engines/godot/native/gs1_godot_debug_http_protocol.cpp
-        engines/godot/native/gs1_godot_debug_http_server.cpp
         engines/godot/native/godot_progression_resources.cpp
         engines/godot/native/gs1_godot_prewarm_config.cpp
         engines/godot/native/gs1_godot_prewarm_manager.cpp
@@ -508,8 +515,9 @@ if(GS1_BUILD_GODOT_ADAPTER)
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_CURRENT_SOURCE_DIR}/src
-            ${GS1_SHARED_FRAMEWORK_HOST_INCLUDE_DIR}
+            ${GS1_HOST_BRIDGE_INCLUDE_DIR}
             ${GS1_SHARED_FRAMEWORK_RUNTIME_INCLUDE_DIR}
+            ${GS1_SHARED_FRAMEWORK_GODOT_INCLUDE_DIR}
             ${GS1_GODOT_SOURCE_DIR}
             ${CMAKE_CURRENT_BINARY_DIR}/third_party/godot-cpp/gen/include
             ${GS1_TOMLPLUSPLUS_INCLUDE_DIR})

@@ -6,6 +6,7 @@ This layer is intended for reusable execution, timing, state-ownership, and mess
 
 Current shared areas:
 
+- neutral runtime lifecycle and split-step ABI declarations under `api/`
 - low-level runtime utilities such as fixed-step, ids, random streams, and time-scale helpers
 - compile-time `type_list` and `system_pack` primitives
 - generic system traits for subscribed messages, owned states, and accessed states

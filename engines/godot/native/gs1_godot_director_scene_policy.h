@@ -1,5 +1,7 @@
 #pragma once
 
+#include "shared_framework/godot/scene_director_policy.h"
+
 #include <cstdint>
 
 enum Gs1GodotDirectorScreenKind : std::uint8_t
@@ -16,5 +18,8 @@ enum Gs1GodotDirectorScreenKind : std::uint8_t
     Gs1GodotDirectorScreenKind active_kind,
     Gs1GodotDirectorScreenKind desired_kind) noexcept
 {
-    return !has_active_scene || active_kind != desired_kind;
+    return shared_framework::godot::scene_director_requires_scene_switch(
+        has_active_scene,
+        static_cast<int>(active_kind),
+        static_cast<int>(desired_kind));
 }

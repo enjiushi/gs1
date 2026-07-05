@@ -1,8 +1,8 @@
-#include "shared_framework/host/runtime_session.h"
+#include "gs1/host/runtime_session.h"
 
 #include <cassert>
 
-namespace shared_framework::host {
+namespace gs1::host {
 
 RuntimeSession::~RuntimeSession() noexcept
 {
@@ -24,16 +24,18 @@ bool RuntimeSession::start(
     }
 
     const RuntimeApi& api = loader_.api();
-    if (api.get_api_version == nullptr || api.create_runtime == nullptr || api.destroy_runtime == nullptr)
+    if (api.bootstrap.get_api_version == nullptr ||
+        api.bootstrap.create_runtime == nullptr ||
+        api.bootstrap.destroy_runtime == nullptr)
     {
         last_error_ = "Gameplay DLL is missing required runtime entry points.";
         loader_.unload();
         return false;
     }
 
-    Gs1RuntimeCreateDesc create_desc {};
-    create_desc.struct_size = sizeof(Gs1RuntimeCreateDesc);
-    create_desc.api_version = api.get_api_version();
+    GsRuntimeCreateDesc create_desc {};
+    create_desc.struct_size = sizeof(GsRuntimeCreateDesc);
+    create_desc.api_version = api.bootstrap.get_api_version();
     create_desc.fixed_step_seconds = fixed_step_seconds;
     project_config_root_utf8_ = project_config_root.string();
     create_desc.project_config_root_utf8 = project_config_root_utf8_.c_str();
@@ -42,11 +44,11 @@ bool RuntimeSession::start(
         ? nullptr
         : adapter_config_json_utf8_.c_str();
 
-    Gs1RuntimeHandle* runtime = nullptr;
-    const Gs1Status status = api.create_runtime(&create_desc, &runtime);
-    if (status != GS1_STATUS_OK || runtime == nullptr)
+    RuntimeHostHandle* runtime = nullptr;
+    const GsStatus status = api.bootstrap.create_runtime(&create_desc, &runtime);
+    if (status != GS_STATUS_OK || runtime == nullptr)
     {
-        last_error_ = "gs1_create_runtime failed with status " + std::to_string(static_cast<unsigned>(status));
+        last_error_ = "gs_runtime_create failed with status " + std::to_string(static_cast<unsigned>(status));
         loader_.unload();
         return false;
     }
@@ -61,8 +63,8 @@ void RuntimeSession::stop() noexcept
 {
     if (runtime_ != nullptr)
     {
-        assert(loader_.api().destroy_runtime != nullptr);
-        loader_.api().destroy_runtime(runtime_);
+        assert(loader_.api().bootstrap.destroy_runtime != nullptr);
+        loader_.api().bootstrap.destroy_runtime(runtime_);
     }
 
     runtime_ = nullptr;
@@ -81,21 +83,25 @@ bool RuntimeSession::run_phase1(double delta_seconds, Gs1Phase1Result& out_phase
     }
 
     const RuntimeApi& api = loader_.api();
-    if (api.run_phase1 == nullptr)
+    if (api.bootstrap.run_phase1 == nullptr)
     {
         last_error_ = "Gameplay DLL is missing phase 1 entry points.";
         return false;
     }
 
-    Gs1Phase1Request phase1_request {};
-    phase1_request.struct_size = sizeof(Gs1Phase1Request);
+    GsPhase1Request phase1_request {};
+    phase1_request.struct_size = sizeof(GsPhase1Request);
     phase1_request.real_delta_seconds = delta_seconds;
 
+    GsPhase1Result phase1_result {};
+    const GsStatus status = api.bootstrap.run_phase1(runtime_, &phase1_request, &phase1_result);
     out_phase1 = {};
-    Gs1Status status = api.run_phase1(runtime_, &phase1_request, &out_phase1);
-    if (status != GS1_STATUS_OK)
+    out_phase1.struct_size = phase1_result.struct_size;
+    out_phase1.fixed_steps_executed = phase1_result.fixed_steps_executed;
+    out_phase1.processed_host_message_count = phase1_result.processed_host_message_count;
+    if (status != GS_STATUS_OK)
     {
-        last_error_ = "gs1_run_phase1 failed with status " + std::to_string(static_cast<unsigned>(status));
+        last_error_ = "gs_runtime_run_phase1 failed with status " + std::to_string(static_cast<unsigned>(status));
         return false;
     }
 
@@ -112,20 +118,26 @@ bool RuntimeSession::run_phase2(Gs1Phase2Result& out_phase2)
     }
 
     const RuntimeApi& api = loader_.api();
-    if (api.run_phase2 == nullptr)
+    if (api.bootstrap.run_phase2 == nullptr)
     {
         last_error_ = "Gameplay DLL is missing phase 2 entry points.";
         return false;
     }
 
-    Gs1Phase2Request phase2_request {};
-    phase2_request.struct_size = sizeof(Gs1Phase2Request);
+    GsPhase2Request phase2_request {};
+    phase2_request.struct_size = sizeof(GsPhase2Request);
 
+    GsPhase2Result phase2_result {};
+    const GsStatus status = api.bootstrap.run_phase2(runtime_, &phase2_request, &phase2_result);
     out_phase2 = {};
-    const Gs1Status status = api.run_phase2(runtime_, &phase2_request, &out_phase2);
-    if (status != GS1_STATUS_OK)
+    out_phase2.struct_size = phase2_result.struct_size;
+    out_phase2.processed_host_message_count = phase2_result.processed_host_message_count;
+    out_phase2.reserved0 = phase2_result.reserved0;
+    out_phase2.reserved1 = phase2_result.reserved1;
+    out_phase2.reserved2 = phase2_result.reserved2;
+    if (status != GS_STATUS_OK)
     {
-        last_error_ = "gs1_run_phase2 failed with status " + std::to_string(static_cast<unsigned>(status));
+        last_error_ = "gs_runtime_run_phase2 failed with status " + std::to_string(static_cast<unsigned>(status));
         return false;
     }
 
@@ -386,4 +398,4 @@ bool RuntimeSession::query_site_tile_view(std::uint32_t tile_index, Gs1SiteTileV
     return true;
 }
 
-}  // namespace shared_framework::host
+}  // namespace gs1::host

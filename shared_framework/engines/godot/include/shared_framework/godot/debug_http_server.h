@@ -7,15 +7,16 @@
 #include <string_view>
 #include <thread>
 
-class Gs1GodotDebugHttpServer final
+namespace shared_framework::godot {
+class DebugHttpServer final
 {
 public:
     using CommandCallback = std::function<bool(std::string_view path, const std::string& body, std::string& out_error)>;
 
-    Gs1GodotDebugHttpServer() = default;
-    Gs1GodotDebugHttpServer(const Gs1GodotDebugHttpServer&) = delete;
-    Gs1GodotDebugHttpServer& operator=(const Gs1GodotDebugHttpServer&) = delete;
-    ~Gs1GodotDebugHttpServer() noexcept;
+    DebugHttpServer() = default;
+    DebugHttpServer(const DebugHttpServer&) = delete;
+    DebugHttpServer& operator=(const DebugHttpServer&) = delete;
+    ~DebugHttpServer() noexcept;
 
     [[nodiscard]] bool start(std::uint16_t preferred_port, CommandCallback command_callback, std::string& out_error);
     void stop() noexcept;
@@ -41,3 +42,4 @@ private:
     std::thread server_thread_ {};
     std::uint16_t port_ {0};
 };
+}  // namespace shared_framework::godot

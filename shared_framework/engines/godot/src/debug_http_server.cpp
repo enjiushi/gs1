@@ -65,12 +65,14 @@ bool read_request(SOCKET client_socket, std::string& out_request)
 #endif
 }
 
-Gs1GodotDebugHttpServer::~Gs1GodotDebugHttpServer() noexcept
+namespace shared_framework::godot {
+
+DebugHttpServer::~DebugHttpServer() noexcept
 {
     stop();
 }
 
-bool Gs1GodotDebugHttpServer::start(std::uint16_t preferred_port, CommandCallback command_callback, std::string& out_error)
+bool DebugHttpServer::start(std::uint16_t preferred_port, CommandCallback command_callback, std::string& out_error)
 {
     if (running_.load())
     {
@@ -140,12 +142,12 @@ bool Gs1GodotDebugHttpServer::start(std::uint16_t preferred_port, CommandCallbac
     port_ = ntohs(bound_address.sin_port);
     listen_socket_ = static_cast<std::uintptr_t>(listen_socket);
     running_.store(true);
-    server_thread_ = std::thread(&Gs1GodotDebugHttpServer::server_loop, this);
+    server_thread_ = std::thread(&DebugHttpServer::server_loop, this);
     return true;
 #endif
 }
 
-void Gs1GodotDebugHttpServer::stop() noexcept
+void DebugHttpServer::stop() noexcept
 {
     if (!running_.load())
     {
@@ -175,7 +177,7 @@ void Gs1GodotDebugHttpServer::stop() noexcept
     port_ = 0;
 }
 
-void Gs1GodotDebugHttpServer::server_loop() noexcept
+void DebugHttpServer::server_loop() noexcept
 {
 #if defined(_WIN32)
     const SOCKET listen_socket = static_cast<SOCKET>(listen_socket_);
@@ -208,7 +210,7 @@ void Gs1GodotDebugHttpServer::server_loop() noexcept
 #endif
 }
 
-void Gs1GodotDebugHttpServer::handle_client(std::uintptr_t client_socket_value)
+void DebugHttpServer::handle_client(std::uintptr_t client_socket_value)
 {
 #if defined(_WIN32)
     const SOCKET client_socket = static_cast<SOCKET>(client_socket_value);
@@ -247,18 +249,6 @@ void Gs1GodotDebugHttpServer::handle_client(std::uintptr_t client_socket_value)
         return;
     }
 
-    if (path != "/gameplay-action" &&
-        path != "/site-action" &&
-        path != "/site-action-cancel" &&
-        path != "/site-storage-view" &&
-        path != "/site-inventory-slot-tap" &&
-        path != "/site-context" &&
-        path != "/site-control")
-    {
-        send_response(client_socket_value, 404, "Not Found", "text/plain; charset=utf-8", "Unknown endpoint.");
-        return;
-    }
-
     std::string error {};
     if (command_callback_ == nullptr)
     {
@@ -282,7 +272,7 @@ void Gs1GodotDebugHttpServer::handle_client(std::uintptr_t client_socket_value)
 #endif
 }
 
-bool Gs1GodotDebugHttpServer::send_all(std::uintptr_t client_socket_value, std::string_view payload)
+bool DebugHttpServer::send_all(std::uintptr_t client_socket_value, std::string_view payload)
 {
 #if !defined(_WIN32)
     (void)client_socket_value;
@@ -308,7 +298,7 @@ bool Gs1GodotDebugHttpServer::send_all(std::uintptr_t client_socket_value, std::
 #endif
 }
 
-void Gs1GodotDebugHttpServer::send_response(
+void DebugHttpServer::send_response(
     std::uintptr_t client_socket_value,
     int status_code,
     const char* status_text,
@@ -325,3 +315,5 @@ void Gs1GodotDebugHttpServer::send_response(
 
     (void)send_all(client_socket_value, response.str());
 }
+
+}  // namespace shared_framework::godot

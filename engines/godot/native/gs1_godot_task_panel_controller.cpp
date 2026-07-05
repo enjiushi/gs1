@@ -4,7 +4,7 @@
 #include "godot_progression_resources.h"
 
 #include "content/defs/task_defs.h"
-#include "shared_framework/host/adapter_metadata_catalog.h"
+#include "gs1/host/adapter_metadata_catalog.h"
 
 #include <godot_cpp/classes/base_button.hpp>
 #include <godot_cpp/classes/node.hpp>
@@ -374,8 +374,8 @@ void Gs1GodotTaskPanelController::reconcile_modifier_rows()
             (modifier.flags & 1U) != 0
                 ? vformat("%dh left", static_cast<int>(modifier.remaining_game_hours))
                 : String("Permanent")));
-        const auto* metadata = shared_framework::host::adapter_metadata_catalog().find(
-            shared_framework::host::AdapterMetadataDomain::Modifier,
+        const auto* metadata = gs1::host::adapter_metadata_catalog().find(
+            gs1::host::AdapterMetadataDomain::Modifier,
             modifier.modifier_id);
         button->set_tooltip_text(
             metadata == nullptr || metadata->description.empty()
@@ -497,8 +497,8 @@ Gs1GodotTaskPanelController::modifier_ui_for(std::uint32_t modifier_id) const
     ModifierUiCacheEntry entry {};
     entry.icon_texture = load_cached_texture(
         GodotProgressionResourceDatabase::instance().modifier_icon_path(modifier_id));
-    const auto* metadata = shared_framework::host::adapter_metadata_catalog().find(
-        shared_framework::host::AdapterMetadataDomain::Modifier,
+    const auto* metadata = gs1::host::adapter_metadata_catalog().find(
+        gs1::host::AdapterMetadataDomain::Modifier,
         modifier_id);
     entry.label = metadata == nullptr || metadata->display_name.empty()
         ? vformat("Modifier %d", static_cast<int>(modifier_id))

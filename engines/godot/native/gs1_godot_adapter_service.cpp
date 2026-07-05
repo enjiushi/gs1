@@ -1,7 +1,8 @@
 #include "gs1_godot_adapter_service.h"
 #include "gs1_godot_notification_policy.h"
 
-#include "shared_framework/host/adapter_metadata_catalog.h"
+#include "gs1/host/adapter_metadata_catalog.h"
+#include "shared_framework/godot/adapter_config_loader.h"
 
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/variant/string.hpp>
@@ -416,9 +417,11 @@ void Gs1GodotAdapterService::ensure_runtime_started()
         refresh_project_config_root();
     }
 
-    adapter_config_ = shared_framework::host::load_adapter_config_blob(
-        project_config_root_,
-        globalize_res_path("res://gs1/godot_config"));
+    const shared_framework::godot::AdapterConfigBlob shared_adapter_config =
+        shared_framework::godot::load_adapter_config_blob(
+            project_config_root_,
+            globalize_res_path("res://gs1/godot_config"));
+    adapter_config_.json_utf8 = shared_adapter_config.json_utf8;
 
     notify_runtime_message_reset();
     reset_ui_session_state();
@@ -921,7 +924,7 @@ void Gs1GodotAdapterService::refresh_gameplay_dll_path()
 void Gs1GodotAdapterService::refresh_project_config_root()
 {
     project_config_root_ = std::filesystem::path {compute_default_project_config_root()};
-    shared_framework::host::load_adapter_metadata_catalog_from_project_root(project_config_root_);
+    gs1::host::load_adapter_metadata_catalog_from_project_root(project_config_root_);
 }
 
 std::string Gs1GodotAdapterService::compute_default_gameplay_dll_path() const

@@ -1,4 +1,4 @@
-#include "shared_framework/host/adapter_metadata_catalog.h"
+#include "gs1/host/adapter_metadata_catalog.h"
 
 #include "toml.hpp"
 
@@ -138,14 +138,14 @@ template <typename IntegerType>
     return std::nullopt;
 }
 
-[[nodiscard]] shared_framework::host::AdapterMetadataCatalog& mutable_catalog() noexcept
+[[nodiscard]] gs1::host::AdapterMetadataCatalog& mutable_catalog() noexcept
 {
-    static shared_framework::host::AdapterMetadataCatalog catalog {};
+    static gs1::host::AdapterMetadataCatalog catalog {};
     return catalog;
 }
 }  // namespace
 
-namespace shared_framework::host {
+namespace gs1::host {
 
 void AdapterMetadataCatalog::load_from_project_root(const std::filesystem::path& project_root)
 {
@@ -245,4 +245,4 @@ void load_adapter_metadata_catalog_from_project_root(const std::filesystem::path
     mutable_catalog().load_from_project_root(project_root);
 }
 
-}  // namespace shared_framework::host
+}  // namespace gs1::host
